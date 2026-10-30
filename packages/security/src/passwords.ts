@@ -43,8 +43,11 @@ export function loadNodeScrypt(): Promise<NodeScrypt | null> {
       // not Node
     }
     try {
-      const specifier = 'node:crypto';
-      const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ specifier)) as {
+      // Computed so bundlers neither inline nor trace it (Edge-runtime builds warn on literal `node:` imports).
+      const specifier = ['node', 'crypto'].join(':');
+      const mod = (await import(
+        /* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ specifier
+      )) as {
         scrypt?: NodeScrypt;
       };
       if (typeof mod.scrypt === 'function') return mod.scrypt;

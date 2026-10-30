@@ -231,6 +231,12 @@ describe('hypdriv doctor', () => {
     expect(byId['vercel.regions']?.status).toBe('warn');
     expect(byId['vercel.proxy-runtime']?.status).toBe('fail');
     expect(byId['vercel.function-size']?.status).toBe('skip');
+    // Vercel owns deployment ids and skew protection; cron jobs authenticate with CRON_SECRET there.
+    expect(byId['next.deployment-id']).toMatchObject({
+      status: 'pass',
+      message: expect.stringContaining('VERCEL_DEPLOYMENT_ID'),
+    });
+    expect(byId['security.internal-secret']?.status).toBe('skip');
     const fixed = await doctor(p.dir, ['--fix', '--only', 'vercel.crons'], { CRON_SECRET: 'x'.repeat(32) });
     expect(fixed.byId['vercel.crons']?.fixed).toBe(true);
     expect(JSON.parse(p.read('vercel.json')).crons).toEqual([

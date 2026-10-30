@@ -710,7 +710,9 @@ const rootCheck = checkObjectShape({
   vercel: checkObjectShape({
     cdn: boolOr(checkObjectShape({ downstream: checkBoolean })),
     globalConfig: boolOr(checkObjectShape({ connectionEnv: checkStringArray })),
-    redis: boolOr(checkObjectShape({ urlEnv: checkStringArray, tokenEnv: checkStringArray, prefix: checkString })),
+    redis: boolOr(
+      checkObjectShape({ urlEnv: checkStringArray, tokenEnv: checkStringArray, prefix: checkString }),
+    ),
     firewall: checkObjectShape({ rateLimitRules: recordOf(checkString) }),
     botId: boolOr(checkObjectShape({ checkLevel: checkEnum(['basic', 'deepAnalysis']) })),
     purge: checkObjectShape({ tokenEnv: checkString, teamIdEnv: checkString, projectIdEnv: checkString }),

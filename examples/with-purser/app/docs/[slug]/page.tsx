@@ -16,7 +16,7 @@ const docs = {
   },
   audit: {
     title: 'Zero-override audit',
-    body: 'Run pnpm preview, then pnpm audit:css. Every route is evaluated with Purser\'s strike-count script at 375, 768 and 1280 pixels, in light and dark, at rest, on hover and with keyboard focus. Any struck-through declaration fails the audit.',
+    body: "Run pnpm preview, then pnpm audit:css. Every route is evaluated with Purser's strike-count script at 375, 768 and 1280 pixels, in light and dark, at rest, on hover and with keyboard focus. Any struck-through declaration fails the audit.",
   },
 } as const;
 

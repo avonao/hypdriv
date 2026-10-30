@@ -5,6 +5,7 @@ export interface CacheAuditInput {
   /** Whether the manifest resolved an edge cache policy for the route. */
   hasPolicy: boolean;
   first: { status: number; headers: Headers };
+  /** The repeat visit (sent with the cookies the first response set, as a browser would). */
   second: { status: number; headers: Headers };
 }
 
@@ -22,14 +23,20 @@ export interface CacheAuditResult {
 
 const SERVED_FROM_CACHE = new Set(['HIT', 'STALE', 'REVALIDATED', 'ERROR-STALE', 'NEGATIVE', 'PRERENDER']);
 
+function token(value: string | null): string | null {
+  return value ? value.split(';')[0]!.trim().toUpperCase() : null;
+}
+
 /**
  * Cache status of a response: HypDriv's `x-hypdriv-cache`, else Vercel's CDN header `x-vercel-cache`
- * (`HIT`, `MISS`, `STALE`, `PRERENDER`, `REVALIDATED`, `BYPASS`).
+ * (`HIT`, `MISS`, `STALE`, `PRERENDER`, `REVALIDATED`, `BYPASS`). On Vercel HypDriv only plans the CDN's
+ * caching (`x-hypdriv-cache: CDN`), so Vercel's own status wins there.
  */
 export function cacheStatus(headers: Headers): string | null {
-  const raw = headers.get('x-hypdriv-cache') ?? headers.get('x-vercel-cache');
-  if (!raw) return null;
-  return raw.split(';')[0]!.trim().toUpperCase();
+  const hyp = token(headers.get('x-hypdriv-cache'));
+  const vercel = token(headers.get('x-vercel-cache'));
+  if (hyp === 'CDN') return vercel ?? 'CDN';
+  return hyp ?? vercel;
 }
 
 /** Checks two consecutive responses for the expected edge-cache behaviour. */
@@ -49,12 +56,32 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
       message:
         'no x-hypdriv-cache (or x-vercel-cache) header: HypDriv is not running in front of this server (or cache.edge.debugHeader is off)',
     });
-  } else if (input.hasPolicy) {
-    if (first && !['MISS', 'HIT', 'STALE', 'REVALIDATED', 'PRERENDER'].includes(first))
+  } else if (second === 'CDN') {
+    // Vercel CDN headers planned by HypDriv, served without Vercel's CDN in front (next start, vercel dev).
+    const cdn =
+      input.second.headers.get('vercel-cdn-cache-control') ?? input.second.headers.get('cdn-cache-control');
+    if (!cdn)
       findings.push({
-        level: 'warn',
-        message: `first request returned ${first} although the route has a policy`,
+        level: 'fail',
+        message: 'x-hypdriv-cache is CDN but no Vercel-CDN-Cache-Control header was sent',
       });
+    else
+      findings.push({
+        level: 'info',
+        message: `Vercel CDN headers present (${cdn}); hits show as x-vercel-cache on a deployment`,
+      });
+  } else if (input.hasPolicy) {
+    const firstSetCookie = input.first.headers.has('set-cookie');
+    if (first && !['MISS', 'HIT', 'STALE', 'REVALIDATED', 'PRERENDER', 'CDN'].includes(first))
+      findings.push(
+        first === 'BYPASS' && firstSetCookie
+          ? {
+              level: 'info',
+              message:
+                'the first visit sets a cookie (flags bucketing, session) and is not cached; repeat visits are',
+            }
+          : { level: 'warn', message: `first request returned ${first} although the route has a policy` },
+      );
     if (!second || !SERVED_FROM_CACHE.has(second))
       findings.push({
         level: 'fail',

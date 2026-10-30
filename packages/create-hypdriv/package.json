@@ -1,7 +1,7 @@
 {
   "name": "create-hypdriv",
   "version": "0.1.0",
-  "description": "Scaffold a Next.js 16 app on Cloudflare Workers with OpenNext and HypDriv (and optionally Purser CSS).",
+  "description": "Scaffold a Next.js 16 app with HypDriv on Cloudflare Workers (OpenNext) or Vercel, optionally styled with Purser CSS.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",
@@ -13,6 +13,7 @@
   },
   "files": [
     "dist",
+    "templates",
     "README.md",
     "LICENSE"
   ],
@@ -25,7 +26,9 @@
     "nextjs",
     "cloudflare",
     "workers",
-    "edge",
+    "vercel",
+    "create",
+    "scaffold",
     "hypdriv"
   ],
   "bin": {
@@ -33,14 +36,15 @@
   },
   "exports": {
     ".": {
-      "source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "source": "./src/api.ts",
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsdown",
+    "sync-templates": "node scripts/sync-templates.ts",
+    "build": "node scripts/sync-templates.ts && tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"

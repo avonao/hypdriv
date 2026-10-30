@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [{ "path": "/api/jobs/digest", "schedule": "0 9 * * 1" }],
+  "functions": {
+    "app/api/queues/emails/route.ts": {
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "transactional-email" }]
+    }
+  }
+}

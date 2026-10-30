@@ -129,7 +129,9 @@ describe('build-time configuration (env.HYPDRIV_IMAGES)', () => {
     process.env.HYPDRIV_IMAGES = JSON.stringify({ cdnCgi: true, quality: 82, basePath: '/shop' });
     resetInlinedImageConfig();
     expect(getImageLoaderConfig()).toEqual({ cdnCgi: true, quality: 82, basePath: '/shop' });
-    expect(cloudflareLoader({ src: '/a.png', width: 320 })).toBe('/cdn-cgi/image/width=320,quality=82,format=auto,fit=scale-down/a.png');
+    expect(cloudflareLoader({ src: '/a.png', width: 320 })).toBe(
+      '/cdn-cgi/image/width=320,quality=82,format=auto,fit=scale-down/a.png',
+    );
     configureImageLoader({ cdnCgi: false });
     expect(getImageLoaderConfig()).toMatchObject({ cdnCgi: false, quality: 82 });
   });

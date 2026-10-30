@@ -108,6 +108,14 @@ export interface BudgetResult {
 export interface HypManifest {
   version: typeof MANIFEST_VERSION;
   buildId: string;
+  /**
+   * Content fingerprint of the build output: Next's build id plus every route's client assets
+   * (content-hashed file names), CSP hashes of prerendered HTML and HypDriv's inline-script hashes. Next.js
+   * derives deterministic build ids from the deployment id, so two different outputs of the same commit can
+   * share a `buildId`; edge-cache keys use this fingerprint (`cacheVersion()`) so a rebuild never serves
+   * HTML that references another build's chunks or hashes.
+   */
+  fingerprint?: string;
   deploymentId?: string;
   nextVersion: string;
   hypdrivVersion: string;
@@ -171,4 +179,9 @@ export function assertManifest(value: unknown): asserts value is HypManifest {
     );
   if (!Array.isArray(m.routes)) throw new TypeError('manifest.routes must be an array');
   if (typeof m.buildId !== 'string') throw new TypeError('manifest.buildId must be a string');
+}
+
+/** The build identity edge-cache keys are scoped to: the content fingerprint, else the build id. */
+export function cacheVersion(manifest: Pick<HypManifest, 'buildId' | 'fingerprint'>): string {
+  return manifest.fingerprint ?? manifest.buildId;
 }

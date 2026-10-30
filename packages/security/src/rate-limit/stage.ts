@@ -12,6 +12,7 @@ import {
   stateKey,
   text,
 } from '@hypdriv/core';
+import { verifiedAudit } from '../audit-token';
 import { RATE_LIMIT_KEY, type RateLimitStateEntry } from '../keys';
 import { rateLimitHeaders } from './headers';
 import type { RateLimiter, RateLimitResult } from './types';
@@ -106,6 +107,11 @@ export function rateLimitStage(config: ResolvedConfig, limiter: RateLimiter): St
     name: 'rate-limit',
     async pre(ctx) {
       if (!policies.length) return;
+      // Signed owner audits (`hypdriv audit|bench|warm`) are not throttled.
+      if (await verifiedAudit(ctx, config)) {
+        ctx.timings.mark('limit', 'audit');
+        return;
+      }
       const now = Date.now();
       const entries: RateLimitStateEntry[] = [];
       let tightest: Pending | null = null;

@@ -19,8 +19,8 @@ import {
   type SecretsScanner,
 } from './build-manifest';
 import { createNodeFs } from './fs';
-import { mirrorAllScopedArtifacts } from './scoped-artifacts';
 import { renderReport } from './report';
+import { mirrorAllScopedArtifacts } from './scoped-artifacts';
 import type {
   AdapterNextConfig,
   ModifyConfigContext,
@@ -255,7 +255,10 @@ export function createAdapter(options: CreateAdapterOptions = {}): NextAdapterLi
       // OpenNext and Vercel's legacy builder read (see scoped-artifacts.ts).
       if (options.mirrorScopedArtifacts ?? !b) {
         const { copied } = mirrorAllScopedArtifacts(ctx.distDir);
-        if (copied) log.info(`hypdriv: restored ${copied} prerendered file(s) to the classic .next/server layout for deployment tooling`);
+        if (copied)
+          log.info(
+            `hypdriv: restored ${copied} prerendered file(s) to the classic .next/server layout for deployment tooling`,
+          );
       }
       const config = await resolveHypConfig(ctx.projectDir, options.config, log);
       const purser = options.purser === null ? null : (options.purser ?? (await defaultPurserVerifier()));
@@ -297,7 +300,10 @@ export function createAdapter(options: CreateAdapterOptions = {}): NextAdapterLi
 export function withExtraAssets(ctx: OnBuildCompleteContext, files: string[]): OnBuildCompleteContext {
   const root = ctx.repoRoot ?? ctx.projectDir;
   const extra = Object.fromEntries(files.map((file) => [relative(root, file).split('\\').join('/'), file]));
-  const add = <T extends { assets: Record<string, string> }>(output: T): T => ({ ...output, assets: { ...output.assets, ...extra } });
+  const add = <T extends { assets: Record<string, string> }>(output: T): T => ({
+    ...output,
+    assets: { ...output.assets, ...extra },
+  });
   const outputs = ctx.outputs;
   return {
     ...ctx,
@@ -321,7 +327,9 @@ export function addToServerTraces(distDir: string, files: string[]): number {
   const serverDir = join(distDir, 'server');
   if (!existsSync(serverDir)) return 0;
   const fsx = createNodeFs();
-  const traces = fsx.listFiles(serverDir).filter((f) => f.endsWith('.js.nft.json') && !f.includes(`${join(serverDir, 'chunks')}`));
+  const traces = fsx
+    .listFiles(serverDir)
+    .filter((f) => f.endsWith('.js.nft.json') && !f.includes(`${join(serverDir, 'chunks')}`));
   let changed = 0;
   for (const trace of traces) {
     try {

@@ -50,6 +50,7 @@
     "@hypdriv/security": "workspace:*"
   },
   "devDependencies": {
+    "@hypdriv/flags": "workspace:*",
     "@hypdriv/testing": "workspace:*",
     "@types/node": "catalog:",
     "tsdown": "catalog:",

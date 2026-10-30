@@ -29,7 +29,12 @@ export class HypDrivIndex extends DurableObject {
     this.init();
     const expires = now + Math.max(60, ttlSeconds) * 1000;
     for (const tag of tags) {
-      this.ctx.storage.sql.exec('INSERT OR REPLACE INTO tag_keys (tag, key, expires) VALUES (?, ?, ?)', tag, key, expires);
+      this.ctx.storage.sql.exec(
+        'INSERT OR REPLACE INTO tag_keys (tag, key, expires) VALUES (?, ?, ?)',
+        tag,
+        key,
+        expires,
+      );
     }
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null) await this.ctx.storage.setAlarm(now + 10 * 60 * 1000);
@@ -40,7 +45,13 @@ export class HypDrivIndex extends DurableObject {
     this.init();
     if (!tags.length) return [];
     const placeholders = tags.map(() => '?').join(',');
-    const rows = this.ctx.storage.sql.exec<{ key: string }>(`SELECT DISTINCT key FROM tag_keys WHERE tag IN (${placeholders}) AND expires > ?`, ...tags, now).toArray();
+    const rows = this.ctx.storage.sql
+      .exec<{ key: string }>(
+        `SELECT DISTINCT key FROM tag_keys WHERE tag IN (${placeholders}) AND expires > ?`,
+        ...tags,
+        now,
+      )
+      .toArray();
     return rows.map((r) => r.key);
   }
 
@@ -52,7 +63,10 @@ export class HypDrivIndex extends DurableObject {
     for (let i = 0; i < keys.length; i += 100) {
       const chunk = keys.slice(i, i + 100);
       const placeholders = chunk.map(() => '?').join(',');
-      removed += this.ctx.storage.sql.exec(`DELETE FROM tag_keys WHERE key IN (${placeholders})`, ...chunk).rowsWritten;
+      removed += this.ctx.storage.sql.exec(
+        `DELETE FROM tag_keys WHERE key IN (${placeholders})`,
+        ...chunk,
+      ).rowsWritten;
     }
     return removed;
   }
@@ -62,13 +76,16 @@ export class HypDrivIndex extends DurableObject {
     this.init();
     if (!tags.length) return 0;
     const placeholders = tags.map(() => '?').join(',');
-    return this.ctx.storage.sql.exec(`DELETE FROM tag_keys WHERE tag IN (${placeholders})`, ...tags).rowsWritten;
+    return this.ctx.storage.sql.exec(`DELETE FROM tag_keys WHERE tag IN (${placeholders})`, ...tags)
+      .rowsWritten;
   }
 
   async stats(): Promise<{ associations: number; tags: number }> {
     this.init();
     const a = this.ctx.storage.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM tag_keys').one().n;
-    const t = this.ctx.storage.sql.exec<{ n: number }>('SELECT COUNT(DISTINCT tag) AS n FROM tag_keys').one().n;
+    const t = this.ctx.storage.sql
+      .exec<{ n: number }>('SELECT COUNT(DISTINCT tag) AS n FROM tag_keys')
+      .one().n;
     return { associations: a, tags: t };
   }
 

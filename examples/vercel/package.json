@@ -1,0 +1,32 @@
+{
+  "name": "@hypdriv/example-vercel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:vercel": "vercel build",
+    "deploy": "vercel deploy --prebuilt",
+    "hypdriv:doctor": "hypdriv doctor --platform vercel",
+    "hypdriv:analyze": "hypdriv analyze --platform vercel",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/queue": "^0.10.0",
+    "hypdriv": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "babel-plugin-react-compiler": "catalog:",
+    "typescript": "catalog:"
+  }
+}

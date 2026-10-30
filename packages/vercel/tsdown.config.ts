@@ -8,7 +8,7 @@ export default defineConfig({
   platform: 'neutral',
   target: 'es2023',
   // Workspace packages stay external: the application installs them next to this package.
-  external: [/^node:/, /^@hypdriv\//],
+  deps: { neverBundle: [/^node:/, /^@hypdriv\//] },
   dts: true,
   sourcemap: true,
   clean: true,

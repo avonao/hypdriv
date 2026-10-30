@@ -10,7 +10,17 @@ pnpm preview      # opennextjs-cloudflare build && opennextjs-cloudflare preview
 pnpm deploy       # opennextjs-cloudflare build && opennextjs-cloudflare deploy
 ```
 
-Add `--purser` to scaffold the Purser CSS integration as well.
+Add `--purser` to scaffold the Purser CSS integration as well. For Vercel:
+
+```sh
+npm create hypdriv@latest my-app -- --platform vercel --pm pnpm
+cd my-app
+pnpm dev          # next dev (proxy.ts runs the HypDriv stages)
+pnpm build        # next build (withHypDriv emits the Vercel CDN route headers)
+vercel deploy
+```
+
+The scaffolder generates local secrets (`.dev.vars` on Cloudflare, `.env.local` on Vercel), names the Worker and its resources after the project, and initialises git. See [`create-hypdriv`](../../packages/create-hypdriv/README.md) for every option.
 
 ## Existing project on OpenNext Cloudflare
 
@@ -31,9 +41,18 @@ npx hypdriv init
 
 Every file it touches is backed up as `<name>.hypdriv.bak` first. Run it again at any time; it is idempotent.
 
-## Existing project that is not on Cloudflare yet
+## Existing project on Vercel
 
-Run `npx @opennextjs/cloudflare migrate` first (it configures OpenNext), then `npx hypdriv init`. Alternatively use HypDriv without Cloudflare: `withHypDriv()` and `createProxy()` work on `next start` and on other hosts; the Worker-only capabilities (edge cache, nonce injection for cached HTML, live channels, scheduled handlers) are simply reported as unavailable by `hypdriv doctor`.
+```sh
+pnpm add hypdriv
+npx hypdriv init --platform vercel
+```
+
+The same steps without the Worker entry: `proxy.ts` runs the stages in Routing Middleware and wires the Vercel CDN, Upstash / Global Config stores and Vercel purges automatically; `vercel.json#crons` is kept in sync with `jobs.cron`. See the [Vercel guide](vercel.md).
+
+## Existing project on another host
+
+To move to Cloudflare, run `npx @opennextjs/cloudflare migrate` first (it configures OpenNext), then `npx hypdriv init`. HypDriv also runs on any Node host (`next start`, containers): `withHypDriv()` and `createProxy()` work there, and the Worker-only capabilities (edge cache storage, nonce injection for cached HTML, live channels over Durable Objects, scheduled handlers) are reported as unavailable by `hypdriv doctor --platform node`.
 
 ## Verify
 
@@ -52,15 +71,16 @@ Open the site in development and press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</k
 | Variable | Used by | Required |
 | --- | --- | --- |
 | `HYPDRIV_SESSION_SECRET` | encrypted sessions, CSRF tokens | when you use sessions/CSRF |
-| `HYPDRIV_INTERNAL_SECRET` | signed cron/queue → Route Handler requests | when you use jobs |
+| `HYPDRIV_INTERNAL_SECRET` | signed cron/queue → Route Handler requests, `hypdriv jobs run`, audit tokens | when you use jobs |
+| `CRON_SECRET` | Vercel Cron → job routes | on Vercel with crons |
 | `CACHE_PURGE_ZONE_ID`, `CACHE_PURGE_API_TOKEN` | zone-level purge on `revalidateTag` | optional |
 | `TURNSTILE_SECRET_KEY` | bot challenges | optional |
 | `OTLP_HEADERS` (or the name you configure) | OTLP exporter authentication | optional |
 
-Set them with `wrangler secret put <NAME>` for production and in `.dev.vars` for `wrangler dev`.
+Set them with `wrangler secret put <NAME>` for production and in `.dev.vars` for `wrangler dev` on Cloudflare; with `vercel env add <NAME>` and in `.env.local` on Vercel.
 
 ## Next steps
 
 - [Configuration reference](configuration.md)
-- [Cloudflare bindings and what each unlocks](cloudflare.md)
+- [Cloudflare bindings and what each unlocks](cloudflare.md) · [Vercel services and what each unlocks](vercel.md)
 - [Caching](caching.md) · [Security](security.md) · [Observability](observability.md) · [Purser CSS](purser.md)

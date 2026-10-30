@@ -1,4 +1,5 @@
 import { base64UrlEncode, HEADER, hmacSign, sha256Hex, timingSafeEqual } from '@hypdriv/core';
+import { signAuditToken, verifyAuditToken } from './audit-token';
 
 async function mac(secret: string, data: string): Promise<string> {
   return base64UrlEncode(await hmacSign(secret, data));
@@ -137,5 +138,7 @@ export const signing = {
   verifyValue,
   signInternalRequest,
   verifyInternalRequest,
+  signAuditToken,
+  verifyAuditToken,
   canonicalUrl,
 };

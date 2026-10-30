@@ -8,7 +8,7 @@ export default defineConfig({
   format: ['esm'],
   platform: 'neutral',
   target: 'es2023',
-  external: [/^node:/],
+  deps: { neverBundle: [/^node:/] },
   dts: true,
   sourcemap: true,
   clean: true,

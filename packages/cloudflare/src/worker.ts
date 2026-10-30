@@ -1,31 +1,42 @@
-import { UPSTREAM_KEY, createKvTagIndex, registerEdgePurger } from '@hypdriv/cache';
+import { createKvTagIndex, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
 import {
-  HEADER,
-  type HypContext,
-  type HypDrivConfig,
-  type HypDrivEnv,
-  type HypManifest,
-  type KVNamespaceLike,
-  type ResolvedConfig,
-  type Stage,
   assertManifest,
   clientIp,
   createContext,
   detectCapabilities,
   emptyManifest,
   getCf,
+  HEADER,
+  type HypContext,
+  type HypDrivConfig,
+  type HypDrivEnv,
+  type HypManifest,
+  isResolvedConfig,
+  type KVNamespaceLike,
   loadConfig,
   looksLikeStaticAsset,
   nodeEnvironment,
   orderStages,
+  type ResolvedConfig,
   runPipeline,
+  type Stage,
   sanitizeInboundRequest,
 } from '@hypdriv/core';
-import { type Platform, buildDefaultStages, createPlatform } from '@hypdriv/next/stages';
+import { buildDefaultStages, createPlatform, type Platform } from '@hypdriv/next/stages';
 import { runWithHypContext } from './context';
 import { edgeStages } from './edge-stages';
-import { type DispatchContext, type EmailMessageLike, type MessageBatchLike, type ScheduledEventLike, type TailEventLike, dispatchEmail, dispatchQueue, dispatchScheduled, forwardTail } from './handlers';
 import { cloudflareGeo } from './geo';
+import {
+  type DispatchContext,
+  dispatchEmail,
+  dispatchQueue,
+  dispatchScheduled,
+  type EmailMessageLike,
+  forwardTail,
+  type MessageBatchLike,
+  type ScheduledEventLike,
+  type TailEventLike,
+} from './handlers';
 import { internalRoutes } from './internal-routes';
 import { createDoCounterStore, createDoTagIndex } from './stores';
 
@@ -73,13 +84,16 @@ interface Runtime {
 }
 
 function isResolved(config: HypDrivConfig | ResolvedConfig): config is ResolvedConfig {
-  return 'stages' in config && Array.isArray((config as ResolvedConfig).stages?.disable) && typeof (config as ResolvedConfig).site?.name === 'string';
+  return isResolvedConfig(config);
 }
 
 async function loadManifest(source: CreateWorkerOptions['manifest']): Promise<HypManifest> {
   try {
     const loaded = typeof source === 'function' ? await source() : source;
-    const manifest = loaded && 'default' in (loaded as { default?: unknown }) ? (loaded as { default: HypManifest }).default : (loaded as HypManifest | undefined);
+    const manifest =
+      loaded && 'default' in (loaded as { default?: unknown })
+        ? (loaded as { default: HypManifest }).default
+        : (loaded as HypManifest | undefined);
     if (!manifest) return emptyManifest();
     assertManifest(manifest);
     return manifest;
@@ -90,7 +104,12 @@ async function loadManifest(source: CreateWorkerOptions['manifest']): Promise<Hy
 }
 
 function isLocalHost(hostname: string): boolean {
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname.endsWith('.localhost');
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  );
 }
 
 /**
@@ -110,20 +129,41 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
 
   const buildRuntime = async (env: HypDrivEnv, request?: Request): Promise<Runtime> => {
     const manifest = await loadManifest(options.manifest);
-    const development = options.development ?? (nodeEnvironment(env as Record<string, unknown>) === 'development' || (request ? isLocalHost(new URL(request.url).hostname) : false));
+    const development =
+      options.development ??
+      (nodeEnvironment(env as Record<string, unknown>) === 'development' ||
+        (request ? isLocalHost(new URL(request.url).hostname) : false));
     const caps = detectCapabilities(env as Record<string, unknown>, resolved, { cf: true, waitUntil: true });
     const b = resolved.cloudflare.bindings;
     const overrides: NonNullable<Parameters<typeof createPlatform>[0]['overrides']> = { capabilities: caps };
-    if (caps.limiter) overrides.counterStores = { 'durable-object': createDoCounterStore(env[b.limiter] as never) };
+    if (caps.limiter)
+      overrides.counterStores = { 'durable-object': createDoCounterStore(env[b.limiter] as never) };
     if (caps.tagIndex) overrides.tagIndex = createDoTagIndex(env[b.tagIndex] as never);
     else if (caps.kv) overrides.tagIndex = createKvTagIndex(env[b.kv] as KVNamespaceLike);
-    const platform = createPlatform({ config: resolved, manifest, env, runner: 'worker', development, overrides });
+    const platform = createPlatform({
+      config: resolved,
+      manifest,
+      env,
+      runner: 'worker',
+      development,
+      overrides,
+    });
     const defaults = [...buildDefaultStages(platform), ...edgeStages(resolved)];
-    const list = typeof options.stages === 'function' ? options.stages(defaults, platform) : (options.stages ?? defaults);
+    const list =
+      typeof options.stages === 'function'
+        ? options.stages(defaults, platform)
+        : (options.stages ?? defaults);
     const stages = orderStages(list, { order: resolved.stages.order, disable: resolved.stages.disable });
     if (platform.edgeCache) registerEdgePurger(platform.edgeCache);
-    const internal = internalRoutes(platform, { devEndpoints: development, ...(options.devState ? { devState: options.devState } : {}) });
-    platform.log.info('hypdriv worker ready', { build: manifest.buildId, routes: manifest.routes.length, stages: stages.map((s) => s.name) });
+    const internal = internalRoutes(platform, {
+      devEndpoints: development,
+      ...(options.devState ? { devState: options.devState } : {}),
+    });
+    platform.log.info('hypdriv worker ready', {
+      build: manifest.buildId,
+      routes: manifest.routes.length,
+      stages: stages.map((s) => s.name),
+    });
     return { platform, stages, internal, development };
   };
 
@@ -140,30 +180,59 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
 
   const errorResponse = async (error: Error, request: Request, ctx: HypContext | null): Promise<Response> => {
     if (options.onError) return options.onError(error, request, ctx);
-    const body = { error: 'internal_error', requestId: ctx?.id ?? null, message: ctx?.development ? error.message : undefined };
-    return new Response(JSON.stringify(body), { status: 500, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(ctx ? { [HEADER.requestId]: ctx.id, [HEADER.hypRequestId]: ctx.id } : {}) } });
+    const body = {
+      error: 'internal_error',
+      requestId: ctx?.id ?? null,
+      message: ctx?.development ? error.message : undefined,
+    };
+    return new Response(JSON.stringify(body), {
+      status: 500,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        ...(ctx ? { [HEADER.requestId]: ctx.id, [HEADER.hypRequestId]: ctx.id } : {}),
+      },
+    });
   };
 
-  const invokeNext = async (request: Request, env: HypDrivEnv, exec: ExecutionContextLike): Promise<Response> => {
+  const invokeNext = async (
+    request: Request,
+    env: HypDrivEnv,
+    exec: ExecutionContextLike,
+  ): Promise<Response> => {
     const mod = await loadNext();
     return mod.default.fetch(request, env, exec);
   };
 
-  const fetchHandler = async (incoming: Request, env: HypDrivEnv, exec: ExecutionContextLike): Promise<Response> => {
+  const fetchHandler = async (
+    incoming: Request,
+    env: HypDrivEnv,
+    exec: ExecutionContextLike,
+  ): Promise<Response> => {
     const runtime = await getRuntime(env, incoming);
     // Client-supplied x-hypdriv-* / nonce / x-middleware-* headers must never reach the stages or Next.js.
-    const request = sanitizeInboundRequest(incoming, { nonceHeader: runtime.platform.config.security.csp?.nonceHeader ?? HEADER.nonce });
+    const request = sanitizeInboundRequest(incoming, {
+      nonceHeader: runtime.platform.config.security.csp?.nonceHeader ?? HEADER.nonce,
+    });
     const { platform, stages, internal } = runtime;
     const url = new URL(request.url);
     const cf = getCf(request);
     const ip = clientIp(request.headers, platform.config.security.trustedProxies);
     const country = typeof cf?.country === 'string' ? cf.country : undefined;
 
-    const handled = await internal(request, { ip, ...(country ? { country } : {}), waitUntil: (p) => exec.waitUntil(p) });
+    const handled = await internal(request, {
+      ip,
+      ...(country ? { country } : {}),
+      waitUntil: (p) => exec.waitUntil(p),
+    });
     if (handled) return handled;
 
     // Static assets are normally served before the Worker; when they do arrive (run_worker_first), skip the pipeline.
-    if (platform.config.cloudflare.skipStaticAssets && (url.pathname.startsWith('/_next/static/') || (looksLikeStaticAsset(url.pathname) && !url.pathname.startsWith('/api/')))) {
+    if (
+      platform.config.cloudflare.skipStaticAssets &&
+      (url.pathname.startsWith('/_next/static/') ||
+        (looksLikeStaticAsset(url.pathname) && !url.pathname.startsWith('/api/')))
+    ) {
       return invokeNext(request, env, exec);
     }
 
@@ -192,14 +261,23 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
           ctx,
           next: (forwarded) => ctx.state.get(UPSTREAM_KEY)!(forwarded),
           onStageError: (error, stage, phase) => {
-            platform.log.error('stage failed', { stage: stage.name, phase, error: error.message, requestId: ctx.id });
+            platform.log.error('stage failed', {
+              stage: stage.name,
+              phase,
+              error: error.message,
+              requestId: ctx.id,
+            });
             return 'continue';
           },
         }),
       );
       return response;
     } catch (err) {
-      platform.log.error('request failed', { requestId: ctx.id, path: url.pathname, error: (err as Error).message });
+      platform.log.error('request failed', {
+        requestId: ctx.id,
+        path: url.pathname,
+        error: (err as Error).message,
+      });
       // stale-if-error: answer with a cached copy when the policy allows it.
       const stale = platform.edgeCache?.recover(ctx);
       if (stale) return stale;
@@ -207,7 +285,11 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
     }
   };
 
-  const dispatchContext = (runtime: Runtime, env: HypDrivEnv, exec: ExecutionContextLike): DispatchContext => ({
+  const dispatchContext = (
+    runtime: Runtime,
+    env: HypDrivEnv,
+    exec: ExecutionContextLike,
+  ): DispatchContext => ({
     config: runtime.platform.config,
     env,
     log: runtime.platform.log,

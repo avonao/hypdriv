@@ -28,7 +28,10 @@ function memoryIndex() {
 
 describe('callDurableObject', () => {
   it('prefers RPC methods on the stub', async () => {
-    const ns = createFakeDurableObjectNamespace(() => ({ fetch: () => new Response('no'), double: async (n: number) => n * 2 }));
+    const ns = createFakeDurableObjectNamespace(() => ({
+      fetch: () => new Response('no'),
+      double: async (n: number) => n * 2,
+    }));
     expect(await callDurableObject<number>(ns, 'a', 'double', [21])).toBe(42);
     expect(ns.fetches).toHaveLength(0);
   });
@@ -45,8 +48,12 @@ describe('callDurableObject', () => {
   });
 
   it('throws on transport errors', async () => {
-    const ns = createFakeDurableObjectNamespace(() => ({ fetch: () => new Response('bad', { status: 500 }) }));
-    await expect(callDurableObject(ns, 'c', 'missing', [])).rejects.toThrow('durable object missing failed: 500');
+    const ns = createFakeDurableObjectNamespace(() => ({
+      fetch: () => new Response('bad', { status: 500 }),
+    }));
+    await expect(callDurableObject(ns, 'c', 'missing', [])).rejects.toThrow(
+      'durable object missing failed: 500',
+    );
   });
 });
 
@@ -79,16 +86,35 @@ describe('createDoCounterStore / createDoLock', () => {
     const calls: Array<{ name: string | undefined; op: string; args: unknown[] }> = [];
     const ns = createFakeDurableObjectNamespace((id) => ({
       fetch: () => new Response('rpc only', { status: 405 }),
-      increment: async (...args: unknown[]) => (calls.push({ name: id.name, op: 'increment', args }), { count: 1, resetAt: 60_000 }),
-      slidingCount: async (...args: unknown[]) => (calls.push({ name: id.name, op: 'slidingCount', args }), { count: 2, resetAt: 60_000 }),
-      takeToken: async (...args: unknown[]) => (calls.push({ name: id.name, op: 'takeToken', args }), { allowed: true, remaining: 4, resetAt: 1 }),
-      lock: async (...args: unknown[]) => (calls.push({ name: id.name, op: 'lock', args }), { acquired: true, holder: 'h1', expiresAt: 5 }),
-      unlock: async (...args: unknown[]) => (calls.push({ name: id.name, op: 'unlock', args }), true),
+      increment: async (...args: unknown[]) => {
+        calls.push({ name: id.name, op: 'increment', args });
+        return { count: 1, resetAt: 60_000 };
+      },
+      slidingCount: async (...args: unknown[]) => {
+        calls.push({ name: id.name, op: 'slidingCount', args });
+        return { count: 2, resetAt: 60_000 };
+      },
+      takeToken: async (...args: unknown[]) => {
+        calls.push({ name: id.name, op: 'takeToken', args });
+        return { allowed: true, remaining: 4, resetAt: 1 };
+      },
+      lock: async (...args: unknown[]) => {
+        calls.push({ name: id.name, op: 'lock', args });
+        return { acquired: true, holder: 'h1', expiresAt: 5 };
+      },
+      unlock: async (...args: unknown[]) => {
+        calls.push({ name: id.name, op: 'unlock', args });
+        return true;
+      },
     }));
     const store = createDoCounterStore(ns);
     expect(await store.increment('rl:api:1.2.3.4', 60, 1000)).toEqual({ count: 1, resetAt: 60_000 });
     expect(await store.slidingCount!('rl:api:1.2.3.4', 60, 1000)).toEqual({ count: 2, resetAt: 60_000 });
-    expect(await store.takeToken!('rl:burst', 5, 1, 1000)).toEqual({ allowed: true, remaining: 4, resetAt: 1 });
+    expect(await store.takeToken!('rl:burst', 5, 1, 1000)).toEqual({
+      allowed: true,
+      remaining: 4,
+      resetAt: 1,
+    });
     const lock = createDoLock(ns);
     expect(await lock.acquire('render:/', 'h1', 5000)).toMatchObject({ acquired: true });
     expect(await lock.release('render:/', 'h1')).toBe(true);

@@ -187,6 +187,8 @@ export const HEADER = {
   cspMode: 'x-hypdriv-csp',
   internalSignature: 'x-hypdriv-signature',
   internalTimestamp: 'x-hypdriv-timestamp',
+  /** Short-lived HMAC token that identifies the owner's own audit/benchmark tooling (`hypdriv audit`). */
+  auditToken: 'x-hypdriv-audit',
   skew: 'x-hypdriv-skew',
   deploymentId: 'x-deployment-id',
   runner: 'x-hypdriv-runner',

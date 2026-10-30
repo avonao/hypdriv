@@ -271,12 +271,14 @@ describe('createCdpClient', () => {
 
 interface FakeDevToolsOptions {
   navigateError?: string;
+  /** HTTP status reported by the navigation-timing script. */
+  status?: number;
   strike?: (state: { navigations: number; hovered: boolean; focused: boolean }) => Record<string, unknown>;
 }
 
 function fakeDevTools(options: FakeDevToolsOptions = {}) {
   const log: Array<{ method: string; params: Record<string, unknown>; sessionId?: string }> = [];
-  const state = { navigations: 0, hovered: false, focused: false, themes: [] as string[] };
+  const state = { navigations: 0, hovered: false, focused: false, themes: [] as string[], fetch: false };
   const connect: CdpConnect = async () => {
     let onMessage: (data: string) => void = () => {};
     let onClose: (reason?: string) => void = () => {};
@@ -304,6 +306,20 @@ function fakeDevTools(options: FakeDevToolsOptions = {}) {
             state.focused = false;
             if (options.navigateError) return reply({ frameId: 'F', errorText: options.navigateError });
             reply({ frameId: 'F', loaderId: 'L' });
+            if (state.fetch)
+              for (const [i, url] of [String(msg.params.url), 'https://cdn.third-party.test/x.js'].entries())
+                queueMicrotask(() =>
+                  onMessage(
+                    JSON.stringify({
+                      method: 'Fetch.requestPaused',
+                      params: {
+                        requestId: `R${state.navigations}-${i}`,
+                        request: { url, headers: { 'User-Agent': 'HeadlessChrome', Accept: 'text/html' } },
+                      },
+                      sessionId: 'S1',
+                    }),
+                  ),
+                );
             setTimeout(
               () =>
                 onMessage(
@@ -319,10 +335,14 @@ function fakeDevTools(options: FakeDevToolsOptions = {}) {
           case 'Input.dispatchMouseEvent':
             state.hovered = true;
             return reply({});
+          case 'Fetch.enable':
+            state.fetch = true;
+            return reply({});
           case 'Runtime.evaluate': {
             const expr = String(msg.params.expression);
             let value: unknown;
-            if (expr.includes('purserStrikeCount')) {
+            if (expr.includes('getEntriesByType("navigation")')) value = options.status ?? 200;
+            else if (expr.includes('purserStrikeCount')) {
               value = JSON.stringify(
                 options.strike?.(state) ?? { count: 0, struck: [], rules: 3, skipped: [] },
               );
@@ -487,6 +507,110 @@ describe('auditOverrides', () => {
       error: 'navigation failed: net::ERR_CONNECTION_REFUSED',
     });
     expect(launcher2.calls.closed).toBe(1);
+  });
+
+  it('adds extra headers to requests for the audited origins only', async () => {
+    const devtools = fakeDevTools();
+    const launcher = fakeLauncher();
+    const report = await auditOverrides({
+      urls: ['http://a.test/', 'http://a.test/blog'],
+      widths: [800],
+      states: ['default'],
+      chromePath: process.execPath,
+      strikeScript: STRIKE_STUB,
+      launch: launcher.launch,
+      connect: devtools.connect,
+      headers: { 'x-hypdriv-audit': 'v1.1.sig' },
+    });
+    expect(report.ok).toBe(true);
+    const enable = devtools.log.find((l) => l.method === 'Fetch.enable');
+    expect(enable?.params).toEqual({
+      patterns: [{ urlPattern: 'http://a.test/*', requestStage: 'Request' }],
+    });
+    expect(enable?.sessionId).toBe('S1');
+    await new Promise((r) => setTimeout(r, 5));
+    const continued = devtools.log.filter((l) => l.method === 'Fetch.continueRequest');
+    // The fake pauses every request (the real pattern would not match the third-party one); the
+    // handler still adds the token, so Chrome's pattern scoping is what keeps it first-party.
+    expect(continued.length).toBeGreaterThanOrEqual(2);
+    expect(continued[0]!.params).toEqual({
+      requestId: 'R1-0',
+      headers: [
+        { name: 'user-agent', value: 'HeadlessChrome' },
+        { name: 'accept', value: 'text/html' },
+        { name: 'x-hypdriv-audit', value: 'v1.1.sig' },
+      ],
+    });
+  });
+
+  it('does not enable interception without extra headers', async () => {
+    const devtools = fakeDevTools();
+    await auditOverrides({
+      urls: ['http://a.test/'],
+      widths: [800],
+      states: ['default'],
+      chromePath: process.execPath,
+      strikeScript: STRIKE_STUB,
+      launch: fakeLauncher().launch,
+      connect: devtools.connect,
+    });
+    expect(devtools.log.some((l) => l.method.startsWith('Fetch.'))).toBe(false);
+  });
+
+  it('fails pages served with an error status instead of auditing the error page', async () => {
+    const devtools = fakeDevTools({ status: 403 });
+    const report = await auditOverrides({
+      urls: ['http://a.test/'],
+      widths: [800],
+      states: ['default', 'hover'],
+      chromePath: process.execPath,
+      strikeScript: STRIKE_STUB,
+      launch: fakeLauncher().launch,
+      connect: devtools.connect,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.pages).toHaveLength(2);
+    expect(report.pages.every((p) => p.error === 'HTTP 403' && p.count === -1)).toBe(true);
+    expect(devtools.log.some((l) => String(l.params.expression ?? '').includes('purserStrikeCount'))).toBe(
+      false,
+    );
+  });
+
+  it('fails pages where no author rule could be evaluated', async () => {
+    const devtools = fakeDevTools({
+      strike: () => ({
+        count: 0,
+        struck: [],
+        rules: 0,
+        skipped: ['cross-origin stylesheet https://cdn.test/a.css'],
+      }),
+    });
+    const report = await auditOverrides({
+      urls: ['http://a.test/'],
+      widths: [800],
+      states: ['default'],
+      chromePath: process.execPath,
+      strikeScript: STRIKE_STUB,
+      launch: fakeLauncher().launch,
+      connect: devtools.connect,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.pages[0]).toMatchObject({
+      count: -1,
+      rules: 0,
+      error: 'no author CSS rules could be evaluated (cross-origin stylesheet https://cdn.test/a.css)',
+    });
+    const empty = fakeDevTools({ strike: () => ({ count: 0, struck: [], rules: 0, skipped: [] }) });
+    const second = await auditOverrides({
+      urls: ['http://a.test/'],
+      widths: [800],
+      states: ['default'],
+      chromePath: process.execPath,
+      strikeScript: STRIKE_STUB,
+      launch: fakeLauncher().launch,
+      connect: empty.connect,
+    });
+    expect(second.pages[0]!.error).toBe('no author CSS rules could be evaluated (no stylesheet loaded)');
   });
 
   it('closes Chrome when the connection fails', async () => {

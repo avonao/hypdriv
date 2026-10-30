@@ -6,7 +6,10 @@
 export interface KVNamespaceLike {
   get(key: string, options?: { type?: 'text'; cacheTtl?: number } | 'text'): Promise<string | null>;
   get(key: string, options: { type: 'json'; cacheTtl?: number } | 'json'): Promise<unknown>;
-  get(key: string, options: { type: 'arrayBuffer'; cacheTtl?: number } | 'arrayBuffer'): Promise<ArrayBuffer | null>;
+  get(
+    key: string,
+    options: { type: 'arrayBuffer'; cacheTtl?: number } | 'arrayBuffer',
+  ): Promise<ArrayBuffer | null>;
   put(
     key: string,
     value: string | ArrayBuffer | ArrayBufferView | ReadableStream,
@@ -46,8 +49,18 @@ export interface RateLimitBindingLike {
 }
 
 export interface QueueLike<Body = unknown> {
-  send(body: Body, options?: { contentType?: 'json' | 'text' | 'bytes' | 'v8'; delaySeconds?: number }): Promise<void>;
-  sendBatch?(messages: Iterable<{ body: Body; contentType?: 'json' | 'text' | 'bytes' | 'v8'; delaySeconds?: number }>): Promise<void>;
+  send(
+    body: Body,
+    options?: { contentType?: 'json' | 'text' | 'bytes' | 'v8'; delaySeconds?: number },
+  ): Promise<void>;
+  sendBatch?(
+    messages: Iterable<{ body: Body; contentType?: 'json' | 'text' | 'bytes' | 'v8'; delaySeconds?: number }>,
+  ): Promise<void>;
+  /**
+   * Producers backed by a lazily registered SDK (Vercel Queues) report whether they can send right now;
+   * `enqueue()` falls back to invoking the consumer route when this returns `false`.
+   */
+  ready?(): boolean;
 }
 
 export interface FetcherLike {

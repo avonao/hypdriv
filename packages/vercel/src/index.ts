@@ -1,53 +1,11 @@
-// SDK registration and request context
+/** `@hypdriv/vercel`: HypDriv on Vercel (CDN headers and purge, Upstash/Global Config stores, WAF, BotID, Queues). */
 export {
-  type BotIdHeaders,
-  type CheckBotIdFn,
-  type CheckBotIdOptions,
-  type CheckBotIdResult,
-  type CheckRateLimitFn,
-  type CheckRateLimitOptions,
-  type CheckRateLimitResult,
-  getVercelSdk,
-  type QueueBatchSendResult,
-  type QueueCallbackOptions,
-  type QueueHandleCallbackFn,
-  type QueueMessageHandler,
-  type QueueMessageMetadata,
-  type QueueRetryDirective,
-  type QueueSendBatchFn,
-  type QueueSendFn,
-  type QueueSendOptions,
-  registerVercelSdk,
-  type VercelSdk,
-} from './sdk';
-export {
-  isVercel,
-  VERCEL_REQUEST_CONTEXT,
-  type VercelDeleteOptions,
-  type VercelPurgeApi,
-  type VercelRequestContext,
-  vercelRequestContext,
-} from './context';
-// Stores
-export {
-  createUpstashClient,
-  escapeGlob,
-  type RedisCommand,
-  TOKEN_BUCKET_SCRIPT,
-  type UpstashClient,
-  type UpstashKv,
-  type UpstashOptions,
-  upstashCounterStore,
-  upstashKv,
-} from './upstash';
-export {
-  type GlobalConfigConnection,
-  type GlobalConfigKv,
-  type GlobalConfigKvOptions,
-  globalConfigKv,
-  parseGlobalConfigConnection,
-} from './global-config';
-// CDN cache and purge
+  type BotIdGuardOptions,
+  type BotIdVerdict,
+  botIdGuard,
+  type VerifyBotIdOptions,
+  verifyBotId,
+} from './botid';
 export {
   CDN_CACHE_CONTROL,
   CDN_DECISION_KEY,
@@ -77,28 +35,13 @@ export {
   vercelCdnRouteHeaders,
 } from './cdn-routes';
 export {
-  deleteTags,
-  invalidateTags,
-  type PurgeMode,
-  purgeVercelTags,
-  type VercelDeleteTagsOptions,
-  type VercelPurgeOptions,
-  type VercelPurger,
-  type VercelPurgerOptions,
-  vercelPurger,
-} from './purge';
-export {
-  MAX_TAG_BYTES,
-  MAX_TAGS_PER_PURGE,
-  MAX_TAGS_PER_RESPONSE,
-  PATH_TAG_PREFIX,
-  pathTag,
-  ROUTE_TAG_PREFIX,
-  routeTag,
-  sanitizeTag,
-  sanitizeTags,
-} from './tags';
-// Firewall, BotID, Queues
+  isVercel,
+  VERCEL_REQUEST_CONTEXT,
+  type VercelDeleteOptions,
+  type VercelPurgeApi,
+  type VercelRequestContext,
+  vercelRequestContext,
+} from './context';
 export {
   type VercelRateLimitBindingOptions,
   type VercelRateLimitStageOptions,
@@ -107,23 +50,12 @@ export {
   vercelRateLimitStage,
 } from './firewall';
 export {
-  type BotIdGuardOptions,
-  type BotIdVerdict,
-  botIdGuard,
-  type VerifyBotIdOptions,
-  verifyBotId,
-} from './botid';
-export {
-  type QueueConsumerOptions,
-  type QueueJobHandler,
-  type QueueJobInput,
-  type QueueJobMessage,
-  queueConsumer,
-  queueTopic,
-  toQueueCallback,
-  vercelQueue,
-} from './queues';
-// Platform wiring
+  type GlobalConfigConnection,
+  type GlobalConfigKv,
+  type GlobalConfigKvOptions,
+  globalConfigKv,
+  parseGlobalConfigConnection,
+} from './global-config';
 export {
   REDIS_BINDING,
   resolveGlobalConfig,
@@ -135,3 +67,68 @@ export {
   vercelPlatformOverrides,
   vercelStages,
 } from './platform';
+export {
+  deleteTags,
+  invalidateTags,
+  type PurgeMode,
+  purgeVercelTags,
+  toPlatformPurger,
+  type VercelDeleteTagsOptions,
+  type VercelPurgeOptions,
+  type VercelPurger,
+  type VercelPurgerOptions,
+  vercelPurger,
+} from './purge';
+export {
+  type QueueConsumerOptions,
+  type QueueJobHandler,
+  type QueueJobInput,
+  type QueueJobMessage,
+  queueConsumer,
+  queueTopic,
+  toQueueCallback,
+  vercelQueue,
+} from './queues';
+export {
+  type BotIdHeaders,
+  type CheckBotIdFn,
+  type CheckBotIdOptions,
+  type CheckBotIdResult,
+  type CheckRateLimitFn,
+  type CheckRateLimitOptions,
+  type CheckRateLimitResult,
+  getVercelSdk,
+  type QueueBatchSendResult,
+  type QueueCallbackOptions,
+  type QueueHandleCallbackFn,
+  type QueueMessageHandler,
+  type QueueMessageMetadata,
+  type QueueRetryDirective,
+  type QueueSendBatchFn,
+  type QueueSendFn,
+  type QueueSendOptions,
+  registerVercelSdk,
+  type VercelSdk,
+} from './sdk';
+export {
+  MAX_TAG_BYTES,
+  MAX_TAGS_PER_PURGE,
+  MAX_TAGS_PER_RESPONSE,
+  PATH_TAG_PREFIX,
+  pathTag,
+  ROUTE_TAG_PREFIX,
+  routeTag,
+  sanitizeTag,
+  sanitizeTags,
+} from './tags';
+export {
+  createUpstashClient,
+  escapeGlob,
+  type RedisCommand,
+  TOKEN_BUCKET_SCRIPT,
+  type UpstashClient,
+  type UpstashKv,
+  type UpstashOptions,
+  upstashCounterStore,
+  upstashKv,
+} from './upstash';

@@ -16,7 +16,6 @@ export {
   cloudflareLoader,
   configureImageLoader,
   getImageLoaderConfig,
-  resetInlinedImageConfig,
   type ImageFit,
   type ImageFormat,
   type ImageGravity,
@@ -25,4 +24,5 @@ export {
   isCdnCgiEnabled,
   isPassthroughSource,
   type NextImageLoaderParams,
+  resetInlinedImageConfig,
 } from './loader';

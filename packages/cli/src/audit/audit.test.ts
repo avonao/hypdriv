@@ -308,12 +308,171 @@ describe('CSP audit with hashes alongside nonces', () => {
     const result = auditCsp(
       {
         path: '/',
+        status: 200,
         expected: 'nonce',
-        headers: new Headers({ 'content-type': 'text/html', 'content-security-policy': `script-src 'self' 'nonce-abc' 'sha256-${hash}' 'strict-dynamic'; object-src 'none'; base-uri 'self'` }),
+        headers: new Headers({
+          'content-type': 'text/html',
+          'content-security-policy': `script-src 'self' 'nonce-abc' 'sha256-${hash}' 'strict-dynamic'; object-src 'none'; base-uri 'self'`,
+        }),
         body: `<html><script nonce="abc">a()</script><script type="speculationrules">${rules}</script><script>b()</script></html>`,
       },
       {},
     );
-    expect(result.findings.find((f) => f.level === 'fail')?.message).toBe('1 inline script(s) lack the policy nonce and will be blocked');
+    expect(result.findings.find((f) => f.level === 'fail')?.message).toBe(
+      '1 inline script(s) lack the policy nonce and will be blocked',
+    );
+  });
+});
+
+describe('owner audit tokens', () => {
+  it('signs with the internal secret from .dev.vars and binds the token to the host', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { auditAuth, describeAuditAuth, AUDIT_TOKEN_HEADER } = await import('./token');
+    const { verifyAuditToken } = await import('@hypdriv/security');
+    const root = mkdtempSync(join(tmpdir(), 'hypdriv-audit-token-'));
+    writeFileSync(join(root, '.dev.vars'), 'HYPDRIV_INTERNAL_SECRET="s3cret-value-for-tests"\n');
+    const io = { env: {}, date: () => new Date(1_800_000_000_000) };
+    const auth = await auditAuth({ root, io, base: 'http://127.0.0.1:8787' });
+    expect(auth.source).toBe('.dev.vars');
+    const token = auth.headers[AUDIT_TOKEN_HEADER]!;
+    expect(
+      await verifyAuditToken(token, 's3cret-value-for-tests', { host: '127.0.0.1', now: 1_800_000_000_000 }),
+    ).toBe(true);
+    expect(
+      await verifyAuditToken(token, 's3cret-value-for-tests', { host: 'evil.test', now: 1_800_000_000_000 }),
+    ).toBe(false);
+    expect(describeAuditAuth(auth)).toContain('signed audit token (HYPDRIV_INTERNAL_SECRET from .dev.vars)');
+
+    const anonymous = await auditAuth({ root, io, base: 'http://127.0.0.1:8787', anonymous: true });
+    expect(anonymous).toMatchObject({ headers: {}, source: null, reason: '--anonymous' });
+    const protectedDeployment = await auditAuth({
+      root,
+      io: { ...io, env: { VERCEL_AUTOMATION_BYPASS_SECRET: 'bypass-me' } },
+      base: 'https://app-git-main.vercel.app',
+      anonymous: true,
+    });
+    expect(protectedDeployment.headers).toEqual({ 'x-vercel-protection-bypass': 'bypass-me' });
+    const missing = await auditAuth({ root, io, base: 'http://x.test', secretName: 'OTHER_SECRET' });
+    expect(missing.headers).toEqual({});
+    expect(describeAuditAuth(missing)).toContain('OTHER_SECRET is not set');
+  });
+
+  it('fails pages answered by the bot shield or rate limiter and explains how to sign', async () => {
+    const { auditHeadersPages, blockedByShield, shieldHint } = await import('../commands/audit');
+    const blocked = {
+      url: 'http://x/',
+      status: 403,
+      ok: false,
+      headers: new Headers({ 'x-hypdriv-bot': 'definite', 'content-type': 'application/json' }),
+      body: '{"error":"forbidden"}',
+      ttfbMs: 1,
+      totalMs: 1,
+      redirected: null,
+      error: null,
+    };
+    expect(blockedByShield(blocked)).toBe(true);
+    expect(blockedByShield({ status: 403, headers: new Headers() })).toBe(false);
+    expect(blockedByShield({ status: 429, headers: new Headers({ ratelimit: '"api";r=0;t=5' }) })).toBe(true);
+    const unsigned = { headers: {}, source: null, secretName: 'HYPDRIV_INTERNAL_SECRET', reason: 'x' };
+    expect(shieldHint(blocked, unsigned)).toBe(
+      '403 blocked by the bot shield (x-hypdriv-bot: definite); set HYPDRIV_INTERNAL_SECRET so the CLI signs its requests',
+    );
+    const [entry] = auditHeadersPages([{ path: '/', page: blocked }], true, unsigned);
+    expect(entry).toMatchObject({ level: 'fail', grade: null, status: 403 });
+    const notFound = { ...blocked, status: 404, headers: new Headers({ 'content-type': 'text/html' }) };
+    expect(auditHeadersPages([{ path: '/x', page: notFound }], true)[0]!.level).not.toBe('pass');
+  });
+});
+
+describe('CSP audit of the declared cached-HTML fallback', () => {
+  it('warns instead of failing when HypDriv declares the unsafe-inline fallback', async () => {
+    const { auditCsp } = await import('./csp');
+    const policy =
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'";
+    const body = '<html><script>self.__next_f.push([1])</script></html>';
+    const declared = auditCsp({
+      path: '/blog/x',
+      status: 200,
+      expected: 'nonce',
+      headers: new Headers({
+        'content-type': 'text/html',
+        'content-security-policy': policy,
+        'x-hypdriv-csp': 'unsafe-inline-fallback',
+      }),
+      body,
+    });
+    expect(declared.status).toBe('warn');
+    expect(declared.findings).toHaveLength(1);
+    expect(declared.findings[0]!.message).toContain('cached HTML');
+    const undeclared = auditCsp({
+      path: '/blog/x',
+      status: 200,
+      expected: 'nonce',
+      headers: new Headers({ 'content-type': 'text/html', 'content-security-policy': policy }),
+      body,
+    });
+    expect(undeclared.status).toBe('fail');
+  });
+});
+
+describe('cache audit on Vercel and with cookies', () => {
+  it('reads the CDN plan and Vercel cache status', async () => {
+    const { auditCache, cacheStatus } = await import('./cache');
+    expect(cacheStatus(new Headers({ 'x-hypdriv-cache': 'CDN', 'x-vercel-cache': 'HIT' }))).toBe('HIT');
+    expect(cacheStatus(new Headers({ 'x-hypdriv-cache': 'CDN' }))).toBe('CDN');
+    expect(cacheStatus(new Headers({ 'x-hypdriv-cache': 'MISS', 'x-vercel-cache': 'HIT' }))).toBe('MISS');
+    const planned = auditCache({
+      path: '/products/1',
+      hasPolicy: true,
+      first: { status: 200, headers: new Headers({ 'x-hypdriv-cache': 'CDN', 'cache-control': 'public' }) },
+      second: {
+        status: 200,
+        headers: new Headers({
+          'x-hypdriv-cache': 'CDN',
+          'vercel-cdn-cache-control': 's-maxage=300',
+          'cache-control': 'public',
+        }),
+      },
+    });
+    expect(planned.status).toBe('pass');
+    expect(planned.findings[0]).toMatchObject({ level: 'info' });
+    const missing = auditCache({
+      path: '/products/1',
+      hasPolicy: true,
+      first: { status: 200, headers: new Headers({ 'x-hypdriv-cache': 'CDN' }) },
+      second: { status: 200, headers: new Headers({ 'x-hypdriv-cache': 'CDN', 'cache-control': 'public' }) },
+    });
+    expect(missing.status).toBe('fail');
+  });
+
+  it('explains a first visit that bypasses because it sets a cookie', async () => {
+    const { auditCache } = await import('./cache');
+    const result = auditCache({
+      path: '/',
+      hasPolicy: true,
+      first: {
+        status: 200,
+        headers: new Headers({ 'x-hypdriv-cache': 'BYPASS', 'set-cookie': 'hyp_uid=a; Path=/' }),
+      },
+      second: {
+        status: 200,
+        headers: new Headers({ 'x-hypdriv-cache': 'HIT', age: '1', 'cache-control': 's-maxage=60' }),
+      },
+    });
+    expect(result.status).toBe('pass');
+    expect(result.findings.map((f) => f.level)).toEqual(['info']);
+  });
+
+  it('builds the Cookie header a browser would send back', async () => {
+    const { cookiesFrom } = await import('./http');
+    const headers = new Headers();
+    headers.append('set-cookie', 'hyp_uid=abc123; Max-Age=31536000; Path=/; HttpOnly');
+    headers.append('set-cookie', 'theme=dark; Path=/');
+    headers.append('set-cookie', 'old=1; Max-Age=0; Path=/');
+    expect(cookiesFrom(headers)).toBe('hyp_uid=abc123; theme=dark');
+    expect(cookiesFrom(headers, 'old=x; keep=1')).toBe('keep=1; hyp_uid=abc123; theme=dark');
+    expect(cookiesFrom(new Headers())).toBe('');
   });
 });

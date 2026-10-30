@@ -75,7 +75,11 @@ export class HypDrivLimiter extends DurableObject {
   }
 
   /** Fixed-window increment; the window is aligned to multiples of `windowSeconds`. */
-  async increment(key: string, windowSeconds: number, now: number = Date.now()): Promise<LimiterIncrementResult> {
+  async increment(
+    key: string,
+    windowSeconds: number,
+    now: number = Date.now(),
+  ): Promise<LimiterIncrementResult> {
     await this.load();
     const windowMs = windowSeconds * 1000;
     const start = Math.floor(now / windowMs) * windowMs;
@@ -93,7 +97,11 @@ export class HypDrivLimiter extends DurableObject {
   }
 
   /** Sliding-window estimate: previous window weighted by the remaining fraction plus the current count. */
-  async slidingCount(key: string, windowSeconds: number, now: number = Date.now()): Promise<LimiterIncrementResult> {
+  async slidingCount(
+    key: string,
+    windowSeconds: number,
+    now: number = Date.now(),
+  ): Promise<LimiterIncrementResult> {
     const { count, resetAt } = await this.increment(key, windowSeconds, now);
     const state = this.windows.get(key)!;
     const windowMs = windowSeconds * 1000;
@@ -103,7 +111,12 @@ export class HypDrivLimiter extends DurableObject {
   }
 
   /** Token bucket with continuous refill. */
-  async takeToken(key: string, capacity: number, refillPerSecond: number, now: number = Date.now()): Promise<LimiterTokenResult> {
+  async takeToken(
+    key: string,
+    capacity: number,
+    refillPerSecond: number,
+    now: number = Date.now(),
+  ): Promise<LimiterTokenResult> {
     await this.load();
     const state = this.buckets.get(key) ?? { tokens: capacity, updatedAt: now };
     const elapsedSeconds = Math.max(0, (now - state.updatedAt) / 1000);
@@ -118,7 +131,12 @@ export class HypDrivLimiter extends DurableObject {
   }
 
   /** Acquires a lock for cross-isolate coalescing. Returns the current holder when taken. */
-  async lock(key: string, holder: string, ttlMs: number, now: number = Date.now()): Promise<LimiterLockResult> {
+  async lock(
+    key: string,
+    holder: string,
+    ttlMs: number,
+    now: number = Date.now(),
+  ): Promise<LimiterLockResult> {
     await this.load();
     const current = this.locks.get(key);
     if (current && current.expiresAt > now && current.holder !== holder) {
@@ -152,7 +170,11 @@ export class HypDrivLimiter extends DurableObject {
     for (const [k, b] of this.buckets) if (now - b.updatedAt > 24 * 60 * 60 * 1000) this.buckets.delete(k);
     for (const [k, l] of this.locks) if (l.expiresAt <= now) this.locks.delete(k);
     if (this.windows.size || this.buckets.size || this.locks.size) {
-      await this.ctx.storage.put({ windows: Object.fromEntries(this.windows), buckets: Object.fromEntries(this.buckets), locks: Object.fromEntries(this.locks) });
+      await this.ctx.storage.put({
+        windows: Object.fromEntries(this.windows),
+        buckets: Object.fromEntries(this.buckets),
+        locks: Object.fromEntries(this.locks),
+      });
       await this.ctx.storage.setAlarm(now + ALARM_INTERVAL_MS);
     } else {
       await this.ctx.storage.deleteAll();

@@ -90,7 +90,10 @@ const MISSING: unique symbol = Symbol('missing');
  * the whole store (`/items`). Writes go through the Vercel REST API or dashboard, so `put`/`delete` throw
  * `HypDrivError('E_UNSUPPORTED')`.
  */
-export function globalConfigKv(connectionString: string, options: GlobalConfigKvOptions = {}): GlobalConfigKv {
+export function globalConfigKv(
+  connectionString: string,
+  options: GlobalConfigKvOptions = {},
+): GlobalConfigKv {
   const connection = parseGlobalConfigConnection(connectionString);
   if (!connection)
     throw new HypDrivError(
@@ -113,8 +116,12 @@ export function globalConfigKv(connectionString: string, options: GlobalConfigKv
 
   const fail = (status: number): never => {
     if (status === 401 || status === 403)
-      throw new HypDrivError('E_UNAUTHORIZED', `Global Config ${connection.id}: read token rejected (HTTP ${status})`);
-    if (status === 404) throw new HypDrivError('E_NOT_FOUND', `Global Config ${connection.id} does not exist`);
+      throw new HypDrivError(
+        'E_UNAUTHORIZED',
+        `Global Config ${connection.id}: read token rejected (HTTP ${status})`,
+      );
+    if (status === 404)
+      throw new HypDrivError('E_NOT_FOUND', `Global Config ${connection.id} does not exist`);
     throw new HypDrivError('E_UPSTREAM', `Global Config ${connection.id}: HTTP ${status}`, { status });
   };
 
@@ -177,7 +184,12 @@ export function globalConfigKv(connectionString: string, options: GlobalConfigKv
 
   return {
     name: 'global-config',
-    connection: { type: connection.type, id: connection.id, baseUrl: connection.baseUrl, version: connection.version },
+    connection: {
+      type: connection.type,
+      id: connection.id,
+      baseUrl: connection.baseUrl,
+      version: connection.version,
+    },
     get: get as KVNamespaceLike['get'],
     async put() {
       readOnly('put');

@@ -1,15 +1,11 @@
-import {
-  bypassReason,
-  effectiveTags,
-  matchPolicy,
-  resolvePolicies,
-} from '@hypdriv/cache';
+import { bypassReason, effectiveTags, matchPolicy, resolvePolicies } from '@hypdriv/cache';
 import {
   appendListHeader,
   createContext,
   createRouteMatcher,
   defineStage,
   emptyManifest,
+  FLAGS_COOKIE_PENDING_KEY,
   getSetCookies,
   HEADER,
   type HypContext,
@@ -24,7 +20,7 @@ import {
   stateKey,
 } from '@hypdriv/core';
 import { MAX_TAGS_PER_RESPONSE, pathTag, routeTag, sanitizeTags } from './tags';
-import { warnOnce } from './util';
+import { type ConfigInput, readBuildManifest, resolveInput, warnOnce } from './util';
 
 /** Response header Vercel's CDN reads first (consumed by Vercel, never forwarded to clients). */
 export const VERCEL_CDN_CACHE_CONTROL = 'vercel-cdn-cache-control';
@@ -120,7 +116,8 @@ export function cdnExpressibility(
   const headers = policy.vary.headers.map((h) => h.toLowerCase());
   if (headers.includes('cookie')) return { ok: false, reason: 'vary:cookie' };
   if (headers.includes('*')) return { ok: false, reason: 'vary:*' };
-  if (policy.vary.language && config.i18n?.strategy === 'cookie') return { ok: false, reason: 'vary:language-cookie' };
+  if (policy.vary.language && config.i18n?.strategy === 'cookie')
+    return { ok: false, reason: 'vary:language-cookie' };
 
   const vary: string[] = [...policy.vary.headers];
   for (const name of policy.bypass.headers) if (name.toLowerCase() !== 'authorization') vary.push(name);
@@ -149,7 +146,11 @@ export function cdnExpressibility(
 }
 
 /** Writes the CDN headers of a plan onto `headers`. */
-export function writeCdnHeaders(headers: Headers, cacheControl: string, plan: Pick<CdnPlan, 'tags' | 'downstream'>): void {
+export function writeCdnHeaders(
+  headers: Headers,
+  cacheControl: string,
+  plan: Pick<CdnPlan, 'tags' | 'downstream'>,
+): void {
   headers.set(VERCEL_CDN_CACHE_CONTROL, cacheControl);
   if (plan.downstream) headers.set(CDN_CACHE_CONTROL, cacheControl);
   if (plan.tags.length) headers.set(VERCEL_CACHE_TAG, plan.tags.join(','));
@@ -179,11 +180,16 @@ export type CdnVerdict =
  * earlier stage), no `Vary: *` / `Vary: Cookie`, an origin that did not take its own CDN decision, and,
  * with `respectOrigin`, the origin's `Cache-Control` (`no-store`, `private`, `no-cache`, shorter lifetimes).
  */
-export function cdnVerdict(plan: CdnPlan, response: Response, options: { pendingSetCookie?: boolean } = {}): CdnVerdict {
+export function cdnVerdict(
+  plan: CdnPlan,
+  response: Response,
+  options: { pendingSetCookie?: boolean } = {},
+): CdnVerdict {
   const status = response.status;
   if (!VERCEL_CACHEABLE_STATUSES.has(status) || !plan.statuses.includes(status))
     return { ok: false, reason: `status:${status}` };
-  if (options.pendingSetCookie || getSetCookies(response.headers).length) return { ok: false, reason: 'set-cookie' };
+  if (options.pendingSetCookie || getSetCookies(response.headers).length)
+    return { ok: false, reason: 'set-cookie' };
   const vary = (response.headers.get('vary') ?? '').split(',').map((v) => v.trim().toLowerCase());
   if (vary.includes('*')) return { ok: false, reason: 'vary:*' };
   if (vary.includes('cookie')) return { ok: false, reason: 'vary:cookie' };
@@ -256,7 +262,8 @@ function createPlanner(config: ResolvedConfig, downstream: boolean): Planner {
   return {
     plan(ctx) {
       const method = ctx.request.method.toUpperCase();
-      if (method !== 'GET' && method !== 'HEAD') return { decision: { status: 'DYNAMIC', reason: `method:${method}` } };
+      if (method !== 'GET' && method !== 'HEAD')
+        return { decision: { status: 'DYNAMIC', reason: `method:${method}` } };
       const policy = matchPolicy(policiesFor(ctx.manifest), ctx);
       if (!policy) return { decision: { status: 'DYNAMIC', reason: 'no-policy' } };
       if (!policy.methods.includes(method))
@@ -299,10 +306,9 @@ function createPlanner(config: ResolvedConfig, downstream: boolean): Planner {
   };
 }
 
-/** `true` when the flags stage will add its bucketing cookie in a later `post` (its `flags.needsCookie` slot). */
+/** `true` when the flags stage will add its bucketing cookie in a later `post`. */
 function flagsCookiePending(ctx: HypContext): boolean {
-  for (const [name, value] of ctx.state.entries()) if (name === 'flags.needsCookie' && value === true) return true;
-  return false;
+  return ctx.state.get(FLAGS_COOKIE_PENDING_KEY) === true;
 }
 
 function record(ctx: HypContext, decision: CdnDecision, debugHeader: boolean): void {
@@ -336,7 +342,8 @@ function record(ctx: HypContext, decision: CdnDecision, debugHeader: boolean): v
  * wrap Route Handlers with `withVercelCdn()` and emit page headers through `next.config` `headers()`
  * (`vercelCdnRouteHeaders()`).
  */
-export function vercelCdnStage(config: ResolvedConfig, options: VercelCdnOptions = {}): Stage | null {
+export function vercelCdnStage(configInput: ConfigInput, options: VercelCdnOptions = {}): Stage | null {
+  const config = resolveInput(configInput);
   const cdn = config.vercel.cdn;
   const edge = config.cache.edge;
   if (!cdn || !edge) return null;
@@ -358,7 +365,7 @@ export function vercelCdnStage(config: ResolvedConfig, options: VercelCdnOptions
     post(ctx, response) {
       const decision = ctx.state.get(CDN_DECISION_KEY);
       const plan = ctx.state.get(PLAN_KEY);
-      if (!decision || decision.status !== 'CDN' || !plan) return response;
+      if (decision?.status !== 'CDN' || !plan) return response;
       const pendingSetCookie = getSetCookies(ctx.responseHeaders).length > 0 || flagsCookiePending(ctx);
       const verdict = cdnVerdict(plan, response, { pendingSetCookie });
       if (!verdict.ok) {
@@ -385,12 +392,19 @@ export function vercelCdnStage(config: ResolvedConfig, options: VercelCdnOptions
 
 /** Options of `withVercelCdn`. */
 export interface WithVercelCdnOptions extends VercelCdnOptions {
-  /** The build manifest, for route tags and inferred policies (default: an empty manifest). */
+  /**
+   * The build manifest, for route tags, the `build:<id>` tag and inferred policies. Default: `.hypdriv/manifest.json`
+   * read once from the function's working directory (an empty manifest whose build id is the Vercel deployment id
+   * when it cannot be read); `null` uses an empty manifest.
+   */
   manifest?: HypManifest | null;
   log?: Logger;
 }
 
-type RouteHandler<Req extends Request, Context> = (request: Req, context: Context) => Response | Promise<Response>;
+type RouteHandler<Req extends Request, Context> = (
+  request: Req,
+  context: Context,
+) => Response | Promise<Response>;
 
 /**
  * Wraps a Route Handler so its response carries the Vercel CDN headers of the matching edge-cache policy
@@ -402,18 +416,31 @@ type RouteHandler<Req extends Request, Context> = (request: Req, context: Contex
  * ```
  */
 export function withVercelCdn<Req extends Request = Request, Context = unknown>(
-  config: ResolvedConfig,
+  configInput: ConfigInput,
   handler: RouteHandler<Req, Context>,
   options: WithVercelCdnOptions = {},
 ): (request: Req, context: Context) => Promise<Response> {
+  const config = resolveInput(configInput);
   const cdn = config.vercel.cdn;
   const edge = config.cache.edge;
   if (!cdn || !edge) return async (request, context) => handler(request, context);
   const planner = createPlanner(config, options.downstream ?? cdn.downstream);
-  const manifest = options.manifest ?? emptyManifest();
+  let loading: Promise<HypManifest> | null = null;
+  const loadManifest = (): Promise<HypManifest> => {
+    if (options.manifest !== undefined) return Promise.resolve(options.manifest ?? emptyManifest());
+    loading ??= readBuildManifest().then((found) => {
+      if (found) return found;
+      const env =
+        (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+      const buildId = env.VERCEL_DEPLOYMENT_ID ?? env.NEXT_DEPLOYMENT_ID;
+      return emptyManifest(buildId ? { buildId } : {});
+    });
+    return loading;
+  };
   let matcher: RouteMatcher | null = null;
 
   return async (request, context) => {
+    const manifest = await loadManifest();
     matcher ??= createRouteMatcher(manifest);
     const pathname = new URL(request.url).pathname;
     const ctx = createContext({

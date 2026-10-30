@@ -78,21 +78,31 @@ export const securityChecks: Check[] = [
     id: 'security.internal-secret',
     title: 'HYPDRIV_INTERNAL_SECRET',
     category: 'security',
-    platforms: ['cloudflare', 'node'],
+    platforms: ['cloudflare', 'vercel', 'node'],
     severity: 'warn',
     run(ctx) {
       const jobs = ctx.config.resolved.jobs;
-      const used =
-        Object.keys(jobs.cron).length > 0 || Object.keys(jobs.queues).length > 0 || jobs.email !== null;
+      const vercel = ctx.project.platform === 'vercel';
+      // On Vercel, Vercel Cron authenticates with CRON_SECRET; the internal secret signs enqueue()'s
+      // consumer-route fallback, `hypdriv jobs run` and the audit token.
+      const used = vercel
+        ? Object.keys(jobs.queues).length > 0 || jobs.email !== null
+        : Object.keys(jobs.cron).length > 0 || Object.keys(jobs.queues).length > 0 || jobs.email !== null;
       const name = ctx.config.resolved.security.internalAuth.secretEnv;
       const where = secretAvailable(ctx, name);
       if (!used)
         return where
           ? pass(`${name} available (${where}).`)
-          : skip('No cron, queue or email jobs configured.');
+          : skip(
+              vercel
+                ? 'No queue or email jobs configured (Vercel Cron uses CRON_SECRET).'
+                : 'No cron, queue or email jobs configured.',
+            );
       if (!where)
         return warn(
-          `${name} is not set but jobs are configured; the scheduled/queue handlers sign requests with it (${setHint(ctx, name)}).`,
+          vercel
+            ? `${name} is not set but queues are configured; enqueue() signs its consumer-route fallback with it (${setHint(ctx, name)}).`
+            : `${name} is not set but jobs are configured; the scheduled/queue handlers sign requests with it (${setHint(ctx, name)}).`,
         );
       return pass(`${name} available (${where}).`);
     },

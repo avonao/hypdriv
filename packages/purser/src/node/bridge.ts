@@ -148,7 +148,9 @@ export async function loadPurserBuildModule(projectDir: string): Promise<PurserB
       throw notInstalled(cause);
     }
   }
-  const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(file).href)) as Partial<PurserBuildModule> & {
+  const mod = (await import(
+    /* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(file).href
+  )) as Partial<PurserBuildModule> & {
     default?: Partial<PurserBuildModule>;
   };
   const api = typeof mod.build === 'function' ? mod : (mod.default ?? mod);

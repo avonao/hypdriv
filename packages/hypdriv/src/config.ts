@@ -1,3 +1,11 @@
 /** `withHypDriv()` for `next.config.ts`. */
-export { PHASE, defaultDeploymentId, resolveAdapterPath, resolveImageLoaderPath, withHypDriv, type WithHypDrivOptions } from '@hypdriv/next/config';
+
 export { defineConfig, type HypDrivConfig } from '@hypdriv/core';
+export {
+  defaultDeploymentId,
+  PHASE,
+  resolveAdapterPath,
+  resolveImageLoaderPath,
+  type WithHypDrivOptions,
+  withHypDriv,
+} from '@hypdriv/next/config';

@@ -31,6 +31,8 @@ export const DEFAULT_STAGE_ORDER = [
   'shield',
   'bots',
   'rate-limit',
+  // Vercel WAF rate-limit rules (`@hypdriv/vercel`), after the local limiter.
+  'rate-limit-vercel',
   'geo',
   'i18n',
   'flags',

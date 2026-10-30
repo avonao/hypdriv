@@ -1,4 +1,4 @@
-import { HypDrivError, json, type Logger, type QueueLike, type ResolvedConfig, toError } from '@hypdriv/core';
+import { HypDrivError, json, type Logger, type QueueLike, toError } from '@hypdriv/core';
 import {
   getVercelSdk,
   type QueueCallbackOptions,
@@ -7,7 +7,7 @@ import {
   type QueueSendOptions,
   type VercelSdk,
 } from './sdk';
-import { chunk, defaultLogger, warnOnce } from './util';
+import { type ConfigInput, chunk, defaultLogger, resolveInput, warnOnce } from './util';
 
 const NOT_REGISTERED =
   '@vercel/queue is not registered: call registerVercelSdk({ queue: { send, handleCallback } }) in instrumentation.ts';
@@ -19,7 +19,8 @@ function queueSdk(): NonNullable<VercelSdk['queue']> {
 }
 
 /** The Vercel Queues topic of a HypDriv queue name (`vercel.queues[name]`, else the name itself). */
-export function queueTopic(name: string, config: ResolvedConfig): string {
+export function queueTopic(name: string, configInput: ConfigInput): string {
+  const config = resolveInput(configInput);
   return config.vercel.queues[name] ?? name;
 }
 
@@ -29,11 +30,13 @@ export function queueTopic(name: string, config: ResolvedConfig): string {
  * same name (`contentType` is not used). `sendBatch` uses the SDK's batch API (100 messages per request)
  * when registered and throws when any message was not accepted.
  */
-export function vercelQueue<Body = unknown>(name: string, config: ResolvedConfig): QueueLike<Body> {
+export function vercelQueue<Body = unknown>(name: string, configInput: ConfigInput): QueueLike<Body> {
+  const config = resolveInput(configInput);
   const topic = queueTopic(name, config);
   const sendOptions = (delaySeconds: number | undefined): QueueSendOptions | undefined =>
     delaySeconds !== undefined && delaySeconds > 0 ? { delaySeconds: Math.floor(delaySeconds) } : undefined;
   return {
+    ready: () => Boolean(getVercelSdk().queue),
     async send(body, options) {
       await queueSdk().send(topic, body, sendOptions(options?.delaySeconds));
     },
@@ -51,13 +54,18 @@ export function vercelQueue<Body = unknown>(name: string, config: ResolvedConfig
           topic,
           batch.map((m) => ({ payload: m.body, ...sendOptions(m.delaySeconds) })),
         );
-        for (const result of results) if (result.status === 'failed') failures.push(`${result.statusCode}: ${result.error}`);
+        for (const result of results)
+          if (result.status === 'failed') failures.push(`${result.statusCode}: ${result.error}`);
       }
       if (failures.length)
-        throw new HypDrivError('E_UPSTREAM', `Vercel Queues rejected ${failures.length} of ${list.length} messages`, {
-          topic,
-          errors: failures.slice(0, 10),
-        });
+        throw new HypDrivError(
+          'E_UPSTREAM',
+          `Vercel Queues rejected ${failures.length} of ${list.length} messages`,
+          {
+            topic,
+            errors: failures.slice(0, 10),
+          },
+        );
     },
   };
 }
@@ -87,7 +95,7 @@ export interface QueueConsumerOptions {
   /** Message lock duration while the handler runs (SDK default 300, max 3600). */
   visibilityTimeoutSeconds?: number;
   /** Reverse-maps topics to HypDriv queue names (`vercel.queues`) and supplies `jobs.queues[name].retry`. */
-  config?: ResolvedConfig;
+  config?: ConfigInput;
   /** Fixed job name (overrides the topic mapping). */
   job?: string;
   /** Delay before a requested retry, by delivery attempt (default 5 s doubling up to 15 min). */
@@ -120,10 +128,11 @@ export function toQueueCallback(
   handler: QueueJobHandler,
   options: QueueConsumerOptions = {},
 ): [QueueMessageHandler, QueueCallbackOptions] {
+  const config = options.config ? resolveInput(options.config) : undefined;
   const topics = new Map<string, string>();
-  for (const [name, topic] of Object.entries(options.config?.vercel.queues ?? {})) topics.set(topic, name);
+  for (const [name, topic] of Object.entries(config?.vercel.queues ?? {})) topics.set(topic, name);
   const jobFor = (topic: string) => options.job ?? topics.get(topic) ?? topic;
-  const retryMode = (job: string) => options.config?.jobs.queues[job]?.retry ?? 'failed';
+  const retryMode = (job: string) => config?.jobs.queues[job]?.retry ?? 'failed';
   const delay = options.retryDelaySeconds ?? defaultDelay;
 
   const messageHandler: QueueMessageHandler = async (message, metadata) => {
@@ -174,16 +183,25 @@ export function queueConsumer(
   options: QueueConsumerOptions = {},
 ): (request: Request) => Promise<Response> {
   const log = options.log ?? defaultLogger();
-  let built: { handleCallback: QueueHandleCallbackFn; route: (request: Request) => Promise<Response> } | null = null;
+  let built: {
+    handleCallback: QueueHandleCallbackFn;
+    route: (request: Request) => Promise<Response>;
+  } | null = null;
   return async (request) => {
     const queue = getVercelSdk().queue;
     if (!queue) {
       warnOnce(log, 'vercel-queue:not-registered', NOT_REGISTERED);
-      return json({ error: 'queue_unavailable', message: '@vercel/queue is not registered' }, { status: 503 });
+      return json(
+        { error: 'queue_unavailable', message: '@vercel/queue is not registered' },
+        { status: 503 },
+      );
     }
     if (!built || built.handleCallback !== queue.handleCallback) {
       try {
-        built = { handleCallback: queue.handleCallback, route: queue.handleCallback(...toQueueCallback(handler, options)) };
+        built = {
+          handleCallback: queue.handleCallback,
+          route: queue.handleCallback(...toQueueCallback(handler, options)),
+        };
       } catch (error) {
         log.error('vercel queue: handleCallback setup failed', { error: toError(error).message });
         return json({ error: 'queue_unavailable' }, { status: 503 });

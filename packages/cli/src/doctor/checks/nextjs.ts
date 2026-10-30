@@ -281,6 +281,10 @@ export const nextjsChecks: Check[] = [
     run(ctx) {
       const skew = ctx.config.resolved.performance.skewProtection;
       if (!skew) return skip('skew protection is disabled.');
+      if (ctx.project.platform === 'vercel')
+        return pass(
+          'Vercel assigns the deployment id (VERCEL_DEPLOYMENT_ID); enable Skew Protection in the project settings.',
+        );
       if (skew.deploymentId) return pass(`deploymentId "${skew.deploymentId}" from hypdriv.config.`);
       if (ctx.project.nextConfig?.setsDeploymentId) return pass('next.config sets deploymentId.');
       if (ctx.manifest?.deploymentId) return pass(`manifest deploymentId ${ctx.manifest.deploymentId}.`);

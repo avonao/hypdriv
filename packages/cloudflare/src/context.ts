@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { type HypContext, getCurrentContext, setContextStore } from '@hypdriv/core';
+import { getCurrentContext, type HypContext, setContextStore } from '@hypdriv/core';
 
 const als = new AsyncLocalStorage<HypContext>();
 let installed = false;

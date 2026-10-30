@@ -2,6 +2,8 @@
 
 // Server functions
 export * from './actions';
+// Owner audit tokens (bots + rate-limit bypass for `hypdriv audit|bench|warm`)
+export * from './audit-token';
 // Bots, shield, CSRF, Turnstile
 export * from './bots';
 // Sessions and crypto

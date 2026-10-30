@@ -1,7 +1,7 @@
 {
   "name": "hypdriv",
   "version": "0.1.0",
-  "description": "HypDriv \u2014 the Hyper-Extension for Next.js 16+ on Cloudflare Workers. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.",
+  "description": "HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",
@@ -27,7 +27,8 @@
     "cloudflare",
     "workers",
     "edge",
-    "hypdriv"
+    "hypdriv",
+    "vercel"
   ],
   "bin": {
     "hypdriv": "./bin/hypdriv.js"
@@ -63,6 +64,11 @@
       "source": "./src/durable-objects.ts",
       "types": "./dist/durable-objects.d.ts",
       "default": "./dist/durable-objects.js"
+    },
+    "./vercel": {
+      "source": "./src/vercel.ts",
+      "types": "./dist/vercel.d.ts",
+      "default": "./dist/vercel.js"
     },
     "./server": {
       "source": "./src/server.ts",
@@ -133,7 +139,8 @@
     "@hypdriv/next": "workspace:*",
     "@hypdriv/observe": "workspace:*",
     "@hypdriv/purser": "workspace:*",
-    "@hypdriv/security": "workspace:*"
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/vercel": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=16.0.0",

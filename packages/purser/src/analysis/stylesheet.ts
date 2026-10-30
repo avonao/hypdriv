@@ -257,6 +257,7 @@ export function isPurserStylesheet(
   // Bundlers (Next.js/Turbopack via Lightning CSS) drop the comment and fold the ordering statement into
   // the layer blocks, so fall back to the tokens and atoms layer blocks themselves.
   const names = layers ?? { tokens: 'purser.tokens', globals: 'purser.globals', atoms: 'purser.atoms' };
-  const block = (name: string) => new RegExp(`@layer\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`);
+  const block = (name: string) =>
+    new RegExp(`@layer\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`);
   return block(names.tokens).test(css) && block(names.atoms).test(css);
 }

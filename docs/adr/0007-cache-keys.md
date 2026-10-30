@@ -14,3 +14,7 @@ Keys are built from: method, lowercase host, pathname normalised per Next's `tra
 
 - Deployments never serve mixed content.
 - Policies declare exactly which dimensions fragment the cache.
+
+## Amendment (2026-10-30): keys use the build *fingerprint*
+
+Next.js derives deterministic build ids from the deployment id (HypDriv derives that from the git commit), so two different outputs of the same commit — an uncommitted rebuild, a changed environment variable, a dependency bump without a commit — share a `buildId`. A persistent store (KV) would then serve HTML that references the other output's chunks and CSP hashes. Keys therefore use `manifest.fingerprint` (`cacheVersion()`): a hash of the build id, the deployment id, every route's content-hashed client assets, the CSP hashes of prerendered HTML, HypDriv's inline-script hashes and the Purser stylesheet. The `build:<buildId>` tag is unchanged, so build-wide purges still address the deployment.

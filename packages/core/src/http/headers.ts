@@ -246,7 +246,8 @@ export function acceptsHtml(headers: Headers): boolean {
 /**
  * Inbound `x-hypdriv-*` headers HypDriv accepts from clients. Everything else under that prefix is set by
  * the stages and forwarded to the application, so a client-supplied copy must never reach it. The
- * internal-request headers are claims that `jobHandler()` verifies against the HMAC signature.
+ * internal-request headers are claims that `jobHandler()` verifies against the HMAC signature, and the
+ * audit token is verified by `verifiedAudit()` before the bot shield or rate limiter trust it.
  */
 export const TRUSTED_INBOUND_HYPDRIV_HEADERS: ReadonlySet<string> = new Set([
   'x-hypdriv-request-id',
@@ -256,6 +257,7 @@ export const TRUSTED_INBOUND_HYPDRIV_HEADERS: ReadonlySet<string> = new Set([
   'x-hypdriv-job',
   'x-hypdriv-warm',
   'x-hypdriv-challenge',
+  'x-hypdriv-audit',
 ]);
 
 /**
@@ -264,13 +266,21 @@ export const TRUSTED_INBOUND_HYPDRIV_HEADERS: ReadonlySet<string> = new Set([
  * and Next.js' internal `x-middleware-*` headers (in front of Next.js only; pass `middlewareHeaders: false`
  * inside `proxy.ts`, where Next.js already sanitised them). Returns the same `Request` when nothing was removed.
  */
-export function sanitizeInboundRequest(request: Request, options: { nonceHeader?: string; middlewareHeaders?: boolean } = {}): Request {
+export function sanitizeInboundRequest(
+  request: Request,
+  options: { nonceHeader?: string; middlewareHeaders?: boolean } = {},
+): Request {
   const nonceHeader = (options.nonceHeader ?? 'x-nonce').toLowerCase();
   const stripMiddleware = options.middlewareHeaders !== false;
   const remove: string[] = [];
   for (const name of request.headers.keys()) {
     const lower = name.toLowerCase();
-    if (lower === nonceHeader || (stripMiddleware && lower.startsWith('x-middleware-')) || (lower.startsWith('x-hypdriv-') && !TRUSTED_INBOUND_HYPDRIV_HEADERS.has(lower))) remove.push(name);
+    if (
+      lower === nonceHeader ||
+      (stripMiddleware && lower.startsWith('x-middleware-')) ||
+      (lower.startsWith('x-hypdriv-') && !TRUSTED_INBOUND_HYPDRIV_HEADERS.has(lower))
+    )
+      remove.push(name);
   }
   if (!remove.length) return request;
   const headers = new Headers(request.headers);

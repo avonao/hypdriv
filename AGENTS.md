@@ -1,12 +1,13 @@
 # HypDriv — guidance for coding agents
 
-HypDriv is the Hyper-Extension for Next.js 16+ on Cloudflare Workers: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
+HypDriv is the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
 
 ## Posture
 
 - **Production grade, complete features.** Do not land stubs, TODO-only paths, "MVP" shortcuts or deferred large tasks. If a feature needs a new subsystem, build it in the same change.
 - **Sidecar only.** Never patch `next`, `@opennextjs/*` or `wrangler`. Integrate through `next.config.ts`, the Adapter API, `proxy.ts`, the Worker entry and application code.
-- **Zero-infrastructure baseline.** Every feature works on a bare Worker; bindings are optional upgrades detected at run time.
+- **Zero-infrastructure baseline.** Every feature works on a bare Worker and on a plain Vercel project; bindings and platform services are optional upgrades detected at run time.
+- **Two first-class platforms.** Cloudflare Workers and Vercel (`docs/adr/0013-deploy-targets.md`). Platform differences live in `packages/cloudflare`, `packages/vercel` and `detectDeployTarget()`; stages stay shared.
 - **Purser is external.** `packages/purser` consumes `@avonao/purser/build`; never edit Purser from here.
 - **US-first defaults.** Documentation examples use US regions/entities first; EU is a secondary market.
 
@@ -30,6 +31,7 @@ Workspace packages resolve through the `source` export condition, so tests and t
 packages/core        kernel: config schema, pipeline, manifest types + matcher, utils
 packages/next        withHypDriv, adapter chain, proxy composables, server/client helpers
 packages/cloudflare  Worker shell (createWorker), handlers, Durable Objects, bindings
+packages/vercel      Vercel CDN headers + purge, Upstash/Global Config stores, WAF, BotID, Queues
 packages/cache       edge cache engine (policies, keys, stores, SWR, tags)
 packages/security    CSP, headers, rate limiting, bot shield, safeAction, sessions, crypto
 packages/observe     tracing, logging, Server-Timing, Web Vitals
@@ -42,7 +44,7 @@ packages/testing     fakes, request builders, vitest presets
 packages/cli         the `hypdriv` command
 packages/create-hypdriv  scaffolder
 packages/hypdriv     umbrella
-examples/            runnable Next 16 apps on OpenNext Cloudflare
+examples/            runnable Next 16 apps: basic, with-purser (Cloudflare); vercel, vercel-purser (Vercel); the create-hypdriv templates
 docs/                architecture, catalog, ADRs, guides
 skills/hypdriv       agent skill for adopting HypDriv in an application
 ```
@@ -61,6 +63,7 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 1. `pnpm build && pnpm test && pnpm typecheck && pnpm lint`.
 2. For runtime behaviour: `pnpm -F @hypdriv/example-basic build:worker && pnpm -F @hypdriv/example-basic preview`, then `pnpm -F @hypdriv/cli exec hypdriv audit all --url http://localhost:8787`.
 3. For Purser behaviour: `pnpm -F @hypdriv/example-with-purser audit:css`.
+4. For Vercel behaviour: `VERCEL=1 pnpm -F @hypdriv/example-vercel build`, `pnpm -F @hypdriv/example-vercel start`, then `hypdriv audit all --url http://localhost:3000`; `vercel build` in `examples/vercel` checks the Build Output API.
 
 ## Dependency freshness
 

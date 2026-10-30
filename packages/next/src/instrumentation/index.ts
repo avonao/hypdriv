@@ -1,10 +1,13 @@
 import {
   detectCapabilities,
+  detectDeployTarget,
   type HypDrivConfig,
   type HypDrivEnv,
+  isResolvedConfig,
   type Logger,
   loadConfig,
   type ResolvedConfig,
+  registerRuntime,
 } from '@hypdriv/core';
 import {
   createLogger,
@@ -27,7 +30,7 @@ export interface InstrumentationOptions {
 }
 
 function isResolved(config: HypDrivConfig | ResolvedConfig | undefined): config is ResolvedConfig {
-  return !!config && 'stages' in config && Array.isArray((config as ResolvedConfig).stages?.disable);
+  return isResolvedConfig(config);
 }
 
 /**
@@ -53,13 +56,26 @@ export function createInstrumentation(options: InstrumentationOptions = {}): {
     options.log ??
     createLogger(resolved.observe.logging, { service: resolved.site.name, component: 'instrumentation' });
   const errors = resolved.observe.errors;
+  const env = options.env ?? ((typeof process !== 'undefined' ? process.env : {}) as HypDrivEnv);
+  // Registers config + platform env for server helpers that run outside a request context (`enqueue()` in
+  // Vercel functions, where proxy.ts runs in a separate invocation).
+  const registerHypRuntime = async () => {
+    const target = detectDeployTarget(env as Record<string, unknown>, resolved.platform);
+    let runtimeEnv = env;
+    if (target === 'vercel') {
+      const { vercelEnv } = await import('@hypdriv/vercel');
+      runtimeEnv = vercelEnv(resolved, env as Record<string, unknown>) as HypDrivEnv;
+    }
+    registerRuntime({ config: resolved, env: runtimeEnv, target });
+  };
   if (errors.sink === 'none') {
     return {
-      async register() {},
+      async register() {
+        await registerHypRuntime();
+      },
       async onRequestError() {},
     };
   }
-  const env = options.env ?? ((typeof process !== 'undefined' ? process.env : {}) as HypDrivEnv);
   let built: NextOnRequestError | null = null;
   // Built on first use so tracing credentials are read after `register()` and env population.
   const hook: NextOnRequestError = (error, request, context) => {
@@ -91,6 +107,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): {
   };
   return {
     async register() {
+      await registerHypRuntime();
       log.debug('hypdriv instrumentation registered', {
         runtime: (typeof process !== 'undefined' && process.env.NEXT_RUNTIME) || 'nodejs',
         errors: errors.sink,

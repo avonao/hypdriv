@@ -11,7 +11,8 @@ const testEnv = env as unknown as TestEnv;
 const browser = {
   accept: 'text/html,application/xhtml+xml',
   'accept-language': 'en-US,en;q=0.9',
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
+  'user-agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
 };
 
 describe('createWorker in workerd', () => {
@@ -24,12 +25,17 @@ describe('createWorker in workerd', () => {
     expect(body).toContain('<!--$-->');
     expect(body).toContain('<!--/$-->');
     // the likely-LCP image is prioritised and no longer lazy
-    expect(body).toMatch(/<img src="\/hero.jpg" class="hero" fetchpriority="high">|<img[^>]*fetchpriority="high"[^>]*>/);
+    expect(body).toMatch(
+      /<img src="\/hero.jpg" class="hero" fetchpriority="high">|<img[^>]*fetchpriority="high"[^>]*>/,
+    );
     expect(body).not.toContain('loading="lazy"');
     // whitespace is preserved inside <pre>
     expect(body).toContain('<pre>  keep   this  </pre>');
     expect(response.headers.get('x-hypdriv-request-id')).toBeTruthy();
-    expect(response.headers.get('content-security-policy') ?? response.headers.get('content-security-policy-report-only')).toBeTruthy();
+    expect(
+      response.headers.get('content-security-policy') ??
+        response.headers.get('content-security-policy-report-only'),
+    ).toBeTruthy();
   });
 
   it('rate limits exactly through the HypDrivLimiter Durable Object', async () => {
@@ -57,7 +63,10 @@ describe('HypDrivLimiter', () => {
   it('counts fixed and sliding windows and hands out tokens', async () => {
     const stub = testEnv.HYPDRIV_LIMITER.get(testEnv.HYPDRIV_LIMITER.idFromName('limiter-test'));
     const t0 = 1_800_000_000_000;
-    expect(await stub.increment('k', 60, t0)).toEqual({ count: 1, resetAt: Math.floor(t0 / 60_000) * 60_000 + 60_000 });
+    expect(await stub.increment('k', 60, t0)).toEqual({
+      count: 1,
+      resetAt: Math.floor(t0 / 60_000) * 60_000 + 60_000,
+    });
     expect((await stub.increment('k', 60, t0 + 1)).count).toBe(2);
     // next window: sliding estimate includes the weighted previous window
     const next = Math.floor(t0 / 60_000) * 60_000 + 60_000;
@@ -86,9 +95,15 @@ describe('HypDrivLimiter', () => {
 
   it('speaks the JSON fetch transport', async () => {
     const stub = testEnv.HYPDRIV_LIMITER.get(testEnv.HYPDRIV_LIMITER.idFromName('fetch-test'));
-    const res = await stub.fetch('https://hypdriv.do/', { method: 'POST', body: JSON.stringify({ op: 'increment', args: ['x', 10, 0] }) });
+    const res = await stub.fetch('https://hypdriv.do/', {
+      method: 'POST',
+      body: JSON.stringify({ op: 'increment', args: ['x', 10, 0] }),
+    });
     expect(await res.json()).toEqual({ count: 1, resetAt: 10_000 });
-    const bad = await stub.fetch('https://hypdriv.do/', { method: 'POST', body: JSON.stringify({ op: 'nope' }) });
+    const bad = await stub.fetch('https://hypdriv.do/', {
+      method: 'POST',
+      body: JSON.stringify({ op: 'nope' }),
+    });
     expect(bad.status).toBe(400);
   });
 });

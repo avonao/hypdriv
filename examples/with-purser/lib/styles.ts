@@ -37,6 +37,11 @@ export const layout = css.create({
 
 export const text = css.create({
   title: { fontSize: { default: '2rem', [bp.md]: '2.75rem' }, lineHeight: '1.15', marginBlock: '0' },
-  lead: { fontSize: '1.125rem', color: t.color.muted, marginBlockStart: t.space[3], marginBlockEnd: t.space[8] },
+  lead: {
+    fontSize: '1.125rem',
+    color: t.color.muted,
+    marginBlockStart: t.space[3],
+    marginBlockEnd: t.space[8],
+  },
   code: { fontFamily: t.font.mono, fontSize: '0.875em' },
 });

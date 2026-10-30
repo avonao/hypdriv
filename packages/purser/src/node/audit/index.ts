@@ -56,6 +56,11 @@ export interface AuditOverridesOptions {
   themeClasses?: string[][];
   /** Viewport height (default 900). */
   height?: number;
+  /**
+   * Extra request headers for requests to the audited origins only (never third-party origins), e.g. the
+   * signed `x-hypdriv-audit` token that lets the headless browser past HypDriv's bot shield.
+   */
+  headers?: Record<string, string>;
   log?: Logger;
   /** Chrome launcher override (tests). */
   launch?: (options: LaunchChromeOptions) => Promise<LaunchedChrome>;
@@ -84,6 +89,11 @@ export function hoverTargetScript(): string {
 /** Page script: focuses the first focusable element when nothing is focused yet; reports the outcome. */
 export function focusScript(): string {
   return `(function(){var a=document.activeElement;if(!a||a===document.body||a===document.documentElement){var els=document.querySelectorAll(${JSON.stringify(INTERACTIVE_SELECTOR)});for(var i=0;i<els.length;i++){var r=els[i].getBoundingClientRect();if(r.width>0&&r.height>0){try{els[i].focus({focusVisible:true})}catch(e){els[i].focus()}break}}a=document.activeElement}var ok=!!a&&a!==document.body&&a!==document.documentElement;var fv=false;try{fv=ok&&a.matches(":focus-visible")}catch(e){}return{focused:ok,focusVisible:fv,tag:ok?a.tagName.toLowerCase():null}})()`;
+}
+
+/** Page script: HTTP status of the document's navigation (`0` when the browser does not expose it). */
+export function navigationStatusScript(): string {
+  return `(function(){try{var e=performance.getEntriesByType("navigation")[0];return e&&typeof e.responseStatus==="number"?e.responseStatus:0}catch(x){return 0}})()`;
 }
 
 /** Page script: replaces the theme classes on `<html>` (removes every known one, adds the chosen set). */
@@ -162,6 +172,35 @@ export async function auditOverrides(options: AuditOverridesOptions): Promise<Au
     });
     await client.send('Page.enable', {}, sessionId);
     await client.send('Runtime.enable', {}, sessionId);
+    const extraHeaders = Object.entries(options.headers ?? {});
+    if (extraHeaders.length) {
+      // Fetch interception scoped to the audited origins keeps the headers away from third parties.
+      const origins = [...new Set(options.urls.map((u) => new URL(u).origin))];
+      const cdp = client;
+      cdp.on('Fetch.requestPaused', (event) => {
+        if (event.sessionId !== sessionId) return;
+        const { requestId, request } = event.params as {
+          requestId: string;
+          request: { headers?: Record<string, string> };
+        };
+        const merged = new Map<string, string>();
+        for (const [name, value] of Object.entries(request.headers ?? {}))
+          merged.set(name.toLowerCase(), value);
+        for (const [name, value] of extraHeaders) merged.set(name.toLowerCase(), value);
+        cdp
+          .send(
+            'Fetch.continueRequest',
+            { requestId, headers: [...merged].map(([name, value]) => ({ name, value })) },
+            sessionId,
+          )
+          .catch(() => undefined);
+      });
+      await client.send(
+        'Fetch.enable',
+        { patterns: origins.map((origin) => ({ urlPattern: `${origin}/*`, requestStage: 'Request' })) },
+        sessionId,
+      );
+    }
 
     const fail = (url: string, width: number, theme: string[], error: string) => {
       for (const state of states)
@@ -185,6 +224,11 @@ export async function auditOverrides(options: AuditOverridesOptions): Promise<Au
               continue;
             }
             await loaded;
+            const status = await evaluate<number>(client, sessionId, navigationStatusScript());
+            if (typeof status === 'number' && status >= 400) {
+              fail(url, width, theme, `HTTP ${status}`);
+              continue;
+            }
             if (theme.length || allThemeClassNames.length) {
               await evaluate(client, sessionId, themeClassesScript(theme, allThemeClassNames));
             }
@@ -245,15 +289,22 @@ export async function auditOverrides(options: AuditOverridesOptions): Promise<Au
                 });
                 continue;
               }
+              // A page without evaluable author rules proves nothing: report it instead of a clean pass.
+              const nothingEvaluated = report.rules === 0;
               pages.push({
                 url,
                 width,
                 state,
                 theme,
-                count: report.count,
+                count: nothingEvaluated ? -1 : report.count,
                 struck: report.struck,
                 rules: report.rules,
                 skipped: [...skipped, ...report.skipped],
+                ...(nothingEvaluated
+                  ? {
+                      error: `no author CSS rules could be evaluated${report.skipped.length ? ` (${report.skipped.slice(0, 3).join('; ')})` : ' (no stylesheet loaded)'}`,
+                    }
+                  : {}),
               });
               log.info('purser audit', { url, width, state, theme: theme.join(' '), count: report.count });
             }

@@ -1,11 +1,11 @@
-import { type CacheStore, createMemoryStore } from '@hypdriv/cache';
+import { type CacheStore, createMemoryStore, type Purger } from '@hypdriv/cache';
 import {
   type Capabilities,
   detectCapabilities,
   type Logger,
+  queueEnvKey,
   type RateLimitBindingLike,
   type RateLimitStore,
-  type ResolvedConfig,
   type Stage,
   shortHash,
 } from '@hypdriv/core';
@@ -13,18 +13,20 @@ import { type CounterStore, createMemoryCounterStore } from '@hypdriv/security';
 import { type VercelCdnOptions, vercelCdnStage } from './cdn';
 import { vercelRateLimitRouter, vercelRateLimitStage } from './firewall';
 import { type GlobalConfigKv, globalConfigKv, parseGlobalConfigConnection } from './global-config';
-import { type VercelPurger, vercelPurger } from './purge';
+import { toPlatformPurger, type VercelPurger, vercelPurger } from './purge';
+import { vercelQueue } from './queues';
 import { type UpstashKv, upstashCounterStore, upstashKv } from './upstash';
-import { defaultLogger, readFirstEnv, warnOnce } from './util';
+import { type ConfigInput, defaultLogger, readFirstEnv, resolveInput, warnOnce } from './util';
 
 /** The env key under which `vercelEnv` exposes Upstash Redis as a KV namespace (always read-write). */
 export const REDIS_BINDING = 'HYPDRIV_REDIS';
 
 /** Upstash credentials resolved from `vercel.redis` (`KV_REST_API_*`, then `UPSTASH_REDIS_REST_*`). */
 export function resolveRedis(
-  config: ResolvedConfig,
+  configInput: ConfigInput,
   env: Record<string, unknown>,
 ): { url: string; token: string; prefix: string } | null {
+  const config = resolveInput(configInput);
   const redis = config.vercel.redis;
   if (!redis) return null;
   const url = readFirstEnv(env, redis.urlEnv);
@@ -33,7 +35,8 @@ export function resolveRedis(
 }
 
 /** The Global Config connection string from `vercel.globalConfig.connectionEnv` (`GLOBAL_CONFIG`, then `EDGE_CONFIG`). */
-export function resolveGlobalConfig(config: ResolvedConfig, env: Record<string, unknown>): string | null {
+export function resolveGlobalConfig(configInput: ConfigInput, env: Record<string, unknown>): string | null {
+  const config = resolveInput(configInput);
   const gc = config.vercel.globalConfig;
   if (!gc) return null;
   return readFirstEnv(env, gc.connectionEnv) ?? null;
@@ -78,13 +81,16 @@ export interface VercelEnvOptions {
  * - the generic KV binding (`cloudflare.bindings.kv`, and the flags/redirects/maintenance KV bindings when they
  *   differ): Global Config when a connection string exists (those consumers only read), otherwise Upstash
  *   Redis when its credentials exist;
- * - `HYPDRIV_REDIS`: Upstash Redis (read-write) when configured.
+ * - `HYPDRIV_REDIS`: Upstash Redis (read-write) when configured;
+ * - `HYPDRIV_QUEUE:<name>`: a Vercel Queues producer for every configured queue (`enqueue()` uses it once
+ *   `@vercel/queue` is registered).
  */
 export function vercelEnv(
-  config: ResolvedConfig,
+  configInput: ConfigInput,
   env: Record<string, unknown>,
   options: VercelEnvOptions = {},
 ): Record<string, unknown> {
+  const config = resolveInput(configInput);
   const out: Record<string, unknown> = { ...env };
   const custom = options.fetch !== undefined;
   const fetchOption = options.fetch ? { fetch: options.fetch } : {};
@@ -92,8 +98,10 @@ export function vercelEnv(
   let redis: UpstashKv | null = null;
   const redisConfig = resolveRedis(config, env);
   if (redisConfig) {
-    redis = memo(`upstash|${redisConfig.url}|${redisConfig.prefix}|${shortHash(redisConfig.token)}`, custom, () =>
-      upstashKv({ ...redisConfig, ...fetchOption }),
+    redis = memo(
+      `upstash|${redisConfig.url}|${redisConfig.prefix}|${shortHash(redisConfig.token)}`,
+      custom,
+      () => upstashKv({ ...redisConfig, ...fetchOption }),
     );
   }
 
@@ -101,7 +109,9 @@ export function vercelEnv(
   const connection = resolveGlobalConfig(config, env);
   if (connection) {
     if (parseGlobalConfigConnection(connection)) {
-      globalConfig = memo(`global-config|${shortHash(connection)}`, custom, () => globalConfigKv(connection, fetchOption));
+      globalConfig = memo(`global-config|${shortHash(connection)}`, custom, () =>
+        globalConfigKv(connection, fetchOption),
+      );
     } else {
       warnOnce(
         options.log ?? defaultLogger(),
@@ -110,6 +120,18 @@ export function vercelEnv(
         { env: config.vercel.globalConfig?.connectionEnv },
       );
     }
+  }
+
+  // Queue producers for `enqueue()`: Vercel Queues per HypDriv queue name (ready once `@vercel/queue` is
+  // registered with `registerVercelSdk`; until then `enqueue()` calls the consumer route inline).
+  const queueNames = new Set([
+    ...Object.keys(config.jobs.queues),
+    ...Object.keys(config.vercel.queues),
+    ...Object.keys(config.cloudflare.bindings.queues),
+  ]);
+  for (const name of queueNames) {
+    const key = queueEnvKey(name);
+    if (!out[key]) out[key] = vercelQueue(name, config);
   }
 
   if (redis && !isKvLike(out[REDIS_BINDING])) out[REDIS_BINDING] = redis;
@@ -131,7 +153,14 @@ export function vercelEnv(
 /** The `overrides` for `createPlatform` (`@hypdriv/next/stages`) on Vercel. */
 export interface VercelPlatformOverrides {
   capabilities: Capabilities;
-  purger: VercelPurger;
+  /** `vercelPurger` adapted to the platform's `Purger` slot (reached through the edge cache's purge). */
+  purger: Purger;
+  /**
+   * The same purger with purge counts. Not a `createPlatform` override: register it with
+   * `registerEdgePurger` on Vercel so `purgeEdge()` / `revalidateTag()` report what Vercel purged (the edge
+   * cache's own store is unused when `vercelCdnStage` replaces its stage).
+   */
+  edgePurger: VercelPurger;
   /** Default counter store for `store: 'auto'` policies: Upstash (exact, global) when configured. */
   counterStore?: CounterStore;
   counterStores?: Partial<Record<RateLimitStore, CounterStore>>;
@@ -150,24 +179,45 @@ export interface VercelPlatformOverrides {
  *   Global Config, a memory store replaces the KV counter store (with a one-time warning);
  * - `rateLimitBinding`: the WAF router when `vercel.firewall.rateLimitRules` has entries (the SDK is resolved at
  *   call time, so registering it later still works);
- * - `purger`: `vercelPurger`;
+ * - `purger`: `vercelPurger` (adapted to the `Purger` slot; `edgePurger` is the same purger with counts);
  * - `cacheStore`: a memory store when the KV binding is read-only.
  */
 export function vercelPlatformOverrides(
-  config: ResolvedConfig,
+  configInput: ConfigInput,
   env: Record<string, unknown>,
   options: VercelEnvOptions = {},
 ): VercelPlatformOverrides {
+  const config = resolveInput(configInput);
   const log = options.log ?? defaultLogger();
   const augmented = vercelEnv(config, env, options);
+  const edgePurger = vercelPurger({
+    env: augmented,
+    config,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+    log,
+  });
+  const capabilities = detectCapabilities(augmented, config, { cf: false, waitUntil: true });
+  const redisReady = resolveRedis(config, augmented) !== null;
+  const wafRules = Object.keys(config.vercel.firewall.rateLimitRules).length;
+  const queueNames = [...new Set([...Object.keys(config.jobs.queues), ...Object.keys(config.vercel.queues)])];
+  capabilities.services = {
+    cache: config.vercel.cdn
+      ? 'Vercel CDN (Vercel-CDN-Cache-Control, Vercel-Cache-Tag)'
+      : 'memory (per instance)',
+    'tag purge': 'Vercel CDN tag purge (request context, REST with VERCEL_TOKEN)',
+    'rate limiting': [
+      redisReady ? 'exact (Upstash Redis)' : 'per instance',
+      ...(wafRules ? [`Vercel WAF (${wafRules} rule${wafRules === 1 ? '' : 's'})`] : []),
+    ].join(' + '),
+    images: 'Vercel Image Optimization',
+    queues: queueNames.length
+      ? `Vercel Queues (${queueNames.join(', ')}; consumer route until @vercel/queue is registered)`
+      : 'none',
+  };
   const overrides: VercelPlatformOverrides = {
-    capabilities: detectCapabilities(augmented, config, { cf: false, waitUntil: true }),
-    purger: vercelPurger({
-      env: augmented,
-      config,
-      ...(options.fetch ? { fetch: options.fetch } : {}),
-      log,
-    }),
+    capabilities,
+    purger: toPlatformPurger(edgePurger),
+    edgePurger,
   };
   const kvReadOnly = isReadOnlyKv(augmented[config.cloudflare.bindings.kv]);
   const redis = resolveRedis(config, augmented);
@@ -205,10 +255,17 @@ export interface VercelStagesOptions extends VercelCdnOptions {
  *
  * Pass it as the `stages` callback (`createProxy(config, vercelStages(config))`).
  */
-export function vercelStages(config: ResolvedConfig, options: VercelStagesOptions = {}): (defaults: Stage[]) => Stage[] {
+export function vercelStages(
+  configInput: ConfigInput,
+  options: VercelStagesOptions = {},
+): (defaults: Stage[]) => Stage[] {
+  const config = resolveInput(configInput);
   return (defaults) => {
     const cdn = vercelCdnStage(config, options);
-    const waf = vercelRateLimitStage(config, options.wafTimeoutMs !== undefined ? { timeoutMs: options.wafTimeoutMs } : {});
+    const waf = vercelRateLimitStage(
+      config,
+      options.wafTimeoutMs !== undefined ? { timeoutMs: options.wafTimeoutMs } : {},
+    );
     const out: Stage[] = [];
     let wafPlaced = !waf;
     for (const stage of defaults) {

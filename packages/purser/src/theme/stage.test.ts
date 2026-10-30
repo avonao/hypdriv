@@ -74,9 +74,14 @@ const html = (body: string, init: ResponseInit = {}) =>
     headers: { 'content-type': 'text/html; charset=utf-8', ...(init.headers ?? {}) },
   });
 
-async function run(config: HypDrivConfig, request: Request, upstream: (req: Request) => Response) {
+async function run(
+  config: HypDrivConfig,
+  request: Request,
+  upstream: (req: Request) => Response,
+  runner: 'worker' | 'proxy' = 'worker',
+) {
   const resolved = resolveConfig(config);
-  const ctx = createContext({ request, config: resolved, runner: 'worker' });
+  const ctx = createContext({ request, config: resolved, runner });
   let forwarded: Request | undefined;
   const { response } = await runPipeline({
     stages: [themeStage(resolved)],
@@ -187,5 +192,22 @@ describe('mergeThemeClasses', () => {
     expect(mergeThemeClasses(null, ['dark', 'dark'], known)).toBe('dark');
     expect(mergeThemeClasses('dark', [], known)).toBe('');
     expect(mergeThemeClasses('x x', [], known)).toBe('x');
+  });
+});
+
+describe('themeStage in proxy.ts', () => {
+  it('negotiates on Next.js pass-through responses (no body to rewrite yet)', async () => {
+    const { response, forwarded } = await run(
+      themed,
+      new Request('https://x.test/docs', {
+        headers: { cookie: 'hyp_theme=mode%3Ddark', accept: 'text/html' },
+      }),
+      () => new Response(null, { headers: { 'x-middleware-next': '1' } }),
+      'proxy',
+    );
+    expect(forwarded.headers.get(HEADER.theme)).toContain('mode=dark');
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.headers.get('vary')).toContain('Cookie');
+    expect(response.headers.get('accept-ch')).toContain('Sec-CH-Prefers-Color-Scheme');
   });
 });

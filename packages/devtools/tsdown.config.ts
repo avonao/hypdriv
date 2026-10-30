@@ -7,7 +7,7 @@ export default defineConfig({
   format: ['esm'],
   platform: 'browser',
   target: 'es2023',
-  external: [/^node:/, /^cloudflare:/],
+  deps: { neverBundle: [/^node:/, /^cloudflare:/] },
   dts: true,
   sourcemap: true,
   clean: true,

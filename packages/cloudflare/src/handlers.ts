@@ -15,14 +15,29 @@ function originFor(config: ResolvedConfig): string {
   return config.site.origin ?? 'https://hypdriv.internal';
 }
 
-async function internalRequest(ctx: DispatchContext, path: string, body: unknown, init: { method?: string; headers?: Record<string, string>; job?: string } = {}): Promise<Request> {
+async function internalRequest(
+  ctx: DispatchContext,
+  path: string,
+  body: unknown,
+  init: { method?: string; headers?: Record<string, string>; job?: string } = {},
+): Promise<Request> {
   const url = new URL(path, originFor(ctx.config));
-  const headers = new Headers({ 'content-type': 'application/json', 'x-hypdriv-internal': '1', ...(init.headers ?? {}) });
+  const headers = new Headers({
+    'content-type': 'application/json',
+    'x-hypdriv-internal': '1',
+    ...(init.headers ?? {}),
+  });
   if (init.job) headers.set('x-hypdriv-job', init.job);
-  const request = new Request(url, { method: init.method ?? 'POST', headers, body: init.method === 'GET' ? undefined : JSON.stringify(body) });
+  const request = new Request(url, {
+    method: init.method ?? 'POST',
+    headers,
+    body: init.method === 'GET' ? undefined : JSON.stringify(body),
+  });
   const secret = readEnv(ctx.env, ctx.config.security.internalAuth.secretEnv);
   if (!secret) {
-    ctx.log.warn(`hypdriv: ${ctx.config.security.internalAuth.secretEnv} is not set; internal requests are unsigned and job routes will reject them outside development`);
+    ctx.log.warn(
+      `hypdriv: ${ctx.config.security.internalAuth.secretEnv} is not set; internal requests are unsigned and job routes will reject them outside development`,
+    );
     return request;
   }
   return signing.signInternalRequest(request, secret);
@@ -49,14 +64,22 @@ export interface ScheduledEventLike {
 /** Dispatches a cron trigger to the configured job routes (and warms routes when `cache.warm.cron` matches). */
 const normalizeCron = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-export async function dispatchScheduled(event: ScheduledEventLike, ctx: DispatchContext): Promise<{ ran: string[]; failed: string[] }> {
+export async function dispatchScheduled(
+  event: ScheduledEventLike,
+  ctx: DispatchContext,
+): Promise<{ ran: string[]; failed: string[] }> {
   const cron = normalizeCron(event.cron);
   const ran: string[] = [];
   const failed: string[] = [];
   const jobs = Object.entries(ctx.config.jobs.cron).filter(([, j]) => normalizeCron(j.cron) === cron);
   for (const [name, job] of jobs) {
     try {
-      const request = await internalRequest(ctx, job.path, { job: name, cron, scheduledTime: event.scheduledTime }, { method: job.method, job: name });
+      const request = await internalRequest(
+        ctx,
+        job.path,
+        { job: name, cron, scheduledTime: event.scheduledTime },
+        { method: job.method, job: name },
+      );
       const res = await withTimeout(ctx.invoke(request), job.timeoutMs, `job ${name}`);
       if (!res.ok) throw new Error(`job ${name} responded ${res.status}`);
       ran.push(name);
@@ -75,7 +98,9 @@ export async function dispatchScheduled(event: ScheduledEventLike, ctx: Dispatch
       while (index < warm.routes.length) {
         const route = warm.routes[index++]!;
         try {
-          const res = await ctx.invoke(new Request(new URL(route, origin), { headers: { 'x-hypdriv-warm': '1', accept: 'text/html' } }));
+          const res = await ctx.invoke(
+            new Request(new URL(route, origin), { headers: { 'x-hypdriv-warm': '1', accept: 'text/html' } }),
+          );
           await res.body?.cancel();
         } catch (err) {
           ctx.log.warn('warm failed', { route, error: (err as Error).message });
@@ -110,13 +135,21 @@ export interface MessageBatchLike<Body = unknown> {
 export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContext): Promise<void> {
   const consumer = ctx.config.jobs.queues[batch.queue];
   if (!consumer) {
-    ctx.log.error('queue batch has no configured consumer', { queue: batch.queue, size: batch.messages.length });
+    ctx.log.error('queue batch has no configured consumer', {
+      queue: batch.queue,
+      size: batch.messages.length,
+    });
     batch.retryAll();
     return;
   }
   const payload = {
     job: batch.queue,
-    messages: batch.messages.map((m) => ({ id: m.id, timestamp: m.timestamp.toISOString(), body: m.body, attempts: m.attempts })),
+    messages: batch.messages.map((m) => ({
+      id: m.id,
+      timestamp: m.timestamp.toISOString(),
+      body: m.body,
+      attempts: m.attempts,
+    })),
   };
   try {
     const request = await internalRequest(ctx, consumer.path, payload, { job: batch.queue });
@@ -133,7 +166,11 @@ export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContex
       if (retry.has(m.id) && consumer.retry !== 'none') m.retry();
       else m.ack();
     }
-    ctx.log.info('queue batch processed', { queue: batch.queue, size: batch.messages.length, retried: retry.size });
+    ctx.log.info('queue batch processed', {
+      queue: batch.queue,
+      size: batch.messages.length,
+      retried: retry.size,
+    });
   } catch (err) {
     ctx.log.error('queue batch failed', { queue: batch.queue, error: (err as Error).message });
     if (consumer.retry === 'none') batch.ackAll();
@@ -159,7 +196,13 @@ export async function dispatchEmail(message: EmailMessageLike, ctx: DispatchCont
     return;
   }
   const url = new URL(target.path, originFor(ctx.config));
-  const headers = new Headers({ 'content-type': 'message/rfc822', 'x-hypdriv-internal': '1', 'x-hypdriv-job': 'email', 'x-email-from': message.from, 'x-email-to': message.to });
+  const headers = new Headers({
+    'content-type': 'message/rfc822',
+    'x-hypdriv-internal': '1',
+    'x-hypdriv-job': 'email',
+    'x-email-from': message.from,
+    'x-email-to': message.to,
+  });
   const id = message.headers.get('message-id');
   if (id) headers.set('x-email-message-id', id);
   const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
@@ -168,7 +211,10 @@ export async function dispatchEmail(message: EmailMessageLike, ctx: DispatchCont
   if (secret) request = await signing.signInternalRequest(request, secret);
   const res = await ctx.invoke(request);
   if (res.status >= 400) {
-    const reason = res.status === 550 || res.status === 422 ? await res.text().catch(() => 'rejected') : `handler responded ${res.status}`;
+    const reason =
+      res.status === 550 || res.status === 422
+        ? await res.text().catch(() => 'rejected')
+        : `handler responded ${res.status}`;
     message.setReject(reason.slice(0, 200));
   }
 }
@@ -185,10 +231,19 @@ export interface TailEventLike {
 /** Forwards tail events (from a tail consumer Worker) to structured logs. */
 export function forwardTail(events: TailEventLike[], ctx: Pick<DispatchContext, 'log'>): void {
   for (const e of events) {
-    for (const ex of e.exceptions) ctx.log.error('tail exception', { script: e.scriptName, name: ex.name, message: ex.message, outcome: e.outcome, at: ex.timestamp });
+    for (const ex of e.exceptions)
+      ctx.log.error('tail exception', {
+        script: e.scriptName,
+        name: ex.name,
+        message: ex.message,
+        outcome: e.outcome,
+        at: ex.timestamp,
+      });
     for (const l of e.logs) {
-      if (l.level === 'error') ctx.log.error('tail log', { script: e.scriptName, message: l.message, at: l.timestamp });
-      else if (l.level === 'warn') ctx.log.warn('tail log', { script: e.scriptName, message: l.message, at: l.timestamp });
+      if (l.level === 'error')
+        ctx.log.error('tail log', { script: e.scriptName, message: l.message, at: l.timestamp });
+      else if (l.level === 'warn')
+        ctx.log.warn('tail log', { script: e.scriptName, message: l.message, at: l.timestamp });
     }
   }
 }

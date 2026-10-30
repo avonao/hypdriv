@@ -10,8 +10,26 @@ export { HypDrivIndex, HypDrivLimiter } from '../durable-objects/index';
 const manifest = emptyManifest({
   buildId: 'workers-test',
   routes: [
-    { id: 'app:/', pathname: '/', regex: routePatternToRegex('/'), kind: 'app-page', classification: 'dynamic', runtime: 'nodejs', dynamic: true, assets: { js: [], css: [], fonts: [] } },
-    { id: 'route:/api/ping', pathname: '/api/ping', regex: routePatternToRegex('/api/ping'), kind: 'app-route', classification: 'route', runtime: 'nodejs', dynamic: true, assets: { js: [], css: [], fonts: [] } },
+    {
+      id: 'app:/',
+      pathname: '/',
+      regex: routePatternToRegex('/'),
+      kind: 'app-page',
+      classification: 'dynamic',
+      runtime: 'nodejs',
+      dynamic: true,
+      assets: { js: [], css: [], fonts: [] },
+    },
+    {
+      id: 'route:/api/ping',
+      pathname: '/api/ping',
+      regex: routePatternToRegex('/api/ping'),
+      kind: 'app-route',
+      classification: 'route',
+      runtime: 'nodejs',
+      dynamic: true,
+      assets: { js: [], css: [], fonts: [] },
+    },
   ],
 });
 
@@ -23,8 +41,13 @@ const html = `<!doctype html><html><head><title>t</title></head><body>
 export default createWorker({
   config: {
     site: { name: 'workers-test' },
-    performance: { html: { stripComments: true, collapseWhitespace: true }, priorityHints: { selectors: ['img.hero'] } },
-    security: { rateLimit: [{ id: 'api', match: '/api/**', limit: 3, window: '1m', algorithm: 'fixed-window' }] },
+    performance: {
+      html: { stripComments: true, collapseWhitespace: true },
+      priorityHints: { selectors: ['img.hero'] },
+    },
+    security: {
+      rateLimit: [{ id: 'api', match: '/api/**', limit: 3, window: '1m', algorithm: 'fixed-window' }],
+    },
   },
   manifest,
   development: false,

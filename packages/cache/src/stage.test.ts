@@ -314,6 +314,25 @@ describe('edge-cache stage: miss, hit, stale', () => {
   });
 });
 
+describe('edge-cache stage: build scoping', () => {
+  it('never serves an entry stored by another build output, even with the same build id', async () => {
+    const store = createMemoryStore({ now: () => NOW });
+    const first = harness({ store, manifest: { ...manifest, fingerprint: 'aaaaaaaaaaaaaaaa' } });
+    const stored = await first.request('https://x.test/blog/hello');
+    expect(stored.decision.status).toBe('MISS');
+    await stored.flush();
+    expect((await first.request('https://x.test/blog/hello')).decision.status).toBe('HIT');
+
+    // Rebuild of the same commit: same buildId, different output.
+    const rebuilt = harness({ store, manifest: { ...manifest, fingerprint: 'bbbbbbbbbbbbbbbb' } });
+    const fresh = await rebuilt.request('https://x.test/blog/hello');
+    expect(fresh.decision.status).toBe('MISS');
+    expect(fresh.decision.key).not.toBe(stored.decision.key);
+    // Tags keep the build id, so `build:<id>` purges still address the deployment.
+    expect(fresh.response.headers.get('cache-tag')).toContain('build:build-1');
+  });
+});
+
 describe('edge-cache stage: cacheability of upstream responses', () => {
   it('respects origin Cache-Control', async () => {
     const h = harness();

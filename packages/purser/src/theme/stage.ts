@@ -2,7 +2,7 @@ import {
   appendListHeader,
   defineStage,
   HEADER,
-  isHtmlResponse,
+  isHtmlLike,
   parseCookies,
   type ResolvedConfig,
   type Stage,
@@ -159,7 +159,8 @@ export function themeStage(config: ResolvedConfig): Stage {
       ctx.requestHeaders.set(HEADER.theme, resolved.header);
     },
     post(ctx, response) {
-      if (!theme || !isHtmlResponse(response)) return response;
+      // `isHtmlLike`: in proxy.ts the response is Next's pass-through marker; the negotiation headers still apply.
+      if (!theme || !isHtmlLike(ctx, response)) return response;
       const resolved = ctx.state.get(THEME_RESOLVED_KEY) ?? resolveFor(ctx.request);
       const pinned = pinThemeResponse(response, resolved, known);
       const headers = new Headers(pinned.headers);

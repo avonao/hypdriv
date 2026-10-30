@@ -8,8 +8,6 @@ Runtime-neutral: no Node built-ins, no Cloudflare types, no OpenTelemetry SDK.
 
 ```sh
 pnpm add @hypdriv/observe @hypdriv/core
-# optional, for the client reporter's full metric set (INP, attribution, session windows):
-pnpm add web-vitals
 ```
 
 ## Tracing
@@ -98,7 +96,7 @@ import { reportVitals, readServerTiming, readHypDrivHeaders } from '@hypdriv/obs
 const stop = reportVitals({ endpoint: '/_hypdriv/vitals', sampleRate: 1, attribution: true });
 ```
 
-- `reportVitals(options)` loads `web-vitals` (`web-vitals/attribution` when `attribution` is on) with a dynamic import and subscribes to LCP, INP, CLS, FCP and TTFB. When the import fails it falls back to a basic `PerformanceObserver` implementation (TTFB, FCP, LCP, CLS; no INP, no session windows). Bundlers resolve the dynamic import at build time, so install `web-vitals` or pass `source: 'observer'`; `source: (report) => …` plugs any metric stream in (e.g. `useReportWebVitals(report)` from `next/web-vitals`).
+- `reportVitals(options)` loads `web-vitals` (a dependency; `web-vitals/attribution` when `attribution` is on) as a separate chunk and subscribes to LCP, INP, CLS, FCP and TTFB. When the chunk cannot load it falls back to a basic `PerformanceObserver` implementation (TTFB, FCP, LCP, CLS; no INP, no session windows); `source: 'observer'` forces that, and `source: (report) => …` plugs any metric stream in (e.g. `useReportWebVitals(report)` from `next/web-vitals`).
 - Payloads carry `route` and `buildId` from `<meta name="hypdriv:route">` / `<meta name="hypdriv:build">`, `cache` from the `cache` Server-Timing entry, `pathname`, `ts`, optional `attribution` and `extra()` fields. They are batched and sent with `navigator.sendBeacon` on `visibilitychange` (hidden) / `pagehide`, else `fetch` with `keepalive`.
 - `createVitalsReporter(options)` is the queue + beacon half without a metric source. `readServerTiming()` returns the navigation entry's `Server-Timing` as core `TimingEntry[]`; `readHypDrivHeaders()` returns all `hypdriv:*` meta tags plus the cache status.
 

@@ -48,14 +48,8 @@ export interface TagIndex {
 }
 
 export type CacheStatus =
-  | 'HIT'
-  | 'MISS'
-  | 'STALE'
-  | 'BYPASS'
-  | 'REVALIDATED'
-  | 'ERROR-STALE'
-  | 'DYNAMIC'
-  | 'NEGATIVE';
+  /** Cached by the hosting platform's CDN (Vercel) from headers HypDriv wrote, not by HypDriv's store. */
+  'CDN' | 'HIT' | 'MISS' | 'STALE' | 'BYPASS' | 'REVALIDATED' | 'ERROR-STALE' | 'DYNAMIC' | 'NEGATIVE';
 
 /** The outcome of the edge-cache stage for one request (`ctx.state.get(CACHE_DECISION_KEY)`). */
 export interface CacheDecision {

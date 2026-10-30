@@ -1,24 +1,33 @@
-import { UPSTREAM_KEY } from '@hypdriv/cache';
+import { type EdgePurger, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
 import {
   clientIp,
   createContext,
+  type DeployTarget,
+  detectDeployTarget,
   getCf,
   getCurrentContext,
   HEADER,
   type HypDrivConfig,
   type HypDrivEnv,
   type HypManifest,
+  isResolvedConfig,
   loadConfig,
   nodeEnvironment,
   type ResolvedConfig,
+  registerRuntime,
   runPipeline,
   runWithContext,
   type Stage,
   sanitizeInboundRequest,
 } from '@hypdriv/core';
-import { registerEdgePurger } from '@hypdriv/cache';
 import { readManifestFile } from '../shared/manifest-file';
-import { buildDefaultStages, type CreatePlatformInput, createPlatform, internalRoutes, type Platform } from '../stages/index';
+import {
+  buildDefaultStages,
+  type CreatePlatformInput,
+  createPlatform,
+  internalRoutes,
+  type Platform,
+} from '../stages/index';
 
 export { buildDefaultStages, createPlatform, type Platform, stages } from '../stages/index';
 
@@ -40,6 +49,13 @@ export interface CreateProxyOptions {
   devState?: () => Promise<Record<string, unknown>>;
   /** Produces the pass-through response (default: `NextResponse.next({ request: { headers } })`). */
   next?: (request: Request) => Promise<Response>;
+  /**
+   * Deployment target (default: the config's `platform`, else detected — `VERCEL=1` → `vercel`). On Vercel the
+   * proxy wires `@hypdriv/vercel` automatically: Upstash/Global Config bindings, Vercel CDN cache headers in
+   * place of the edge-cache stage, tag purges through Vercel, WAF rate-limit rules. `options.platform`
+   * overrides still win.
+   */
+  target?: DeployTarget;
 }
 
 type StageList = Stage[] | ((defaults: Stage[], platform: Platform) => Stage[]);
@@ -64,7 +80,11 @@ async function readDevState(): Promise<Record<string, unknown>> {
     if (typeof proc?.cwd !== 'function') return {};
     const { readFile } = await import('node:fs/promises');
     const { join } = await import('node:path');
-    return { purser: JSON.parse(await readFile(join(proc.cwd(), '.hypdriv', 'dev', 'purser.json'), 'utf8')) as unknown };
+    return {
+      purser: JSON.parse(
+        await readFile(join(proc.cwd(), '.hypdriv', 'dev', 'purser.json'), 'utf8'),
+      ) as unknown,
+    };
   } catch {
     return {};
   }
@@ -86,32 +106,49 @@ export function createProxy(
   stageList?: StageList,
   options: CreateProxyOptions = {},
 ) {
-  const resolved: ResolvedConfig =
-    'site' in config &&
-    'stages' in config &&
-    typeof (config as ResolvedConfig).site?.name === 'string' &&
-    Array.isArray((config as ResolvedConfig).stages?.disable)
-      ? (config as ResolvedConfig)
-      : loadConfig(config as HypDrivConfig);
-  let ready: Promise<{ platform: Platform; stages: Stage[]; internal: ReturnType<typeof internalRoutes> }> | null = null;
+  const resolved: ResolvedConfig = isResolvedConfig(config) ? config : loadConfig(config);
+  let ready: Promise<{
+    platform: Platform;
+    stages: Stage[];
+    internal: ReturnType<typeof internalRoutes>;
+  }> | null = null;
 
   const init = async () => {
     const manifest =
       options.manifest === undefined ? await readManifestFile(Number.POSITIVE_INFINITY) : options.manifest;
-    const env = options.env ?? (globalThis as { process?: { env?: HypDrivEnv } }).process?.env ?? {};
+    let env: HypDrivEnv =
+      options.env ?? (globalThis as { process?: { env?: HypDrivEnv } }).process?.env ?? {};
     const development =
       options.development ?? nodeEnvironment(env as Record<string, unknown>) === 'development';
+    const target = options.target ?? detectDeployTarget(env as Record<string, unknown>, resolved.platform);
+    let overrides: CreatePlatformInput['overrides'] | undefined = options.platform;
+    let adapt: ((defaults: Stage[]) => Stage[]) | null = null;
+    let purger: EdgePurger | null = null;
+    if (target === 'vercel') {
+      const vercel = await import('@hypdriv/vercel');
+      env = vercel.vercelEnv(resolved, env as Record<string, unknown>) as HypDrivEnv;
+      const { edgePurger, ...platformOverrides } = vercel.vercelPlatformOverrides(
+        resolved,
+        env as Record<string, unknown>,
+      );
+      overrides = { ...platformOverrides, ...(options.platform ?? {}) };
+      purger = edgePurger;
+      adapt = vercel.vercelStages(resolved);
+    }
     const platform = createPlatform({
       config: resolved,
       manifest,
       env,
       runner: 'proxy',
       development,
-      ...(options.platform ? { overrides: options.platform } : {}),
+      ...(overrides ? { overrides } : {}),
     });
-    const defaults = buildDefaultStages(platform);
+    const defaults = adapt ? adapt(buildDefaultStages(platform)) : buildDefaultStages(platform);
     const list = typeof stageList === 'function' ? stageList(defaults, platform) : (stageList ?? defaults);
-    if (platform.edgeCache) registerEdgePurger(platform.edgeCache);
+    registerRuntime({ config: platform.config, env, target });
+    // `revalidateTag()` / `purgeEdge()` purge what actually caches responses: Vercel's CDN, or the edge cache.
+    if (purger) registerEdgePurger(purger);
+    else if (platform.edgeCache) registerEdgePurger(platform.edgeCache);
     const internal = internalRoutes(platform, {
       devEndpoints: platform.development,
       devState: options.devState ?? readDevState,

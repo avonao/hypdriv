@@ -545,3 +545,47 @@ describe('cspReportHandler and suggestPolicy', () => {
     expect(directives['connect-src']).toEqual(["'self'", 'https://api.example.com']);
   });
 });
+
+describe('cspStage in proxy.ts', () => {
+  const config = resolveConfig({});
+  const passThrough = () => new Response(null, { headers: { 'x-middleware-next': '1' } });
+  const asProxy = <T extends { runner: string }>(ctx: T) => Object.assign(ctx, { runner: 'proxy' });
+
+  it('sets the policy on Next.js pass-through responses of page routes', async () => {
+    const ctx = asProxy(
+      makeCtx({
+        config,
+        url: 'https://app.test/dash',
+        route: dynamicRoute,
+        headers: { accept: 'text/html' },
+      }),
+    );
+    const { response, forwarded } = await runStage(
+      cspStage(config, { htmlRewriter: null }),
+      ctx,
+      passThrough,
+    );
+    const policy = response.headers.get('content-security-policy');
+    expect(policy).toContain(`'nonce-${ctx.state.get(NONCE_KEY)}'`);
+    expect(forwarded?.headers.get('content-security-policy')).toBe(policy);
+    expect(response.headers.get(HEADER.cspMode)).toBe('nonce');
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('uses the manifest hashes for static pages and skips Route Handlers', async () => {
+    const page = asProxy(makeCtx({ config, url: 'https://app.test/', route: staticRoute, manifest }));
+    const { response } = await runStage(cspStage(config, { htmlRewriter: null }), page, passThrough);
+    expect(response.headers.get('content-security-policy')).toContain(HASH);
+    expect(response.headers.get(HEADER.cspMode)).toBe('hash');
+
+    const api = asProxy(
+      makeCtx({
+        config,
+        url: 'https://app.test/api/items',
+        route: route({ pathname: '/api/items', kind: 'app-route' }),
+      }),
+    );
+    const apiResult = await runStage(cspStage(config, { htmlRewriter: null }), api, passThrough);
+    expect(apiResult.response.headers.get('content-security-policy')).toBeNull();
+  });
+});

@@ -1,8 +1,17 @@
-import type { EdgePurger } from '@hypdriv/cache';
-import { type Logger, readEnv, type ResolvedConfig, toError } from '@hypdriv/core';
+import type { EdgePurger, Purger } from '@hypdriv/cache';
+import { type Logger, readEnv, toError } from '@hypdriv/core';
 import { vercelRequestContext } from './context';
 import { MAX_TAGS_PER_PURGE, pathTag, sanitizeTags } from './tags';
-import { chunk, defaultLogger, readFirstEnv, retryAfterMs, sleep, warnOnce } from './util';
+import {
+  type ConfigInput,
+  chunk,
+  defaultLogger,
+  readFirstEnv,
+  resolveInput,
+  retryAfterMs,
+  sleep,
+  warnOnce,
+} from './util';
 
 /** `invalidate` marks entries stale (served while revalidating); `delete` drops them (foreground revalidation). */
 export type PurgeMode = 'invalidate' | 'delete';
@@ -12,7 +21,7 @@ export interface VercelPurgeOptions {
   /** Environment for the REST fallback credentials (default: `process.env` through `readEnv`). */
   env?: Record<string, unknown>;
   /** Supplies `vercel.purge.tokenEnv` / `teamIdEnv` / `projectIdEnv` (defaults `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`). */
-  config?: ResolvedConfig;
+  config?: ConfigInput;
   fetch?: typeof fetch;
   log?: Logger;
   /**
@@ -35,7 +44,11 @@ export interface VercelDeleteTagsOptions extends VercelPurgeOptions {
   revalidationDeadlineSeconds?: number;
 }
 
-const DEFAULT_PURGE_ENV = { tokenEnv: 'VERCEL_TOKEN', teamIdEnv: 'VERCEL_TEAM_ID', projectIdEnv: 'VERCEL_PROJECT_ID' };
+const DEFAULT_PURGE_ENV = {
+  tokenEnv: 'VERCEL_TOKEN',
+  teamIdEnv: 'VERCEL_TEAM_ID',
+  projectIdEnv: 'VERCEL_PROJECT_ID',
+};
 
 interface RestTarget {
   url: string;
@@ -45,7 +58,8 @@ interface RestTarget {
 
 function restTarget(mode: PurgeMode, options: VercelPurgeOptions): RestTarget | null {
   const env = options.env ?? {};
-  const names = options.config?.vercel.purge ?? DEFAULT_PURGE_ENV;
+  const names =
+    (options.config ? resolveInput(options.config) : undefined)?.vercel.purge ?? DEFAULT_PURGE_ENV;
   const token = readFirstEnv(env, [names.tokenEnv]);
   const project = readFirstEnv(env, [names.projectIdEnv, 'VERCEL_PROJECT_ID']);
   if (!token || !project) return null;
@@ -134,7 +148,11 @@ export async function purgeVercelTags(
     if (api) {
       try {
         if (mode === 'invalidate') await api.invalidateByTag(batch);
-        else await api.dangerouslyDeleteByTag(batch, deadline !== undefined ? { revalidationDeadlineSeconds: deadline } : {});
+        else
+          await api.dangerouslyDeleteByTag(
+            batch,
+            deadline !== undefined ? { revalidationDeadlineSeconds: deadline } : {},
+          );
         purged += batch.length;
         continue;
       } catch (error) {
@@ -187,10 +205,25 @@ export interface VercelPurger extends EdgePurger {
   purgeUrls(urls: string[]): Promise<number>;
 }
 
+/**
+ * Adapts a `VercelPurger` to the `Purger` slot of the platform (`@hypdriv/cache` types its methods as
+ * `Promise<void>`; the edge cache ignores the counts anyway).
+ */
+export function toPlatformPurger(purger: VercelPurger): Purger {
+  return {
+    async purgeTags(tags) {
+      await purger.purgeTags(tags);
+    },
+    async purgeUrls(urls) {
+      await purger.purgeUrls(urls);
+    },
+  };
+}
+
 /** Options of `vercelPurger`. */
 export interface VercelPurgerOptions {
   env: Record<string, unknown>;
-  config: ResolvedConfig;
+  config: ConfigInput;
   fetch?: typeof fetch;
   log?: Logger;
 }
@@ -215,7 +248,9 @@ export function vercelPurger(options: VercelPurgerOptions): VercelPurger {
         try {
           tags.push(pathTag(new URL(raw, 'https://hypdriv.invalid').pathname));
         } catch {
-          (options.log ?? defaultLogger()).warn('vercel purge: skipped an invalid URL', { url: String(raw).slice(0, 200) });
+          (options.log ?? defaultLogger()).warn('vercel purge: skipped an invalid URL', {
+            url: String(raw).slice(0, 200),
+          });
         }
       }
       return invalidateTags(tags, shared);

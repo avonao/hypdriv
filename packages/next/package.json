@@ -91,7 +91,8 @@
     "@hypdriv/live": "workspace:*",
     "@hypdriv/observe": "workspace:*",
     "@hypdriv/purser": "workspace:*",
-    "@hypdriv/security": "workspace:*"
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/vercel": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=16.0.0",

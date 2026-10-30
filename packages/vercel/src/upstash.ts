@@ -65,7 +65,9 @@ export function createUpstashClient(options: UpstashOptions): UpstashClient {
     }
     if (!res.ok) {
       const message =
-        parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : '';
+        parsed && typeof parsed === 'object' && 'error' in parsed
+          ? String((parsed as { error: unknown }).error)
+          : '';
       throw new HypDrivError('E_UPSTREAM', `upstash: HTTP ${res.status}${message ? `: ${message}` : ''}`, {
         status: res.status,
       });
@@ -77,7 +79,9 @@ export function createUpstashClient(options: UpstashOptions): UpstashClient {
     async command(command) {
       const body = (await post('', command)) as { result?: unknown; error?: unknown } | null;
       if (body && typeof body === 'object' && body.error !== undefined && body.error !== null)
-        throw new HypDrivError('E_UPSTREAM', `upstash: ${String(body.error)}`, { command: String(command[0]) });
+        throw new HypDrivError('E_UPSTREAM', `upstash: ${String(body.error)}`, {
+          command: String(command[0]),
+        });
       return body?.result ?? null;
     },
     async pipeline(commands) {
@@ -87,9 +91,13 @@ export function createUpstashClient(options: UpstashOptions): UpstashClient {
         throw new HypDrivError('E_UPSTREAM', 'upstash: unexpected pipeline response');
       return body.map((item: { result?: unknown; error?: unknown }, i) => {
         if (item?.error !== undefined && item.error !== null)
-          throw new HypDrivError('E_UPSTREAM', `upstash: command ${i + 1} (${commands[i]![0]}) failed: ${String(item.error)}`, {
-            command: String(commands[i]![0]),
-          });
+          throw new HypDrivError(
+            'E_UPSTREAM',
+            `upstash: command ${i + 1} (${commands[i]![0]}) failed: ${String(item.error)}`,
+            {
+              command: String(commands[i]![0]),
+            },
+          );
         return item?.result ?? null;
       });
     },
@@ -128,7 +136,8 @@ async function encodeValue(value: string | ArrayBuffer | ArrayBufferView | Reada
   if (typeof value === 'string') return value.startsWith(RESERVED) ? TEXT_MARKER + value : value;
   let bytes: Uint8Array;
   if (value instanceof ArrayBuffer) bytes = new Uint8Array(value);
-  else if (ArrayBuffer.isView(value)) bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  else if (ArrayBuffer.isView(value))
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   else if (value && typeof (value as ReadableStream).getReader === 'function')
     bytes = new Uint8Array(await new Response(value as ReadableStream).arrayBuffer());
   else throw new TypeError('upstashKv.put: unsupported value type');
@@ -167,7 +176,8 @@ export function upstashKv(options: UpstashOptions): UpstashKv {
     if (stored === null || stored === undefined) return null;
     const decoded = decodeStored(String(stored));
     const type = valueType(options);
-    if (type === 'arrayBuffer') return toArrayBuffer('bytes' in decoded ? decoded.bytes : utf8Encode(decoded.text));
+    if (type === 'arrayBuffer')
+      return toArrayBuffer('bytes' in decoded ? decoded.bytes : utf8Encode(decoded.text));
     const text = 'bytes' in decoded ? utf8Decode(decoded.bytes) : decoded.text;
     return type === 'json' ? JSON.parse(text) : text;
   }
@@ -179,8 +189,10 @@ export function upstashKv(options: UpstashOptions): UpstashKv {
     get: get as KVNamespaceLike['get'],
     async put(key, value, putOptions) {
       const command: RedisCommand = ['SET', k(key), await encodeValue(value)];
-      if (putOptions?.expirationTtl !== undefined) command.push('EX', Math.max(1, Math.ceil(putOptions.expirationTtl)));
-      else if (putOptions?.expiration !== undefined) command.push('EXAT', Math.max(1, Math.floor(putOptions.expiration)));
+      if (putOptions?.expirationTtl !== undefined)
+        command.push('EX', Math.max(1, Math.ceil(putOptions.expirationTtl)));
+      else if (putOptions?.expiration !== undefined)
+        command.push('EXAT', Math.max(1, Math.floor(putOptions.expiration)));
       await client.command(command);
     },
     async delete(key) {

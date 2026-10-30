@@ -67,7 +67,9 @@ export async function collectPrerenderedHtml(
   const bases = [join(root, 'server', 'app'), join(root, 'server', 'pages')];
   const routeCache = join(root, 'server', 'route-cache', 'APP_PAGE');
   if (existsSync(routeCache)) {
-    for (const entry of (await readdir(routeCache, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    for (const entry of (await readdir(routeCache, { withFileTypes: true })).sort((a, b) =>
+      a.name < b.name ? -1 : 1,
+    )) {
       const base = join(routeCache, entry.name, '$');
       if (entry.isDirectory() && existsSync(base)) bases.push(base);
     }

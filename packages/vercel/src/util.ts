@@ -1,4 +1,16 @@
-import { createConsoleLogger, HypDrivError, type Logger, readEnv, toError } from '@hypdriv/core';
+import {
+  assertManifest,
+  createConsoleLogger,
+  type HypDrivConfig,
+  HypDrivError,
+  type HypManifest,
+  isResolvedConfig,
+  type Logger,
+  loadConfig,
+  type ResolvedConfig,
+  readEnv,
+  toError,
+} from '@hypdriv/core';
 
 /** First non-empty value among several environment variable names (`env` first, then `process.env`). */
 export function readFirstEnv(env: Record<string, unknown>, names: readonly string[]): string | undefined {
@@ -52,9 +64,14 @@ export async function fetchWithTimeout(
   } catch (error) {
     if (controller.signal.aborted && !outer?.aborted)
       throw new HypDrivError('E_TIMEOUT', `${service}: request timed out after ${timeoutMs} ms`, { service });
-    throw new HypDrivError('E_UPSTREAM', `${service}: request failed: ${toError(error).message}`, { service }, {
-      cause: error,
-    });
+    throw new HypDrivError(
+      'E_UPSTREAM',
+      `${service}: request failed: ${toError(error).message}`,
+      { service },
+      {
+        cause: error,
+      },
+    );
   } finally {
     clearTimeout(timer);
     outer?.removeEventListener('abort', forward);
@@ -80,4 +97,38 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
+}
+
+/** A HypDriv config as written in `hypdriv.config.ts`, or already resolved. */
+export type ConfigInput = HypDrivConfig | ResolvedConfig;
+
+/** Resolves `hypdriv.config` input once (cached on the object by `loadConfig`); resolved configs pass through. */
+export function resolveInput(config: ConfigInput): ResolvedConfig {
+  return isResolvedConfig(config) ? config : loadConfig(config);
+}
+
+/**
+ * Reads `.hypdriv/manifest.json` from the working directory of a Node function (the HypDriv adapter adds it
+ * to every function's traced files). Uses `process.getBuiltinModule`, so bundlers neither trace nor inline
+ * Node built-ins; `null` on runtimes without it (Edge) or when the file is missing or invalid.
+ */
+export async function readBuildManifest(): Promise<HypManifest | null> {
+  const proc = (
+    globalThis as {
+      process?: { cwd?: () => string; getBuiltinModule?: (id: string) => unknown };
+    }
+  ).process;
+  const fs = proc?.getBuiltinModule?.('node:fs') as
+    | { promises?: { readFile(path: string, encoding: 'utf8'): Promise<string> } }
+    | undefined;
+  if (!fs?.promises || typeof proc?.cwd !== 'function') return null;
+  try {
+    const value: unknown = JSON.parse(
+      await fs.promises.readFile(`${proc.cwd()}/.hypdriv/manifest.json`, 'utf8'),
+    );
+    assertManifest(value);
+    return value;
+  } catch {
+    return null;
+  }
 }

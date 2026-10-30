@@ -124,15 +124,21 @@ export async function importConfigModule<T = unknown>(file: string): Promise<T> 
     return (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ href)) as T;
   } catch (err) {
     if (!TS_EXTENSIONS.has(extname(file)) || !isTypeScriptLoadError(err)) throw err;
-    const mod = (await import('node:module')) as { stripTypeScriptTypes?: (code: string, options?: { mode?: 'strip' | 'transform' }) => string };
+    const mod = (await import('node:module')) as {
+      stripTypeScriptTypes?: (code: string, options?: { mode?: 'strip' | 'transform' }) => string;
+    };
     if (typeof mod.stripTypeScriptTypes !== 'function') {
-      throw new Error(`cannot load ${basename(file)}: this Node.js version cannot run TypeScript. Use Node 22.18+ or rename the file to .mjs (${(err as Error).message})`);
+      throw new Error(
+        `cannot load ${basename(file)}: this Node.js version cannot run TypeScript. Use Node 22.18+ or rename the file to .mjs (${(err as Error).message})`,
+      );
     }
     const js = mod.stripTypeScriptTypes(readFileSync(file, 'utf8'), { mode: 'transform' });
     const tmp = join(dirname(file), `.${basename(file, extname(file))}.${process.pid}.${Date.now()}.mjs`);
     writeFileSync(tmp, js);
     try {
-      return (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(tmp).href)) as T;
+      return (await import(
+        /* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(tmp).href
+      )) as T;
     } finally {
       rmSync(tmp, { force: true });
     }

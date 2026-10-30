@@ -48,21 +48,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hypdriv/core": "workspace:*"
-  },
-  "peerDependencies": {
-    "web-vitals": "^5.0.0 || ^6.0.0"
-  },
-  "peerDependenciesMeta": {
-    "web-vitals": {
-      "optional": true
-    }
+    "@hypdriv/core": "workspace:*",
+    "web-vitals": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "web-vitals": "catalog:"
+    "vitest": "catalog:"
   }
 }

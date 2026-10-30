@@ -1,7 +1,7 @@
-import { isDevelopment, type Logger, type ResolvedConfig, toError } from '@hypdriv/core';
+import { isDevelopment, type Logger, toError } from '@hypdriv/core';
 import { ActionError } from '@hypdriv/security';
 import { type BotIdHeaders, type CheckBotIdOptions, getVercelSdk } from './sdk';
-import { defaultLogger, warnOnce } from './util';
+import { type ConfigInput, defaultLogger, resolveInput, warnOnce } from './util';
 
 /** Options of `verifyBotId`. */
 export interface VerifyBotIdOptions {
@@ -71,7 +71,7 @@ export interface BotIdGuardOptions {
   /** Check level (default `config.vercel.botId.checkLevel`, else `basic`). */
   checkLevel?: 'basic' | 'deepAnalysis';
   /** Supplies the default check level. */
-  config?: ResolvedConfig;
+  config?: ConfigInput;
   /**
    * What to do when BotID is not registered or the check fails: `deny` (default in production) or `allow`
    * (default in development, where BotID bypasses anyway).
@@ -91,10 +91,16 @@ export function botIdGuard(
   options: BotIdGuardOptions = {},
 ): (ctx: { headers?: Headers | undefined }) => Promise<void | ActionError> {
   const log = options.log ?? defaultLogger();
-  const checkLevel = options.checkLevel ?? options.config?.vercel.botId?.checkLevel;
+  const checkLevel =
+    options.checkLevel ??
+    (options.config ? resolveInput(options.config) : undefined)?.vercel.botId?.checkLevel;
   const unavailable = (detail: string): void | ActionError => {
     const mode = options.onUnavailable ?? (isDevelopment() ? 'allow' : 'deny');
-    warnOnce(log, `botid:unavailable:${mode}`, `BotID unavailable (${detail}); ${mode === 'allow' ? 'allowing' : 'rejecting'} protected actions`);
+    warnOnce(
+      log,
+      `botid:unavailable:${mode}`,
+      `BotID unavailable (${detail}); ${mode === 'allow' ? 'allowing' : 'rejecting'} protected actions`,
+    );
     return mode === 'allow' ? undefined : new ActionError('FORBIDDEN', 'Bot protection is unavailable');
   };
 

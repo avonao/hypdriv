@@ -187,7 +187,7 @@ describe('hypdriv init', () => {
     expect(wrangler).toContain('"main": "hypdriv.worker.ts", // OpenNext\'s default entry');
     expect(p.read('hypdriv.worker.ts')).toContain("import { createWorker } from 'hypdriv/cloudflare';");
     expect(p.read('hypdriv.worker.ts')).toContain(
-      "export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-objects';",
+      "export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from 'hypdriv/durable-objects';",
     );
     const proxy = p.read('proxy.ts');
     expect(proxy).toContain("import { createProxy } from 'hypdriv/proxy';");

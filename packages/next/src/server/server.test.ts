@@ -264,13 +264,22 @@ describe('jobHandler()', () => {
   it('accepts Vercel Cron calls authenticated with CRON_SECRET', async () => {
     const request = new Request('https://app.example.com/api/jobs/digest', {
       method: 'GET',
-      headers: { authorization: 'Bearer cron-secret-value-1234567890', 'x-vercel-cron-schedule': '0 9 * * 1', 'user-agent': 'vercel-cron/1.0' },
+      headers: {
+        authorization: 'Bearer cron-secret-value-1234567890',
+        'x-vercel-cron-schedule': '0 9 * * 1',
+        'user-agent': 'vercel-cron/1.0',
+      },
     });
     const { response, handler } = await call(request, { CRON_SECRET: 'cron-secret-value-1234567890' });
     expect(response.status).toBe(200);
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'digest', cron: '0 9 * * 1' }));
-    const wrong = new Request('https://app.example.com/api/jobs/digest', { headers: { authorization: 'Bearer nope' } });
-    expect((await call(wrong, { CRON_SECRET: 'cron-secret-value-1234567890', HYPDRIV_INTERNAL_SECRET: secret })).response.status).toBe(401);
+    const wrong = new Request('https://app.example.com/api/jobs/digest', {
+      headers: { authorization: 'Bearer nope' },
+    });
+    expect(
+      (await call(wrong, { CRON_SECRET: 'cron-secret-value-1234567890', HYPDRIV_INTERNAL_SECRET: secret }))
+        .response.status,
+    ).toBe(401);
   });
 
   it('reports handler failures as JSON errors', async () => {

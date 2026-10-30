@@ -1,22 +1,22 @@
 # The `hypdriv` CLI
 
-All commands accept `--root <dir>` (project directory, default: nearest `package.json`) and `--json` (machine-readable output). Exit codes: `0` ok, `1` findings/failures, `2` usage error.
+All commands accept `--root <dir>` (project directory, default: nearest `package.json`), `--json` (machine-readable output) and, where the deploy target matters, `--platform cloudflare|vercel|node` (default: detected from `hypdriv.config.ts#platform`, `wrangler.*` / `@opennextjs/cloudflare`, `vercel.json` / `.vercel`, `VERCEL=1`). Exit codes: `0` ok, `1` findings/failures, `2` usage error.
 
 | Command | What it does |
 | --- | --- |
-| `hypdriv init [--purser] [--no-proxy] [--yes]` | Detects the project and writes/updates `hypdriv.config.ts`, `next.config.ts` (wraps with `withHypDriv`), `hypdriv.worker.ts`, `wrangler.jsonc#main`, `proxy.ts`, `public/_headers`, scripts. Backs up edited files as `*.hypdriv.bak`. |
-| `hypdriv doctor [--fix] [--ci]` | 40+ checks: Node/pnpm, Next.js version & config, adapter chain, `proxy.ts` vs deprecated `middleware.ts`, Edge runtime segments, wrangler compatibility date/flags/bindings/triggers, Node APIs unsupported on workerd, Worker size vs limits, startup risks, env leaks, header posture (from the manifest), Purser setup and TS compatibility, dependency freshness. `--fix` applies safe fixes (cron sync, `_headers`, scripts). |
-| `hypdriv analyze [--worker] [--routes]` | Worker weight report: runs `wrangler deploy --dry-run --outdir` (or reads an existing bundle), attributes bytes to modules via the source map and the OpenNext esbuild metafile, lists largest modules/packages/duplicates and top-level `await`s; per-route JS/CSS (gzip) from the manifest; budget evaluation. Writes `weights.worker` back into `.hypdriv/manifest.json`. |
+| `hypdriv init [--platform …] [--purser] [--no-proxy] [--yes] [--dry-run]` | Detects the project and writes/updates `hypdriv.config.ts`, `next.config.ts` (wraps with `withHypDriv`), `proxy.ts`, `instrumentation.ts`, scripts and, per platform, `hypdriv.worker.ts` + `wrangler.jsonc#main` + `public/_headers` + `.dev.vars.example` (Cloudflare) or `vercel.json#crons` + `.env.example` (Vercel). Backs up edited files as `*.hypdriv.bak`. |
+| `hypdriv doctor [--fix] [--ci]` | 91 checks for the detected platform: Node/pnpm, Next.js version & config, adapter chain, `proxy.ts` vs deprecated `middleware.ts`, Edge runtime segments, wrangler compatibility date/flags/bindings/triggers, Node APIs unsupported on workerd, Worker size vs limits, startup risks; `vercel.json` regions/crons, `CRON_SECRET`, Build Output API freshness and function sizes vs 250 MB; env leaks, secrets, header posture (from the manifest), Purser setup and TS compatibility, dependency freshness. `--fix` applies safe fixes (cron sync, `_headers`, scripts). |
+| `hypdriv analyze [--worker] [--routes]` | Cloudflare: Worker weight report (runs `wrangler deploy --dry-run --outdir` or reads an existing bundle, attributes bytes via the source map and the OpenNext esbuild metafile, lists largest modules/packages/duplicates and top-level `await`s). Vercel: function sizes from `.vercel/output` (after `vercel build`). Both: per-route JS/CSS (gzip) from the manifest and budget evaluation; writes the weights back into `.hypdriv/manifest.json`. |
 | `hypdriv routes [--css] [--cache] [--csp]` | Table of routes with classification, revalidate, cache policy, CSP mode, hints count, JS/CSS weight, Purser atoms. |
-| `hypdriv audit <headers|csp|cache|css|all> --url <base>` | Fetches routes from the manifest (or `--paths`) against a running server: grades security headers (A+ model), validates CSP syntax and nonce/hash presence, checks cache statuses and `Age`/`Vary`, and runs Purser's zero-override check in headless Chrome (`css`). |
+| `hypdriv audit <headers|csp|cache|css|all> --url <base> [--anonymous]` | Fetches routes from the manifest (or `--paths`) against a running server: grades security headers (A+ model), validates CSP syntax and nonce/hash coverage (HypDriv's declared `'unsafe-inline'` fallback for cached HTML on Node/Vercel is a warning), checks cache behaviour like a browser (repeat visits carry the first response's cookies; `x-vercel-cache` and planned Vercel CDN headers on Vercel), and runs Purser's zero-override check in headless Chrome (`css`; pages answered with an error status or without evaluable CSS fail instead of passing vacuously). Requests carry a short-lived `x-hypdriv-audit` token signed with `HYPDRIV_INTERNAL_SECRET`, so your bot shield and rate limits let the audit through; `--anonymous` sends unsigned requests. |
 | `hypdriv budget [--ci] [--snapshot] [--diff]` | Evaluates budgets from the manifest and the worker report, stores snapshots under `.hypdriv/snapshots`, prints Markdown diffs for PR comments. |
 | `hypdriv csp hashes [--route <path>]` / `hypdriv csp suggest [--reports <file>]` / `hypdriv csp print` | Shows static route hashes, proposes allow-list additions from collected violation reports, prints the effective policy. |
 | `hypdriv css build|check|watch` | Purser through the bridge with the config's options. |
-| `hypdriv warm --url <base> [--concurrency 4]` | Fetches the configured warm routes (or all static routes). |
-| `hypdriv bench --url <base> [--paths …] [--n 20]` | TTFB p50/p95 and cache status distribution per path. |
+| `hypdriv warm --url <base> [--concurrency 4] [--anonymous]` | Fetches the configured warm routes (or all static routes), signed with the audit token. |
+| `hypdriv bench --url <base> [--paths …] [--n 20] [--anonymous]` | TTFB p50/p95 and cache status distribution per path, signed with the audit token. |
 | `hypdriv deps [--update safe|major] [--only <name>]` | Dependency freshness across the workspace (npm registry): patch/minor/major classification, optional updates. |
 | `hypdriv manifest [--validate]` | Prints or validates `.hypdriv/manifest.json`. |
-| `hypdriv jobs run <name> --url <base>` | Sends a signed internal request to a job route. |
+| `hypdriv jobs run <name> --url <base>` / `hypdriv jobs list` | Sends a signed internal request to a job route (`HYPDRIV_INTERNAL_SECRET`; on Vercel cron jobs as `GET` with `CRON_SECRET`). |
 | `hypdriv vitals [--days 7]` | p75 per route from Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`). |
 | `hypdriv agent` | Prints agent guidance for this project (what is configured, what to run). |
 
@@ -28,3 +28,5 @@ Add to CI:
 - run: npx hypdriv budget --ci
 - run: pnpm preview & npx wait-on http://localhost:8787 && npx hypdriv audit all --url http://localhost:8787
 ```
+
+On Vercel, audit the preview deployment (`--url https://<deployment>.vercel.app`) with `HYPDRIV_INTERNAL_SECRET` in the environment; for deployments behind Deployment Protection also set `VERCEL_AUTOMATION_BYPASS_SECRET`, which the CLI sends as `x-vercel-protection-bypass` (also from headless Chrome). Locally, `pnpm build && pnpm start` and `--url http://localhost:3000`.

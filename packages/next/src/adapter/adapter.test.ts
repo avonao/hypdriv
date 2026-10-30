@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { assertManifest, createRouteMatcher, resolveConfig } from '@hypdriv/core';
 import { describe, expect, it } from 'vitest';
 import { appRouteAssets, parseClientReferenceManifest } from './assets';
-import { buildManifest } from './build-manifest';
+import { buildFingerprint, buildManifest } from './build-manifest';
 import { classifyOutputs } from './classify';
 import { createNodeFs, rerootPaths } from './fs';
 import { extractAssets, extractInlineScripts, extractLinks, scanTags } from './html';
@@ -153,6 +153,39 @@ describe('buildManifest', () => {
     expect(Object.keys(html)).toContain('app:/blog/[slug]');
   });
 
+  it('fingerprints the build output so cache keys change whenever the output does', async () => {
+    const { manifest } = await buildManifest({
+      context,
+      config,
+      fs,
+      hypdrivVersion: 't',
+      now: () => new Date(0),
+    });
+    expect(manifest.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+    const again = await buildManifest({ context, config, fs, hypdrivVersion: 't', now: () => new Date(1) });
+    expect(again.manifest.fingerprint).toBe(manifest.fingerprint);
+    // Same BUILD_ID (deterministic from the deployment id), different output → different fingerprint.
+    const route = manifest.routes.find((r) => r.assets.js.length)!;
+    const changedAssets = {
+      ...manifest,
+      routes: manifest.routes.map((r) =>
+        r.id === route.id
+          ? { ...r, assets: { ...r.assets, js: [...r.assets.js, '/_next/static/chunks/new.js'] } }
+          : r,
+      ),
+    };
+    expect(await buildFingerprint(changedAssets)).not.toBe(manifest.fingerprint);
+    const changedHtml = {
+      ...manifest,
+      csp: { ...manifest.csp, 'app:/': { scriptHashes: ["'sha256-other='"], styleHashes: [] } },
+    };
+    expect(await buildFingerprint(changedHtml)).not.toBe(manifest.fingerprint);
+    // Order-insensitive.
+    expect(await buildFingerprint({ ...manifest, routes: [...manifest.routes].reverse() })).toBe(
+      manifest.fingerprint,
+    );
+  });
+
   it('computes CSP hashes only for immutable static routes', async () => {
     const { manifest } = await buildManifest({ context, config, fs, hypdrivVersion: 't' });
     expect(manifest.csp['app:/']?.scriptHashes.length).toBeGreaterThan(2);
@@ -253,8 +286,17 @@ describe('buildManifest', () => {
 describe('assets with skew-protection queries', () => {
   it('deduplicates ?dpl= spellings and keeps the document spelling for preloads', async () => {
     const { mergeWithHtml } = await import('./assets');
-    const html = '<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css?dpl=d1"><script src="/_next/static/chunks/main.js?dpl=d1" async></script></head></html>';
-    const merged = mergeWithHtml({ js: ['/_next/static/chunks/main.js', '/_next/static/chunks/other.js'], css: ['/_next/static/chunks/a.css'], fonts: [], main: ['/_next/static/chunks/main.js'] }, html);
+    const html =
+      '<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css?dpl=d1"><script src="/_next/static/chunks/main.js?dpl=d1" async></script></head></html>';
+    const merged = mergeWithHtml(
+      {
+        js: ['/_next/static/chunks/main.js', '/_next/static/chunks/other.js'],
+        css: ['/_next/static/chunks/a.css'],
+        fonts: [],
+        main: ['/_next/static/chunks/main.js'],
+      },
+      html,
+    );
     expect(merged.css).toEqual(['/_next/static/chunks/a.css?dpl=d1']);
     expect(merged.js).toEqual(['/_next/static/chunks/main.js?dpl=d1', '/_next/static/chunks/other.js']);
     expect(merged.main).toEqual(['/_next/static/chunks/main.js?dpl=d1']);
@@ -263,7 +305,14 @@ describe('assets with skew-protection queries', () => {
 
 describe('scoped prerender artifacts (Next ≥ 16.4 with an adapter)', () => {
   it('restores the classic server/app layout without overwriting files', async () => {
-    const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: read, existsSync: exists, rmSync } = await import('node:fs');
+    const {
+      mkdtempSync,
+      mkdirSync,
+      writeFileSync,
+      readFileSync: read,
+      existsSync: exists,
+      rmSync,
+    } = await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join: j } = await import('node:path');
     const { mirrorAllScopedArtifacts } = await import('./scoped-artifacts');
@@ -278,7 +327,18 @@ describe('scoped prerender artifacts (Next ≥ 16.4 with an adapter)', () => {
       mkdirSync(pages, { recursive: true });
       writeFileSync(j(pages, '404.html'), 'not found');
       // a standalone copy, as OpenNext builds produce
-      const standalone = j(dist, 'standalone', 'apps', 'web', '.next', 'server', 'route-cache', 'APP_PAGE', 'c'.repeat(64), '$');
+      const standalone = j(
+        dist,
+        'standalone',
+        'apps',
+        'web',
+        '.next',
+        'server',
+        'route-cache',
+        'APP_PAGE',
+        'c'.repeat(64),
+        '$',
+      );
       mkdirSync(standalone, { recursive: true });
       writeFileSync(j(standalone, 'index.html'), 'home');
       mkdirSync(j(dist, 'server', 'app'), { recursive: true });
@@ -290,7 +350,9 @@ describe('scoped prerender artifacts (Next ≥ 16.4 with an adapter)', () => {
       expect(exists(j(dist, 'server', 'app', 'blog.meta'))).toBe(true);
       expect(exists(j(dist, 'server', 'app', 'blog.segments', '_tree.segment.rsc'))).toBe(true);
       expect(read(j(dist, 'server', 'pages', '404.html'), 'utf8')).toBe('not found');
-      expect(read(j(dist, 'standalone', 'apps', 'web', '.next', 'server', 'app', 'index.html'), 'utf8')).toBe('home');
+      expect(read(j(dist, 'standalone', 'apps', 'web', '.next', 'server', 'app', 'index.html'), 'utf8')).toBe(
+        'home',
+      );
       expect(read(j(dist, 'server', 'app', 'existing.html'), 'utf8')).toBe('keep');
       // idempotent
       expect(mirrorAllScopedArtifacts(dist).copied).toBe(0);
@@ -308,7 +370,9 @@ describe('shipping the manifest with server functions', () => {
       expect(Object.keys(output.assets).some((k) => k.endsWith('.hypdriv/manifest.json'))).toBe(true);
     }
     // the original context is untouched
-    expect(Object.keys(context.outputs.appPages[0]!.assets).some((k) => k.endsWith('.hypdriv/manifest.json'))).toBe(false);
+    expect(
+      Object.keys(context.outputs.appPages[0]!.assets).some((k) => k.endsWith('.hypdriv/manifest.json')),
+    ).toBe(false);
   });
 
   it('appends the manifest to server .nft.json traces once', async () => {
@@ -319,13 +383,21 @@ describe('shipping the manifest with server functions', () => {
     try {
       const server = join(project, '.next', 'server');
       mkdirSync(join(server, 'app', 'page'), { recursive: true });
-      writeFileSync(join(server, 'middleware.js.nft.json'), JSON.stringify({ version: 1, files: ['../../node_modules/x.js'] }));
+      writeFileSync(
+        join(server, 'middleware.js.nft.json'),
+        JSON.stringify({ version: 1, files: ['../../node_modules/x.js'] }),
+      );
       writeFileSync(join(server, 'app', 'page.js.nft.json'), JSON.stringify({ version: 1, files: [] }));
       const manifest = join(project, '.hypdriv', 'manifest.json');
       expect(addToServerTraces(join(project, '.next'), [manifest])).toBe(2);
       expect(addToServerTraces(join(project, '.next'), [manifest])).toBe(0);
-      expect(JSON.parse(read(join(server, 'middleware.js.nft.json'), 'utf8')).files).toEqual(['../../node_modules/x.js', '../../.hypdriv/manifest.json']);
-      expect(JSON.parse(read(join(server, 'app', 'page.js.nft.json'), 'utf8')).files).toEqual(['../../../.hypdriv/manifest.json']);
+      expect(JSON.parse(read(join(server, 'middleware.js.nft.json'), 'utf8')).files).toEqual([
+        '../../node_modules/x.js',
+        '../../.hypdriv/manifest.json',
+      ]);
+      expect(JSON.parse(read(join(server, 'app', 'page.js.nft.json'), 'utf8')).files).toEqual([
+        '../../../.hypdriv/manifest.json',
+      ]);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

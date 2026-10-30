@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
 import { hyp } from 'hypdriv/server';
+import { Suspense } from 'react';
 
 export default function Dashboard() {
   return (

@@ -5,7 +5,7 @@ import {
   firstMatch,
   HEADER,
   type HypContext,
-  isHtmlResponse,
+  isHtmlLike,
   isRscRequest,
   type ResolvedConfig,
   type ResolvedCsp,
@@ -110,7 +110,10 @@ export function policyHeadersFor(
   // HypDriv's own route-independent inline scripts (speculation document rules, the Purser theme
   // fallback) render without a nonce so layouts stay prerenderable; the manifest carries their hashes.
   const manifest = (ctx as { manifest?: HypContext['manifest'] }).manifest;
-  const manifestHashes = [...(manifest?.inlineScriptHashes ?? []), ...(manifest?.purser?.themeScriptHash ? [manifest.purser.themeScriptHash] : [])];
+  const manifestHashes = [
+    ...(manifest?.inlineScriptHashes ?? []),
+    ...(manifest?.purser?.themeScriptHash ? [manifest.purser.themeScriptHash] : []),
+  ];
   const extra =
     decision.mode === 'hash' || decision.mode === 'nonce'
       ? [...new Set([...(ctx.state.get(CSP_EXTRA_HASHES_KEY) ?? []), ...manifestHashes])]
@@ -210,7 +213,9 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
       const reportTo = decision.effective.reportTo;
       if (reportTo && decision.effective.reportingEndpoints)
         headers['reporting-endpoints'] = `hypdriv="${absolutize(reportTo, ctx.url.origin)}"`;
-      if (!isHtmlResponse(response))
+      // `isHtmlLike` also covers proxy.ts, where the response is Next's pass-through marker for a page that
+      // renders afterwards (no content type yet): its policy header must be set here.
+      if (!isHtmlLike(ctx, response))
         return Object.keys(headers).length ? withHeaders(response, headers) : response;
 
       const { enforced, reportOnly } = policyHeadersFor(decision, ctx);

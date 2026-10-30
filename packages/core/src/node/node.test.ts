@@ -3,7 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyManifest } from '../manifest/types';
-import { findConfigFile, findProjectRoot, importConfigModule, installedVersion, loadConfigFile, readManifestSync, readPackageJson, writeManifest } from './index';
+import {
+  findConfigFile,
+  findProjectRoot,
+  importConfigModule,
+  installedVersion,
+  loadConfigFile,
+  readManifestSync,
+  readPackageJson,
+  writeManifest,
+} from './index';
 
 let dir: string;
 
@@ -26,7 +35,7 @@ describe('config files', () => {
     writeFileSync(
       join(dir, 'hypdriv.config.ts'),
       [
-        "interface Shape { site: { name: string } }",
+        'interface Shape { site: { name: string } }',
         "const value: Shape = { site: { name: 'typed-app' } };",
         'export default value;',
       ].join('\n'),
@@ -50,10 +59,14 @@ describe('config files', () => {
   it('re-imports a changed file', async () => {
     const file = join(dir, 'hypdriv.config.mjs');
     writeFileSync(file, "export default { site: { name: 'one' } };\n");
-    expect((await importConfigModule<{ default: { site: { name: string } } }>(file)).default.site.name).toBe('one');
+    expect((await importConfigModule<{ default: { site: { name: string } } }>(file)).default.site.name).toBe(
+      'one',
+    );
     await new Promise((r) => setTimeout(r, 15));
     writeFileSync(file, "export default { site: { name: 'two' } };\n");
-    expect((await importConfigModule<{ default: { site: { name: string } } }>(file)).default.site.name).toBe('two');
+    expect((await importConfigModule<{ default: { site: { name: string } } }>(file)).default.site.name).toBe(
+      'two',
+    );
   });
 
   it('surfaces syntax errors in JavaScript configs', async () => {
@@ -65,7 +78,15 @@ describe('config files', () => {
 
 describe('project helpers', () => {
   it('finds the project root and reads package.json', () => {
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0', dependencies: { next: '16.4.3' }, packageManager: 'pnpm@12.16.1' }));
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'app',
+        version: '1.0.0',
+        dependencies: { next: '16.4.3' },
+        packageManager: 'pnpm@12.16.1',
+      }),
+    );
     mkdirSync(join(dir, 'app', 'blog'), { recursive: true });
     expect(findProjectRoot(join(dir, 'app', 'blog'))).toBe(dir);
     const pkg = readPackageJson(dir);

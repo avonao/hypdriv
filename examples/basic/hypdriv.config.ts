@@ -19,7 +19,11 @@ export default defineConfig({
   observe: { tracing: { exporter: 'console' }, vitals: { sink: 'log' } },
   flags: {
     definitions: {
-      newHero: { description: 'New landing hero', default: false, rules: [{ when: { country: ['US'] }, percentage: 50, value: true }] },
+      newHero: {
+        description: 'New landing hero',
+        default: false,
+        rules: [{ when: { country: ['US'] }, percentage: 50, value: true }],
+      },
     },
   },
   jobs: {

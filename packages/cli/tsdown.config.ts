@@ -10,7 +10,7 @@ export default defineConfig({
   target: 'es2023',
   // package.json maps the bin and exports to `dist/*.js` (the package is `"type": "module"`).
   fixedExtension: false,
-  external: [/^node:/, /^cloudflare:/],
+  deps: { neverBundle: [/^node:/, /^cloudflare:/] },
   dts: true,
   sourcemap: true,
   clean: true,

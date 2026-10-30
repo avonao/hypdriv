@@ -1,6 +1,7 @@
 import {
   appendSetCookie,
   defineStage,
+  FLAGS_COOKIE_PENDING_KEY,
   type FlagValue,
   type HypContext,
   parseCookies,
@@ -27,7 +28,6 @@ export const FLAG_REASONS_KEY = stateKey<Record<string, string>>('flags.reasons'
 /** The stable visitor id used for bucketing (from the cookie, or freshly generated). */
 export const FLAG_ID_KEY = stateKey<string>('flags.id');
 
-const NEEDS_COOKIE_KEY = stateKey<boolean>('flags.needsCookie');
 const COUNT_KEY = stateKey<number>('flags.count');
 
 /** Stable ids are 8–64 URL-safe characters; anything else is treated as missing. */
@@ -92,7 +92,7 @@ export function flagsStage(
       let stableId = fromCookie && STABLE_ID_RE.test(fromCookie) ? fromCookie : undefined;
       if (!stableId) {
         stableId = randomToken(12);
-        if (remote || needsStableId(definitions)) ctx.state.set(NEEDS_COOKIE_KEY, true);
+        if (remote || needsStableId(definitions)) ctx.state.set(FLAGS_COOKIE_PENDING_KEY, true);
       }
       ctx.state.set(FLAG_ID_KEY, stableId);
 
@@ -115,7 +115,7 @@ export function flagsStage(
       ctx.requestHeaders.set(f.header, encodeFlagsHeader(result.values));
     },
     post(ctx, response) {
-      if (ctx.state.get(NEEDS_COOKIE_KEY)) {
+      if (ctx.state.get(FLAGS_COOKIE_PENDING_KEY)) {
         const id = ctx.state.get(FLAG_ID_KEY);
         if (id) {
           appendSetCookie(

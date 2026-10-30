@@ -18,6 +18,7 @@ export {
   routePatternSpecificity,
 } from './policies';
 export { createZonePurger, PURGE_BATCH_SIZE, type ZonePurgerOptions } from './purge';
+export { type EdgePurger, getEdgePurger, registerEdgePurger } from './registry';
 export {
   bypassReason,
   cacheability,
@@ -57,4 +58,3 @@ export type {
   Purger,
   TagIndex,
 } from './types';
-export { type EdgePurger, getEdgePurger, registerEdgePurger } from './registry';

@@ -1,6 +1,6 @@
 # HypDriv feature catalog
 
-Every capability HypDriv adds to a Next.js 16+ application, grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Package names tell you where the code lives.
+Every capability HypDriv adds to a Next.js 16+ application, grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Section 5 lists how each capability is delivered on Vercel, where platform services take the place of bindings. Package names tell you where the code lives.
 
 Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end validation in the example apps · 🧭 designed, implementation tracked in `docs/roadmap.md`.
 
@@ -72,9 +72,30 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Edge redirects        | Redirect table evaluated before Next.js                                                           | config              | KV-backed table without redeploy | `cloudflare`         | ✅     |
 | Maintenance mode      | Branded maintenance page toggled by env or KV                                                     | ✅                  | KV                               | `cloudflare`         | ✅     |
 | Typed bindings access | `hyp().env` typed from `CloudflareEnv`, dev fallback via OpenNext                                 | ✅                  | —                                | `cloudflare`, `next` | ✅     |
-| Background work       | `defer()` → `waitUntil`/`after()`, `enqueue()` → Queues or in-process                             | ✅                  | Queues                           | `cloudflare`         | ✅     |
+| Background work       | `defer()` → `waitUntil`/`after()`, `enqueue()` → Queues, else a signed consumer-route call        | ✅                  | Queues                           | `cloudflare`         | ✅     |
 
-## 5. Purser CSS
+## 5. Vercel
+
+Detected from `VERCEL=1`, `vercel.json` / `.vercel` or `platform: 'vercel'` ([ADR 0013](adr/0013-deploy-targets.md), [guide](guides/vercel.md)). The stages run in Routing Middleware (`proxy.ts`), which `createProxy()` wires to `@hypdriv/vercel` automatically.
+
+| Capability | On Vercel | Baseline | Upgrade | Package | Status |
+| --- | --- | --- | --- | --- | --- |
+| Edge cache | Policies expressed as `Vercel-CDN-Cache-Control` + `Vercel-Cache-Tag`: `next.config` route headers for pages (`withHypDriv`), `withVercelCdn()` for Route Handlers, the `edge-cache` stage plans the decision (`x-hypdriv-cache: CDN`) | ✅ | `CDN-Cache-Control` for a downstream CDN | `vercel`, `next` | ✅ |
+| Tag purge | `revalidateTag()` / `purgeEdge()` purge Vercel's CDN (request-context API, REST with `VERCEL_TOKEN`), 16 tags per call, `Retry-After` aware | ✅ | — | `vercel`, `cache` | ✅ |
+| Rate limiting | Same policies and headers | per instance | Upstash Redis (exact, global); Vercel WAF rules (`rate-limit-vercel`) | `vercel`, `security` | ✅ |
+| Bot shield | Heuristics, honeypots, `Sec-Fetch-*`, Turnstile | ✅ | BotID (`botIdGuard()`, `verifyBotId()`) | `vercel`, `security` | ✅ |
+| Flags, redirects, maintenance | KV-backed providers read Global Config | config / env | Global Config (read-only), Upstash Redis | `vercel`, `flags` | ✅ |
+| Cron | Vercel Cron (`GET` + `Authorization: Bearer $CRON_SECRET`) accepted by `jobHandler`; `hypdriv init` syncs `vercel.json#crons` | ✅ | — | `next`, `cli` | ✅ |
+| Queues | `enqueue()` → Vercel Queues; `queueConsumer()` with HypDriv's retry contract | signed consumer-route call | `@vercel/queue` | `vercel`, `cloudflare` | ✅ |
+| CSP | Hash for static routes, nonce for dynamic routes; declared `'unsafe-inline'` fallback for ISR / PPR shells (no `HTMLRewriter`) | ✅ | — | `security` | ✅ |
+| Geo | `x-vercel-ip-*` headers (country, region, city, coordinates, postal code, timezone) and the `x-vercel-id` region | ✅ | — | `next` | ✅ |
+| Build integration | Classic prerender layout restored for Vercel's builder, chaining with Vercel's adapter (`NEXT_ENABLE_ADAPTER=1`), manifest traced into every function | ✅ | — | `next` | ✅ |
+| Runtime registry | Config + platform env registered by `createInstrumentation()` for helpers outside a proxied request | ✅ | — | `core`, `next` | ✅ |
+| Tooling | `doctor`/`analyze`/`init --platform vercel`, Build Output API and function-size checks, `x-vercel-cache` in cache audits, Deployment Protection bypass | ✅ | — | `cli` | ✅ |
+
+Not available on Vercel (documented fallbacks): HTML transforms and edge nonce injection (HTMLRewriter), Durable Object live channels (polling transport), 103 Early Hints (preload `Link` headers instead), Workers Analytics Engine sinks (logs / OTLP).
+
+## 6. Purser CSS
 
 | Feature                        | What it does                                                                      | Package                | Status |
 | ------------------------------ | --------------------------------------------------------------------------------- | ---------------------- | ------ |
@@ -86,12 +107,12 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Layer coexistence              | Ordered `@layer` statement generation for Tailwind/legacy CSS                     | `purser`               | ✅     |
 | Early Hints for the stylesheet | Purser stylesheet preloaded on every route                                        | `next`                 | ✅     |
 
-## 6. Developer experience
+## 7. Developer experience
 
 | Feature                  | What it does                                     | Package          | Status |
 | ------------------------ | ------------------------------------------------ | ---------------- | ------ |
-| `hypdriv init`           | Detect, scaffold, wire                           | `cli`            | ✅     |
-| `hypdriv doctor`         | 40+ checks with fixes                            | `cli`            | ✅     |
+| `hypdriv init`           | Detect, scaffold, wire (Cloudflare, Vercel, Node) | `cli`            | ✅     |
+| `hypdriv doctor`         | 91 platform-aware checks with fixes              | `cli`            | ✅     |
 | `hypdriv analyze`        | Worker weight + route assets                     | `cli`            | ✅     |
 | `hypdriv routes`         | Manifest table                                   | `cli`            | ✅     |
 | `hypdriv audit`          | Headers, CSP, cache, CSS audits                  | `cli`            | ✅     |
@@ -100,12 +121,13 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | `hypdriv css`            | Purser passthrough                               | `cli`            | ✅     |
 | `hypdriv warm` / `bench` | Warming and benchmarking                         | `cli`            | ✅     |
 | `hypdriv deps`           | Daily dependency freshness with safe auto-update | `cli`            | ✅     |
-| `create-hypdriv`         | New project scaffolder                           | `create-hypdriv` | ✅     |
+| `create-hypdriv`         | Scaffolder: Cloudflare or Vercel, with or without Purser; templates are the audited example apps; generated local secrets | `create-hypdriv` | ✅     |
+| Owner audit tokens       | `audit`/`bench`/`warm` sign requests so the bot shield and rate limits let them through ([ADR 0015](adr/0015-owner-audit-tokens.md)) | `security`, `cli`, `purser` | ✅ |
 | Testing kit              | Fake bindings, request builders, vitest presets  | `testing`        | ✅     |
 | Agent skill              | `skills/hypdriv/SKILL.md` and `AGENTS.md`        | repo             | ✅     |
 
-## 7. Deliberately not included
+## 8. Deliberately not included
 
-- A replacement image optimiser (OpenNext + Cloudflare Images already cover it).
+- A replacement image optimiser (OpenNext + Cloudflare Images and Vercel Image Optimization already cover it).
 - A replacement for Next's Cache Components / ISR storage (OpenNext's incremental cache covers it; HypDriv layers an edge cache on top).
 - A hosted service. HypDriv is code only.

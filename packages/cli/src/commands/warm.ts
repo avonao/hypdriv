@@ -3,6 +3,7 @@ import { UsageError } from '../args';
 import { cacheStatus } from '../audit/cache';
 import { fetchPage, joinUrl, mapConcurrent, normalizeBaseUrl } from '../audit/http';
 import { concretePaths, isPageRoute } from '../audit/paths';
+import { auditAuth, describeAuditAuth } from '../audit/token';
 import { createContext } from '../context';
 import { millis } from '../ui';
 import { defineCommand } from './types';
@@ -40,6 +41,10 @@ export const warmCommand = defineCommand({
       description: 'Parallel requests (default: cache.warm.concurrency)',
     },
     timeout: { type: 'string', value: '<ms>', description: 'Per-request timeout', default: '10000' },
+    anonymous: {
+      type: 'boolean',
+      description: 'Send unsigned requests (no x-hypdriv-audit token), as an anonymous visitor would',
+    },
   },
   examples: [
     'hypdriv warm --url https://www.example.com',
@@ -58,11 +63,21 @@ export const warmCommand = defineCommand({
       max: 64,
     });
     const timeoutMs = args.number('timeout', 10_000, { min: 100 });
-    if (!args.json) ui.heading(`Warming ${paths.length} path(s) on ${base} (concurrency ${concurrency})`);
+    const auth = await auditAuth({
+      root: ctx.root,
+      io,
+      base,
+      secretName: config.resolved.security.internalAuth.secretEnv,
+      anonymous: args.boolean('anonymous'),
+    });
+    if (!args.json) {
+      ui.heading(`Warming ${paths.length} path(s) on ${base} (concurrency ${concurrency})`);
+      ui.note(describeAuditAuth(auth));
+    }
     const results = await mapConcurrent(paths, concurrency, async (path) => {
       const page = await fetchPage(
         joinUrl(base, path),
-        { fetch: io.fetch, timeoutMs, follow: false },
+        { fetch: io.fetch, timeoutMs, follow: false, headers: auth.headers },
         io.now,
       );
       const row = {

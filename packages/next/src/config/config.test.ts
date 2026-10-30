@@ -43,13 +43,96 @@ describe('deploy targets', () => {
   });
 
   it('keeps Vercel in charge of deployment ids and image optimization', async () => {
-    const fn = withHypDriv({}, { projectDir: dir, config: { performance: { skewProtection: true } }, adapterPath: '/virtual/adapter.js', log: silentLogger, purser: false, target: 'vercel', deploymentId: () => 'from-git' });
+    const fn = withHypDriv(
+      {},
+      {
+        projectDir: dir,
+        config: { performance: { skewProtection: true } },
+        adapterPath: '/virtual/adapter.js',
+        log: silentLogger,
+        purser: false,
+        target: 'vercel',
+        deploymentId: () => 'from-git',
+      },
+    );
     const out = await fn(PHASE.productionBuild, { defaultConfig: {} });
     expect(out.deploymentId).toBeUndefined();
     expect(out.images?.loaderFile).toBeUndefined();
-    const node = await withHypDriv({}, { projectDir: dir, adapterPath: '/virtual/adapter.js', log: silentLogger, purser: false, target: 'node', deploymentId: () => 'from-git' })(PHASE.productionBuild, { defaultConfig: {} });
+    const node = await withHypDriv(
+      {},
+      {
+        projectDir: dir,
+        adapterPath: '/virtual/adapter.js',
+        log: silentLogger,
+        purser: false,
+        target: 'node',
+        deploymentId: () => 'from-git',
+      },
+    )(PHASE.productionBuild, { defaultConfig: {} });
     expect(node.deploymentId).toBe('from-git');
     expect(node.images?.loaderFile).toBeUndefined();
+  });
+});
+
+describe('withHypDriv on Vercel', () => {
+  const policies = {
+    cache: {
+      edge: {
+        policies: [
+          {
+            id: 'catalog',
+            match: '/products/**',
+            ttl: '5m',
+            swr: '1h',
+            respectOrigin: false,
+            tags: ['catalog'],
+          },
+          { id: 'origin', match: '/blog/**', ttl: '1m' },
+        ],
+      },
+    },
+  };
+
+  it('turns explicit edge-cache policies into Vercel CDN route headers ahead of the app rules', async () => {
+    const appRule = {
+      source: '/products/special',
+      headers: [{ key: 'Vercel-CDN-Cache-Control', value: 'no-store' }],
+    };
+    const out = await withHypDriv(
+      { headers: async () => [appRule] },
+      {
+        projectDir: dir,
+        config: policies,
+        adapterPath: '/virtual/adapter.js',
+        log: silentLogger,
+        purser: false,
+        target: 'vercel',
+      },
+    )(PHASE.productionBuild, { defaultConfig: {} });
+    const rules = await out.headers!();
+    expect(rules.at(-1)).toEqual(appRule);
+    const catalog = rules.find((r) => r.source.startsWith('/products/:'));
+    expect(catalog).toBeDefined();
+    const headers = Object.fromEntries(catalog!.headers.map((h) => [h.key.toLowerCase(), h.value]));
+    expect(headers['vercel-cdn-cache-control']).toMatch(/s-maxage=300/);
+    expect(headers['vercel-cache-tag']).toContain('catalog');
+    // respectOrigin policies keep following the page's own Cache-Control.
+    expect(rules.some((r) => r.source.startsWith('/blog'))).toBe(false);
+  });
+
+  it('adds no header rules on other targets', async () => {
+    const out = await withHypDriv(
+      {},
+      {
+        projectDir: dir,
+        config: policies,
+        adapterPath: '/virtual/adapter.js',
+        log: silentLogger,
+        purser: false,
+        target: 'cloudflare',
+      },
+    )(PHASE.productionBuild, { defaultConfig: {} });
+    expect(out.headers).toBeUndefined();
   });
 });
 

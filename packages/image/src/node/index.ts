@@ -76,7 +76,9 @@ const DEFAULT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif'];
 export async function loadSharp(): Promise<SharpLike | null> {
   const specifier = 'sharp';
   try {
-    const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ specifier)) as { default?: unknown } | undefined;
+    const mod = (await import(
+      /* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ specifier
+    )) as { default?: unknown } | undefined;
     const candidate = (mod && 'default' in mod ? mod.default : mod) as unknown;
     return typeof candidate === 'function' ? (candidate as SharpLike) : null;
   } catch {

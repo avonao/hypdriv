@@ -1,8 +1,8 @@
 import { css } from '@avonao/purser';
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
 import { HypDrivDevTools, VitalsReporter } from 'hypdriv/client';
 import { HypDrivMeta, Speculation, ThemeScript } from 'hypdriv/server';
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import { ThemeSwitch } from '@/components/theme-switch';
 import { layout } from '@/lib/styles';
 import config from '../hypdriv.config';
@@ -10,7 +10,8 @@ import './purser.css';
 
 export const metadata: Metadata = {
   title: { default: 'HypDriv × Purser CSS', template: '%s · HypDriv × Purser' },
-  description: 'Next.js 16 on Cloudflare Workers with HypDriv and Purser CSS: zero overrides, flashless themes.',
+  description:
+    'Next.js 16 on Cloudflare Workers with HypDriv and Purser CSS: zero overrides, flashless themes.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

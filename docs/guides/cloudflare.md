@@ -103,4 +103,6 @@ HypDriv's edge stages are latency-sensitive and should stay at the edge; if you 
 
 - `next dev` runs the stages through `proxy.ts` (Node runtime). Edge-only stages (HTML transforms, nonce injection for cached HTML, edge cache storage) are skipped and the HUD shows `runner: proxy`.
 - `pnpm preview` runs the real Worker locally with Miniflare; bindings declared in `wrangler.jsonc` are emulated. Put secrets in `.dev.vars`.
-- `initOpenNextCloudflareForDev()` in `next.config.ts` exposes emulated bindings inside `next dev` so `hyp().env` works there too.
+- Running `wrangler dev` yourself after `opennextjs-cloudflare build`? Populate the local incremental cache first (`opennextjs-cloudflare populateCache local`; `preview` does it for you). Without it, prerendered Cache Components pages have no cache entries in the local R2 bucket and render on demand.
+- `hypdriv audit all --url http://127.0.0.1:8787` signs its requests with an audit token derived from `HYPDRIV_INTERNAL_SECRET` in `.dev.vars`, so the bot shield lets the headless-Chrome CSS audit through (`--anonymous` audits as a stranger would).
+- `initOpenNextCloudflareForDev()` in `next.config.ts` exposes emulated bindings inside `next dev` so `hyp().env` works there too. Its platform proxy warns that the Worker's own Durable Objects (`HYPDRIV_CHANNEL`, `HYPDRIV_LIMITER`, `HYPDRIV_INDEX`) "will not work in local development": that applies to `next dev` only, where HypDriv uses in-memory counters, tag indexes and the polling live transport; `wrangler dev` and production run the Durable Objects.

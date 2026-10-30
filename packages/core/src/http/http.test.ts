@@ -173,8 +173,16 @@ describe('sanitizeInboundRequest', () => {
       },
     });
     const clean = sanitizeInboundRequest(request);
-    expect([...clean.headers.keys()].sort()).toEqual(['accept', 'x-hypdriv-request-id', 'x-hypdriv-signature', 'x-hypdriv-timestamp']);
-    const custom = sanitizeInboundRequest(new Request('https://x.test/', { headers: { 'x-csp-nonce': 'a', 'x-nonce': 'b' } }), { nonceHeader: 'x-csp-nonce' });
+    expect([...clean.headers.keys()].sort()).toEqual([
+      'accept',
+      'x-hypdriv-request-id',
+      'x-hypdriv-signature',
+      'x-hypdriv-timestamp',
+    ]);
+    const custom = sanitizeInboundRequest(
+      new Request('https://x.test/', { headers: { 'x-csp-nonce': 'a', 'x-nonce': 'b' } }),
+      { nonceHeader: 'x-csp-nonce' },
+    );
     expect([...custom.headers.keys()]).toEqual(['x-nonce']);
   });
 

@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
 import { flag, geo } from 'hypdriv/server';
+import { Suspense } from 'react';
 
 export default function Home() {
   return (
@@ -13,9 +13,15 @@ export default function Home() {
         <Personalised />
       </Suspense>
       <ul>
-        <li><a href="/blog/hello-world">Hello world (ISR, 60s)</a></li>
-        <li><a href="/blog/second-post">Second post (ISR, 60s)</a></li>
-        <li><a href="/dashboard">Dashboard (dynamic)</a></li>
+        <li>
+          <a href="/blog/hello-world">Hello world (ISR, 60s)</a>
+        </li>
+        <li>
+          <a href="/blog/second-post">Second post (ISR, 60s)</a>
+        </li>
+        <li>
+          <a href="/dashboard">Dashboard (dynamic)</a>
+        </li>
       </ul>
     </>
   );

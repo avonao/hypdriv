@@ -1,11 +1,11 @@
 ---
 name: hypdriv
-description: Adopt, configure and operate HypDriv (the Hyper-Extension for Next.js 16+ on Cloudflare Workers) in a Next.js application — install, wire next.config/proxy/worker entry, tune caching, CSP, rate limits, flags, Purser CSS and observability, and verify with the hypdriv CLI.
+description: Adopt, configure and operate HypDriv (the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel) in a Next.js application — install, wire next.config/proxy/worker entry, tune caching, CSP, rate limits, flags, jobs, Purser CSS and observability, and verify with the hypdriv CLI.
 ---
 
 # HypDriv for coding agents
 
-Use this skill when a Next.js 16+ project should run on Cloudflare Workers with HypDriv, or when an existing HypDriv setup needs configuration, diagnosis or verification.
+Use this skill when a Next.js 16+ project should run with HypDriv on Cloudflare Workers (OpenNext) or Vercel, or when an existing HypDriv setup needs configuration, diagnosis or verification. The deploy target comes from `hypdriv.config.ts#platform` (`auto` detects it); pass `--platform cloudflare|vercel|node` to CLI commands to override.
 
 ## 1. Detect the situation
 
@@ -18,16 +18,17 @@ The JSON report tells you: Next.js version and config, whether `@opennextjs/clou
 ## 2. Install and wire (new projects)
 
 ```sh
-npm create hypdriv@latest my-app -- --pm pnpm            # Next 16 + OpenNext + HypDriv
-# or in an existing OpenNext project:
-pnpm add hypdriv && npx hypdriv init
+npm create hypdriv@latest my-app -- --pm pnpm                    # Cloudflare Workers (OpenNext)
+npm create hypdriv@latest my-app -- --pm pnpm --platform vercel  # Vercel
+# add --purser for Purser CSS; or in an existing project:
+pnpm add hypdriv && npx hypdriv init [--platform vercel]
 ```
 
 `hypdriv init` is idempotent. It:
 1. writes `hypdriv.config.ts` (`defineConfig({...})`) with commented defaults,
 2. wraps `next.config.ts` in `withHypDriv()` (keeps existing options),
-3. writes `hypdriv.worker.ts` and sets `wrangler.jsonc#main` to it (keeps OpenNext's Durable Object exports),
-4. writes `proxy.ts` with `createProxy()` when none exists,
+3. on Cloudflare: writes `hypdriv.worker.ts` and sets `wrangler.jsonc#main` to it (keeps OpenNext's Durable Object exports); on Vercel: syncs `vercel.json#crons` with `jobs.cron` and writes `.env.example`,
+4. writes `proxy.ts` with `createProxy()` when none exists (on Vercel it wires `@hypdriv/vercel` automatically) and `instrumentation.ts` with `createInstrumentation()`,
 5. adds scripts: `hypdriv:doctor`, `hypdriv:analyze`, `hypdriv:audit`,
 6. optionally scaffolds the Purser bridge when `@avonao/purser` is installed.
 
@@ -41,7 +42,8 @@ All configuration lives in `hypdriv.config.ts`. Read `docs/guides/configuration.
 - **Cache a route at the edge**: `cache.edge.policies: [{ match: '/blog/**', ttl: '10m', swr: '1d', tags: ['blog'] }]`; purge with `revalidateTag('blog')` from `hypdriv/cache`.
 - **Rate limit an API**: `security.rateLimit: [{ id: 'api', match: '/api/**', limit: 120, window: '1m', key: ['ip'] }]`.
 - **Feature flag**: `flags.definitions.newCheckout = { default: false, rules: [{ when: { country: ['US'] }, percentage: 25, value: true }] }`; read with `await flag('newCheckout')` on the server or `useFlag('newCheckout')` on the client.
-- **Cron job**: `jobs.cron.digest = { cron: '0 9 * * 1', path: '/api/jobs/digest' }`, add the cron to `wrangler.jsonc#triggers.crons` (or run `hypdriv doctor --fix`), implement the route with `jobHandler()` from `hypdriv/server`.
+- **Cron job**: `jobs.cron.digest = { cron: '0 9 * * 1', path: '/api/jobs/digest' }`, add the cron to `wrangler.jsonc#triggers.crons` on Cloudflare or `vercel.json#crons` on Vercel (or run `hypdriv doctor --fix`), implement the route with `jobHandler()` from `hypdriv/server` and export it as both `GET` (Vercel Cron, `CRON_SECRET`) and `POST`.
+- **Vercel CDN caching**: on Vercel, explicit policies with `respectOrigin: false` become `Vercel-CDN-Cache-Control` route headers at build time; wrap Route Handlers with `withVercelCdn(config, handler)` from `hypdriv/vercel`. Upstash (`KV_REST_API_URL`/`KV_REST_API_TOKEN`) gives exact rate limits; `GLOBAL_CONFIG` backs flags/redirects/maintenance.
 - **Purser CSS**: `purser: { tokens: 'lib/tokens.ts', src: ['app','components','lib'], out: 'app/purser.css', theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light', clientHint: { hint: 'prefers-color-scheme', values: { dark: 'dark', light: 'light' } } } } } }`.
 
 Rules of thumb:
@@ -54,17 +56,21 @@ Rules of thumb:
 ```sh
 pnpm build                              # next build → .hypdriv/manifest.json
 npx hypdriv routes                      # classification, cache policy, CSP mode per route
-npx hypdriv analyze                     # Worker weight, per-route JS/CSS, budgets
-pnpm preview &                          # opennextjs-cloudflare build && preview
+npx hypdriv analyze                     # Worker weight (Cloudflare) or function sizes (Vercel, after `vercel build`), per-route JS/CSS, budgets
+pnpm preview &                          # Cloudflare: opennextjs-cloudflare build && preview → :8787
+pnpm start &                            # Vercel / Node: next start → :3000
 npx hypdriv audit all --url http://localhost:8787
 npx hypdriv audit css --url http://localhost:8787   # Purser zero-override check (needs Chrome)
 ```
+
+Audits sign their requests with a short-lived token derived from `HYPDRIV_INTERNAL_SECRET` (from the environment, `.dev.vars` or `.env.local`), so the bot shield does not block headless Chrome; without the secret, a 403 from the shield is reported with that hint. On Vercel, the CSP audit warns (not fails) for ISR / PPR routes that use HypDriv's declared `'unsafe-inline'` fallback.
 
 `hypdriv audit` exits non-zero on failures; fix the configuration and re-run. For CI add `npx hypdriv doctor --ci` and `npx hypdriv budget --ci`.
 
 ## 5. Diagnose at runtime
 
-- Every response carries `Server-Timing` (stage timings), `x-hypdriv-cache` (HIT/MISS/STALE/BYPASS + reason), `x-hypdriv-csp` (nonce/hash/report-only), `x-request-id`.
+- Every response carries `Server-Timing` (stage timings), `x-hypdriv-cache` (HIT/MISS/STALE/BYPASS, `CDN` on Vercel), `x-hypdriv-csp` (nonce/hash/report-only/unsafe-inline-fallback), `x-request-id`.
+- `/_hypdriv/health` lists the capabilities in use and which binding or platform service backs each one.
 - In development open the HUD (Alt+Shift+H) or render `<HypDrivDevTools />` from `hypdriv/client` in the root layout.
 - CSP violations are collected at `/_hypdriv/csp-report`; `npx hypdriv csp suggest` proposes allow-list additions from collected reports.
 - Web Vitals are posted to `/_hypdriv/vitals`; `npx hypdriv vitals` prints p75 per route when Analytics Engine is bound.

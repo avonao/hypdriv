@@ -19,8 +19,18 @@ describe('redactFields', () => {
   it('keeps correlation identifiers intact', () => {
     const requestId = '0192f3a4-5b6c-7d8e-9f01-23456789abcd';
     const traceId = '4bf92f3577b34da6a3ce929d0e0e4736';
-    const out = redactFields({ requestId, traceId, spanId: '00f067aa0ba902b7', buildId: 'b1a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7' });
-    expect(out).toEqual({ requestId, traceId, spanId: '00f067aa0ba902b7', buildId: 'b1a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7' });
+    const out = redactFields({
+      requestId,
+      traceId,
+      spanId: '00f067aa0ba902b7',
+      buildId: 'b1a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7',
+    });
+    expect(out).toEqual({
+      requestId,
+      traceId,
+      spanId: '00f067aa0ba902b7',
+      buildId: 'b1a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7',
+    });
   });
 
   it('honours extra redact keys and extra allowed id keys', () => {
@@ -40,7 +50,13 @@ describe('createConsoleLogger', () => {
     const lines: string[] = [];
     const log = createConsoleLogger({ clock: () => 'T', sink: (line) => lines.push(line) });
     log.child({ requestId: '0192f3a4-5b6c-7d8e-9f01-23456789abcd' }).info('hello', { token: 'secret' });
-    expect(JSON.parse(lines[0]!)).toEqual({ time: 'T', level: 'info', msg: 'hello', requestId: '0192f3a4-5b6c-7d8e-9f01-23456789abcd', token: '[redacted]' });
+    expect(JSON.parse(lines[0]!)).toEqual({
+      time: 'T',
+      level: 'info',
+      msg: 'hello',
+      requestId: '0192f3a4-5b6c-7d8e-9f01-23456789abcd',
+      token: '[redacted]',
+    });
   });
 
   it('respects the level threshold', () => {

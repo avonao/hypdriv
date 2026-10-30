@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defineConfig, loadConfig } from './define';
-import { resolveConfig } from './resolve';
+import { isResolvedConfig, resolveConfig } from './resolve';
 import { validateConfig } from './validate';
 
 describe('resolveConfig', () => {
@@ -143,5 +143,19 @@ describe('defineConfig / loadConfig', () => {
     const warnings: string[] = [];
     loadConfig({ nope: true } as never, { onWarning: (w) => warnings.push(w.path) });
     expect(warnings).toEqual(['nope']);
+  });
+});
+
+describe('isResolvedConfig', () => {
+  it('recognises resolved configs by their brand, never by shape', () => {
+    const input = { stages: { disable: ['devtools'] }, site: { name: 'shop' } };
+    expect(isResolvedConfig(input)).toBe(false);
+    const resolved = resolveConfig(input);
+    expect(isResolvedConfig(resolved)).toBe(true);
+    expect(isResolvedConfig(loadConfig(input))).toBe(true);
+    // The brand is not enumerable: serialisation and spreads stay plain data.
+    expect(Object.keys(resolved)).not.toContain('hypdriv.resolved-config');
+    expect(isResolvedConfig(JSON.parse(JSON.stringify(resolved)))).toBe(false);
+    expect(isResolvedConfig(null)).toBe(false);
   });
 });

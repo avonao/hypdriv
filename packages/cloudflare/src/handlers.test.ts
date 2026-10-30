@@ -1,7 +1,16 @@
-import { type Logger, type ResolvedConfig, loadConfig, silentLogger } from '@hypdriv/core';
+import { type Logger, loadConfig, type ResolvedConfig, silentLogger } from '@hypdriv/core';
 import { signing } from '@hypdriv/security';
 import { describe, expect, it, vi } from 'vitest';
-import { type DispatchContext, type EmailMessageLike, type MessageBatchLike, type QueueMessageLike, dispatchEmail, dispatchQueue, dispatchScheduled, forwardTail } from './handlers';
+import {
+  type DispatchContext,
+  dispatchEmail,
+  dispatchQueue,
+  dispatchScheduled,
+  type EmailMessageLike,
+  forwardTail,
+  type MessageBatchLike,
+  type QueueMessageLike,
+} from './handlers';
 
 const SECRET = 'internal-secret-0123456789-abcdefghijklmnop';
 
@@ -18,7 +27,12 @@ function recordingLogger() {
   return { log: make(), lines };
 }
 
-function dispatchContext(config: ResolvedConfig, invoke: DispatchContext['invoke'], env: Record<string, unknown> = { HYPDRIV_INTERNAL_SECRET: SECRET }, log: Logger = silentLogger): DispatchContext {
+function dispatchContext(
+  config: ResolvedConfig,
+  invoke: DispatchContext['invoke'],
+  env: Record<string, unknown> = { HYPDRIV_INTERNAL_SECRET: SECRET },
+  log: Logger = silentLogger,
+): DispatchContext {
   return { config, env, log, invoke, waitUntil: () => {} };
 }
 
@@ -40,23 +54,35 @@ describe('dispatchScheduled', () => {
       requests.push(request.clone() as Request);
       return Response.json({ ok: true });
     });
-    const result = await dispatchScheduled({ cron: '0  9 * * 1', scheduledTime: 1_793_000_000_000 }, dispatchContext(config, invoke));
+    const result = await dispatchScheduled(
+      { cron: '0  9 * * 1', scheduledTime: 1_793_000_000_000 },
+      dispatchContext(config, invoke),
+    );
     expect(result).toEqual({ ran: ['digest'], failed: [] });
     const request = requests[0]!;
     expect(new URL(request.url).toString()).toBe('https://shop.example.com/api/jobs/digest');
     expect(request.method).toBe('POST');
     expect(request.headers.get('x-hypdriv-job')).toBe('digest');
     expect(await signing.verifyInternalRequest(request.clone() as Request, SECRET)).toBe(true);
-    expect(await request.json()).toEqual({ job: 'digest', cron: '0 9 * * 1', scheduledTime: 1_793_000_000_000 });
+    expect(await request.json()).toEqual({
+      job: 'digest',
+      cron: '0 9 * * 1',
+      scheduledTime: 1_793_000_000_000,
+    });
   });
 
   it('runs GET jobs and warms configured routes on the shared schedule', async () => {
     const urls: string[] = [];
     const invoke = vi.fn(async (request: Request) => {
-      urls.push(`${request.method} ${new URL(request.url).pathname}${request.headers.get('x-hypdriv-warm') ? ' (warm)' : ''}`);
+      urls.push(
+        `${request.method} ${new URL(request.url).pathname}${request.headers.get('x-hypdriv-warm') ? ' (warm)' : ''}`,
+      );
       return new Response('ok');
     });
-    const result = await dispatchScheduled({ cron: '*/15 * * * *', scheduledTime: Date.now() }, dispatchContext(config, invoke));
+    const result = await dispatchScheduled(
+      { cron: '*/15 * * * *', scheduledTime: Date.now() },
+      dispatchContext(config, invoke),
+    );
     expect(result.ran).toEqual(['cleanup', 'warm']);
     expect(urls).toContain('GET /api/jobs/cleanup');
     expect(urls).toContain('GET / (warm)');
@@ -66,19 +92,38 @@ describe('dispatchScheduled', () => {
   it('reports failing jobs and rethrows so Cloudflare records the failure', async () => {
     const { log, lines } = recordingLogger();
     const invoke = vi.fn(async () => new Response('nope', { status: 500 }));
-    await expect(dispatchScheduled({ cron: '0 9 * * 1', scheduledTime: 0 }, dispatchContext(config, invoke, undefined, log))).rejects.toThrow(/1 cron job\(s\) failed: digest/);
+    await expect(
+      dispatchScheduled(
+        { cron: '0 9 * * 1', scheduledTime: 0 },
+        dispatchContext(config, invoke, undefined, log),
+      ),
+    ).rejects.toThrow(/1 cron job\(s\) failed: digest/);
     expect(lines.some((l) => l.level === 'error' && l.message === 'cron job failed')).toBe(true);
   });
 
   it('warns about triggers without a configured job and sends unsigned requests without a secret', async () => {
     const { log, lines } = recordingLogger();
     const invoke = vi.fn(async () => new Response('ok'));
-    await dispatchScheduled({ cron: '0 0 1 1 *', scheduledTime: 0 }, dispatchContext(config, invoke, {}, log));
+    await dispatchScheduled(
+      { cron: '0 0 1 1 *', scheduledTime: 0 },
+      dispatchContext(config, invoke, {}, log),
+    );
     expect(invoke).not.toHaveBeenCalled();
     expect(lines.some((l) => l.message === 'cron trigger has no configured job')).toBe(true);
 
     const requests: Request[] = [];
-    await dispatchScheduled({ cron: '0 9 * * 1', scheduledTime: 0 }, dispatchContext(config, async (r) => (requests.push(r), new Response('ok')), {}, log));
+    await dispatchScheduled(
+      { cron: '0 9 * * 1', scheduledTime: 0 },
+      dispatchContext(
+        config,
+        async (r) => {
+          requests.push(r);
+          return new Response('ok');
+        },
+        {},
+        log,
+      ),
+    );
     expect(requests[0]!.headers.get('x-hypdriv-signature')).toBeNull();
     expect(lines.some((l) => l.level === 'warn' && l.message.includes('HYPDRIV_INTERNAL_SECRET'))).toBe(true);
   });
@@ -105,7 +150,11 @@ function batchOf(queue: string, bodies: unknown[]) {
 }
 
 describe('dispatchQueue', () => {
-  const config = loadConfig({ jobs: { queues: { emails: { path: '/api/queues/emails' }, audit: { path: '/api/queues/audit', retry: 'none' } } } });
+  const config = loadConfig({
+    jobs: {
+      queues: { emails: { path: '/api/queues/emails' }, audit: { path: '/api/queues/audit', retry: 'none' } },
+    },
+  });
 
   it('acks everything the consumer accepted and retries what it asks for', async () => {
     const seen: unknown[] = [];
@@ -162,7 +211,13 @@ describe('dispatchEmail', () => {
     const config = loadConfig({ jobs: { email: { path: '/api/inbound-email' } } });
     const requests: Request[] = [];
     const rejects: string[] = [];
-    await dispatchEmail(email('Subject: hi\r\n\r\nbody', rejects), dispatchContext(config, async (r) => (requests.push(r), new Response(null, { status: 204 }))));
+    await dispatchEmail(
+      email('Subject: hi\r\n\r\nbody', rejects),
+      dispatchContext(config, async (r) => {
+        requests.push(r);
+        return new Response(null, { status: 204 });
+      }),
+    );
     const request = requests[0]!;
     expect(new URL(request.url).pathname).toBe('/api/inbound-email');
     expect(request.headers.get('content-type')).toBe('message/rfc822');
@@ -176,7 +231,10 @@ describe('dispatchEmail', () => {
   it('rejects mail the handler refuses and mail without a handler', async () => {
     const config = loadConfig({ jobs: { email: { path: '/api/inbound-email' } } });
     const rejects: string[] = [];
-    await dispatchEmail(email('x', rejects), dispatchContext(config, async () => new Response('mailbox unavailable', { status: 550 })));
+    await dispatchEmail(
+      email('x', rejects),
+      dispatchContext(config, async () => new Response('mailbox unavailable', { status: 550 })),
+    );
     expect(rejects).toEqual(['mailbox unavailable']);
 
     const none: string[] = [];
@@ -205,6 +263,10 @@ describe('forwardTail', () => {
       ],
       { log },
     );
-    expect(lines.map((l) => `${l.level}:${l.message}`)).toEqual(['error:tail exception', 'warn:tail log', 'error:tail log']);
+    expect(lines.map((l) => `${l.level}:${l.message}`)).toEqual([
+      'error:tail exception',
+      'warn:tail log',
+      'error:tail log',
+    ]);
   });
 });

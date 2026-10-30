@@ -26,7 +26,6 @@ import {
   type RscNavigation,
   readDevState,
   readPurserDiagnostics,
-  readRequestFacts,
   type VitalSample,
 } from './readers';
 import {

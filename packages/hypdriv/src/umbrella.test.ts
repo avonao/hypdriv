@@ -21,12 +21,30 @@ describe('hypdriv umbrella', () => {
     expect(typeof proxy.createProxy).toBe('function');
     expect(proxy.matcher.matcher.length).toBeGreaterThan(0);
 
+    const vercel = await import('./vercel');
+    expect(typeof vercel.withVercelCdn).toBe('function');
+    expect(typeof vercel.vercelPlatformOverrides).toBe('function');
+    expect(typeof vercel.registerVercelSdk).toBe('function');
     const cloudflare = await import('./cloudflare');
     expect(typeof cloudflare.createWorker).toBe('function');
     expect(typeof cloudflare.enqueue).toBe('function');
 
     const server = await import('./server');
-    for (const name of ['hyp', 'flag', 'nonce', 'jobHandler', 'safeAction', 'defineRoute', 'createSessionStore', 'signJwt', 'verifyJwt', 'hashPassword', 'safeRedirect', 'enqueue', 'publish']) {
+    for (const name of [
+      'hyp',
+      'flag',
+      'nonce',
+      'jobHandler',
+      'safeAction',
+      'defineRoute',
+      'createSessionStore',
+      'signJwt',
+      'verifyJwt',
+      'hashPassword',
+      'safeRedirect',
+      'enqueue',
+      'publish',
+    ]) {
       expect(typeof (server as Record<string, unknown>)[name], name).toBe('function');
     }
     expect(typeof server.webhooks.verifyStripe).toBe('function');

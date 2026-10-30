@@ -208,3 +208,28 @@ export function percentile(values: number[], p: number): number {
   const rank = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return sorted[rank]!;
 }
+
+/**
+ * `Cookie` header for a repeat visit: the name=value pairs of the response's `Set-Cookie` headers (what a
+ * browser sends back). Attributes are dropped; expired cookies (`Max-Age=0`) are skipped.
+ */
+export function cookiesFrom(headers: Headers, previous = ''): string {
+  const jar = new Map<string, string>();
+  for (const pair of previous.split(';')) {
+    const [name, ...rest] = pair.trim().split('=');
+    if (name) jar.set(name, rest.join('='));
+  }
+  const setCookies =
+    typeof (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie === 'function'
+      ? headers.getSetCookie()
+      : (headers.get('set-cookie') ?? '').split(/,(?=\s*[^;=\s]+=)/);
+  for (const raw of setCookies) {
+    const [first, ...attrs] = raw.split(';');
+    const eq = first?.indexOf('=') ?? -1;
+    if (!first || eq <= 0) continue;
+    const name = first.slice(0, eq).trim();
+    if (attrs.some((a) => /^\s*max-age\s*=\s*0\s*$/i.test(a))) jar.delete(name);
+    else jar.set(name, first.slice(eq + 1).trim());
+  }
+  return [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
+}

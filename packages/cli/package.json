@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/cli",
   "version": "0.1.0",
-  "description": "The hypdriv command: init, doctor, analyze, routes, audit, budget, csp, css, warm, bench, deps, manifest.",
+  "description": "The hypdriv command for Cloudflare Workers and Vercel: init, doctor, analyze, routes, audit, budget, csp, css, warm, bench, deps, jobs, vitals, manifest, agent.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -10,6 +10,7 @@ import {
   matchesAny,
   type PurserManifest,
   type ResolvedConfig,
+  sha256Hex,
   silentLogger,
 } from '@hypdriv/core';
 import { linkEntriesForRoute, linkHeaderValues } from '../shared/hints';
@@ -100,7 +101,11 @@ const INTERNAL_PAGES = new Set(['/_global-error', '/_error', '/_app', '/_documen
  * Prerendered documents by pathname (HTML plus the full-route RSC payload), read from the files the
  * adapter outputs point at. Segment payloads (`.segments/`) are skipped: the full payload covers them.
  */
-export function collectDocuments(context: OnBuildCompleteContext, fs: AdapterFs, limits: { maxFiles?: number; maxBytes?: number } = {}): Record<string, string> {
+export function collectDocuments(
+  context: OnBuildCompleteContext,
+  fs: AdapterFs,
+  limits: { maxFiles?: number; maxBytes?: number } = {},
+): Record<string, string> {
   const maxFiles = limits.maxFiles ?? 4000;
   const maxBytes = limits.maxBytes ?? 4 * 1024 * 1024;
   const rscSuffix = context.routing.rsc?.suffix ?? '.rsc';
@@ -349,6 +354,8 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
     warnings,
   };
 
+  manifest.fingerprint = await buildFingerprint(manifest);
+
   // Attach inferred cache policy ids so runtimes/CLI can show them without recomputing.
   if (config.cache.edge) {
     for (const route of manifest.routes) {
@@ -365,6 +372,38 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
   }
 
   return { manifest, failures, html };
+}
+
+/**
+ * Content fingerprint of the build output (see `HypManifest.fingerprint`): Next's build id and deployment id,
+ * every route's client assets (content-hashed names), CSP hashes of prerendered HTML, HypDriv's inline-script
+ * hashes and the Purser stylesheet. Canonical JSON, SHA-256, 16 hex characters.
+ */
+export async function buildFingerprint(
+  manifest: Pick<
+    HypManifest,
+    'buildId' | 'deploymentId' | 'routes' | 'csp' | 'inlineScriptHashes' | 'purser'
+  >,
+): Promise<string> {
+  const routes = [...manifest.routes]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((r) => [r.id, r.classification, [...r.assets.js].sort(), [...r.assets.css].sort()]);
+  const csp = Object.keys(manifest.csp)
+    .sort()
+    .map((id) => [
+      id,
+      [...(manifest.csp[id]?.scriptHashes ?? [])].sort(),
+      [...(manifest.csp[id]?.styleHashes ?? [])].sort(),
+    ]);
+  const canonical = JSON.stringify({
+    b: manifest.buildId,
+    d: manifest.deploymentId ?? null,
+    r: routes,
+    c: csp,
+    s: [...(manifest.inlineScriptHashes ?? [])].sort(),
+    p: manifest.purser?.asset ?? null,
+  });
+  return (await sha256Hex(canonical)).slice(0, 16);
 }
 
 async function hashesFor(doc: string): Promise<{ scriptHashes: string[]; styleHashes: string[] }> {

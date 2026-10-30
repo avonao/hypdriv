@@ -266,11 +266,22 @@ async function runPurser(
  * build runs on Vercel (`VERCEL=1`, `NEXT_EDGE_RUNTIME_PROVIDER=vercel`) or the project has a Vercel
  * config, Cloudflare when the project has a wrangler config or `@opennextjs/cloudflare`, else a Node host.
  */
-export function resolveBuildTarget(projectDir: string, config: Pick<ResolvedConfig, 'platform'>, env: Record<string, string | undefined> = process.env): DeployTarget {
+export function resolveBuildTarget(
+  projectDir: string,
+  config: Pick<ResolvedConfig, 'platform'>,
+  env: Record<string, string | undefined> = process.env,
+): DeployTarget {
   if (config.platform !== 'auto') return config.platform;
   if (env.VERCEL === '1' || env.NEXT_EDGE_RUNTIME_PROVIDER === 'vercel') return 'vercel';
   const has = (name: string) => existsSync(join(projectDir, name));
-  if (has('wrangler.jsonc') || has('wrangler.json') || has('wrangler.toml') || has('cloudflare.config.ts') || installedVersion(projectDir, '@opennextjs/cloudflare')) return 'cloudflare';
+  if (
+    has('wrangler.jsonc') ||
+    has('wrangler.json') ||
+    has('wrangler.toml') ||
+    has('cloudflare.config.ts') ||
+    installedVersion(projectDir, '@opennextjs/cloudflare')
+  )
+    return 'cloudflare';
   if (has('vercel.json') || has('vercel.ts') || has('vercel.toml') || has('.vercel')) return 'vercel';
   return 'node';
 }
@@ -305,7 +316,12 @@ function applySafeDefaults(
   }
   // `auto`: the Cloudflare loader only on Cloudflare; on Vercel a custom loader would bypass Vercel Image
   // Optimization, and on Node hosts Next's own optimizer is the right default.
-  const imageLoader = config.images.loader === 'auto' ? (target === 'cloudflare' ? 'cloudflare' : 'next') : config.images.loader;
+  const imageLoader =
+    config.images.loader === 'auto'
+      ? target === 'cloudflare'
+        ? 'cloudflare'
+        : 'next'
+      : config.images.loader;
   if (
     imageLoader === 'cloudflare' &&
     !out.images?.loaderFile &&
@@ -334,6 +350,33 @@ function applySafeDefaults(
       };
       out.env = { ...(out.env ?? {}), HYPDRIV_IMAGES: JSON.stringify(loaderConfig) };
     }
+  }
+}
+
+/**
+ * On Vercel the CDN caches what the function returns and Routing Middleware cannot set caching headers, so
+ * explicit edge-cache policies become `headers()` rules carrying `Vercel-CDN-Cache-Control` and
+ * `Vercel-Cache-Tag` (`vercelCdnRouteHeaders`). HypDriv's rules come first: the application's own rules for
+ * the same header and path win.
+ */
+async function applyVercelCdnHeaders(
+  out: NextConfig,
+  config: ResolvedConfig,
+  phase: string,
+  log: Logger,
+): Promise<void> {
+  const { vercelCdnRouteHeaders } = await import('@hypdriv/vercel');
+  const { rules, skipped } = vercelCdnRouteHeaders(config);
+  if (rules.length) {
+    const appHeaders = out.headers;
+    out.headers = async () => [...rules, ...(appHeaders ? await appHeaders() : [])];
+  }
+  if (phase === PHASE.productionBuild) {
+    if (rules.length) log.info(`hypdriv: ${rules.length} Vercel CDN header rule(s) from edge-cache policies`);
+    for (const { policy, reason } of skipped)
+      log.info(
+        `hypdriv: edge-cache policy "${policy}" is not a Vercel CDN route header (${reason}); wrap its Route Handlers with withVercelCdn() — pages follow their own Cache-Control`,
+      );
   }
 }
 
@@ -367,6 +410,8 @@ export function withHypDriv(
 
     const out: NextConfig = { ...base };
     if (options.safeDefaults !== false) applySafeDefaults(out, resolved, phase, projectDir, options, log);
+    const target = options.target ?? resolveBuildTarget(projectDir, resolved);
+    if (target === 'vercel') await applyVercelCdnHeaders(out, resolved, phase, log);
 
     // Adapter chain.
     const baseAdapter =

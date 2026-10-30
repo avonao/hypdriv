@@ -54,7 +54,11 @@ export const ID_FIELD_KEYS: ReadonlySet<string> = new Set([
  * Redacts values whose key looks secret and long opaque strings that look like credentials. Values under
  * correlation-id keys ({@link ID_FIELD_KEYS} plus `allowKeys`) are kept.
  */
-export function redactFields(fields: LogFields, extraKeys: string[] = [], allowKeys: string[] = []): LogFields {
+export function redactFields(
+  fields: LogFields,
+  extraKeys: string[] = [],
+  allowKeys: string[] = [],
+): LogFields {
   const extra = new Set(extraKeys.map((k) => k.toLowerCase()));
   const allow = new Set(allowKeys.map((k) => k.toLowerCase()));
   const walk = (value: unknown, depth: number, key?: string): unknown => {

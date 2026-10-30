@@ -113,3 +113,29 @@ describe('createClientInstrumentation', () => {
     expect(typeof client.onRouterTransitionStart).toBe('function');
   });
 });
+
+describe('createInstrumentation runtime registration', () => {
+  it('registers config and env for helpers that run outside a request context', async () => {
+    const { getRuntime, registerRuntime, queueEnvKey } = await import('@hypdriv/core');
+    registerRuntime(null);
+    const { register } = createInstrumentation({
+      config: { site: { name: 'shop' }, observe: { errors: { sink: 'none' } } },
+      env: { FOO: 'bar' },
+    });
+    await register();
+    expect(getRuntime()).toMatchObject({ target: 'node', env: { FOO: 'bar' } });
+    expect(getRuntime()?.config.site.name).toBe('shop');
+
+    const vercel = createInstrumentation({
+      config: { jobs: { queues: { emails: { path: '/api/jobs/emails' } } } },
+      env: { VERCEL: '1' },
+    });
+    await vercel.register();
+    const runtime = getRuntime()!;
+    expect(runtime.target).toBe('vercel');
+    expect(typeof (runtime.env as Record<string, { send?: unknown }>)[queueEnvKey('emails')]?.send).toBe(
+      'function',
+    );
+    registerRuntime(null);
+  });
+});

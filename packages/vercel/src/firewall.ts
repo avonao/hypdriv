@@ -2,7 +2,6 @@ import {
   defineStage,
   type Logger,
   type RateLimitBindingLike,
-  type ResolvedConfig,
   type ResolvedRateLimitPolicy,
   type Stage,
   toError,
@@ -15,7 +14,7 @@ import {
   resolveRateLimitKey,
 } from '@hypdriv/security';
 import { type CheckRateLimitFn, type CheckRateLimitResult, getVercelSdk } from './sdk';
-import { defaultLogger, warnOnce } from './util';
+import { type ConfigInput, defaultLogger, resolveInput, warnOnce } from './util';
 
 /** Options of `vercelRateLimitBinding`. */
 export interface VercelRateLimitBindingOptions {
@@ -48,7 +47,10 @@ async function checkRule(
  * An unknown rule (`error: 'not-found'`) or a missing SDK is logged once and allows the request: a WAF
  * misconfiguration must not take the application down.
  */
-export function vercelRateLimitBinding(ruleId: string, options: VercelRateLimitBindingOptions = {}): RateLimitBindingLike {
+export function vercelRateLimitBinding(
+  ruleId: string,
+  options: VercelRateLimitBindingOptions = {},
+): RateLimitBindingLike {
   const log = options.log ?? defaultLogger();
   return {
     async limit({ key }) {
@@ -59,9 +61,14 @@ export function vercelRateLimitBinding(ruleId: string, options: VercelRateLimitB
       }
       const result = await checkRule(check, ruleId, key, options);
       if (result.error === 'not-found') {
-        warnOnce(log, `vercel-waf:not-found:${ruleId}`, `vercel WAF: rate-limit rule "${ruleId}" is not configured; allowing requests`, {
-          rule: ruleId,
-        });
+        warnOnce(
+          log,
+          `vercel-waf:not-found:${ruleId}`,
+          `vercel WAF: rate-limit rule "${ruleId}" is not configured; allowing requests`,
+          {
+            rule: ruleId,
+          },
+        );
         return { success: true };
       }
       return { success: !result.rateLimited };
@@ -76,9 +83,10 @@ export function vercelRateLimitBinding(ruleId: string, options: VercelRateLimitB
  * is configured.
  */
 export function vercelRateLimitRouter(
-  config: ResolvedConfig,
+  configInput: ConfigInput,
   options: Omit<VercelRateLimitBindingOptions, 'request'> = {},
 ): RateLimitBindingLike | null {
+  const config = resolveInput(configInput);
   const rules = config.vercel.firewall.rateLimitRules;
   const ids = Object.values(rules);
   if (!ids.length) return null;
@@ -114,7 +122,11 @@ export interface VercelRateLimitStageOptions {
  * because the main `rate-limit` stage already sends them to the WAF through the platform binding. WAF errors
  * fail open (logged). Returns `null` when no configured policy is mapped to a rule.
  */
-export function vercelRateLimitStage(config: ResolvedConfig, options: VercelRateLimitStageOptions = {}): Stage | null {
+export function vercelRateLimitStage(
+  configInput: ConfigInput,
+  options: VercelRateLimitStageOptions = {},
+): Stage | null {
+  const config = resolveInput(configInput);
   const rules = config.vercel.firewall.rateLimitRules;
   const mapped: Array<{ policy: ResolvedRateLimitPolicy; rule: string }> = [];
   for (const policy of config.security.rateLimit) {
@@ -138,7 +150,10 @@ export function vercelRateLimitStage(config: ResolvedConfig, options: VercelRate
       const results = await Promise.all(
         applicable.map(async ({ policy, rule }) => {
           try {
-            return await checkRule(check, rule, resolveRateLimitKey(policy, ctx), { request: ctx.request, timeoutMs });
+            return await checkRule(check, rule, resolveRateLimitKey(policy, ctx), {
+              request: ctx.request,
+              timeoutMs,
+            });
           } catch (error) {
             ctx.log.error('vercel WAF rate-limit check failed; allowing request', {
               policy: policy.id,
@@ -154,10 +169,15 @@ export function vercelRateLimitStage(config: ResolvedConfig, options: VercelRate
         const result = results[i];
         if (!result) continue;
         if (result.error === 'not-found') {
-          warnOnce(ctx.log, `vercel-waf:not-found:${rule}`, `vercel WAF: rate-limit rule "${rule}" is not configured; allowing requests`, {
-            rule,
-            policy: policy.id,
-          });
+          warnOnce(
+            ctx.log,
+            `vercel-waf:not-found:${rule}`,
+            `vercel WAF: rate-limit rule "${rule}" is not configured; allowing requests`,
+            {
+              rule,
+              policy: policy.id,
+            },
+          );
           continue;
         }
         if (!result.rateLimited) continue;

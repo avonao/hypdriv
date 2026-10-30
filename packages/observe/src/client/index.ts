@@ -1,7 +1,7 @@
 /**
  * Browser-only helpers: Web Vitals reporting to `/_hypdriv/vitals` and reading HypDriv's
- * `Server-Timing` / `<meta name="hypdriv:*">` attribution. No Node APIs, no runtime dependencies;
- * `web-vitals` is loaded dynamically when installed.
+ * `Server-Timing` / `<meta name="hypdriv:*">` attribution. No Node APIs; `web-vitals` (a dependency) is
+ * loaded as a separate chunk on first use, with a `PerformanceObserver` fallback when the chunk cannot load.
  */
 import type { TimingEntry } from '@hypdriv/core';
 
@@ -211,7 +211,7 @@ async function loadWebVitals(attribution: boolean): Promise<WebVitalsModule> {
   return mod as WebVitalsModule;
 }
 
-/** Basic LCP/CLS/FCP/TTFB via `PerformanceObserver` when `web-vitals` is unavailable (no INP, no session windows). */
+/** Basic LCP/CLS/FCP/TTFB via `PerformanceObserver` when the `web-vitals` chunk fails to load (no INP, no session windows). */
 function observerSource(report: (metric: VitalMetricLike) => void): () => void {
   const observers: PerformanceObserver[] = [];
   const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;

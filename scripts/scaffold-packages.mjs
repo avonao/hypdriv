@@ -22,14 +22,16 @@ const common = {
 const packages = {
   cache: {
     name: '@hypdriv/cache',
-    description: 'HypDriv edge cache engine: policies, normalised keys, SWR, coalescing, tags and purge over Cache API, memory or KV stores.',
+    description:
+      'HypDriv edge cache engine: policies, normalised keys, SWR, coalescing, tags and purge over Cache API, memory or KV stores.',
     entries: { index: 'src/index.ts' },
     deps: { '@hypdriv/core': 'workspace:*' },
     workers: true,
   },
   security: {
     name: '@hypdriv/security',
-    description: 'HypDriv security primitives: CSP autopilot, security headers, rate limiting, bot shield, safe actions, encrypted sessions, JWT, signing, webhooks, secrets scan.',
+    description:
+      'HypDriv security primitives: CSP autopilot, security headers, rate limiting, bot shield, safe actions, encrypted sessions, JWT, signing, webhooks, secrets scan.',
     entries: { index: 'src/index.ts', node: 'src/node/index.ts' },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { '@standard-schema/spec': '^1.1.0' },
@@ -38,7 +40,8 @@ const packages = {
   },
   observe: {
     name: '@hypdriv/observe',
-    description: 'HypDriv observability: tracing with OTLP export, structured logging, Server-Timing and Web Vitals collection.',
+    description:
+      'HypDriv observability: tracing with OTLP export, structured logging, Server-Timing and Web Vitals collection.',
     entries: { index: 'src/index.ts', client: 'src/client/index.ts' },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { 'web-vitals': '^5.0.0 || ^6.0.0' },
@@ -47,7 +50,8 @@ const packages = {
   },
   flags: {
     name: '@hypdriv/flags',
-    description: 'HypDriv edge feature flags: deterministic bucketing, geo/cookie/percentage rules, providers (static, env, KV, OpenFeature) and React hooks.',
+    description:
+      'HypDriv edge feature flags: deterministic bucketing, geo/cookie/percentage rules, providers (static, env, KV, OpenFeature) and React hooks.',
     entries: { index: 'src/index.ts', react: 'src/react/index.tsx' },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { react: '^19.0.0' },
@@ -56,8 +60,13 @@ const packages = {
   },
   live: {
     name: '@hypdriv/live',
-    description: 'HypDriv live channels: Durable Object pub/sub with WebSocket hibernation and SSE, polling fallback, and the useLive React hook.',
-    entries: { index: 'src/index.ts', react: 'src/react/index.tsx', 'durable-object': 'src/durable-object/index.ts' },
+    description:
+      'HypDriv live channels: Durable Object pub/sub with WebSocket hibernation and SSE, polling fallback, and the useLive React hook.',
+    entries: {
+      index: 'src/index.ts',
+      react: 'src/react/index.tsx',
+      'durable-object': 'src/durable-object/index.ts',
+    },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { react: '^19.0.0' },
     peerMeta: { react: { optional: true } },
@@ -66,8 +75,14 @@ const packages = {
   },
   image: {
     name: '@hypdriv/image',
-    description: 'HypDriv images: Cloudflare image loader for next/image, placeholder generation and the HypImage component.',
-    entries: { index: 'src/index.ts', loader: 'src/loader.ts', react: 'src/react/index.tsx', node: 'src/node/index.ts' },
+    description:
+      'HypDriv images: Cloudflare image loader for next/image, placeholder generation and the HypImage component.',
+    entries: {
+      index: 'src/index.ts',
+      loader: 'src/loader.ts',
+      react: 'src/react/index.tsx',
+      node: 'src/node/index.ts',
+    },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { next: '>=16.0.0', react: '^19.0.0', sharp: '>=0.33.0' },
     peerMeta: { next: { optional: true }, react: { optional: true }, sharp: { optional: true } },
@@ -75,13 +90,15 @@ const packages = {
   },
   purser: {
     name: '@hypdriv/purser',
-    description: 'HypDriv bridge for Purser CSS: in-process build/watch, unstyled-atom guard, atom usage reports, edge theme pinning and zero-override audits.',
+    description:
+      'HypDriv bridge for Purser CSS: in-process build/watch, unstyled-atom guard, atom usage reports, edge theme pinning and zero-override audits.',
     entries: { index: 'src/index.ts', node: 'src/node/index.ts' },
     deps: { '@hypdriv/core': 'workspace:*' },
   },
   next: {
     name: '@hypdriv/next',
-    description: 'HypDriv for Next.js 16+: withHypDriv config wrapper, adapter chain, proxy composables, server helpers and client components.',
+    description:
+      'HypDriv for Next.js 16+: withHypDriv config wrapper, adapter chain, proxy composables, server helpers and client components.',
     entries: {
       index: 'src/index.ts',
       config: 'src/config/index.ts',
@@ -104,13 +121,24 @@ const packages = {
     },
     peer: { next: '>=16.0.0', react: '^19.0.0', 'react-dom': '^19.0.0' },
     peerMeta: { react: { optional: false }, 'react-dom': { optional: true } },
-    dev: { next: 'catalog:', react: 'catalog:', 'react-dom': 'catalog:', '@types/react': 'catalog:', '@types/react-dom': 'catalog:' },
+    dev: {
+      next: 'catalog:',
+      react: 'catalog:',
+      'react-dom': 'catalog:',
+      '@types/react': 'catalog:',
+      '@types/react-dom': 'catalog:',
+    },
     react: true,
   },
   cloudflare: {
     name: '@hypdriv/cloudflare',
-    description: 'HypDriv Worker shell for OpenNext on Cloudflare: Drivetrain pipeline, scheduled/queue/email/tail handlers, Durable Objects and binding adapters.',
-    entries: { index: 'src/index.ts', 'durable-objects': 'src/durable-objects/index.ts', context: 'src/context.ts' },
+    description:
+      'HypDriv Worker shell for OpenNext on Cloudflare: Drivetrain pipeline, scheduled/queue/email/tail handlers, Durable Objects and binding adapters.',
+    entries: {
+      index: 'src/index.ts',
+      'durable-objects': 'src/durable-objects/index.ts',
+      context: 'src/context.ts',
+    },
     deps: {
       '@hypdriv/core': 'workspace:*',
       '@hypdriv/next': 'workspace:*',
@@ -127,7 +155,8 @@ const packages = {
   },
   devtools: {
     name: '@hypdriv/devtools',
-    description: 'HypDriv DevTools HUD: an in-app panel that reads Server-Timing, Web Vitals, flags and Purser diagnostics.',
+    description:
+      'HypDriv DevTools HUD: an in-app panel that reads Server-Timing, Web Vitals, flags and Purser diagnostics.',
     entries: { index: 'src/index.tsx' },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { react: '^19.0.0', 'react-dom': '^19.0.0' },
@@ -136,7 +165,8 @@ const packages = {
   },
   testing: {
     name: '@hypdriv/testing',
-    description: 'HypDriv testing kit: fake bindings (KV, R2, Durable Objects, Queues), request builders, pipeline harness and vitest presets.',
+    description:
+      'HypDriv testing kit: fake bindings (KV, R2, Durable Objects, Queues), request builders, pipeline harness and vitest presets.',
     entries: { index: 'src/index.ts', vitest: 'src/vitest.ts' },
     deps: { '@hypdriv/core': 'workspace:*' },
     peer: { vitest: '>=3.0.0' },
@@ -145,23 +175,38 @@ const packages = {
   },
   cli: {
     name: '@hypdriv/cli',
-    description: 'The hypdriv command: init, doctor, analyze, routes, audit, budget, csp, css, warm, bench, deps, manifest.',
+    description:
+      'The hypdriv command: init, doctor, analyze, routes, audit, budget, csp, css, warm, bench, deps, manifest.',
     entries: { index: 'src/index.ts', bin: 'src/bin.ts' },
-    deps: { '@hypdriv/core': 'workspace:*', '@hypdriv/security': 'workspace:*', '@hypdriv/purser': 'workspace:*', '@hypdriv/next': 'workspace:*' },
+    deps: {
+      '@hypdriv/core': 'workspace:*',
+      '@hypdriv/security': 'workspace:*',
+      '@hypdriv/purser': 'workspace:*',
+      '@hypdriv/next': 'workspace:*',
+    },
     bin: { hypdriv: './dist/bin.js' },
     platform: 'node',
   },
   'create-hypdriv': {
     name: 'create-hypdriv',
-    description: 'Scaffold a Next.js 16 app on Cloudflare Workers with OpenNext and HypDriv (and optionally Purser CSS).',
+    description:
+      'Scaffold a Next.js 16 app on Cloudflare Workers with OpenNext and HypDriv (and optionally Purser CSS).',
     entries: { index: 'src/index.ts' },
     bin: { 'create-hypdriv': './dist/index.js' },
     platform: 'node',
   },
   hypdriv: {
     name: 'hypdriv',
-    description: 'HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.',
-    entries: { index: 'src/index.ts', config: 'src/config.ts', next: 'src/next.ts', cloudflare: 'src/cloudflare.ts', server: 'src/server.ts', client: 'src/client.tsx' },
+    description:
+      'HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.',
+    entries: {
+      index: 'src/index.ts',
+      config: 'src/config.ts',
+      next: 'src/next.ts',
+      cloudflare: 'src/cloudflare.ts',
+      server: 'src/server.ts',
+      client: 'src/client.tsx',
+    },
     deps: {
       '@hypdriv/core': 'workspace:*',
       '@hypdriv/next': 'workspace:*',
@@ -210,8 +255,21 @@ for (const [dir, spec] of Object.entries(packages)) {
     tsdown: 'catalog:',
     typescript: 'catalog:',
     vitest: 'catalog:',
-    ...(spec.workers ? { '@cloudflare/workers-types': 'catalog:', '@cloudflare/vitest-plugin': 'catalog:', wrangler: 'catalog:' } : {}),
-    ...(spec.react ? { react: 'catalog:', 'react-dom': 'catalog:', '@types/react': 'catalog:', '@types/react-dom': 'catalog:' } : {}),
+    ...(spec.workers
+      ? {
+          '@cloudflare/workers-types': 'catalog:',
+          '@cloudflare/vitest-plugin': 'catalog:',
+          wrangler: 'catalog:',
+        }
+      : {}),
+    ...(spec.react
+      ? {
+          react: 'catalog:',
+          'react-dom': 'catalog:',
+          '@types/react': 'catalog:',
+          '@types/react-dom': 'catalog:',
+        }
+      : {}),
     ...(spec.dev ?? {}),
   };
 
@@ -220,7 +278,11 @@ for (const [dir, spec] of Object.entries(packages)) {
     version: '0.1.0',
     description: spec.description,
     ...common,
-    repository: { type: 'git', url: 'git+https://github.com/avonao/hypdriv.git', directory: `packages/${dir}` },
+    repository: {
+      type: 'git',
+      url: 'git+https://github.com/avonao/hypdriv.git',
+      directory: `packages/${dir}`,
+    },
     keywords: ['nextjs', 'cloudflare', 'workers', 'edge', 'hypdriv', ...(spec.keywords ?? [])],
     ...(spec.bin ? { bin: spec.bin } : {}),
     exports: ordered,
@@ -238,7 +300,11 @@ for (const [dir, spec] of Object.entries(packages)) {
   if (spec.bin && spec.name === 'hypdriv') pkg.files = ['dist', 'bin', 'README.md', 'LICENSE'];
   write(join(pkgDir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
 
-  const types = ['node', ...(spec.workers ? ['@cloudflare/workers-types', '@cloudflare/vitest-plugin/types'] : []), ...(spec.react ? ['react', 'react-dom'] : [])];
+  const types = [
+    'node',
+    ...(spec.workers ? ['@cloudflare/workers-types', '@cloudflare/vitest-plugin/types'] : []),
+    ...(spec.react ? ['react', 'react-dom'] : []),
+  ];
   write(
     join(pkgDir, 'tsconfig.json'),
     `${JSON.stringify(
@@ -261,7 +327,7 @@ export default defineConfig({
   format: ['esm'],
   platform: '${spec.platform ?? 'neutral'}',
   target: 'es2023',
-  external: [/^node:/, /^cloudflare:/],
+  deps: { neverBundle: [/^node:/, /^cloudflare:/] },
   dts: true,
   sourcemap: true,
   clean: true,
@@ -326,7 +392,10 @@ export default defineConfig({
     );
   }
 
-  write(join(pkgDir, 'README.md'), `# ${spec.name}\n\n${spec.description}\n\nPart of [HypDriv](https://github.com/avonao/hypdriv). See the repository docs for guides.\n`);
+  write(
+    join(pkgDir, 'README.md'),
+    `# ${spec.name}\n\n${spec.description}\n\nPart of [HypDriv](https://github.com/avonao/hypdriv). See the repository docs for guides.\n`,
+  );
   write(join(pkgDir, 'LICENSE'), '');
 }
 console.log('scaffolded', Object.keys(packages).length, 'packages');

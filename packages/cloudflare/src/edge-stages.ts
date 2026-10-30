@@ -1,4 +1,4 @@
-import { type ResolvedConfig, type Stage, defineStage, isHtmlLike } from '@hypdriv/core';
+import { defineStage, isHtmlLike, type ResolvedConfig, type Stage } from '@hypdriv/core';
 
 type Rewriter = {
   on(selector: string, handlers: Record<string, (node: never) => void>): Rewriter;
@@ -30,7 +30,15 @@ export function htmlTransformsStage(config: ResolvedConfig): Stage | null {
         r.onDocument({
           comments(comment: { text: string; remove(): void }) {
             const t = comment.text.trim();
-            if (t === '$' || t === '/$' || t.startsWith('$?') || t.startsWith('$!') || t.startsWith('$~') || t.startsWith('&')) return;
+            if (
+              t === '$' ||
+              t === '/$' ||
+              t.startsWith('$?') ||
+              t.startsWith('$!') ||
+              t.startsWith('$~') ||
+              t.startsWith('&')
+            )
+              return;
             comment.remove();
           },
         } as never);
@@ -46,7 +54,11 @@ export function htmlTransformsStage(config: ResolvedConfig): Stage | null {
           },
         } as never);
         r.onDocument({
-          text(text: { text: string; lastInTextNode: boolean; replace(content: string, options?: { html?: boolean }): void }) {
+          text(text: {
+            text: string;
+            lastInTextNode: boolean;
+            replace(content: string, options?: { html?: boolean }): void;
+          }) {
             if (preserve > 0) return;
             if (/^\s{2,}$/.test(text.text)) text.replace(' ');
           },
@@ -61,7 +73,7 @@ export function htmlTransformsStage(config: ResolvedConfig): Stage | null {
 /** Adds `fetchpriority="high"` to the first image matching the configured selectors (likely LCP). */
 export function priorityHintsStage(config: ResolvedConfig): Stage | null {
   const ph = config.performance.priorityHints;
-  if (!ph || !ph.selectors.length) return null;
+  if (!ph?.selectors.length) return null;
   return defineStage({
     name: 'priority-hints',
     edgeOnly: true,
@@ -73,7 +85,11 @@ export function priorityHintsStage(config: ResolvedConfig): Stage | null {
       let done = false;
       for (const selector of ph.selectors) {
         r.on(selector, {
-          element(el: { getAttribute(n: string): string | null; setAttribute(n: string, v: string): void; removeAttribute(n: string): void }) {
+          element(el: {
+            getAttribute(n: string): string | null;
+            setAttribute(n: string, v: string): void;
+            removeAttribute(n: string): void;
+          }) {
             if (done) return;
             done = true;
             el.setAttribute('fetchpriority', 'high');

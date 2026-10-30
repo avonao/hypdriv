@@ -17,6 +17,7 @@ import {
   shortHash,
   timingSafeEqual,
 } from '@hypdriv/core';
+import { verifiedAudit } from './audit-token';
 import { BOT_KEY, type BotClassification } from './keys';
 import {
   readTurnstileToken,
@@ -290,6 +291,14 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
     async pre(ctx) {
       if (!bots) return;
       if (matchesAny(bots.exempt, ctx.url)) return;
+      // The owner's own tooling (`hypdriv audit`, headless-Chrome CSS audit, bench, warm) signs its requests.
+      if (await verifiedAudit(ctx, config)) {
+        const audit: BotClassification = { verdict: 'human', reason: 'audit-token' };
+        ctx.state.set(BOT_KEY, audit);
+        ctx.timings.mark('bot', 'audit');
+        ctx.requestHeaders.set(HEADER.bot, audit.verdict);
+        return;
+      }
       const headers = ctx.request.headers;
       const ua = headers.get('user-agent') ?? '';
       const secret = secretFor(ctx);

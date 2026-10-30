@@ -219,7 +219,12 @@ describe('createProxy hardening', () => {
 describe('internal routes on the proxy runner', () => {
   it('answers /_hypdriv/health and keeps dev endpoints closed in production', async () => {
     const { next } = markerNext();
-    const proxy = createProxy({ site: { name: 'shop' } }, undefined, { manifest, env: {}, next, development: false });
+    const proxy = createProxy({ site: { name: 'shop' } }, undefined, {
+      manifest,
+      env: {},
+      next,
+      development: false,
+    });
     const health = await proxy(new Request('https://shop.example.com/_hypdriv/health'), event());
     expect(health.status).toBe(200);
     expect(await health.json()).toMatchObject({ ok: true, service: 'shop', build: 'b1', routes: 3 });
@@ -230,8 +235,73 @@ describe('internal routes on the proxy runner', () => {
 
   it('serves dev state with the proxy runner in development', async () => {
     const { next } = markerNext();
-    const proxy = createProxy({}, undefined, { manifest, env: {}, next, development: true, devState: async () => ({ purser: { ok: true } }) });
+    const proxy = createProxy({}, undefined, {
+      manifest,
+      env: {},
+      next,
+      development: true,
+      devState: async () => ({ purser: { ok: true } }),
+    });
     const res = await proxy(new Request('https://shop.example.com/_hypdriv/dev/state'), event());
     expect(await res.json()).toMatchObject({ runner: 'proxy', purser: { ok: true } });
+  });
+});
+
+describe('createProxy on Vercel', () => {
+  const config = {
+    site: { name: 'shop' },
+    cache: {
+      edge: {
+        policies: [{ id: 'items', match: '/api/items', ttl: '2m', respectOrigin: false, tags: ['items'] }],
+      },
+    },
+  };
+
+  it('replaces the edge cache with Vercel CDN headers and registers the Vercel purger', async () => {
+    const { getEdgePurger } = await import('@hypdriv/cache');
+    const { next } = markerNext();
+    const names: string[] = [];
+    const proxy = createProxy(
+      config,
+      (defaults) => {
+        names.push(...defaults.map((s) => s.name));
+        return defaults;
+      },
+      { manifest, env: { VERCEL: '1', VERCEL_ENV: 'production' }, next },
+    );
+    const response = await proxy(
+      new Request('https://shop.example.com/api/items', {
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Safari/605.1.15',
+        },
+      }),
+      event(),
+    );
+    expect(names).toContain('edge-cache');
+    expect(names).not.toContain('html-transforms');
+    expect(response.headers.get('vercel-cdn-cache-control')).toMatch(/s-maxage=120/);
+    expect(response.headers.get('vercel-cache-tag')).toContain('items');
+    expect(response.headers.get('x-hypdriv-cache')).toBe('CDN');
+    const purger = getEdgePurger();
+    expect(purger).toBeDefined();
+    expect(typeof purger!.purgeTags).toBe('function');
+  });
+
+  it('keeps the Cloudflare/Node wiring when the target is not Vercel', async () => {
+    const { next } = markerNext();
+    const names: string[] = [];
+    const proxy = createProxy(
+      config,
+      (defaults) => {
+        names.push(...defaults.map((s) => s.name));
+        return defaults;
+      },
+      { manifest, env: {}, next, target: 'node' },
+    );
+    const response = await proxy(new Request('https://shop.example.com/api/items'), event());
+    expect(names).toContain('edge-cache');
+    expect(response.headers.get('x-hypdriv-cache')).toBe('MISS');
+    expect(response.headers.get('vercel-cdn-cache-control')).toBeNull();
   });
 });

@@ -20,7 +20,22 @@ export interface Capabilities {
   /** HTMLRewriter available (Workers). */
   htmlRewriter: boolean;
   asyncLocalStorage: boolean;
+  /**
+   * Platform services that replace a capability outside Cloudflare (Vercel CDN, Upstash, Vercel Queues…),
+   * keyed by the `describeCapabilities` line they describe.
+   */
+  services?: Partial<Record<CapabilityLine, string>>;
 }
+
+/** The lines of `describeCapabilities`. */
+export type CapabilityLine =
+  | 'cache'
+  | 'tag purge'
+  | 'rate limiting'
+  | 'live channels'
+  | 'vitals/traces sink'
+  | 'images'
+  | 'queues';
 
 function isNamespaceLike(value: unknown, methods: string[]): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -58,19 +73,30 @@ export function detectCapabilities(
 
 /** Human-readable summary used by `hypdriv doctor` and the HUD. */
 export function describeCapabilities(c: Capabilities): string[] {
-  const lines: string[] = [];
-  lines.push(
-    `cache: ${c.kv ? 'tiered (memory → Cache API → KV)' : c.cacheApi ? 'Cache API (per colo)' : 'memory (per isolate)'}`,
-  );
-  lines.push(
-    `tag purge: ${c.tagIndex ? 'exact (Durable Object index)' : c.kv ? 'KV index' : 'TTL/SWR bounded'}`,
-  );
-  lines.push(
-    `rate limiting: ${c.limiter ? 'exact (Durable Object)' : c.rateLimitBinding ? 'Rate Limiting binding (per colo)' : c.cacheApi ? 'approximate (Cache API)' : 'per isolate'}`,
-  );
-  lines.push(`live channels: ${c.channel ? 'Durable Object (SSE/WebSocket)' : 'polling fallback'}`);
-  lines.push(`vitals/traces sink: ${c.analyticsEngine ? 'Analytics Engine' : 'logs'}`);
-  lines.push(`images: ${c.images ? 'Images binding' : 'loader only'}`);
-  lines.push(`queues: ${c.queues.length ? c.queues.join(', ') : 'none (in-process fallback)'}`);
-  return lines;
+  const line = (key: CapabilityLine, fallback: string) => `${key}: ${c.services?.[key] ?? fallback}`;
+  return [
+    line(
+      'cache',
+      c.kv
+        ? 'tiered (memory → Cache API → KV)'
+        : c.cacheApi
+          ? 'Cache API (per colo)'
+          : 'memory (per isolate)',
+    ),
+    line('tag purge', c.tagIndex ? 'exact (Durable Object index)' : c.kv ? 'KV index' : 'TTL/SWR bounded'),
+    line(
+      'rate limiting',
+      c.limiter
+        ? 'exact (Durable Object)'
+        : c.rateLimitBinding
+          ? 'Rate Limiting binding (per colo)'
+          : c.cacheApi
+            ? 'approximate (Cache API)'
+            : 'per isolate',
+    ),
+    line('live channels', c.channel ? 'Durable Object (SSE/WebSocket)' : 'polling fallback'),
+    line('vitals/traces sink', c.analyticsEngine ? 'Analytics Engine' : 'logs'),
+    line('images', c.images ? 'Images binding' : 'loader only'),
+    line('queues', c.queues.length ? c.queues.join(', ') : 'none (in-process fallback)'),
+  ];
 }

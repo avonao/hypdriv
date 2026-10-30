@@ -46,7 +46,7 @@ import { VitalsReporter } from 'hypdriv/client';
 <VitalsReporter />   // beacons LCP, INP, CLS, FCP, TTFB to /_hypdriv/vitals
 ```
 
-Payloads include the route id, build id, navigation type, the `cache` status read from `Server-Timing`, and attribution (LCP element, INP target, CLS sources) when `web-vitals` is installed (`pnpm add web-vitals`; otherwise a `PerformanceObserver` fallback reports LCP/CLS/FCP/TTFB). Sinks: logs (default) or Analytics Engine. With Analytics Engine:
+Payloads include the route id, build id, navigation type, the `cache` status read from `Server-Timing`, and attribution (LCP element, INP target, CLS sources) from `web-vitals` (loaded as a separate chunk; if it cannot load, a `PerformanceObserver` fallback reports LCP/CLS/FCP/TTFB). Sinks: logs (default) or Analytics Engine. With Analytics Engine:
 
 ```sh
 CF_ACCOUNT_ID=… CF_API_TOKEN=… npx hypdriv vitals --days 7      # p75 per route and metric

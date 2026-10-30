@@ -2,6 +2,7 @@ import { UsageError } from '../args';
 import { cacheStatus } from '../audit/cache';
 import { fetchTtfb, joinUrl, mapConcurrent, normalizeBaseUrl, percentile } from '../audit/http';
 import { choosePaths } from '../audit/paths';
+import { auditAuth, describeAuditAuth } from '../audit/token';
 import { createContext } from '../context';
 import { millis } from '../ui';
 import { defineCommand } from './types';
@@ -75,6 +76,10 @@ export const benchCommand = defineCommand({
     warmup: { type: 'string', value: '<n>', description: 'Unmeasured requests per path first', default: '1' },
     limit: { type: 'string', value: '<n>', description: 'Maximum manifest paths', default: '10' },
     timeout: { type: 'string', value: '<ms>', description: 'Per-request timeout', default: '10000' },
+    anonymous: {
+      type: 'boolean',
+      description: 'Send unsigned requests (no x-hypdriv-audit token), as an anonymous visitor would',
+    },
   },
   examples: [
     'hypdriv bench --url http://localhost:8787',
@@ -93,9 +98,24 @@ export const benchCommand = defineCommand({
       paths: args.list('paths'),
       limit: args.number('limit', 10, { min: 1 }),
     }).map((p) => p.path);
-    const opts = { fetch: io.fetch, timeoutMs };
-    if (!args.json)
+    let secretName = 'HYPDRIV_INTERNAL_SECRET';
+    try {
+      secretName = (await ctx.loadConfig()).resolved.security.internalAuth.secretEnv;
+    } catch {
+      // bench works without a HypDriv config (any Next.js deployment); keep the default variable name.
+    }
+    const auth = await auditAuth({
+      root: ctx.root,
+      io,
+      base,
+      secretName,
+      anonymous: args.boolean('anonymous'),
+    });
+    const opts = { fetch: io.fetch, timeoutMs, headers: auth.headers };
+    if (!args.json) {
       ui.heading(`Benchmark ${base} · ${paths.length} path(s) × ${n} requests · concurrency ${concurrency}`);
+      ui.note(describeAuditAuth(auth));
+    }
     const results: BenchPathResult[] = [];
     for (const path of paths) {
       const url = joinUrl(base, path);

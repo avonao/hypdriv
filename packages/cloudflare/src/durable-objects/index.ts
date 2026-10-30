@@ -5,7 +5,8 @@
  * export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects';
  * ```
  */
-export { HypDrivLimiter } from './limiter';
-export type { LimiterIncrementResult, LimiterLockResult, LimiterTokenResult } from './limiter';
-export { HypDrivIndex, INDEX_SHARDS } from './index-do';
+
 export { HypDrivChannel } from '@hypdriv/live/durable-object';
+export { HypDrivIndex, INDEX_SHARDS } from './index-do';
+export type { LimiterIncrementResult, LimiterLockResult, LimiterTokenResult } from './limiter';
+export { HypDrivLimiter } from './limiter';

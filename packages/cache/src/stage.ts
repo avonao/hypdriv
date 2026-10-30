@@ -1,6 +1,7 @@
 import {
   appendListHeader,
   buildForwardedRequest,
+  cacheVersion,
   createRouteMatcher,
   defineStage,
   type FlagValue,
@@ -330,7 +331,7 @@ class EdgeCacheImpl implements EdgeCache {
       request: ctx.request,
       url: ctx.url,
       policy,
-      buildId: ctx.manifest.buildId,
+      buildId: cacheVersion(ctx.manifest),
       geo: dims.geo,
       flags: dims.flags,
       locale: dims.locale,
@@ -764,7 +765,7 @@ class EdgeCacheImpl implements EdgeCache {
           request: new Request(url, { method: 'GET' }),
           url,
           policy,
-          buildId: context.manifest.buildId,
+          buildId: cacheVersion(context.manifest),
           trailingSlash: context.config.site.trailingSlash ?? context.manifest.trailingSlash,
           ignoredQuery: edge.ignoredQuery,
         });

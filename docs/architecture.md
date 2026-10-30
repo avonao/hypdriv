@@ -1,6 +1,6 @@
 # HypDriv architecture
 
-> **HypDriv** is a Hyper-Extension for Next.js 16+: a sidecar that attaches to a Next.js application through its public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, without forking Next.js or OpenNext and without requiring any infrastructure beyond a Worker.
+> **HypDriv** is a Hyper-Extension for Next.js 16+: a sidecar that attaches to a Next.js application through its public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers and on Vercel, without forking Next.js, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
 
 This document is the source of truth for the design. Package READMEs and guides elaborate; they never contradict it.
 
@@ -11,7 +11,7 @@ This document is the source of truth for the design. Package READMEs and guides 
 1. **Sidecar, never a fork.** HypDriv integrates through exactly five attachment points (§3). It never patches `next`, `@opennextjs/*` or `wrangler`. When Next.js changes, HypDriv adapts at the attachment point.
 2. **Zero-infrastructure baseline.** Every feature has a mode that works on a bare Worker with the static-assets binding OpenNext already requires. Cloudflare bindings (KV, R2, D1, Durable Objects, Queues, Rate Limiting, Analytics Engine, Images, AI) are _upgrades_: optional, auto-detected at startup, never required.
 3. **Build-time knowledge, run-time use.** The Next.js Adapter API gives HypDriv a typed description of the application after `next build`. HypDriv turns it into one artifact (`.hypdriv/manifest.json`) that the runtime reads. Nothing derived from a build is baked back into that same build, which avoids circular dependencies between `next build`, `proxy.ts` and the Worker bundle.
-4. **Portable by construction, best on Workers.** The proxy composables, server helpers and security primitives run on Node (`next start`), on Vercel and on Workers. The Worker shell adds the capabilities only the edge can provide (HTML streaming transforms, request coalescing, geo, scheduled/queue handlers, Durable Objects).
+4. **Portable by construction, native per platform.** The proxy composables, server helpers and security primitives run on Node (`next start`), on Vercel and on Workers; a deploy target (`cloudflare` · `vercel` · `node`, detected at build and run time, [ADR 0013](adr/0013-deploy-targets.md)) selects platform overrides for the same pipeline. The Worker shell adds the capabilities only the Cloudflare edge provides (HTML streaming transforms, edge cache storage with coalescing, scheduled/queue handlers, Durable Objects); on Vercel, `@hypdriv/vercel` maps them to the Vercel CDN, Upstash Redis, Global Config, the WAF, BotID and Vercel Queues.
 5. **Secure defaults, measurable claims.** Defaults pass securityheaders.com with an A+ and Lighthouse best-practice audits. Every performance feature emits `Server-Timing` entries so its effect is visible, not assumed.
 6. **Agent-native.** Every CLI command has `--json`. The repository ships `AGENTS.md` and a skill so coding agents can adopt and operate HypDriv correctly.
 7. **Purser-native CSS.** Purser CSS is the first-class styling path: HypDriv builds it in-process, verifies that no unstyled atom ships, pins themes at the edge, and audits zero-override guarantees per route.
@@ -24,6 +24,7 @@ This document is the source of truth for the design. Package READMEs and guides 
 | React                             | 19.2+                                                                                                            |
 | Node.js (dev/build, `next start`) | 20.9+ (22+ recommended)                                                                                          |
 | Cloudflare                        | Workers with `nodejs_compat`, `compatibility_date >= 2024-09-23`, via `@opennextjs/cloudflare` 1.15+             |
+| Vercel                            | Vercel Functions (Node.js runtime) and Routing Middleware; legacy builder and the Next.js adapter (`NEXT_ENABLE_ADAPTER=1`) |
 | Bundler                           | Turbopack (default) and `next build --webpack`                                                                   |
 | TypeScript in host apps           | 5.9, 6.x, 7.x                                                                                                    |
 | Purser CSS                        | 0.1+ (`@avonao/purser/build` API)                                                                                |
@@ -85,7 +86,9 @@ Next.js 16.2+ exposes the stable Adapter API (`adapterPath`, `modifyConfig`, `on
 9. Measure **weights** (`.open-next/worker.js` when present, client JS per route) and evaluate budgets.
 10. Write `.hypdriv/manifest.json` (+ `.hypdriv/manifest.js` for bundlers without JSON import support) and `.hypdriv/report.md`.
 
-Because OpenNext Cloudflare currently consumes the standalone build rather than the Adapter API, the chain is OpenNext-agnostic: `onBuildComplete` fires during `next build`, which OpenNext invokes before its own bundling. When OpenNext ships its Adapter-API-based adapter, it simply becomes the base adapter.
+Because OpenNext Cloudflare currently consumes the standalone build rather than the Adapter API, the chain is OpenNext-agnostic: `onBuildComplete` fires during `next build`, which OpenNext invokes before its own bundling. When OpenNext ships its Adapter-API-based adapter, it simply becomes the base adapter; Vercel's adapter (`NEXT_ENABLE_ADAPTER=1` → `NEXT_ADAPTER_PATH`) is chained the same way and receives the manifest as an extra asset.
+
+Next.js ≥ 16.4 writes prerenders to scoped paths (`server/route-cache/**`) as soon as any adapter is configured. Without a base adapter, HypDriv restores the classic `server/app/**` layout after the build (never overwriting files) so OpenNext's cache population and Vercel's legacy builder find every prerender, and adds the manifest to the server traces so every function ships it ([ADR 0014](adr/0014-scoped-build-artifacts.md)).
 
 ### 3.3 Worker entry — `createWorker`
 
@@ -109,7 +112,7 @@ export default createWorker({
 
 ### 3.4 `proxy.ts` — `createProxy`
 
-For deployments that are not on Workers, and for `next dev`, the same stages run inside `proxy.ts`:
+For deployments that are not on Workers (Vercel, Node hosts), and for `next dev`, the same stages run inside `proxy.ts`. On Vercel, `createProxy()` applies `@hypdriv/vercel` automatically: `vercelEnv()` (Global Config / Upstash as KV, Upstash counters, Vercel Queues producers), `vercelPlatformOverrides()` (capabilities, counter stores, WAF binding, purger) and `vercelStages()` (the Vercel CDN stage under the `edge-cache` name, `rate-limit-vercel`, no `html-transforms`); it also registers the process runtime for helpers that run outside a proxied request (`enqueue()` in Vercel Functions):
 
 ```ts
 import { createProxy } from 'hypdriv/proxy';
@@ -213,22 +216,23 @@ Execution order is fixed by the stage list the application passes (or by the def
 | 1   | `request-id`       | assign id, start timings, create logger/span                                | `x-request-id`, `x-hypdriv-request-id`, `Server-Timing`, end span    |
 | 2   | `maintenance`      | serve maintenance page when enabled                                         | —                                                                    |
 | 3   | `shield`           | WAF-lite rules, method allow-list, path traversal, body limits              | —                                                                    |
-| 4   | `bots`             | classify, Turnstile challenge, block/log                                    | `x-hypdriv-bot`                                                      |
-| 5   | `rate-limit`       | per-policy limiters (memory → Cache API → KV → Durable Object → binding)    | `RateLimit-*` headers                                                |
-| 6   | `geo`              | geo context → `x-hypdriv-geo`                                               | —                                                                    |
-| 7   | `i18n`             | negotiate locale, redirect                                                  | —                                                                    |
-| 8   | `flags`            | evaluate flags → `x-hypdriv-flags`                                          | set bucketing cookie once                                            |
-| 9   | `redirects`        | static + KV redirect table, canonical host, https                          | —                                                                    |
-| 10  | `theme`            | read theme cookie / client hints → `x-hypdriv-theme`                        | pin `<html class>` (HTMLRewriter), `Accept-CH`, `Vary`               |
-| 11  | `speculation`      | prepare per-route rules, register their CSP hash                            | replace the component's document rules with graph rules (edge)     |
-| 12  | `csp`              | pick mode (nonce/hash/report-only), set request CSP for nonce mode          | response CSP; nonce injection into cached HTML (edge)                |
-| 13  | `edge-cache`       | lookup / coalesce / serve stale                                             | store, `x-hypdriv-cache`, `Cache-Tag`                                 |
-| 14  | `security-headers` | —                                                                           | HSTS, COOP, CORP, Permissions-Policy, …                              |
-| 15  | `early-hints`      | —                                                                           | `Link` headers from the manifest                                     |
-| 16  | `html-transforms`  | —                                                                           | comment stripping, whitespace, priority hints (edge only)            |
-| 17  | `skew`             | detect deployment skew                                                      | reload instruction                                                   |
-| 18  | `devtools`         | —                                                                           | per-request facts as `Server-Timing` `hyp-*` entries (HUD)            |
-| 19  | `observe`          | —                                                                           | request log line, flush spans in `waitUntil`                          |
+| 4   | `bots`             | classify (owner audit tokens pass), Turnstile challenge, block/log          | `x-hypdriv-bot`                                                      |
+| 5   | `rate-limit`       | per-policy limiters (memory → Cache API → KV/Upstash → Durable Object → binding) | `RateLimit-*` headers                                           |
+| 6   | `rate-limit-vercel`| Vercel WAF rate-limit rules mapped to policies (Vercel only)                | —                                                                    |
+| 7   | `geo`              | geo context → `x-hypdriv-geo`                                               | —                                                                    |
+| 8   | `i18n`             | negotiate locale, redirect                                                  | —                                                                    |
+| 9   | `flags`            | evaluate flags → `x-hypdriv-flags`                                          | set bucketing cookie once                                            |
+| 10  | `redirects`        | static + KV redirect table, canonical host, https                          | —                                                                    |
+| 11  | `theme`            | read theme cookie / client hints → `x-hypdriv-theme`                        | pin `<html class>` (HTMLRewriter), `Accept-CH`, `Vary`               |
+| 12  | `speculation`      | prepare per-route rules, register their CSP hash                            | replace the component's document rules with graph rules (edge)     |
+| 13  | `csp`              | pick mode (nonce/hash/report-only), set request CSP for nonce mode          | response CSP (also on proxy pass-through); nonce injection into cached HTML (edge) |
+| 14  | `edge-cache`       | lookup / coalesce / serve stale — on Vercel: plan the CDN policy            | store, `x-hypdriv-cache`, `Cache-Tag` — on Vercel: `Vercel-CDN-Cache-Control`, `Vercel-Cache-Tag` |
+| 15  | `security-headers` | —                                                                           | HSTS, COOP, CORP, Permissions-Policy, …                              |
+| 16  | `early-hints`      | —                                                                           | `Link` headers from the manifest                                     |
+| 17  | `html-transforms`  | —                                                                           | comment stripping, whitespace, priority hints (edge only)            |
+| 18  | `skew`             | detect deployment skew                                                      | reload instruction                                                   |
+| 19  | `devtools`         | —                                                                           | per-request facts as `Server-Timing` `hyp-*` entries (HUD)            |
+| 20  | `observe`          | —                                                                           | request log line, flush spans in `waitUntil`                          |
 
 Post steps run in reverse order: `edge-cache.post` stores the document exactly as Next.js produced it, then `csp.post`, `speculation.post` and `theme.post` apply the per-request work (nonce, edge rules, theme classes) on misses and hits alike, and `request-id.post` serialises the final `Server-Timing`.
 
@@ -310,12 +314,13 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/live`       | Workers + React                                       | core, cloudflare (DO)                               |
 | `@hypdriv/image`      | neutral + React                                       | core                                                |
 | `@hypdriv/purser`     | Node (bridge) + neutral (runtime bits)                | core                                                |
-| `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, cache, security, observe, flags, purser       |
+| `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, cache, security, observe, flags, purser, vercel |
 | `@hypdriv/cloudflare` | Workers                                               | core, cache, security, observe, flags               |
+| `@hypdriv/vercel`     | neutral (Vercel Functions, Routing Middleware)        | core, cache, security                               |
 | `@hypdriv/devtools`   | browser + neutral                                     | core                                                |
 | `@hypdriv/testing`    | Node + Workers                                        | core                                                |
 | `@hypdriv/cli`        | Node                                                  | core, purser, security (scan), next (adapter utils) |
-| `create-hypdriv`      | Node                                                  | —                                                   |
+| `create-hypdriv`      | Node (templates synced from `examples/*`)             | —                                                   |
 | `hypdriv`             | umbrella                                              | re-exports + bin                                    |
 
 Dependency rule: runtime packages have **no** dependency on `next`, `wrangler` or Node built-ins except through clearly isolated entry points (`/node`). Peer dependencies on `next`, `react`, `@opennextjs/cloudflare` are declared where needed and marked optional when the feature degrades gracefully.

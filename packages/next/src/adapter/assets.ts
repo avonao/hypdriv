@@ -193,7 +193,9 @@ export function mergeWithHtml(sources: RouteAssetSources, html: string | null): 
   const fonts = uniqAssets([...fromHtml.fonts.map((f) => f.href), ...sources.fonts]);
   // Preloads must use the exact URL the document requests (including `?dpl=`), or the browser fetches twice.
   const spelling = new Map(js.map((href) => [assetIdentity(href), href]));
-  const main = sources.main.length ? uniqAssets(sources.main.map((href) => spelling.get(assetIdentity(href)) ?? href)) : js.slice(0, 4);
+  const main = sources.main.length
+    ? uniqAssets(sources.main.map((href) => spelling.get(assetIdentity(href)) ?? href))
+    : js.slice(0, 4);
   return { js, css, fonts, main };
 }
 

@@ -1,4 +1,4 @@
-import type { PathPattern, ResolvedConfig } from '@hypdriv/core';
+import type { PathPattern } from '@hypdriv/core';
 import {
   CDN_CACHE_CONTROL,
   cdnCacheControl,
@@ -8,13 +8,12 @@ import {
   type VercelCdnOptions,
 } from './cdn';
 import { MAX_TAGS_PER_RESPONSE, pathTag, sanitizeTags } from './tags';
+import { type ConfigInput, resolveInput } from './util';
 
-/** A `has` / `missing` condition of a `next.config` `headers()` rule. */
-export interface NextRouteCondition {
-  type: 'header' | 'cookie' | 'query' | 'host';
-  key: string;
-  value?: string;
-}
+/** A `has` / `missing` condition of a `next.config` `headers()` rule (Next's `RouteHas`). */
+export type NextRouteCondition =
+  | { type: 'header' | 'cookie' | 'query'; key: string; value?: string }
+  | { type: 'host'; key?: undefined; value: string };
 
 /** One `next.config` `headers()` rule. */
 export interface NextHeaderRule {
@@ -108,7 +107,11 @@ export function nextHeaderSource(pattern: PathPattern): string | null {
  * `missing` conditions. Static headers apply to every status, so `negativeTtl` and `statuses` do not apply.
  * Inferred policies are not emitted: Vercel caches prerendered and ISR output natively.
  */
-export function vercelCdnRouteHeaders(config: ResolvedConfig, options: VercelCdnOptions = {}): VercelCdnRouteHeaders {
+export function vercelCdnRouteHeaders(
+  configInput: ConfigInput,
+  options: VercelCdnOptions = {},
+): VercelCdnRouteHeaders {
+  const config = resolveInput(configInput);
   const cdn = config.vercel.cdn;
   const edge = config.cache.edge;
   if (!cdn || !edge) return { rules: [], skipped: [] };
@@ -151,7 +154,10 @@ export function vercelCdnRouteHeaders(config: ResolvedConfig, options: VercelCdn
     const policyRules: NextHeaderRule[] = [];
     for (const { source } of sources) {
       const literal = !/[:*()\\]/.test(source!);
-      const tags = sanitizeTags([...(literal ? [pathTag(source!)] : []), ...policy.tags], MAX_TAGS_PER_RESPONSE);
+      const tags = sanitizeTags(
+        [...(literal ? [pathTag(source!)] : []), ...policy.tags],
+        MAX_TAGS_PER_RESPONSE,
+      );
       const headers = [{ key: VERCEL_CDN_CACHE_CONTROL, value: cacheControl }];
       if (downstream) headers.push({ key: CDN_CACHE_CONTROL, value: cacheControl });
       if (tags.length) headers.push({ key: VERCEL_CACHE_TAG, value: tags.join(',') });

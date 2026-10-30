@@ -27,7 +27,10 @@ const s = css.create({
 
 function readTheme(): { mode: Mode; contrast: Contrast } {
   const root = document.documentElement;
-  return { mode: root.classList.contains('dark') ? 'dark' : 'light', contrast: root.classList.contains('hc') ? 'high' : 'normal' };
+  return {
+    mode: root.classList.contains('dark') ? 'dark' : 'light',
+    contrast: root.classList.contains('hc') ? 'high' : 'normal',
+  };
 }
 
 /**
@@ -36,6 +39,7 @@ function readTheme(): { mode: Mode; contrast: Contrast } {
  */
 function persist(next: { mode: Mode; contrast: Contrast }) {
   const value = encodeURIComponent(`contrast=${next.contrast};mode=${next.mode}`);
+  // biome-ignore lint/suspicious/noDocumentCookie: the Cookie Store API is not available in Firefox and older Safari.
   document.cookie = `${COOKIE}=${value}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
   const root = document.documentElement;
   root.classList.toggle('dark', next.mode === 'dark');
@@ -53,11 +57,23 @@ export function ThemeSwitch() {
     setTheme(next);
   };
   return (
+    // A toolbar of two independent toggles (not a single choice), so a <fieldset> would be the wrong semantics.
+    // biome-ignore lint/a11y/useSemanticElements: role="group" labels the toggle buttons as one control group.
     <div className={css.props(s.group)} role="group" aria-label="Theme">
-      <button type="button" className={css.props(s.button)} aria-pressed={theme.mode === 'dark'} onClick={() => update({ mode: theme.mode === 'dark' ? 'light' : 'dark' })}>
+      <button
+        type="button"
+        className={css.props(s.button)}
+        aria-pressed={theme.mode === 'dark'}
+        onClick={() => update({ mode: theme.mode === 'dark' ? 'light' : 'dark' })}
+      >
         Dark
       </button>
-      <button type="button" className={css.props(s.button)} aria-pressed={theme.contrast === 'high'} onClick={() => update({ contrast: theme.contrast === 'high' ? 'normal' : 'high' })}>
+      <button
+        type="button"
+        className={css.props(s.button)}
+        aria-pressed={theme.contrast === 'high'}
+        onClick={() => update({ contrast: theme.contrast === 'high' ? 'normal' : 'high' })}
+      >
         High contrast
       </button>
     </div>

@@ -23,6 +23,10 @@ export interface CspReportLike {
 }
 
 export interface SecurityModule {
+  signAuditToken?: (
+    secret: string,
+    options: { host: string; ttlSeconds?: number; now?: number },
+  ) => Promise<string>;
   parseCsp?: (header: string | null | undefined) => CspDirectives;
   serializeCsp?: (directives: CspDirectives) => string;
   buildCspHeader?: (input: {
@@ -141,6 +145,7 @@ export interface PurserNodeModule {
     projectDir?: string;
     timeoutMs?: number;
     themeClasses?: string[][];
+    headers?: Record<string, string>;
     log?: Logger;
   }) => Promise<AuditReportLike>;
   formatAuditReport?: (report: AuditReportLike) => string;

@@ -1,6 +1,6 @@
 import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
-import type { NextConfig } from 'next';
 import { withHypDriv } from 'hypdriv/config';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   cacheComponents: true,

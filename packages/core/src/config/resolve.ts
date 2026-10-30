@@ -523,7 +523,23 @@ function resolvePurser(input: HypDrivConfig['purser']): ResolvedPurser | null {
 }
 
 /** Applies every documented default. Pure; safe to call at module scope in a Worker. */
+const RESOLVED_BRAND = Symbol.for('hypdriv.resolved-config');
+
+/**
+ * `true` for configs produced by `resolveConfig` / `loadConfig` (branded with a non-enumerable symbol), so APIs
+ * that accept both `hypdriv.config` input and resolved configs never mistake one for the other.
+ */
+export function isResolvedConfig(value: unknown): value is ResolvedConfig {
+  return !!value && typeof value === 'object' && (value as Record<symbol, unknown>)[RESOLVED_BRAND] === true;
+}
+
 export function resolveConfig(input: HypDrivConfig = {}): ResolvedConfig {
+  const resolved = resolveConfigShape(input);
+  Object.defineProperty(resolved, RESOLVED_BRAND, { value: true, enumerable: false });
+  return resolved;
+}
+
+function resolveConfigShape(input: HypDrivConfig): ResolvedConfig {
   const siteName = input.site?.name ?? 'app';
   const devtools =
     input.devtools === false
@@ -648,8 +664,14 @@ export function resolveConfig(input: HypDrivConfig = {}): ResolvedConfig {
     },
     platform: input.platform ?? 'auto',
     vercel: {
-      cdn: vc.cdn === false ? null : { downstream: typeof vc.cdn === 'object' ? (vc.cdn.downstream ?? false) : false },
-      globalConfig: vc.globalConfig === false ? null : { connectionEnv: vc.globalConfig?.connectionEnv ?? ['GLOBAL_CONFIG', 'EDGE_CONFIG'] },
+      cdn:
+        vc.cdn === false
+          ? null
+          : { downstream: typeof vc.cdn === 'object' ? (vc.cdn.downstream ?? false) : false },
+      globalConfig:
+        vc.globalConfig === false
+          ? null
+          : { connectionEnv: vc.globalConfig?.connectionEnv ?? ['GLOBAL_CONFIG', 'EDGE_CONFIG'] },
       redis:
         vc.redis === false
           ? null

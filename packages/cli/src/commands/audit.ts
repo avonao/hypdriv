@@ -3,8 +3,16 @@ import { UsageError } from '../args';
 import { auditCache, type CacheAuditResult } from '../audit/cache';
 import { type AuditLevel, auditCsp, type CspAuditResult } from '../audit/csp';
 import { gradeHeaders, type HeaderGrade } from '../audit/headers';
-import { type FetchedPage, fetchPage, joinUrl, mapConcurrent, normalizeBaseUrl } from '../audit/http';
+import {
+  cookiesFrom,
+  type FetchedPage,
+  fetchPage,
+  joinUrl,
+  mapConcurrent,
+  normalizeBaseUrl,
+} from '../audit/http';
 import { type AuditPath, choosePaths, cspModeFor } from '../audit/paths';
+import { type AuditAuth, auditAuth, describeAuditAuth } from '../audit/token';
 import { CliError, createContext } from '../context';
 import { loadNextAdapter, loadPurserNode } from '../integrations';
 import type { Ui } from '../ui';
@@ -31,19 +39,48 @@ function levelOfGrade(g: HeaderGrade): AuditLevel {
 function pageLevel(page: FetchedPage): AuditLevel | null {
   if (page.error) return 'fail';
   if (page.redirected) return 'warn';
-  if (page.status >= 500) return 'fail';
+  if (page.status >= 500 || blockedByShield(page)) return 'fail';
+  if (page.status >= 400) return 'warn';
   return null;
+}
+
+/** `true` when HypDriv's bot shield or rate limiter answered instead of the application. */
+export function blockedByShield(page: Pick<FetchedPage, 'status' | 'headers'>): boolean {
+  return (
+    (page.status === 403 && page.headers.has('x-hypdriv-bot')) ||
+    (page.status === 429 && (page.headers.has('ratelimit') || page.headers.has('x-hypdriv-bot')))
+  );
+}
+
+/** Explains a 403/429 from the shield, pointing at the audit token when requests were unsigned. */
+export function shieldHint(page: Pick<FetchedPage, 'status' | 'headers'>, auth?: AuditAuth | null): string {
+  const who =
+    page.status === 429
+      ? 'rate limited'
+      : `blocked by the bot shield (x-hypdriv-bot: ${page.headers.get('x-hypdriv-bot')})`;
+  if (!auth || auth.source) return `${page.status} ${who}`;
+  return `${page.status} ${who}; set ${auth.secretName} so the CLI signs its requests`;
 }
 
 /** Headers audit over a list of fetched pages (pure; used by tests). */
 export function auditHeadersPages(
   pages: Array<{ path: string; page: FetchedPage }>,
   https: boolean,
+  auth?: AuditAuth | null,
 ): HeadersAuditEntry[] {
   return pages.map(({ path, page }) => {
     const early = pageLevel(page);
     if (page.error)
       return { path, status: 0, redirected: null, error: page.error, grade: null, level: 'fail' };
+    if (blockedByShield(page))
+      return {
+        path,
+        status: page.status,
+        redirected: null,
+        error: shieldHint(page, auth),
+        grade: null,
+        level: 'fail',
+      };
     const grade = gradeHeaders(page.headers, { https });
     return {
       path,
@@ -77,6 +114,10 @@ export const auditCommand = defineCommand({
     limit: { type: 'string', value: '<n>', description: 'Maximum number of manifest paths', default: '20' },
     concurrency: { type: 'string', value: '<n>', description: 'Parallel requests', default: '4' },
     timeout: { type: 'string', value: '<ms>', description: 'Per-request timeout', default: '10000' },
+    anonymous: {
+      type: 'boolean',
+      description: 'Send unsigned requests (no x-hypdriv-audit token), exactly as an anonymous visitor would',
+    },
     widths: {
       type: 'string',
       value: '<a,b>',
@@ -127,7 +168,15 @@ export const auditCommand = defineCommand({
     const concurrency = args.number('concurrency', 4, { min: 1, max: 32 });
     const timeoutMs = args.number('timeout', 10_000, { min: 100 });
     const https = base.startsWith('https:');
-    const fetchOpts = { fetch: io.fetch, timeoutMs };
+    const auth = await auditAuth({
+      root: ctx.root,
+      io,
+      base,
+      secretName: config.resolved.security.internalAuth.secretEnv,
+      anonymous: args.boolean('anonymous'),
+    });
+    if (!args.json) ui.note(describeAuditAuth(auth));
+    const fetchOpts = { fetch: io.fetch, timeoutMs, headers: auth.headers };
     const results: Record<string, unknown> = {};
     let exit = 0;
     if (!manifest)
@@ -150,6 +199,7 @@ export const auditCommand = defineCommand({
       const entries = auditHeadersPages(
         fetched.map((f) => ({ path: f.path.path, page: f.page })),
         https,
+        auth,
       );
       results.headers = entries;
       if (entries.some((e) => e.level === 'fail')) exit = 1;
@@ -160,13 +210,13 @@ export const auditCommand = defineCommand({
       const extractInlineScripts = adapter?.extractInlineScripts;
       const fetched = await fetchAll();
       const entries: CspAuditResult[] = fetched.map(({ path, page }) => {
-        if (page.error)
+        if (page.error || blockedByShield(page))
           return {
             path: path.path,
             status: 'fail',
             mode: 'none',
             expected: cspModeFor(path.route, manifest),
-            findings: [{ level: 'fail', message: page.error }],
+            findings: [{ level: 'fail', message: page.error ?? shieldHint(page, auth) }],
             policy: null,
             scripts: { inline: 0, external: 0, withNonce: 0, hashed: 0, unmatched: 0 },
           };
@@ -189,8 +239,14 @@ export const auditCommand = defineCommand({
       const entries: CacheAuditResult[] = await mapConcurrent(paths, concurrency, async (p) => {
         const url = joinUrl(base, p.path);
         const first = await fetchPage(url, fetchOpts, io.now);
-        const second = await fetchPage(url, fetchOpts, io.now);
-        if (first.error || second.error) {
+        // A repeat visit carries the cookies the first response set (flags bucketing, sessions), as a
+        // browser would; a first visit that sets a cookie is not cacheable, so it primes once more.
+        const cookie = cookiesFrom(first.headers);
+        const repeatOpts = cookie ? { ...fetchOpts, headers: { ...fetchOpts.headers, cookie } } : fetchOpts;
+        if (cookie) await fetchPage(url, repeatOpts, io.now);
+        const second = await fetchPage(url, repeatOpts, io.now);
+        const blocked = [first, second].find((r) => !r.error && blockedByShield(r));
+        if (first.error || second.error || blocked) {
           return {
             path: p.path,
             status: 'fail',
@@ -200,7 +256,13 @@ export const auditCommand = defineCommand({
             age: null,
             vary: null,
             cacheControl: null,
-            findings: [{ level: 'fail', message: first.error ?? second.error ?? 'request failed' }],
+            findings: [
+              {
+                level: 'fail',
+                message:
+                  first.error ?? second.error ?? (blocked ? shieldHint(blocked, auth) : 'request failed'),
+              },
+            ],
           };
         }
         return auditCache({
@@ -255,11 +317,16 @@ export const auditCommand = defineCommand({
           projectDir: ctx.root,
           timeoutMs: Math.max(timeoutMs, 30_000),
           themeClasses,
+          headers: auth.headers,
           log: silentLogger,
         });
         results.css = report;
         if (!report.ok) exit = 1;
         printCss(ui, report, mod.formatAuditReport);
+        if (!auth.source && report.pages.some((p) => /^HTTP (403|429)\b/.test(p.error ?? '')))
+          ui.warn(
+            `Pages answered 403/429 to headless Chrome — HypDriv's bot shield or rate limiter refused the audit. Set ${auth.secretName} (environment, .dev.vars or .env.local) so the CLI signs its requests.`,
+          );
       } catch (err) {
         const e = err as Error & { code?: string };
         results.css = { ok: false, error: e.message };

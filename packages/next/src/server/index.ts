@@ -240,11 +240,18 @@ export function jobHandler(
     const development = processEnv().NODE_ENV === 'development';
     // Vercel Cron: GET with `Authorization: Bearer $CRON_SECRET` (compared in constant time).
     const authorization = request.headers.get('authorization');
-    const viaVercelCron = !!cronSecret && !!authorization && timingSafeEqual(authorization, `Bearer ${cronSecret}`);
+    const viaVercelCron =
+      !!cronSecret && !!authorization && timingSafeEqual(authorization, `Bearer ${cronSecret}`);
     if (!viaVercelCron) {
       if (!secret) {
         if (!(development && options.allowUnsignedInDevelopment !== false)) {
-          return Response.json({ error: 'internal_secret_missing', hint: `set ${secretEnv} (or ${cronSecretEnv} for Vercel Cron)` }, { status: 503 });
+          return Response.json(
+            {
+              error: 'internal_secret_missing',
+              hint: `set ${secretEnv} (or ${cronSecretEnv} for Vercel Cron)`,
+            },
+            { status: 503 },
+          );
         }
       } else {
         const ok = await signing.verifyInternalRequest(request.clone() as Request, secret, {
@@ -260,7 +267,9 @@ export function jobHandler(
       options.job ??
       new URL(request.url).pathname.split('/').filter(Boolean).pop() ??
       'default';
-    let cron: string | undefined = viaVercelCron ? (request.headers.get('x-vercel-cron-schedule') ?? undefined) : undefined;
+    let cron: string | undefined = viaVercelCron
+      ? (request.headers.get('x-vercel-cron-schedule') ?? undefined)
+      : undefined;
     let messages: JobInput['messages'];
     if (request.method !== 'GET' && request.headers.get('content-type')?.includes('application/json')) {
       try {

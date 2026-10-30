@@ -318,9 +318,27 @@ describe('request facts from Server-Timing', () => {
     ]);
     expect(facts).toEqual({ request: 'req-1', runner: 'worker', route: 'app:/' });
     const merged = mergeBuildInfo(
-      { build: 'b1', route: null, runner: 'proxy', deployment: null, requestId: null, locale: null, cache: null, csp: null, nextVersion: null, hypdrivVersion: '0.1.0', extra: {} },
+      {
+        build: 'b1',
+        route: null,
+        runner: 'proxy',
+        deployment: null,
+        requestId: null,
+        locale: null,
+        cache: null,
+        csp: null,
+        nextVersion: null,
+        hypdrivVersion: '0.1.0',
+        extra: {},
+      },
       facts,
     );
-    expect(merged).toMatchObject({ build: 'b1', route: 'app:/', runner: 'worker', requestId: 'req-1', hypdrivVersion: '0.1.0' });
+    expect(merged).toMatchObject({
+      build: 'b1',
+      route: 'app:/',
+      runner: 'worker',
+      requestId: 'req-1',
+      hypdrivVersion: '0.1.0',
+    });
   });
 });

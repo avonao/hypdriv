@@ -402,6 +402,17 @@ describe('geo on Vercel', () => {
         'x-vercel-id': 'sfo1::iad1::abc-123',
       }),
     );
-    expect(geo).toMatchObject({ country: 'US', regionCode: 'CA', city: 'San Francisco', postalCode: '94107', timezone: 'America/Los_Angeles', latitude: 37.77, colo: 'sfo1', continent: 'NA', isEU: false, source: 'vercel' });
+    expect(geo).toMatchObject({
+      country: 'US',
+      regionCode: 'CA',
+      city: 'San Francisco',
+      postalCode: '94107',
+      timezone: 'America/Los_Angeles',
+      latitude: 37.77,
+      colo: 'sfo1',
+      continent: 'NA',
+      isEU: false,
+      source: 'vercel',
+    });
   });
 });

@@ -239,3 +239,32 @@ describe('route matcher', () => {
     expect(m.match('/app/blog/x')?.params.slug).toBe('x');
   });
 });
+
+describe('runtime registry', () => {
+  it('registers the process runtime and resolves platform waitUntil', async () => {
+    const { getRuntime, platformWaitUntil, queueEnvKey, registerRuntime } = await import(
+      '../runtime-registry'
+    );
+    const { resolveConfig } = await import('../config/resolve');
+    expect(getRuntime()).toBeUndefined();
+    const runtime = { config: resolveConfig({}), env: { A: '1' }, target: 'node' as const };
+    registerRuntime(runtime);
+    expect(getRuntime()).toBe(runtime);
+    registerRuntime(null);
+    expect(getRuntime()).toBeUndefined();
+    expect(queueEnvKey('emails')).toBe('HYPDRIV_QUEUE:emails');
+
+    expect(platformWaitUntil()).toBeNull();
+    const pending: Promise<unknown>[] = [];
+    const slot = Symbol.for('@vercel/request-context');
+    (globalThis as Record<symbol, unknown>)[slot] = {
+      get: () => ({ waitUntil: (p: Promise<unknown>) => pending.push(p) }),
+    };
+    try {
+      platformWaitUntil()!(Promise.resolve(1));
+      expect(pending).toHaveLength(1);
+    } finally {
+      delete (globalThis as Record<symbol, unknown>)[slot];
+    }
+  });
+});

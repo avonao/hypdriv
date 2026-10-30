@@ -1,9 +1,9 @@
 import { createWorker } from 'hypdriv/cloudflare';
 import config from './hypdriv.config';
 
+export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from 'hypdriv/durable-objects';
 // OpenNext's Durable Objects (queue, tag cache, purge) and HypDriv's.
-export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from './.open-next/worker.js';
-export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-objects';
+export { BucketCachePurge, DOQueueHandler, DOShardedTagCache } from './.open-next/worker.js';
 
 export default createWorker({
   config,

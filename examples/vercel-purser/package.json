@@ -1,0 +1,42 @@
+{
+  "name": "@hypdriv/example-vercel-purser",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:vercel": "vercel build",
+    "deploy": "vercel deploy --prebuilt",
+    "css": "hypdriv css build",
+    "css:check": "hypdriv css check",
+    "hypdriv:doctor": "hypdriv doctor --platform vercel",
+    "hypdriv:analyze": "hypdriv analyze --platform vercel",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "audit:css": "hypdriv audit css --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hypdriv": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "optionalDependencies": {
+    "@avonao/purser": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "babel-plugin-react-compiler": "catalog:",
+    "typescript": "catalog:"
+  },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 113",
+    "safari >= 16.4"
+  ]
+}

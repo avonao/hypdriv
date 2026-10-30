@@ -37,7 +37,10 @@ export interface CheckRateLimitResult {
 }
 
 /** `checkRateLimit` from `@vercel/firewall`. */
-export type CheckRateLimitFn = (rateLimitId: string, options?: CheckRateLimitOptions) => Promise<CheckRateLimitResult>;
+export type CheckRateLimitFn = (
+  rateLimitId: string,
+  options?: CheckRateLimitOptions,
+) => Promise<CheckRateLimitResult>;
 
 /** Incoming-message style headers accepted by `checkBotId`'s `advancedOptions.headers`. */
 export type BotIdHeaders = Record<string, string | string[] | undefined>;

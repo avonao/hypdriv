@@ -1,7 +1,7 @@
+import { HypDrivDevTools, VitalsReporter } from 'hypdriv/client';
+import { HypDrivMeta, Speculation } from 'hypdriv/server';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { HypDrivMeta, Speculation } from 'hypdriv/server';
-import { HypDrivDevTools, VitalsReporter } from 'hypdriv/client';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,7 +18,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <header className="site-header">
-          <a href="/" className="brand">HypDriv</a>
+          <a href="/" className="brand">
+            HypDriv
+          </a>
           <nav>
             <a href="/blog">Blog</a>
             <a href="/dashboard">Dashboard</a>

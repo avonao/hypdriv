@@ -1,11 +1,11 @@
 // Config
 
+export * from './bindings';
 export * from './budgets';
 export * from './capabilities';
-export * from './bindings';
 export * from './config/defaults';
 export { type DefinedConfig, defineConfig, formatDiagnostics, loadConfig } from './config/define';
-export { resolveConfig, resolveEdgeCachePolicy } from './config/resolve';
+export { isResolvedConfig, resolveConfig, resolveEdgeCachePolicy } from './config/resolve';
 export type * from './config/resolved';
 export * from './config/types';
 export { type ConfigDiagnostic, validateConfig } from './config/validate';
@@ -28,10 +28,12 @@ export {
 export * from './manifest/types';
 // Pipeline
 export * from './pipeline/context';
-export * from './pipeline/run';
 export * from './pipeline/current';
+export * from './pipeline/keys';
+export * from './pipeline/run';
 export * from './pipeline/stage';
 export { parseServerTiming, type ServerTimingMode, type TimingEntry, Timings } from './pipeline/timing';
+export * from './runtime-registry';
 export * from './util/encoding';
 export * from './util/errors';
 export * from './util/hash';

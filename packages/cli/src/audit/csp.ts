@@ -11,7 +11,8 @@ import {
 export type AuditLevel = 'pass' | 'warn' | 'fail';
 
 export interface AuditFinding {
-  level: 'warn' | 'fail';
+  /** `info` findings explain a result without affecting it. */
+  level: 'info' | 'warn' | 'fail';
   message: string;
 }
 
@@ -101,8 +102,19 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
 
   if (!sources.length)
     findings.push({ level: 'fail', message: 'policy has neither script-src nor default-src' });
+  // HypDriv declares its documented fallback for cached HTML (ISR / PPR shells) on runtimes that cannot inject
+  // a nonce into a cached body (proxy.ts on Node and Vercel): a known trade-off, not a misconfiguration.
+  const declaredFallback = input.headers.get('x-hypdriv-csp') === 'unsafe-inline-fallback';
   if (lower.includes("'unsafe-inline'") && !nonce && !hashes.length)
-    findings.push({ level: 'fail', message: "script-src allows 'unsafe-inline' without nonces or hashes" });
+    findings.push(
+      declaredFallback
+        ? {
+            level: 'warn',
+            message:
+              "'unsafe-inline' fallback for cached HTML (ISR / PPR shell): no per-request nonce can reach a cached body here — render the route dynamically, or serve it through the Cloudflare Worker for edge nonces",
+          }
+        : { level: 'fail', message: "script-src allows 'unsafe-inline' without nonces or hashes" },
+    );
   if (lower.includes("'unsafe-eval'"))
     findings.push({ level: 'warn', message: "script-src allows 'unsafe-eval'" });
   const objectSrc = directives['object-src'];
@@ -141,7 +153,9 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
       // CSP3: inline scripts listed by hash run alongside nonces and 'strict-dynamic' (HypDriv's
       // speculation rules and theme script are allowed this way).
       const allowedHashes = new Set(hashes.filter((h) => h.startsWith('sha256-')).map((h) => h.slice(7)));
-      const missingInline = missing.filter((t) => t.inline && !allowedHashes.has(sha256Base64(t.content))).length;
+      const missingInline = missing.filter(
+        (t) => t.inline && !allowedHashes.has(sha256Base64(t.content)),
+      ).length;
       const missingExternal = missing.filter((t) => !t.inline).length;
       if (missingInline)
         findings.push({
@@ -168,7 +182,7 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
           level: 'fail',
           message: `${unmatched} of ${inline.length} inline script(s) do not match any policy hash (stale manifest or per-request inline content)`,
         });
-    } else if (mode === 'unsafe-inline') {
+    } else if (mode === 'unsafe-inline' && !declaredFallback) {
       findings.push({
         level: 'warn',
         message:
