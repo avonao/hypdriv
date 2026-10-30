@@ -4,15 +4,16 @@ HypDriv runs inside the Worker that OpenNext generates. `hypdriv.worker.ts` beco
 
 ```ts
 // hypdriv.worker.ts
-import { createWorker } from '@hypdriv/cloudflare';
+import { createWorker } from 'hypdriv/cloudflare';
 import config from './hypdriv.config';
 
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from './.open-next/worker.js';
-export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects';
+export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-objects';
 
 export default createWorker({
   config,
   next: () => import('./.open-next/worker.js'),
+  manifest: () => import('./.hypdriv/manifest.js'),   // written by `next build` (the HypDriv adapter)
   // stages: (defaults, platform) => [...defaults, myStage],   // optional customisation
 });
 ```
@@ -78,7 +79,7 @@ jobs: {
 
 ```ts
 // app/api/jobs/digest/route.ts
-import { jobHandler } from '@hypdriv/next/server';
+import { jobHandler } from 'hypdriv/server';
 export const POST = jobHandler({}, async ({ job, cron, payload }) => ({ ok: true }));
 ```
 

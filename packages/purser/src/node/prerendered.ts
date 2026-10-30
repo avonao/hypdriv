@@ -45,8 +45,8 @@ export function pathnameFromPrerenderFile(root: string, file: string, extension:
  * `.next/server/pages/**\/*.html`, keyed by the pathname derived from the file path (`/index.html`
  * → `/`, `/blog/[slug].html` stays the pattern path). With `includeRsc`, `*.rsc` and `*.prefetch.rsc`
  * payloads are appended to the same key so `className` strings in RSC output count for the route.
- * Reads at most `maxFiles` files of at most `maxBytes` each. `distDir` is the `.next` directory; a
- * project directory containing `.next` is accepted too.
+ * Reads at most `maxFiles` files of at most `maxBytes` each; keys are sorted. `distDir` is the `.next`
+ * directory; a project directory containing `.next` is accepted too.
  */
 export async function collectPrerenderedHtml(
   distDir: string,
@@ -56,7 +56,8 @@ export async function collectPrerenderedHtml(
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   let root = resolve(distDir);
-  if (!existsSync(join(root, 'server')) && existsSync(join(root, '.next', 'server'))) root = join(root, '.next');
+  if (!existsSync(join(root, 'server')) && existsSync(join(root, '.next', 'server')))
+    root = join(root, '.next');
   const out: Record<string, string> = {};
   let count = 0;
   let truncated = false;
@@ -87,6 +88,7 @@ export async function collectPrerenderedHtml(
     }
     if (truncated) break;
   }
-  if (truncated) log.warn('purser: prerendered file limit reached; later routes were not checked', { maxFiles });
-  return out;
+  if (truncated)
+    log.warn('purser: prerendered file limit reached; later routes were not checked', { maxFiles });
+  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }

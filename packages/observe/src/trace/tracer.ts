@@ -1,5 +1,5 @@
 import { createSpanId, createTraceId, HYPDRIV_VERSION, type Logger, toError } from '@hypdriv/core';
-import { type Attributes, type Span, type SpanKind, SpanImpl } from './span';
+import { type Attributes, type Span, SpanImpl, type SpanKind } from './span';
 
 export interface TraceContext {
   traceId: string;

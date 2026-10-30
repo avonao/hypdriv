@@ -26,7 +26,7 @@ observe: {
 Each request gets a root span `http.request` (method, path, route id, status, cache status); `traceparent` is accepted from upstream and forwarded to Next.js and to `hypFetch` calls. Exporters: `console` (one JSON line per span, picked up by Workers Logs), `otlp` (OTLP/HTTP JSON, batched, exported in `waitUntil`), `analytics-engine` (`HYPDRIV_ANALYTICS`), `none`. Add your own spans:
 
 ```ts
-import { hyp } from '@hypdriv/next/server';
+import { hyp } from 'hypdriv/server';
 const { pipeline } = await hyp();
 ```
 
@@ -42,7 +42,7 @@ The request summary line (`observe.logging.requests`) contains method, path, sta
 
 ```tsx
 // app/layout.tsx
-import { VitalsReporter } from '@hypdriv/next/client';
+import { VitalsReporter } from 'hypdriv/client';
 <VitalsReporter />   // beacons LCP, INP, CLS, FCP, TTFB to /_hypdriv/vitals
 ```
 
@@ -57,7 +57,7 @@ CF_ACCOUNT_ID=… CF_API_TOKEN=… npx hypdriv vitals --days 7      # p75 per ro
 `instrumentation.ts`:
 
 ```ts
-import { createInstrumentation } from '@hypdriv/next/instrumentation';
+import { createInstrumentation } from 'hypdriv/instrumentation';
 export const { register, onRequestError } = createInstrumentation();
 ```
 
@@ -65,4 +65,4 @@ export const { register, onRequestError } = createInstrumentation();
 
 ## DevTools HUD
 
-`<HypDrivDevTools />` (from `@hypdriv/next/client`) renders a floating panel in development and preview. Panels: request stages (from `Server-Timing`), Web Vitals, navigations (RSC fetches), flags, Purser diagnostics (from the bridge's dev endpoint), build info, capabilities. Toggle with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>. Nothing is injected into production HTML unless you pass `force`.
+`<HypDrivDevTools />` (from `hypdriv/client`) renders a floating panel in development and preview. Panels: request stages (from `Server-Timing`), Web Vitals, navigations (RSC fetches), flags, Purser diagnostics (from the bridge's dev endpoint), build info, capabilities. Toggle with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>. Nothing is injected into production HTML unless you pass `force`.

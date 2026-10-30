@@ -1,4 +1,4 @@
-import { defineRoute } from '@hypdriv/next/server';
+import { defineRoute } from 'hypdriv/server';
 
 export const GET = defineRoute({
   cache: { maxAge: 60, swr: 600 },

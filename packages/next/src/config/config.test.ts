@@ -78,7 +78,6 @@ describe('withHypDriv', () => {
             calls.push('watch');
             return { close() {} };
           },
-          async writeDevDiagnostics() {},
         }),
       },
     );
@@ -88,22 +87,24 @@ describe('withHypDriv', () => {
 
   it('starts the Purser watcher once in development', async () => {
     let watches = 0;
+    let devDiagnostics: boolean | undefined;
     const factory = async () => ({
       outFile: null,
       async build() {
         return { css: '', diagnostics: [], stats: null, written: true, outFile: null };
       },
-      async watch(cb: (r: { css: string | null; diagnostics: never[]; stats: null; written: boolean; outFile: null }) => void) {
+      async watch(cb?: (r: { css: string | null; diagnostics: never[]; stats: null; written: boolean; outFile: null }) => void, options?: { devDiagnostics?: boolean }) {
         watches++;
-        cb({ css: '', diagnostics: [], stats: null, written: true, outFile: null });
+        devDiagnostics = options?.devDiagnostics;
+        cb?.({ css: '', diagnostics: [], stats: null, written: true, outFile: null });
         return { close() {} };
       },
-      async writeDevDiagnostics() {},
     });
     const fn = withHypDriv({}, { projectDir: dir, config: { purser: { enabled: true } }, adapterPath: '/virtual/adapter.js', log: silentLogger, purserBridge: factory });
     await fn(PHASE.developmentServer, { defaultConfig: {} });
     await fn(PHASE.developmentServer, { defaultConfig: {} });
     expect(watches).toBe(1);
+    expect(devDiagnostics).toBe(true);
   });
 
   it('derives a deployment id from the environment', () => {

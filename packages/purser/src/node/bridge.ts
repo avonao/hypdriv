@@ -148,7 +148,7 @@ export async function loadPurserBuildModule(projectDir: string): Promise<PurserB
       throw notInstalled(cause);
     }
   }
-  const mod = (await import(pathToFileURL(file).href)) as Partial<PurserBuildModule> & {
+  const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(file).href)) as Partial<PurserBuildModule> & {
     default?: Partial<PurserBuildModule>;
   };
   const api = typeof mod.build === 'function' ? mod : (mod.default ?? mod);
@@ -194,7 +194,9 @@ function relativeTo(root: string, file: string | null | undefined): string | nul
 /** Purser's CLI line format: `file:line:col: severity: message`. */
 export function formatPurserDiagnostic(diagnostic: PurserDiagnostic, root: string): string {
   const file = relativeTo(root, diagnostic.file);
-  const loc = file ? `${file}${diagnostic.line ? `:${diagnostic.line}:${diagnostic.column ?? 1}` : ''}: ` : '';
+  const loc = file
+    ? `${file}${diagnostic.line ? `:${diagnostic.line}:${diagnostic.column ?? 1}` : ''}: `
+    : '';
   return `${loc}${diagnostic.severity}: ${diagnostic.message}`;
 }
 
@@ -401,9 +403,5 @@ export async function closeAllPurserWatchers(): Promise<void> {
   const registry = watcherRegistry();
   const entries = [...registry.values()];
   registry.clear();
-  await Promise.all(
-    entries.map((e) =>
-      e.handle.then((h) => h.close()).catch(() => undefined),
-    ),
-  );
+  await Promise.all(entries.map((e) => e.handle.then((h) => h.close()).catch(() => undefined)));
 }

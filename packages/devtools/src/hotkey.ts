@@ -117,6 +117,10 @@ export function formatHotkey(hotkey: Hotkey | null): string {
   if (hotkey.alt) parts.push('Alt');
   if (hotkey.shift) parts.push('Shift');
   if (hotkey.meta) parts.push('Cmd');
-  parts.push(hotkey.key.length === 1 ? hotkey.key.toUpperCase() : hotkey.key.charAt(0).toUpperCase() + hotkey.key.slice(1));
+  parts.push(
+    hotkey.key.length === 1
+      ? hotkey.key.toUpperCase()
+      : hotkey.key.charAt(0).toUpperCase() + hotkey.key.slice(1),
+  );
   return parts.join('+');
 }

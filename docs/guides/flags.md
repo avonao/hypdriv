@@ -21,14 +21,14 @@ Rule conditions: `country`, `continent`, `path` patterns, `cookie`/`header` equa
 
 ```ts
 // server (components, actions, route handlers)
-import { flag, hyp } from '@hypdriv/next/server';
+import { flag, hyp } from 'hypdriv/server';
 const enabled = await flag('newCheckout', false);
 const { flags } = await hyp();
 ```
 
 ```tsx
 // client
-import { FlagsProvider, useFlag } from '@hypdriv/next/client';
+import { FlagsProvider, useFlag } from 'hypdriv/client';
 // in a server layout: <FlagsProvider values={publicFlags}>…</FlagsProvider>  (publicFlags = await hyp() then filter serverOnly)
 const variant = useFlag('pricingVariant', 'a');
 ```

@@ -11,16 +11,22 @@ export interface RunPipelineOptions {
   next: (request: Request) => Promise<Response>;
   /** Skip `edgeOnly` stages (proxy runner). */
   skipEdgeOnly?: boolean;
-  /** Called when a stage throws; return a Response to recover, or rethrow. */
+  /**
+   * Called when a stage throws. Return a Response to answer with it, `'continue'` to skip the failed
+   * stage and keep going (fail-open), or `undefined` to rethrow.
+   */
   onStageError?: (
     error: Error,
     stage: Stage,
     phase: 'pre' | 'post',
     ctx: HypContext,
-  ) => Response | undefined | Promise<Response | undefined>;
+  ) => StageErrorResolution | Promise<StageErrorResolution>;
   /** Applies `ctx.responseHeaders` to the final response (default true). */
   applyResponseHeaders?: boolean;
 }
+
+/** What `onStageError` may return. */
+export type StageErrorResolution = Response | 'continue' | undefined;
 
 export interface PipelineResult {
   response: Response;

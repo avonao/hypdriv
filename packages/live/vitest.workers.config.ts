@@ -6,6 +6,8 @@ import { defineConfig } from 'vitest/config';
 // real live handler, so the tests exercise the same code path as `createWorker`.
 export default defineConfig({
   resolve: { conditions: ['source'] },
+  // Vitest runs tests in the SSR environment; resolve workspace packages from src, not dist.
+  ssr: { resolve: { conditions: ['source'] } },
   plugins: [
     cloudflareTest({
       main: './src/durable-object/test-worker.ts',

@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadConfig } from '../config/define';
 import type { ResolvedConfig } from '../config/resolved';
@@ -101,22 +101,57 @@ export function findConfigFile(projectDir: string): string | null {
   return null;
 }
 
+const TS_EXTENSIONS = new Set(['.ts', '.mts', '.cts']);
+
+function isTypeScriptLoadError(err: unknown): boolean {
+  const e = err as { code?: string; name?: string; message?: string };
+  return (
+    e?.code === 'ERR_UNKNOWN_FILE_EXTENSION' ||
+    e?.code === 'ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING' ||
+    e?.name === 'SyntaxError' ||
+    /Unknown file extension|strip-types|type stripping/i.test(e?.message ?? '')
+  );
+}
+
 /**
- * Loads `hypdriv.config.*` with native `import()`. TypeScript configs rely on the runtime's type
- * stripping (Node 22.18+/23.6+ strip types natively; older Node needs `--experimental-strip-types`).
+ * Imports a config module. TypeScript files use the runtime's native type stripping (Node 22.18+ /
+ * 23.6+); on runtimes without it the file is stripped with `node:module`'s `stripTypeScriptTypes`
+ * (Node 22.13+) into a sibling temporary `.mjs` so relative imports keep resolving.
+ */
+export async function importConfigModule<T = unknown>(file: string): Promise<T> {
+  const href = `${pathToFileURL(file).href}?t=${Math.trunc(statSync(file).mtimeMs * 1000)}`;
+  try {
+    return (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ href)) as T;
+  } catch (err) {
+    if (!TS_EXTENSIONS.has(extname(file)) || !isTypeScriptLoadError(err)) throw err;
+    const mod = (await import('node:module')) as { stripTypeScriptTypes?: (code: string, options?: { mode?: 'strip' | 'transform' }) => string };
+    if (typeof mod.stripTypeScriptTypes !== 'function') {
+      throw new Error(`cannot load ${basename(file)}: this Node.js version cannot run TypeScript. Use Node 22.18+ or rename the file to .mjs (${(err as Error).message})`);
+    }
+    const js = mod.stripTypeScriptTypes(readFileSync(file, 'utf8'), { mode: 'transform' });
+    const tmp = join(dirname(file), `.${basename(file, extname(file))}.${process.pid}.${Date.now()}.mjs`);
+    writeFileSync(tmp, js);
+    try {
+      return (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(tmp).href)) as T;
+    } finally {
+      rmSync(tmp, { force: true });
+    }
+  }
+}
+
+/**
+ * Loads `hypdriv.config.*` (or an explicit `file`) and resolves it. Accepts `export default` or a
+ * named `config` export.
  */
 export async function loadConfigFile(
   projectDir: string,
+  file: string | null = findConfigFile(projectDir),
 ): Promise<{ file: string | null; config: HypDrivConfig; resolved: ResolvedConfig }> {
-  const file = findConfigFile(projectDir);
   if (!file) {
     const resolved = loadConfig({});
     return { file: null, config: {}, resolved };
   }
-  const mod = (await import(`${pathToFileURL(file).href}?t=${statSync(file).mtimeMs}`)) as {
-    default?: HypDrivConfig;
-    config?: HypDrivConfig;
-  };
+  const mod = await importConfigModule<{ default?: HypDrivConfig; config?: HypDrivConfig }>(file);
   const config = mod.default ?? mod.config ?? {};
   const resolved = loadConfig(config);
   return { file, config, resolved };

@@ -5,9 +5,9 @@ import {
   hmacSign,
   json,
   matchesAny,
+  type ResolvedConfig,
   randomToken,
   readEnv,
-  type ResolvedConfig,
   type Stage,
   timingSafeEqual,
 } from '@hypdriv/core';
@@ -46,7 +46,8 @@ export async function readSubmittedCsrfToken(request: Request, headerName: strin
   const fromHeader = request.headers.get(headerName);
   if (fromHeader) return fromHeader;
   const type = (request.headers.get('content-type') ?? '').toLowerCase();
-  if (!type.includes('application/x-www-form-urlencoded') && !type.includes('multipart/form-data')) return null;
+  if (!type.includes('application/x-www-form-urlencoded') && !type.includes('multipart/form-data'))
+    return null;
   try {
     const form = await request.clone().formData();
     const value = form.get(headerName) ?? form.get(CSRF_FORM_FIELD);
@@ -57,7 +58,12 @@ export async function readSubmittedCsrfToken(request: Request, headerName: strin
 }
 
 /** Why a request failed the CSRF check. */
-export type CsrfFailure = 'cross-site' | 'missing-cookie' | 'missing-token' | 'mismatch' | 'invalid-signature';
+export type CsrfFailure =
+  | 'cross-site'
+  | 'missing-cookie'
+  | 'missing-token'
+  | 'mismatch'
+  | 'invalid-signature';
 
 /**
  * Pure CSRF check for one request: same-origin `Sec-Fetch-Site` (when accepted) or a double-submit token
@@ -65,13 +71,21 @@ export type CsrfFailure = 'cross-site' | 'missing-cookie' | 'missing-token' | 'm
  */
 export async function checkCsrf(
   request: Request,
-  options: { cookie: string; header: string; acceptSecFetchSite: boolean; secret?: string; sessionId?: string },
+  options: {
+    cookie: string;
+    header: string;
+    acceptSecFetchSite: boolean;
+    secret?: string;
+    sessionId?: string;
+  },
 ): Promise<{ ok: true; via: 'sec-fetch-site' | 'token' } | { ok: false; reason: CsrfFailure }> {
   const site = request.headers.get('sec-fetch-site');
-  if (options.acceptSecFetchSite && (site === 'same-origin' || site === 'none')) return { ok: true, via: 'sec-fetch-site' };
+  if (options.acceptSecFetchSite && (site === 'same-origin' || site === 'none'))
+    return { ok: true, via: 'sec-fetch-site' };
   const cookie = getCookie(request.headers, options.cookie);
   const submitted = await readSubmittedCsrfToken(request, options.header);
-  if (!cookie && !submitted && site && site !== 'same-origin' && site !== 'none') return { ok: false, reason: 'cross-site' };
+  if (!cookie && !submitted && site && site !== 'same-origin' && site !== 'none')
+    return { ok: false, reason: 'cross-site' };
   if (!cookie) return { ok: false, reason: 'missing-cookie' };
   if (!submitted) return { ok: false, reason: 'missing-token' };
   if (!timingSafeEqual(cookie, submitted)) return { ok: false, reason: 'mismatch' };
@@ -100,8 +114,15 @@ export function csrfStage(config: ResolvedConfig): Stage {
       });
       if (result.ok) return;
       ctx.timings.mark('csrf', result.reason);
-      ctx.log.warn('csrf rejected', { reason: result.reason, path: ctx.url.pathname, method: ctx.request.method });
-      return json({ error: 'csrf', reason: result.reason }, { status: 403, headers: { 'cache-control': 'no-store' } });
+      ctx.log.warn('csrf rejected', {
+        reason: result.reason,
+        path: ctx.url.pathname,
+        method: ctx.request.method,
+      });
+      return json(
+        { error: 'csrf', reason: result.reason },
+        { status: 403, headers: { 'cache-control': 'no-store' } },
+      );
     },
   });
 }

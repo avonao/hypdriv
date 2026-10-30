@@ -1,5 +1,6 @@
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 import type { NextConfig } from 'next';
-import { withHypDriv } from '@hypdriv/next/config';
+import { withHypDriv } from 'hypdriv/config';
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
@@ -9,6 +10,5 @@ const nextConfig: NextConfig = {
 
 export default withHypDriv(nextConfig);
 
-// Local bindings in `next dev` (KV, R2, ...) through OpenNext's dev platform.
-import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
+// Local bindings in `next dev` (KV, R2, Durable Objects...) through OpenNext's dev platform.
 initOpenNextCloudflareForDev();

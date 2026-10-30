@@ -155,3 +155,32 @@ describe('response helpers', () => {
     expect(await response.text()).toBe('body');
   });
 });
+
+describe('sanitizeInboundRequest', () => {
+  it('drops spoofable HypDriv, nonce and middleware headers and keeps trusted ones', async () => {
+    const { sanitizeInboundRequest } = await import('./headers');
+    const request = new Request('https://x.test/', {
+      headers: {
+        'x-hypdriv-flags': '{"admin":true}',
+        'x-hypdriv-geo': 'forged',
+        'x-hypdriv-runner': 'worker',
+        'x-nonce': 'attacker',
+        'x-middleware-subrequest': 'middleware',
+        'x-hypdriv-request-id': 'req-1',
+        'x-hypdriv-signature': 'sig',
+        'x-hypdriv-timestamp': '1',
+        accept: 'text/html',
+      },
+    });
+    const clean = sanitizeInboundRequest(request);
+    expect([...clean.headers.keys()].sort()).toEqual(['accept', 'x-hypdriv-request-id', 'x-hypdriv-signature', 'x-hypdriv-timestamp']);
+    const custom = sanitizeInboundRequest(new Request('https://x.test/', { headers: { 'x-csp-nonce': 'a', 'x-nonce': 'b' } }), { nonceHeader: 'x-csp-nonce' });
+    expect([...custom.headers.keys()]).toEqual(['x-nonce']);
+  });
+
+  it('returns the original request when nothing is removed', async () => {
+    const { sanitizeInboundRequest } = await import('./headers');
+    const request = new Request('https://x.test/', { headers: { accept: '*/*' } });
+    expect(sanitizeInboundRequest(request)).toBe(request);
+  });
+});

@@ -15,7 +15,12 @@ export {
   type StylesheetAnalysis,
   stripCssComments,
 } from './analysis/stylesheet';
-export { type VerifyAtomsInput, type VerifyAtomsResult, verifyAtoms, verifyAtomsAgainst } from './analysis/verify';
+export {
+  type VerifyAtomsInput,
+  type VerifyAtomsResult,
+  verifyAtoms,
+  verifyAtomsAgainst,
+} from './analysis/verify';
 export { DEFAULT_PURSER_LAYERS, LAYER_NAME_RE, type LayerStatementOptions, layerStatement } from './layers';
 export {
   allThemeClasses,

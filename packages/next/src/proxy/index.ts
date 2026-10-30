@@ -11,9 +11,13 @@ import {
   loadConfig,
   nodeEnvironment,
   runPipeline,
+  getCurrentContext,
   runWithContext,
+  sanitizeInboundRequest,
 } from '@hypdriv/core';
+import { UPSTREAM_KEY } from '@hypdriv/cache';
 import { registerEdgePurger } from '../cache/index';
+import { readManifestFile } from '../shared/manifest-file';
 import { type CreatePlatformInput, type Platform, buildDefaultStages, createPlatform, stages } from '../stages/index';
 
 export { stages, buildDefaultStages, createPlatform, type Platform } from '../stages/index';
@@ -27,9 +31,8 @@ export interface NextFetchEventLike {
 }
 
 export interface CreateProxyOptions {
-  /** Manifest to use (default: `.hypdriv/manifest.json` from the project dir, read lazily). */
+  /** Manifest to use (default: `.hypdriv/manifest.json` in the working directory, read once). */
   manifest?: HypManifest | null;
-  projectDir?: string;
   env?: HypDrivEnv;
   development?: boolean;
   platform?: CreatePlatformInput['overrides'];
@@ -39,19 +42,15 @@ export interface CreateProxyOptions {
 
 type StageList = Stage[] | ((defaults: Stage[], platform: Platform) => Stage[]);
 
-/** The recommended `config` export for `proxy.ts`: everything except Next internals and common static files. */
+/**
+ * The recommended matcher: everything except Next internals and common static files, plus HypDriv's
+ * internal routes. Next.js parses `proxy.ts`'s `config` statically, so copy this literal into the file
+ * (`export const config = { matcher: [...] }`); re-exporting it is rejected by the compiler.
+ * `hypdriv init` writes it for you and `hypdriv doctor` checks it.
+ */
 export const matcher = {
   matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|woff2?|ttf|otf|css|js|map|txt|xml|json)$).*)', '/_hypdriv/:path*'],
 };
-
-async function readManifest(projectDir: string | undefined): Promise<HypManifest | null> {
-  try {
-    const mod = (await import('@hypdriv/core/node')) as { readManifestSync(dir: string): HypManifest | null; findProjectRoot(start?: string): string };
-    return mod.readManifestSync(projectDir ?? process.env.HYPDRIV_PROJECT_DIR ?? mod.findProjectRoot());
-  } catch {
-    return null;
-  }
-}
 
 async function defaultNext(request: Request): Promise<Response> {
   const mod = (await import('next/server')) as { NextResponse: { next(init?: { request?: { headers?: Headers } }): Response } };
@@ -67,7 +66,7 @@ export function createProxy(config: HypDrivConfig | ResolvedConfig, stageList?: 
   let ready: Promise<{ platform: Platform; stages: Stage[] }> | null = null;
 
   const init = async () => {
-    const manifest = options.manifest === undefined ? await readManifest(options.projectDir) : options.manifest;
+    const manifest = options.manifest === undefined ? await readManifestFile(Number.POSITIVE_INFINITY) : options.manifest;
     const env = options.env ?? ((globalThis as { process?: { env?: HypDrivEnv } }).process?.env ?? {});
     const development = options.development ?? nodeEnvironment(env as Record<string, unknown>) === 'development';
     const platform = createPlatform({ config: resolved, manifest, env, runner: 'proxy', development, ...(options.platform ? { overrides: options.platform } : {}) });
@@ -77,9 +76,14 @@ export function createProxy(config: HypDrivConfig | ResolvedConfig, stageList?: 
     return { platform, stages: list };
   };
 
-  return async function proxy(request: NextRequestLike, event: NextFetchEventLike): Promise<Response> {
+  return async function proxy(incoming: NextRequestLike, event: NextFetchEventLike): Promise<Response> {
+    const passThrough = options.next ?? defaultNext;
+    // Inside the HypDriv Worker (OpenNext runs proxy.ts in the same isolate) the stages already ran around
+    // this request; the Worker's context is visible here through AsyncLocalStorage and cannot be spoofed.
+    if (getCurrentContext()?.runner === 'worker') return passThrough(incoming);
     ready ??= init();
     const { platform, stages: list } = await ready;
+    const request = sanitizeInboundRequest(incoming, { nonceHeader: platform.config.security.csp?.nonceHeader ?? HEADER.nonce, middlewareHeaders: false });
     const ctx = createContext({
       request,
       config: platform.config,
@@ -96,19 +100,27 @@ export function createProxy(config: HypDrivConfig | ResolvedConfig, stageList?: 
     ctx.requestHeaders.set(HEADER.runner, 'proxy');
     if (ctx.route) ctx.requestHeaders.set(HEADER.route, ctx.route.route.id);
     ctx.requestHeaders.set('x-hypdriv-pathname', ctx.url.pathname);
-    const next = options.next ?? defaultNext;
-    const { response } = await runWithContext(ctx, () =>
-      runPipeline({
-        stages: list,
-        ctx,
-        skipEdgeOnly: true,
-        next,
-        onStageError: (error, stage) => {
-          platform.log.error('stage failed', { stage: stage.name, error: error.message });
-          return 'continue';
-        },
-      }),
-    );
-    return response;
+    // The edge cache revalidates in the background and recovers from upstream errors through this key.
+    ctx.state.set(UPSTREAM_KEY, passThrough);
+    try {
+      const { response } = await runWithContext(ctx, () =>
+        runPipeline({
+          stages: list,
+          ctx,
+          skipEdgeOnly: true,
+          next: (forwarded) => ctx.state.get(UPSTREAM_KEY)!(forwarded),
+          onStageError: (error, stage) => {
+            platform.log.error('stage failed', { stage: stage.name, error: error.message });
+            return 'continue';
+          },
+        }),
+      );
+      return response;
+    } catch (err) {
+      platform.log.error('request failed', { requestId: ctx.id, path: ctx.url.pathname, error: (err as Error).message });
+      const stale = platform.edgeCache?.recover(ctx);
+      if (stale) return stale;
+      throw err;
+    }
   };
 }

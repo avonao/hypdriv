@@ -28,9 +28,8 @@ export interface RateLimitStateEntry {
 }
 
 /** Rate-limit outcomes collected by the `rate-limit` stage. */
-export const RATE_LIMIT_KEY: StateKey<RateLimitStateEntry[]> = stateKey<RateLimitStateEntry[]>(
-  'security.rate-limit',
-);
+export const RATE_LIMIT_KEY: StateKey<RateLimitStateEntry[]> =
+  stateKey<RateLimitStateEntry[]>('security.rate-limit');
 
 /** Bot classification verdicts. */
 export type BotVerdict = 'human' | 'verified' | 'likely' | 'definite';

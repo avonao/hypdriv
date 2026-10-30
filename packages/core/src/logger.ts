@@ -26,19 +26,49 @@ export interface ConsoleLoggerOptions {
 const SECRET_KEYS =
   /(password|passwd|secret|token|authorization|cookie|api[-_]?key|private[-_]?key|session|credential)/i;
 
-/** Redacts values whose key looks secret and long opaque strings that look like credentials. */
-export function redactFields(fields: LogFields, extraKeys: string[] = []): LogFields {
+/**
+ * Correlation identifiers are long opaque strings by design (UUIDv7 request ids, 32-hex trace ids) and
+ * must survive redaction, or logs can no longer be joined with traces. Values under these keys skip the
+ * opaque-string heuristic (secret-looking key names are still redacted).
+ */
+export const ID_FIELD_KEYS: ReadonlySet<string> = new Set([
+  'id',
+  'requestid',
+  'request_id',
+  'traceid',
+  'trace_id',
+  'spanid',
+  'span_id',
+  'parentspanid',
+  'parent_span_id',
+  'correlationid',
+  'buildid',
+  'deploymentid',
+  'routeid',
+  'jobid',
+  'messageid',
+  'visitorid',
+]);
+
+/**
+ * Redacts values whose key looks secret and long opaque strings that look like credentials. Values under
+ * correlation-id keys ({@link ID_FIELD_KEYS} plus `allowKeys`) are kept.
+ */
+export function redactFields(fields: LogFields, extraKeys: string[] = [], allowKeys: string[] = []): LogFields {
   const extra = new Set(extraKeys.map((k) => k.toLowerCase()));
-  const walk = (value: unknown, depth: number): unknown => {
+  const allow = new Set(allowKeys.map((k) => k.toLowerCase()));
+  const walk = (value: unknown, depth: number, key?: string): unknown => {
     if (depth > 6) return '[depth]';
     if (Array.isArray(value)) return value.map((v) => walk(v, depth + 1));
     if (value && typeof value === 'object' && !(value instanceof Date)) {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        out[k] = SECRET_KEYS.test(k) || extra.has(k.toLowerCase()) ? '[redacted]' : walk(v, depth + 1);
+        out[k] = SECRET_KEYS.test(k) || extra.has(k.toLowerCase()) ? '[redacted]' : walk(v, depth + 1, k);
       }
       return out;
     }
+    const lower = key?.toLowerCase();
+    if (lower && (ID_FIELD_KEYS.has(lower) || allow.has(lower)) && typeof value === 'string') return value;
     if (
       typeof value === 'string' &&
       /^(?:Bearer\s+)?[A-Za-z0-9_-]{32,}$/.test(value) &&

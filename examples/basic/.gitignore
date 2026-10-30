@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# Next.js / OpenNext / HypDriv build output
+.next/
+.open-next/
+.hypdriv/
+.wrangler/
+next-env.d.ts
+*.tsbuildinfo
+
+# local secrets
+.dev.vars
+.env*.local
+
+# backups written by `hypdriv init`
+*.hypdriv.bak

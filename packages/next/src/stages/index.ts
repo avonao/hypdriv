@@ -15,15 +15,16 @@ import {
   detectCapabilities,
   emptyManifest,
   orderStages,
+  type RateLimitStore,
   readEnv,
 } from '@hypdriv/core';
-import { type FlagProvider, envProvider, flagsStage, kvProvider, staticProvider } from '@hypdriv/flags';
+import { FLAGS_KEY, type FlagProvider, envProvider, flagsStage, kvProvider, staticProvider } from '@hypdriv/flags';
 import { type SpanExporter, type Tracer, type VitalsSink, analyticsEngineExporter, analyticsEngineVitalsSink, consoleExporter, createLogger, createTracer, logVitalsSink, noopExporter, observeStage, otlpHttpExporter, requestIdStage } from '@hypdriv/observe';
 import { themeStage } from '@hypdriv/purser';
-import { type CounterStore, botsStage, createCacheApiCounterStore, createMemoryCounterStore, createRateLimiter, cspStage, csrfStage, rateLimitStage, securityHeadersStage, shieldStage, verifyTurnstile } from '@hypdriv/security';
+import { type CounterStore, botsStage, createCacheApiCounterStore, createKvCounterStore, createMemoryCounterStore, createRateLimiter, cspStage, csrfStage, rateLimitStage, securityHeadersStage, shieldStage, verifyTurnstile } from '@hypdriv/security';
 import { earlyHintsStage } from './early-hints';
 import { geoStage } from './geo';
-import { i18nStage } from './i18n';
+import { LOCALE_KEY, i18nStage } from './i18n';
 import { maintenanceStage } from './maintenance';
 import { redirectsStage } from './redirects';
 import { skewStage } from './skew';
@@ -52,7 +53,10 @@ export interface Platform {
   cacheStore: CacheStore;
   tagIndex: TagIndex;
   purger: Purger | null;
+  /** Default counter store for `store: 'auto'` policies (the best one available). */
   counterStore: CounterStore;
+  /** Counter stores by kind, for policies that pin `store` (`memory`, `cache-api`, `kv`, `durable-object`). */
+  counterStores: Partial<Record<RateLimitStore, CounterStore>>;
   rateLimitBinding: RateLimitBindingLike | null;
   flagsProvider: FlagProvider;
   tracer: Tracer | null;
@@ -70,10 +74,18 @@ export interface CreatePlatformInput {
   development?: boolean;
   log?: Logger;
   /** Overrides for tests and the Worker shell (Durable Object stores etc.). */
-  overrides?: Partial<Pick<Platform, 'cacheStore' | 'tagIndex' | 'purger' | 'counterStore' | 'rateLimitBinding' | 'flagsProvider' | 'tracer' | 'vitalsSink' | 'turnstileVerify' | 'capabilities'>>;
+  overrides?: Partial<Pick<Platform, 'cacheStore' | 'tagIndex' | 'purger' | 'counterStore' | 'counterStores' | 'rateLimitBinding' | 'flagsProvider' | 'tracer' | 'vitalsSink' | 'turnstileVerify' | 'capabilities'>>;
 }
 
-function tracerFor(config: ResolvedConfig, env: HypDrivEnv, caps: Capabilities): Tracer | null {
+/**
+ * Builds the tracer described by `observe.tracing` (OTLP/HTTP with headers from `headersEnv`, console,
+ * Analytics Engine when the binding exists); null when tracing is off.
+ */
+export function createConfiguredTracer(config: ResolvedConfig, env: HypDrivEnv, caps: Pick<Capabilities, 'analyticsEngine'>): Tracer | null {
+  return tracerFor(config, env, caps);
+}
+
+function tracerFor(config: ResolvedConfig, env: HypDrivEnv, caps: Pick<Capabilities, 'analyticsEngine'>): Tracer | null {
   const t = config.observe.tracing;
   if (!t || t.exporter === 'none') return null;
   let exporter: SpanExporter;
@@ -122,7 +134,15 @@ export function createPlatform(input: CreatePlatformInput): Platform {
     const token = readEnv(env, edge.purge.tokenEnv);
     if (zoneId && token) purger = createZonePurger({ zoneId, token });
   }
-  const counterStore = input.overrides?.counterStore ?? (capabilities.cacheApi ? createCacheApiCounterStore() : createMemoryCounterStore());
+  const counterStores: Partial<Record<RateLimitStore, CounterStore>> = {
+    memory: createMemoryCounterStore(),
+    ...(capabilities.cacheApi ? { 'cache-api': createCacheApiCounterStore() } : {}),
+    ...(capabilities.kv ? { kv: createKvCounterStore(env[config.cloudflare.bindings.kv] as never) } : {}),
+    ...(input.overrides?.counterStores ?? {}),
+  };
+  // `auto`: Durable Object (exact, global) → Cache API (per colo) → memory (per isolate). KV is opt-in
+  // per policy because its eventual consistency makes it a poor default counter.
+  const counterStore = input.overrides?.counterStore ?? counterStores['durable-object'] ?? counterStores['cache-api'] ?? counterStores.memory!;
   const rateLimitBinding = input.overrides?.rateLimitBinding ?? ((capabilities.rateLimitBinding ? (env[config.cloudflare.bindings.rateLimit] as RateLimitBindingLike) : null) ?? null);
   const flagsProvider = input.overrides?.flagsProvider ?? flagsProviderFor(config, env, capabilities);
   const tracer = input.overrides?.tracer !== undefined ? input.overrides.tracer : tracerFor(config, env, capabilities);
@@ -138,7 +158,21 @@ export function createPlatform(input: CreatePlatformInput): Platform {
           return (await verifyTurnstile(secret, token, ip)).success;
         }
       : null);
-  const edgeCache = edge ? createEdgeCache({ store: cacheStore, tagIndex, ...(purger ? { purger } : {}) }) : null;
+  const edgeCache = edge
+    ? createEdgeCache({
+        store: cacheStore,
+        tagIndex,
+        config,
+        manifest,
+        log,
+        ...(purger ? { purger } : {}),
+        // Cache variants use the values the earlier stages computed (flags, negotiated locale).
+        resolvers: {
+          flags: (ctx) => ctx.state.get(FLAGS_KEY),
+          locale: (ctx) => ctx.state.get(LOCALE_KEY)?.locale,
+        },
+      })
+    : null;
   return {
     config,
     manifest,
@@ -152,6 +186,7 @@ export function createPlatform(input: CreatePlatformInput): Platform {
     tagIndex,
     purger,
     counterStore,
+    counterStores,
     rateLimitBinding,
     flagsProvider,
     tracer,
@@ -164,7 +199,13 @@ export function createPlatform(input: CreatePlatformInput): Platform {
 /** Builds the default, ordered stage list for a platform (architecture §5). */
 export function buildDefaultStages(platform: Platform): Stage[] {
   const { config } = platform;
-  const limiter = createRateLimiter({ store: platform.counterStore, ...(platform.rateLimitBinding ? { binding: platform.rateLimitBinding } : {}) });
+  const limiter = createRateLimiter({
+    store: platform.counterStore,
+    stores: platform.counterStores,
+    ...(platform.rateLimitBinding ? { binding: platform.rateLimitBinding } : {}),
+    // Fail open (availability first) but never silently.
+    onError: (error, policy, key) => platform.log.error('rate limit store failed; allowing request', { policy: policy.id, key, error: (error as Error)?.message ?? String(error) }),
+  });
   const kv = platform.capabilities.kv ? (platform.env[config.cloudflare.bindings.kv] as never) : undefined;
   const candidates: Array<Stage | null> = [
     requestIdStage(config, platform.tracer ?? undefined),

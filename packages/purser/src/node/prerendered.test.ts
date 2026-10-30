@@ -36,7 +36,15 @@ describe('collectPrerenderedHtml', () => {
       'server/chunks/x.html': '<html>never read</html>',
     });
     const plain = await collectPrerenderedHtml(join(root, '.next'));
-    expect(Object.keys(plain)).toEqual(['/', '/_not-found', '/blog/[slug]', '/docs', '/pricing', '/404', '/legacy/[id]']);
+    expect(Object.keys(plain)).toEqual([
+      '/',
+      '/404',
+      '/_not-found',
+      '/blog/[slug]',
+      '/docs',
+      '/legacy/[id]',
+      '/pricing',
+    ]);
     expect(plain['/']).toBe('<html>home</html>');
     expect(plain['/pricing']).toBe('<html>pricing</html>');
 
@@ -75,7 +83,9 @@ describe('collectPrerenderedHtml', () => {
   it('returns an empty map for a missing build and derives pathnames', async () => {
     expect(await collectPrerenderedHtml(join(tmpdir(), 'does-not-exist-hypdriv'))).toEqual({});
     expect(pathnameFromPrerenderFile('/b/app', '/b/app/index.html', '.html')).toBe('/');
-    expect(pathnameFromPrerenderFile('/b/app', '/b/app/shop/[[...slug]].html', '.html')).toBe('/shop/[[...slug]]');
+    expect(pathnameFromPrerenderFile('/b/app', '/b/app/shop/[[...slug]].html', '.html')).toBe(
+      '/shop/[[...slug]]',
+    );
     expect(pathnameFromPrerenderFile('/b/app', '/b/app/(group)/@slot/x/index.html', '.html')).toBe('/x');
     expect(pathnameFromPrerenderFile('/b/app', '/b/app/a.prefetch.rsc', '.prefetch.rsc')).toBe('/a');
   });

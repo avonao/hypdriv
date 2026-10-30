@@ -81,7 +81,8 @@ export function buildCspDirectives(input: CspBuildInput): CspDirectives {
   const styleSrc: string[] = ["'self'"];
   if (config.unsafeInlineStyles) styleSrc.push("'unsafe-inline'");
   else if (mode === 'nonce' && input.nonce) styleSrc.push(`'nonce-${input.nonce}'`);
-  else if (mode === 'hash') for (const h of input.hashes?.styleHashes ?? []) styleSrc.push(formatHashSource(h));
+  else if (mode === 'hash')
+    for (const h of input.hashes?.styleHashes ?? []) styleSrc.push(formatHashSource(h));
   else if (mode === 'unsafe-inline') styleSrc.push("'unsafe-inline'");
   styleSrc.push(...allow.styles, ...styleBase);
   directives['style-src'] = normalizeSources(styleSrc);

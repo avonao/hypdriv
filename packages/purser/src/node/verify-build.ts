@@ -42,7 +42,9 @@ function describeMissing(missing: Record<string, string[]>, limit = 12): string[
   for (const [route, classes] of Object.entries(missing)) {
     const shown = classes.slice(0, limit).join(', ');
     const more = classes.length > limit ? ` (+${classes.length - limit} more)` : '';
-    lines.push(`${route}: ${classes.length} unstyled atom${classes.length === 1 ? '' : 's'}: ${shown}${more}`);
+    lines.push(
+      `${route}: ${classes.length} unstyled atom${classes.length === 1 ? '' : 's'}: ${shown}${more}`,
+    );
   }
   return lines;
 }
@@ -58,7 +60,9 @@ export async function verifyBuild(options: VerifyBuildOptions): Promise<VerifyBu
   const { config } = options;
   const projectDir = resolve(options.projectDir);
   const purserProjectDir = resolve(projectDir, config.project);
-  const stylesheetFile = options.cssPath ? resolve(projectDir, options.cssPath) : resolve(purserProjectDir, config.out);
+  const stylesheetFile = options.cssPath
+    ? resolve(projectDir, options.cssPath)
+    : resolve(purserProjectDir, config.out);
   const errors: string[] = [];
   const warnings: string[] = [];
   const skipped = config.verify === 'off';
@@ -103,7 +107,11 @@ export async function verifyBuild(options: VerifyBuildOptions): Promise<VerifyBu
   manifest.atoms = analysis.atoms.size;
   if (analysis.layerStatement && analysis.layerStatement.length === 3) {
     const [tokens, globals, atoms] = analysis.layerStatement as [string, string, string];
-    if (tokens !== config.layers.tokens || globals !== config.layers.globals || atoms !== config.layers.atoms) {
+    if (
+      tokens !== config.layers.tokens ||
+      globals !== config.layers.globals ||
+      atoms !== config.layers.atoms
+    ) {
       warnings.push(
         `The stylesheet declares layers ${analysis.layerStatement.join(', ')} but hypdriv.config.ts expects ${config.layers.tokens}, ${config.layers.globals}, ${config.layers.atoms}; the bridge passes config.purser.layers to the build, so the file is stale.`,
       );

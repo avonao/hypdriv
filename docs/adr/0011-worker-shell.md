@@ -8,7 +8,7 @@ OpenNext generates `.open-next/worker.js` exporting `{ fetch }` and three Durabl
 
 ## Decision
 
-`hypdriv.worker.ts` becomes `main`. It re-exports OpenNext's Durable Objects (so existing bindings keep working), exports HypDriv's own Durable Objects, and default-exports `createWorker({ config, next: () => import('./.open-next/worker.js') })`. The OpenNext worker is imported lazily on first non-internal request.
+`hypdriv.worker.ts` becomes `main`. It re-exports OpenNext's Durable Objects (so existing bindings keep working), exports HypDriv's own Durable Objects, and default-exports `createWorker({ config, next: () => import('./.open-next/worker.js'), manifest: () => import('./.hypdriv/manifest.js') })`. The OpenNext worker is imported lazily on first non-internal request.
 
 ## Consequences
 

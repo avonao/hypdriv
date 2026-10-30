@@ -60,7 +60,13 @@ export function encodeCommand(
 }
 
 export type CdpFrame =
-  | { kind: 'response'; id: number; result?: unknown; error?: { code?: number; message: string }; sessionId?: string }
+  | {
+      kind: 'response';
+      id: number;
+      result?: unknown;
+      error?: { code?: number; message: string };
+      sessionId?: string;
+    }
   | { kind: 'event'; method: string; params: Record<string, unknown>; sessionId?: string }
   | { kind: 'invalid' };
 

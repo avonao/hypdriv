@@ -51,9 +51,13 @@
     "@hypdriv/core": "workspace:*"
   },
   "peerDependencies": {
+    "@cloudflare/vitest-plugin": ">=1.0.0",
     "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
+    "@cloudflare/vitest-plugin": {
+      "optional": true
+    },
     "vitest": {
       "optional": true
     }

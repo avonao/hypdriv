@@ -9,7 +9,11 @@ function quote(id: string): string {
  * structured-field style: `"api";r=42;t=17`), the legacy `X-RateLimit-*` trio (`X-RateLimit-Reset` is an
  * epoch in seconds) and `Retry-After` when the request was limited.
  */
-export function rateLimitHeaders(result: RateLimitResult, policyId: string, now: number = Date.now()): Record<string, string> {
+export function rateLimitHeaders(
+  result: RateLimitResult,
+  policyId: string,
+  now: number = Date.now(),
+): Record<string, string> {
   const secondsToReset = Math.max(0, Math.ceil((result.resetAt - now) / 1000));
   const headers: Record<string, string> = {
     RateLimit: `${quote(policyId)};r=${Math.max(0, Math.floor(result.remaining))};t=${secondsToReset}`,

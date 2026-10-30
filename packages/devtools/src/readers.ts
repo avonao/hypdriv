@@ -1,4 +1,11 @@
-import { base64UrlDecode, type Capabilities, type FlagValue, parseServerTiming, type TimingEntry, utf8Decode } from '@hypdriv/core';
+import {
+  base64UrlDecode,
+  type Capabilities,
+  type FlagValue,
+  parseServerTiming,
+  type TimingEntry,
+  utf8Decode,
+} from '@hypdriv/core';
 
 export type VitalName = 'LCP' | 'CLS' | 'INP' | 'FCP' | 'TTFB';
 export type VitalRating = 'good' | 'needs-improvement' | 'poor';
@@ -34,8 +41,15 @@ export interface ServerTimingLike {
   description: string;
 }
 
+/** Parses a raw `Server-Timing` header (for responses the application fetched itself). */
+export function parseServerTimingHeader(header: string | null | undefined): TimingEntry[] {
+  return parseServerTiming(header);
+}
+
 /** Converts browser `serverTiming` entries to core's `TimingEntry` shape. */
-export function serverTimingFromEntries(entries: readonly ServerTimingLike[] | null | undefined): TimingEntry[] {
+export function serverTimingFromEntries(
+  entries: readonly ServerTimingLike[] | null | undefined,
+): TimingEntry[] {
   if (!entries) return [];
   return entries.map((e) => ({
     name: e.name,
@@ -54,7 +68,9 @@ interface NavigationEntryLike {
 
 function perf(): { getEntriesByType(type: string): unknown[] } | null {
   const p = (globalThis as { performance?: { getEntriesByType?: (type: string) => unknown[] } }).performance;
-  return p && typeof p.getEntriesByType === 'function' ? (p as { getEntriesByType(type: string): unknown[] }) : null;
+  return p && typeof p.getEntriesByType === 'function'
+    ? (p as { getEntriesByType(type: string): unknown[] })
+    : null;
 }
 
 /** Server-Timing entries of the current navigation (empty outside a browser). */
@@ -148,7 +164,8 @@ export function decodeFlags(value: string | null | undefined): Record<string, Fl
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     const out: Record<string, FlagValue> = {};
     for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof v === 'boolean' || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))) out[k] = v;
+      if (typeof v === 'boolean' || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)))
+        out[k] = v;
     }
     return out;
   } catch {
@@ -166,6 +183,7 @@ export interface BuildInfo {
   runner: string | null;
   deployment: string | null;
   requestId: string | null;
+  locale: string | null;
   cache: string | null;
   csp: string | null;
   nextVersion: string | null;
@@ -174,7 +192,21 @@ export interface BuildInfo {
   extra: Record<string, string>;
 }
 
-const KNOWN_META = new Set(['build', 'route', 'runner', 'deployment', 'request-id', 'cache', 'csp', 'next', 'version', 'flags']);
+const KNOWN_META = new Set([
+  'build',
+  'route',
+  'runner',
+  'deployment',
+  'request-id',
+  'request',
+  'locale',
+  'cache',
+  'csp',
+  'next',
+  'version',
+  'hypdriv',
+  'flags',
+]);
 
 export function readBuildMeta(document?: DocumentLike): BuildInfo {
   const all = readAllMeta(document);
@@ -185,11 +217,12 @@ export function readBuildMeta(document?: DocumentLike): BuildInfo {
     route: all.route ?? null,
     runner: all.runner ?? null,
     deployment: all.deployment ?? null,
-    requestId: all['request-id'] ?? null,
+    requestId: all['request-id'] ?? all.request ?? null,
+    locale: all.locale ?? null,
     cache: all.cache ?? null,
     csp: all.csp ?? null,
     nextVersion: all.next ?? null,
-    hypdrivVersion: all.version ?? null,
+    hypdrivVersion: all.version ?? all.hypdriv ?? null,
     extra,
   };
 }
@@ -213,7 +246,8 @@ interface ResourceEntryLike {
 
 export function rscNavigationFromEntry(entry: ResourceEntryLike): RscNavigation | null {
   if (!entry || typeof entry.name !== 'string' || !entry.name.includes('_rsc=')) return null;
-  if (entry.initiatorType && entry.initiatorType !== 'fetch' && entry.initiatorType !== 'xmlhttprequest') return null;
+  if (entry.initiatorType && entry.initiatorType !== 'fetch' && entry.initiatorType !== 'xmlhttprequest')
+    return null;
   const entries = serverTimingFromEntries(entry.serverTiming);
   let url = entry.name;
   try {
@@ -267,9 +301,10 @@ export interface PurserStatus {
  */
 export function normalizePurser(raw: unknown): PurserStatus | null {
   if (!raw || typeof raw !== 'object') return null;
-  const obj = (raw as { result?: unknown }).result && typeof (raw as { result?: unknown }).result === 'object'
-    ? ((raw as { result: Record<string, unknown> }).result as Record<string, unknown>)
-    : (raw as Record<string, unknown>);
+  const obj =
+    (raw as { result?: unknown }).result && typeof (raw as { result?: unknown }).result === 'object'
+      ? ((raw as { result: Record<string, unknown> }).result as Record<string, unknown>)
+      : (raw as Record<string, unknown>);
   const diagnostics: PurserDiagnostic[] = [];
   const push = (items: unknown, fallback: PurserDiagnostic['severity']) => {
     if (!Array.isArray(items)) return;
@@ -280,14 +315,24 @@ export function normalizePurser(raw: unknown): PurserStatus | null {
       }
       if (!item || typeof item !== 'object') continue;
       const d = item as Record<string, unknown>;
-      const severityRaw = typeof d.severity === 'string' ? d.severity : typeof d.level === 'string' ? d.level : fallback;
+      const severityRaw =
+        typeof d.severity === 'string' ? d.severity : typeof d.level === 'string' ? d.level : fallback;
       const severity: PurserDiagnostic['severity'] =
-        severityRaw === 'error' || severityRaw === 'fatal' ? 'error' : severityRaw === 'warning' || severityRaw === 'warn' ? 'warning' : 'info';
-      const message = typeof d.message === 'string' ? d.message : typeof d.text === 'string' ? d.text : JSON.stringify(d);
+        severityRaw === 'error' || severityRaw === 'fatal'
+          ? 'error'
+          : severityRaw === 'warning' || severityRaw === 'warn'
+            ? 'warning'
+            : 'info';
+      const message =
+        typeof d.message === 'string' ? d.message : typeof d.text === 'string' ? d.text : JSON.stringify(d);
       diagnostics.push({
         severity,
         message,
-        ...(typeof d.file === 'string' ? { file: d.file } : typeof d.path === 'string' ? { file: d.path } : {}),
+        ...(typeof d.file === 'string'
+          ? { file: d.file }
+          : typeof d.path === 'string'
+            ? { file: d.path }
+            : {}),
         ...(typeof d.line === 'number' ? { line: d.line } : {}),
         ...(typeof d.column === 'number' ? { column: d.column } : {}),
         ...(typeof d.code === 'string' ? { code: d.code } : {}),
@@ -302,17 +347,29 @@ export function normalizePurser(raw: unknown): PurserStatus | null {
     ok: typeof obj.ok === 'boolean' ? obj.ok : !hasErrors,
     diagnostics,
     atoms: typeof obj.atoms === 'number' ? obj.atoms : null,
-    builtAt: typeof obj.builtAt === 'string' ? obj.builtAt : typeof obj.generatedAt === 'string' ? obj.generatedAt : null,
+    builtAt:
+      typeof obj.builtAt === 'string'
+        ? obj.builtAt
+        : typeof obj.generatedAt === 'string'
+          ? obj.generatedAt
+          : null,
     durationMs: typeof obj.durationMs === 'number' ? obj.durationMs : null,
-    stylesheet: typeof obj.stylesheet === 'string' ? obj.stylesheet : typeof obj.out === 'string' ? obj.out : null,
+    stylesheet:
+      typeof obj.stylesheet === 'string' ? obj.stylesheet : typeof obj.out === 'string' ? obj.out : null,
   };
 }
 
 /** Fetches Purser diagnostics from the dev endpoint; `null` when the bridge is not running. */
-export async function readPurserDiagnostics(endpoint: string, fetchImpl: typeof fetch | undefined = globalThis.fetch): Promise<PurserStatus | null> {
+export async function readPurserDiagnostics(
+  endpoint: string,
+  fetchImpl: typeof fetch | undefined = globalThis.fetch,
+): Promise<PurserStatus | null> {
   if (!fetchImpl) return null;
   try {
-    const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/purser`, { headers: { accept: 'application/json' }, cache: 'no-store' });
+    const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/purser`, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
     if (!res.ok) return null;
     return normalizePurser(await res.json());
   } catch {
@@ -320,40 +377,79 @@ export async function readPurserDiagnostics(endpoint: string, fetchImpl: typeof 
   }
 }
 
-/** JSON served by `<endpoint>/state` (`@hypdriv/cloudflare` internal routes / proxy dev routes). */
+/**
+ * JSON served by `<endpoint>/state` (`@hypdriv/cloudflare` internal routes / proxy dev routes). Both the
+ * long (`buildId`, `nextVersion`, `hypdrivVersion`) and short (`build`, `next`, `hypdriv`) key spellings
+ * are accepted.
+ */
 export interface DevState {
   capabilities: Partial<Capabilities> | null;
   /** `describeCapabilities()` lines, when the server includes them. */
   summary: string[];
+  /** Config summary when the server sends one. */
   config: Record<string, unknown> | null;
+  /** Remaining top-level keys (stages, routes, development, ...), shown as JSON. */
+  details: Record<string, unknown>;
   runner: string | null;
+  development: boolean | null;
   buildId: string | null;
   hypdrivVersion: string | null;
   nextVersion: string | null;
   raw: Record<string, unknown>;
 }
 
+const STATE_KNOWN = new Set([
+  'capabilities',
+  'summary',
+  'config',
+  'runner',
+  'development',
+  'buildId',
+  'build',
+  'hypdrivVersion',
+  'hypdriv',
+  'nextVersion',
+  'next',
+]);
+
+function str(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
 export function normalizeDevState(raw: unknown): DevState | null {
   if (!raw || typeof raw !== 'object') return null;
   const obj = raw as Record<string, unknown>;
-  const capabilities = obj.capabilities && typeof obj.capabilities === 'object' ? (obj.capabilities as Partial<Capabilities>) : null;
+  const capabilities =
+    obj.capabilities && typeof obj.capabilities === 'object'
+      ? (obj.capabilities as Partial<Capabilities>)
+      : null;
+  const details: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) if (!STATE_KNOWN.has(k)) details[k] = v;
   return {
     capabilities,
     summary: Array.isArray(obj.summary) ? obj.summary.filter((s): s is string => typeof s === 'string') : [],
     config: obj.config && typeof obj.config === 'object' ? (obj.config as Record<string, unknown>) : null,
-    runner: typeof obj.runner === 'string' ? obj.runner : null,
-    buildId: typeof obj.buildId === 'string' ? obj.buildId : null,
-    hypdrivVersion: typeof obj.hypdrivVersion === 'string' ? obj.hypdrivVersion : null,
-    nextVersion: typeof obj.nextVersion === 'string' ? obj.nextVersion : null,
+    details,
+    runner: str(obj.runner),
+    development: typeof obj.development === 'boolean' ? obj.development : null,
+    buildId: str(obj.buildId) ?? str(obj.build),
+    hypdrivVersion: str(obj.hypdrivVersion) ?? str(obj.hypdriv),
+    nextVersion: str(obj.nextVersion) ?? str(obj.next),
     raw: obj,
   };
 }
 
 /** Fetches `<endpoint>/state` once; `null` when unavailable. */
-export async function readDevState(endpoint: string, fetchImpl: typeof fetch | undefined = globalThis.fetch): Promise<DevState | null> {
+export async function readDevState(
+  endpoint: string,
+  fetchImpl: typeof fetch | undefined = globalThis.fetch,
+): Promise<DevState | null> {
   if (!fetchImpl) return null;
   try {
-    const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/state`, { headers: { accept: 'application/json' }, cache: 'no-store' });
+    const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/state`, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
     if (!res.ok) return null;
     return normalizeDevState(await res.json());
   } catch {
@@ -378,7 +474,10 @@ export function collectDevToolsData(document?: DocumentLike): DevToolsData {
   const ttfb = readTtfb();
   return {
     request: summarizeRequest(entries),
-    vitals: ttfb === null ? {} : { TTFB: { name: 'TTFB', value: ttfb, rating: rateVital('TTFB', ttfb), provisional: false } },
+    vitals:
+      ttfb === null
+        ? {}
+        : { TTFB: { name: 'TTFB', value: ttfb, rating: rateVital('TTFB', ttfb), provisional: false } },
     navigations: readRscNavigations(),
     flags: readFlagsMeta(document),
     build: readBuildMeta(document),

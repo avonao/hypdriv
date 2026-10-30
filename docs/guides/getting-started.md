@@ -45,7 +45,7 @@ pnpm preview &
 npx hypdriv audit all --url http://localhost:8787
 ```
 
-Open the site in development and press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> for the DevTools HUD (render `<HypDrivDevTools />` from `@hypdriv/next/client` in your root layout; `hypdriv init` does that for you).
+Open the site in development and press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> for the DevTools HUD (render `<HypDrivDevTools />` from `hypdriv/client` in your root layout; `hypdriv init` does that for you).
 
 ## Secrets
 

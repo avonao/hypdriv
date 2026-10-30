@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { flag, geo } from '@hypdriv/next/server';
+import { flag, geo } from 'hypdriv/server';
 
 export default function Home() {
   return (

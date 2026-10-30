@@ -1,7 +1,7 @@
 {
   "name": "hypdriv",
   "version": "0.1.0",
-  "description": "HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.",
+  "description": "HypDriv \u2014 the Hyper-Extension for Next.js 16+ on Cloudflare Workers. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",
@@ -49,10 +49,20 @@
       "types": "./dist/next.d.ts",
       "default": "./dist/next.js"
     },
+    "./proxy": {
+      "source": "./src/proxy.ts",
+      "types": "./dist/proxy.d.ts",
+      "default": "./dist/proxy.js"
+    },
     "./cloudflare": {
       "source": "./src/cloudflare.ts",
       "types": "./dist/cloudflare.d.ts",
       "default": "./dist/cloudflare.js"
+    },
+    "./durable-objects": {
+      "source": "./src/durable-objects.ts",
+      "types": "./dist/durable-objects.d.ts",
+      "default": "./dist/durable-objects.js"
     },
     "./server": {
       "source": "./src/server.ts",
@@ -63,6 +73,46 @@
       "source": "./src/client.tsx",
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./cache": {
+      "source": "./src/cache.ts",
+      "types": "./dist/cache.d.ts",
+      "default": "./dist/cache.js"
+    },
+    "./instrumentation": {
+      "source": "./src/instrumentation.ts",
+      "types": "./dist/instrumentation.d.ts",
+      "default": "./dist/instrumentation.js"
+    },
+    "./security": {
+      "source": "./src/security.ts",
+      "types": "./dist/security.d.ts",
+      "default": "./dist/security.js"
+    },
+    "./flags": {
+      "source": "./src/flags.ts",
+      "types": "./dist/flags.d.ts",
+      "default": "./dist/flags.js"
+    },
+    "./live": {
+      "source": "./src/live.ts",
+      "types": "./dist/live.d.ts",
+      "default": "./dist/live.js"
+    },
+    "./observe": {
+      "source": "./src/observe.ts",
+      "types": "./dist/observe.d.ts",
+      "default": "./dist/observe.js"
+    },
+    "./image": {
+      "source": "./src/image.ts",
+      "types": "./dist/image.d.ts",
+      "default": "./dist/image.js"
+    },
+    "./purser": {
+      "source": "./src/purser.ts",
+      "types": "./dist/purser.d.ts",
+      "default": "./dist/purser.js"
     }
   },
   "scripts": {
@@ -72,18 +122,18 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hypdriv/core": "workspace:*",
-    "@hypdriv/next": "workspace:*",
-    "@hypdriv/cloudflare": "workspace:*",
     "@hypdriv/cache": "workspace:*",
-    "@hypdriv/security": "workspace:*",
-    "@hypdriv/observe": "workspace:*",
-    "@hypdriv/flags": "workspace:*",
-    "@hypdriv/live": "workspace:*",
-    "@hypdriv/image": "workspace:*",
-    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/cli": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
     "@hypdriv/devtools": "workspace:*",
-    "@hypdriv/cli": "workspace:*"
+    "@hypdriv/flags": "workspace:*",
+    "@hypdriv/image": "workspace:*",
+    "@hypdriv/live": "workspace:*",
+    "@hypdriv/next": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/security": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=16.0.0",
@@ -98,13 +148,14 @@
     }
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
-    "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

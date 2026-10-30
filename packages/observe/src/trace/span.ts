@@ -18,7 +18,8 @@ export interface Span {
   readonly name: string;
   readonly kind: SpanKind;
   readonly start: number;
-  readonly end?: number;
+  /** End time in epoch ms; undefined while the span is open. */
+  readonly endTime?: number;
   readonly attributes: Attributes;
   readonly events: SpanEvent[];
   readonly status: SpanStatus;
@@ -94,7 +95,7 @@ export class SpanImpl implements Span {
     if (init.attributes) this.setAttributes(init.attributes);
   }
 
-  get end(): number | undefined {
+  get endTime(): number | undefined {
     return this.end_;
   }
 
@@ -113,7 +114,8 @@ export class SpanImpl implements Span {
     const event: SpanEvent = { name, time: this.now() };
     if (attributes) {
       event.attributes = {};
-      for (const [k, v] of Object.entries(attributes)) if (v !== undefined && v !== null) event.attributes[k] = clampValue(v);
+      for (const [k, v] of Object.entries(attributes))
+        if (v !== undefined && v !== null) event.attributes[k] = clampValue(v);
     }
     this.events.push(event);
   }
@@ -153,7 +155,8 @@ export class SpanImpl implements Span {
       listener(this);
       return;
     }
-    (this.listeners ??= []).push(listener);
+    this.listeners ??= [];
+    this.listeners.push(listener);
   }
 
   /** Plain JSON view (used by the console exporter and tests). */

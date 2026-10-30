@@ -72,7 +72,7 @@ Every response carries `x-hypdriv-cache` and a `cache` entry in `Server-Timing`:
 ## Purging
 
 ```ts
-import { revalidateTag, revalidatePath, purgeEdge } from '@hypdriv/next/cache';
+import { revalidateTag, revalidatePath, purgeEdge } from 'hypdriv/cache';
 
 await revalidateTag('blog');                 // Next.js revalidation + edge purge of tag `blog`
 await revalidatePath('/blog/hello-world');   // Next.js + edge purge of the path
@@ -91,4 +91,4 @@ cache: { warm: { routes: ['/', '/blog', '/pricing'], onDeploy: true, cron: '*/30
 
 ## Interaction with Cache Components
 
-`'use cache'` decides what is cacheable *inside* a render; the edge cache decides whether a render happens at all. Keep them aligned: use `cacheTag()` with the same tag names you purge (`revalidateTag` from `@hypdriv/next/cache` clears both). For personalised shells, cache the shell only when the personalised parts stream after `connection()`/`cookies()` — `inferredShell` is off by default because many shells embed user-specific data in the resumed stream.
+`'use cache'` decides what is cacheable *inside* a render; the edge cache decides whether a render happens at all. Keep them aligned: use `cacheTag()` with the same tag names you purge (`revalidateTag` from `hypdriv/cache` clears both). For personalised shells, cache the shell only when the personalised parts stream after `connection()`/`cookies()` — `inferredShell` is off by default because many shells embed user-specific data in the resumed stream.

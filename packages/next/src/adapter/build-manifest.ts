@@ -19,8 +19,30 @@ import type { AdapterFs } from './fs';
 import { extractInlineScripts, extractInlineStyles, extractLinks } from './html';
 import type { OnBuildCompleteContext } from './types';
 
+export interface PurserVerifierInput {
+  /** Prerendered HTML by route id (primary documents only). */
+  html: Record<string, string>;
+  config: ResolvedConfig;
+  projectDir: string;
+  /** Next's dist directory (`.next`), for collecting every prerendered document and RSC payload. */
+  distDir: string;
+  /** Emitted client CSS files (public paths) across all routes. */
+  cssAssets: string[];
+  /** Reads an emitted asset by public path (null when missing). */
+  readAsset: (publicPath: string) => string | null;
+  log: Logger;
+}
+
+export interface PurserVerifierResult {
+  manifest: PurserManifest | null;
+  ok: boolean;
+  warnings: string[];
+  /** Problems that fail the build (missing atoms with `verify: 'error'`, missing stylesheet). */
+  errors?: string[];
+}
+
 export interface PurserVerifier {
-  (input: { html: Record<string, string>; config: ResolvedConfig; projectDir: string; log: Logger }): Promise<{ manifest: PurserManifest | null; ok: boolean; warnings: string[] }>;
+  (input: PurserVerifierInput): Promise<PurserVerifierResult>;
 }
 
 export interface SecretsScanner {
@@ -148,10 +170,25 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
   let purser: PurserManifest | undefined;
   if (config.purser && input.purser) {
     try {
-      const result = await input.purser({ html, config, projectDir: context.projectDir, log });
+      const cssAssets = [...new Set(routes.flatMap((r) => r.assets.css))].sort();
+      const readAsset = (publicPath: string): string | null => {
+        const file = assetFilePath(context.distDir, publicPath, basePath);
+        if (!file || !fs.exists(file)) return null;
+        try {
+          return fs.readText(file);
+        } catch {
+          return null;
+        }
+      };
+      const result = await input.purser({ html, config, projectDir: context.projectDir, distDir: context.distDir, cssAssets, readAsset, log });
       if (result.manifest) purser = result.manifest;
       warnings.push(...result.warnings);
-      if (!result.ok) failures.push('Purser verification failed: prerendered HTML references atoms missing from the stylesheet (see warnings).');
+      if (result.errors?.length) failures.push(...result.errors.map((e) => `Purser: ${e}`));
+      if (!result.ok && !result.errors?.length) failures.push('Purser verification failed: prerendered HTML references atoms missing from the stylesheet (see warnings).');
+      // The theme fallback script is inlined by the root layout; allow it on hash-mode (static) routes.
+      if (purser?.themeScriptHash) {
+        for (const entry of Object.values(csp)) if (!entry.scriptHashes.includes(purser.themeScriptHash)) entry.scriptHashes.push(purser.themeScriptHash);
+      }
     } catch (err) {
       warnings.push(`Purser verification skipped: ${(err as Error).message}`);
     }

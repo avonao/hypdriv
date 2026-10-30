@@ -24,7 +24,9 @@ export const CLIENT_HINT_TOKENS: Record<ClientHintName, string> = {
 };
 
 /** Hints worth a `Critical-CH` retry on the first navigation: only the colour scheme decides paint. */
-export const CRITICAL_CLIENT_HINTS: ReadonlySet<ClientHintName> = new Set<ClientHintName>(['prefers-color-scheme']);
+export const CRITICAL_CLIENT_HINTS: ReadonlySet<ClientHintName> = new Set<ClientHintName>([
+  'prefers-color-scheme',
+]);
 
 /** The attribute the edge pin and the fallback script set on `<html>` (value: `axis=value;axis2=value2`). */
 export const THEME_ATTRIBUTE = 'data-hypdriv-theme';
@@ -55,7 +57,8 @@ export function themeAxes(theme: ThemeConfig): ThemeAxis[] {
   if (!theme.cookie || !TOKEN_RE.test(theme.cookie) || /[=;,]/.test(theme.cookie))
     throw new HypDrivError('E_CONFIG', `purser.theme.cookie: "${theme.cookie}" is not a valid cookie name`);
   const names = Object.keys(theme.axes).sort();
-  if (names.length === 0) throw new HypDrivError('E_CONFIG', 'purser.theme.axes: at least one axis is required');
+  if (names.length === 0)
+    throw new HypDrivError('E_CONFIG', 'purser.theme.axes: at least one axis is required');
   const out: ThemeAxis[] = [];
   const cookieKeys = new Set<string>();
   for (const name of names) {
@@ -70,16 +73,23 @@ export function themeAxes(theme: ThemeConfig): ThemeAxis[] {
       throw new HypDrivError('E_CONFIG', `${path}.cookie: key "${cookie}" is used by another axis`);
     cookieKeys.add(cookie);
     const values = Object.keys(axis.classes);
-    if (values.length === 0) throw new HypDrivError('E_CONFIG', `${path}.classes: at least one value is required`);
+    if (values.length === 0)
+      throw new HypDrivError('E_CONFIG', `${path}.classes: at least one value is required`);
     for (const value of values) {
       if (!TOKEN_RE.test(value) || /[=;,]/.test(value))
         throw new HypDrivError('E_CONFIG', `${path}.classes: value "${value}" is not cookie-safe`);
       const cls = axis.classes[value];
       if (cls !== null && (typeof cls !== 'string' || !CLASS_RE.test(cls)))
-        throw new HypDrivError('E_CONFIG', `${path}.classes.${value}: "${String(cls)}" is not a single class name`);
+        throw new HypDrivError(
+          'E_CONFIG',
+          `${path}.classes.${value}: "${String(cls)}" is not a single class name`,
+        );
     }
     if (!(axis.default in axis.classes))
-      throw new HypDrivError('E_CONFIG', `${path}.default: "${axis.default}" is not one of ${values.join(', ')}`);
+      throw new HypDrivError(
+        'E_CONFIG',
+        `${path}.default: "${axis.default}" is not one of ${values.join(', ')}`,
+      );
     let clientHint: ThemeAxis['clientHint'] = null;
     if (axis.clientHint) {
       const hint = axis.clientHint.hint;
@@ -125,7 +135,10 @@ export function themeClientHints(axes: readonly ThemeAxis[]): ClientHintName[] {
  * A segment without `=` is accepted as the value of the only axis when exactly one axis exists
  * (`hyp_theme=dark`); segments are trimmed and later duplicates win.
  */
-export function parseThemeCookie(value: string | undefined | null, axes: readonly ThemeAxis[]): Record<string, string> {
+export function parseThemeCookie(
+  value: string | undefined | null,
+  axes: readonly ThemeAxis[],
+): Record<string, string> {
   const out: Record<string, string> = {};
   if (!value) return out;
   for (const segment of value.split(';')) {
@@ -141,7 +154,10 @@ export function parseThemeCookie(value: string | undefined | null, axes: readonl
 }
 
 /** Serialises axis values as `axis=value;axis2=value2` in canonical axis order. */
-export function encodeThemeValues(values: Readonly<Record<string, string>>, axes: readonly ThemeAxis[]): string {
+export function encodeThemeValues(
+  values: Readonly<Record<string, string>>,
+  axes: readonly ThemeAxis[],
+): string {
   return axes
     .filter((axis) => values[axis.name] !== undefined)
     .map((axis) => `${axis.name}=${values[axis.name]}`)
@@ -165,6 +181,9 @@ export function decodeThemeHeader(value: string | null | undefined): Record<stri
 }
 
 /** The `Set-Cookie`-ready value for a theme choice: URL-encoded `axis=value;…` pairs. */
-export function encodeThemeCookieValue(values: Readonly<Record<string, string>>, axes: readonly ThemeAxis[]): string {
+export function encodeThemeCookieValue(
+  values: Readonly<Record<string, string>>,
+  axes: readonly ThemeAxis[],
+): string {
   return encodeURIComponent(encodeThemeValues(values, axes));
 }

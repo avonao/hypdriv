@@ -19,12 +19,15 @@ export function cacheStatusOf(ctx: HypContext, response?: Response): string | un
   return marker;
 }
 
-/** Masks the last IPv4 octet / the interface half of an IPv6 address for request logs. */
+/** Masks the last IPv4 octet / the interface half of an IPv6 address (keeps the /64) for request logs. */
 export function maskIp(ip: string | undefined): string | undefined {
   if (!ip) return undefined;
   if (ip.includes(':')) {
-    const groups = ip.split(':');
-    return `${groups.slice(0, 4).join(':')}::`;
+    const [head = '', tail = ''] = ip.split('::');
+    const left = head ? head.split(':') : [];
+    const right = tail ? tail.split(':') : [];
+    const zeros = Array.from({ length: Math.max(0, 8 - left.length - right.length) }, () => '0');
+    return `${[...left, ...zeros, ...right].slice(0, 4).join(':')}::`;
   }
   const parts = ip.split('.');
   if (parts.length !== 4) return ip;

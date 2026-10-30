@@ -35,13 +35,13 @@ Never hand-edit `.hypdriv/` — it is build output.
 
 ## 3. Configure
 
-All configuration lives in `hypdriv.config.ts`. Read `docs/guides/configuration.md` in the HypDriv repository (or `node_modules/hypdriv/docs/configuration.md`) for every key. Typical edits:
+All configuration lives in `hypdriv.config.ts`. Read `docs/guides/configuration.md` in the HypDriv repository (https://github.com/avonao/hypdriv/blob/main/docs/guides/configuration.md) for every key. Typical edits:
 
 - **Allow a third-party script**: `security.csp.allow.scripts: ['https://js.stripe.com']` (and `frames` for iframes).
-- **Cache a route at the edge**: `cache.edge.policies: [{ match: '/blog/**', ttl: '10m', swr: '1d', tags: ['blog'] }]`; purge with `revalidateTag('blog')` from `@hypdriv/next/cache`.
+- **Cache a route at the edge**: `cache.edge.policies: [{ match: '/blog/**', ttl: '10m', swr: '1d', tags: ['blog'] }]`; purge with `revalidateTag('blog')` from `hypdriv/cache`.
 - **Rate limit an API**: `security.rateLimit: [{ id: 'api', match: '/api/**', limit: 120, window: '1m', key: ['ip'] }]`.
 - **Feature flag**: `flags.definitions.newCheckout = { default: false, rules: [{ when: { country: ['US'] }, percentage: 25, value: true }] }`; read with `await flag('newCheckout')` on the server or `useFlag('newCheckout')` on the client.
-- **Cron job**: `jobs.cron.digest = { cron: '0 9 * * 1', path: '/api/jobs/digest' }`, add the cron to `wrangler.jsonc#triggers.crons` (or run `hypdriv doctor --fix`), implement the route with `jobHandler()` from `@hypdriv/next/server`.
+- **Cron job**: `jobs.cron.digest = { cron: '0 9 * * 1', path: '/api/jobs/digest' }`, add the cron to `wrangler.jsonc#triggers.crons` (or run `hypdriv doctor --fix`), implement the route with `jobHandler()` from `hypdriv/server`.
 - **Purser CSS**: `purser: { tokens: 'lib/tokens.ts', src: ['app','components','lib'], out: 'app/purser.css', theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light', clientHint: { hint: 'prefers-color-scheme', values: { dark: 'dark', light: 'light' } } } } } }`.
 
 Rules of thumb:
@@ -65,7 +65,7 @@ npx hypdriv audit css --url http://localhost:8787   # Purser zero-override check
 ## 5. Diagnose at runtime
 
 - Every response carries `Server-Timing` (stage timings), `x-hypdriv-cache` (HIT/MISS/STALE/BYPASS + reason), `x-hypdriv-csp` (nonce/hash/report-only), `x-request-id`.
-- In development open the HUD (Alt+Shift+H) or render `<HypDrivDevTools />` from `@hypdriv/next/client` in the root layout.
+- In development open the HUD (Alt+Shift+H) or render `<HypDrivDevTools />` from `hypdriv/client` in the root layout.
 - CSP violations are collected at `/_hypdriv/csp-report`; `npx hypdriv csp suggest` proposes allow-list additions from collected reports.
 - Web Vitals are posted to `/_hypdriv/vitals`; `npx hypdriv vitals` prints p75 per route when Analytics Engine is bound.
 

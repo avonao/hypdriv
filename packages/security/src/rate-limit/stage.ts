@@ -7,8 +7,8 @@ import {
   mergeHeaders,
   type ResolvedConfig,
   type ResolvedRateLimitPolicy,
-  shortHash,
   type Stage,
+  shortHash,
   stateKey,
   text,
 } from '@hypdriv/core';
@@ -18,7 +18,12 @@ import type { RateLimiter, RateLimitResult } from './types';
 
 function clean(value: string | null | undefined, max = 128): string {
   if (!value) return '-';
-  const v = value.replace(/[\s|\u0000-\u001f\u007f]+/g, '').slice(0, max);
+  let v = '';
+  for (let i = 0; i < value.length && v.length < max; i++) {
+    const c = value.charCodeAt(i);
+    if (c <= 0x20 || c === 0x7f || c === 0x7c /* | */) continue;
+    v += value[i];
+  }
   return v || '-';
 }
 
@@ -55,14 +60,21 @@ export function resolveRateLimitKey(policy: ResolvedRateLimitPolicy, ctx: HypCon
 /** `true` when a policy applies to the request (pattern, methods and `skip` predicate). */
 export function policyApplies(policy: ResolvedRateLimitPolicy, ctx: HypContext): boolean {
   if (!matchesAny(policy.match, ctx.url)) return false;
-  if (policy.methods.length && !policy.methods.map((m) => m.toUpperCase()).includes(ctx.request.method.toUpperCase()))
+  if (
+    policy.methods.length &&
+    !policy.methods.map((m) => m.toUpperCase()).includes(ctx.request.method.toUpperCase())
+  )
     return false;
   if (policy.skip?.({ ip: ctx.ip, url: ctx.url, headers: ctx.request.headers })) return false;
   return true;
 }
 
 /** Builds the configured "limited" response (JSON by default) with rate-limit headers. */
-export function rateLimitedResponse(policy: ResolvedRateLimitPolicy, result: RateLimitResult, now: number): Response {
+export function rateLimitedResponse(
+  policy: ResolvedRateLimitPolicy,
+  result: RateLimitResult,
+  now: number,
+): Response {
   const headers = new Headers(policy.response.headers);
   if (policy.headers) mergeHeaders(headers, rateLimitHeaders(result, policy.id, now));
   if (!headers.has('retry-after')) headers.set('retry-after', String(Math.max(1, result.retryAfter)));
@@ -109,7 +121,10 @@ export function rateLimitStage(config: ResolvedConfig, limiter: RateLimiter): St
           return rateLimitedResponse(policy, result, now);
         }
         const ratio = result.limit > 0 ? result.remaining / result.limit : 1;
-        if (policy.headers && (!tightest || ratio < tightest.result.remaining / Math.max(1, tightest.result.limit)))
+        if (
+          policy.headers &&
+          (!tightest || ratio < tightest.result.remaining / Math.max(1, tightest.result.limit))
+        )
           tightest = { policy, result, now };
       }
       if (entries.length) ctx.state.set(RATE_LIMIT_KEY, entries);
@@ -122,7 +137,11 @@ export function rateLimitStage(config: ResolvedConfig, limiter: RateLimiter): St
       const headers = new Headers(response.headers);
       const built = rateLimitHeaders(pending.result, pending.policy.id, pending.now);
       for (const [name, value] of Object.entries(built)) if (!headers.has(name)) headers.set(name, value);
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     },
   });
 }

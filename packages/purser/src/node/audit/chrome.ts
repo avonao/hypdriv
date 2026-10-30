@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 import { HypDrivError } from '@hypdriv/core';
 
 export interface FindChromeOptions {
@@ -45,11 +45,11 @@ export function knownChromeLocations(
       'Brave Browser.app/Contents/MacOS/Brave Browser',
     ];
     const home = env.HOME ?? homedir();
-    return apps.flatMap((app) => [`/Applications/${app}`, join(home, 'Applications', app)]);
+    return apps.flatMap((app) => [`/Applications/${app}`, posix.join(home, 'Applications', app)]);
   }
   if (platform === 'win32') {
-    const roots = [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(
-      (v): v is string => Boolean(v),
+    const roots = [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter((v): v is string =>
+      Boolean(v),
     );
     const rel = [
       'Google\\Chrome\\Application\\chrome.exe',
@@ -58,7 +58,7 @@ export function knownChromeLocations(
       'Microsoft\\Edge\\Application\\msedge.exe',
       'BraveSoftware\\Brave-Browser\\Application\\brave.exe',
     ];
-    return roots.flatMap((root) => rel.map((r) => join(root, r)));
+    return roots.flatMap((root) => rel.map((r) => win32.join(root, r)));
   }
   return [
     '/usr/bin/google-chrome',
@@ -83,7 +83,25 @@ export function findChrome(options: FindChromeOptions = {}): FoundChrome | null 
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const exists = options.exists ?? existsSync;
-  if (options.chromePath) return exists(options.chromePath) ? { path: options.chromePath, source: 'option' } : null;
+  const pathApi = platform === 'win32' ? win32 : posix;
+  const pathEntries = (env.PATH ?? '').split(pathApi.delimiter).filter(Boolean);
+  const onPath = (names: readonly string[]): string | null => {
+    const spelled = platform === 'win32' ? names.flatMap((n) => [`${n}.exe`, `${n}.cmd`, n]) : [...names];
+    for (const dir of pathEntries) {
+      for (const name of spelled) {
+        const candidate = pathApi.join(dir, name);
+        if (exists(candidate)) return candidate;
+      }
+    }
+    return null;
+  };
+  if (options.chromePath) {
+    const given = options.chromePath;
+    if (exists(given)) return { path: given, source: 'option' };
+    // A bare command name (`--chrome chromium`) is looked up on PATH.
+    const bare = !/[\\/]/.test(given) ? onPath([given]) : null;
+    return bare ? { path: bare, source: 'option' } : null;
+  }
   for (const name of ['CHROME_PATH', 'PURSER_CHROME']) {
     const value = env[name];
     if (value && exists(value)) return { path: value, source: 'env' };
@@ -91,18 +109,8 @@ export function findChrome(options: FindChromeOptions = {}): FoundChrome | null 
   for (const candidate of knownChromeLocations(platform, env)) {
     if (exists(candidate)) return { path: candidate, source: 'known-location' };
   }
-  const pathEntries = (env.PATH ?? '').split(platform === 'win32' ? ';' : delimiter).filter(Boolean);
-  const names =
-    platform === 'win32'
-      ? CHROME_PATH_NAMES.flatMap((n) => [`${n}.exe`, `${n}.cmd`, n])
-      : [...CHROME_PATH_NAMES];
-  for (const dir of pathEntries) {
-    for (const name of names) {
-      const candidate = join(dir, name);
-      if (exists(candidate)) return { path: candidate, source: 'path' };
-    }
-  }
-  return null;
+  const found = onPath(CHROME_PATH_NAMES);
+  return found ? { path: found, source: 'path' } : null;
 }
 
 export interface LaunchedChrome {
@@ -215,10 +223,14 @@ export async function launchChrome(options: LaunchChromeOptions): Promise<Launch
       clearTimeout(timer);
       if (!closed)
         void fail(
-          new HypDrivError('E_UPSTREAM', `Chrome exited before the DevTools endpoint was ready (${code ?? signal})`, {
-            path: options.path,
-            stderr: buffer.slice(-2000),
-          }),
+          new HypDrivError(
+            'E_UPSTREAM',
+            `Chrome exited before the DevTools endpoint was ready (${code ?? signal})`,
+            {
+              path: options.path,
+              stderr: buffer.slice(-2000),
+            },
+          ),
         );
     });
     child.stderr?.setEncoding('utf8');

@@ -1,0 +1,41 @@
+{
+  "name": "@hypdriv/example-with-purser",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:worker": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "css": "hypdriv css build",
+    "css:check": "hypdriv css check",
+    "hypdriv:doctor": "hypdriv doctor",
+    "hypdriv:analyze": "hypdriv analyze",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:8787",
+    "audit:css": "hypdriv audit css --url http://localhost:8787",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "catalog:",
+    "hypdriv": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "optionalDependencies": {
+    "@avonao/purser": "^0.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "babel-plugin-react-compiler": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

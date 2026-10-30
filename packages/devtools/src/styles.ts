@@ -140,8 +140,20 @@ export function bodyStyle(): CSSProperties {
   return { padding: 10, overflow: 'auto', flex: 1 };
 }
 
-export function chipStyle(theme: Theme, tone: 'neutral' | 'good' | 'warn' | 'bad' | 'info' = 'neutral'): CSSProperties {
-  const color = tone === 'good' ? theme.good : tone === 'warn' ? theme.warn : tone === 'bad' ? theme.bad : tone === 'info' ? theme.info : theme.muted;
+export function chipStyle(
+  theme: Theme,
+  tone: 'neutral' | 'good' | 'warn' | 'bad' | 'info' = 'neutral',
+): CSSProperties {
+  const color =
+    tone === 'good'
+      ? theme.good
+      : tone === 'warn'
+        ? theme.warn
+        : tone === 'bad'
+          ? theme.bad
+          : tone === 'info'
+            ? theme.info
+            : theme.muted;
   return {
     display: 'inline-block',
     padding: '1px 6px',
@@ -183,7 +195,13 @@ export function mutedStyle(theme: Theme): CSSProperties {
 }
 
 export function codeStyle(theme: Theme): CSSProperties {
-  return { font: 'inherit', background: theme.panel, padding: '1px 4px', borderRadius: 4, wordBreak: 'break-all' };
+  return {
+    font: 'inherit',
+    background: theme.panel,
+    padding: '1px 4px',
+    borderRadius: 4,
+    wordBreak: 'break-all',
+  };
 }
 
 export const srOnly: CSSProperties = {

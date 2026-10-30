@@ -1,0 +1,222 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { HEADER, type HypContext, createContext, loadConfig, runWithContext, setContextStore } from '@hypdriv/core';
+import { decodeFlagsHeader } from '@hypdriv/flags';
+import { signing } from '@hypdriv/security';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { type GeoInfo, encodeGeoHeader } from '../stages/geo';
+import { defer, devtoolsMeta, flag, geo, hyp, jobHandler, nonce, setCloudflareContextLoader } from './index';
+
+const als = new AsyncLocalStorage<HypContext>();
+
+const geoOf = (partial: Partial<GeoInfo>): GeoInfo => ({
+  country: null,
+  region: null,
+  regionCode: null,
+  city: null,
+  continent: null,
+  postalCode: null,
+  timezone: null,
+  latitude: null,
+  longitude: null,
+  colo: null,
+  asn: null,
+  asOrganization: null,
+  isEU: false,
+  source: 'cloudflare',
+  ...partial,
+});
+
+const env = process.env as Record<string, string | undefined>;
+
+beforeAll(() => {
+  setContextStore({ getStore: () => als.getStore(), run: (ctx, fn) => als.run(ctx, fn) });
+});
+
+afterAll(() => {
+  setContextStore(null);
+  setCloudflareContextLoader(null);
+});
+
+function pipelineContext(headers: Record<string, string>, env: Record<string, unknown> = {}, config = loadConfig({})): { ctx: HypContext; pending: Promise<unknown>[] } {
+  const pending: Promise<unknown>[] = [];
+  const ctx = createContext({
+    request: new Request('https://shop.example.com/products/1', { headers }),
+    config,
+    env,
+    runner: 'worker',
+    waitUntil: (p) => pending.push(p),
+  });
+  for (const [k, v] of Object.entries(headers)) ctx.requestHeaders.set(k, v);
+  return { ctx, pending };
+}
+
+describe('hyp()', () => {
+  it('reads forwarded HypDriv headers inside the Worker pipeline', async () => {
+    const { ctx, pending } = pipelineContext(
+      {
+        [HEADER.hypRequestId]: 'req-1',
+        [HEADER.nonce]: 'abc123',
+        [HEADER.geo]: encodeGeoHeader(geoOf({ country: 'US', region: 'CA', city: 'San Francisco' })),
+        [HEADER.locale]: 'en-US',
+        [HEADER.flags]: JSON.stringify({ newCheckout: true, plan: 'pro' }),
+        [HEADER.theme]: 'contrast=high;mode=dark',
+        [HEADER.runner]: 'worker',
+        cookie: 'a=1; b=two',
+      },
+      { HYPDRIV_KV: {} },
+    );
+    const result = await runWithContext(ctx, () => hyp());
+    expect(result.requestId).toBe('req-1');
+    expect(result.nonce).toBe('abc123');
+    expect(result.country).toBe('US');
+    expect(result.geo?.city).toBe('San Francisco');
+    expect(result.locale).toBe('en-US');
+    expect(result.flags).toEqual({ newCheckout: true, plan: 'pro' });
+    expect(result.flag('newCheckout', false)).toBe(true);
+    expect(result.flag('missing', 'fallback')).toBe('fallback');
+    expect(result.theme).toEqual({ contrast: 'high', mode: 'dark' });
+    expect(result.runner).toBe('worker');
+    expect(result.cookies).toEqual({ a: '1', b: 'two' });
+    expect(result.env).toHaveProperty('HYPDRIV_KV');
+    expect(result.pipeline).toBe(ctx);
+    result.waitUntil(Promise.resolve('done'));
+    expect(pending).toHaveLength(1);
+  });
+
+  it('resolves the theme from cookies when the theme stage did not run (RSC navigations)', async () => {
+    const config = loadConfig({ purser: { theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } } } } });
+    const { ctx } = pipelineContext({ cookie: 'hyp_theme=dark' }, {}, config);
+    const result = await runWithContext(ctx, () => hyp());
+    expect(result.theme).toEqual({ mode: 'dark' });
+  });
+
+  it('uses the OpenNext Cloudflare context outside the pipeline', async () => {
+    const waitUntil = vi.fn();
+    setCloudflareContextLoader(async () => ({ env: { SECRET: 'x' }, cf: { country: 'DE' }, ctx: { waitUntil } }));
+    // Outside a pipeline, request headers come from next/headers; provide them through a context with no store.
+    setContextStore(null);
+    vi.doMock('next/headers', () => ({ headers: async () => new Headers({ 'cf-ipcountry': 'DE' }) }));
+    try {
+      const result = await hyp();
+      expect(result.env).toEqual({ SECRET: 'x' });
+      expect(result.cf).toEqual({ country: 'DE' });
+      expect(result.country).toBe('DE');
+      expect(result.pipeline).toBeUndefined();
+      result.waitUntil(Promise.resolve());
+      expect(waitUntil).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock('next/headers');
+      setCloudflareContextLoader(null);
+      setContextStore({ getStore: () => als.getStore(), run: (ctx, fn) => als.run(ctx, fn) });
+    }
+  });
+});
+
+describe('request helpers', () => {
+  it('nonce(), geo(), flag() and devtoolsMeta() read the forwarded headers', async () => {
+    const { ctx } = pipelineContext(
+      {
+      [HEADER.nonce]: 'n0nce',
+      [HEADER.geo]: encodeGeoHeader(geoOf({ country: 'US', region: 'NY' })),
+      [HEADER.flags]: JSON.stringify({ beta: 'on' }),
+      [HEADER.hypRequestId]: 'req-9',
+      [HEADER.runner]: 'proxy',
+      [HEADER.route]: 'app:/products/[id]',
+      },
+      {},
+      loadConfig({ flags: { definitions: { beta: { default: 'off' }, internalPricing: { default: false, serverOnly: true } } } }),
+    );
+    ctx.requestHeaders.set(HEADER.flags, JSON.stringify({ beta: 'on', internalPricing: true }));
+    await runWithContext(ctx, async () => {
+      expect(await nonce()).toBe('n0nce');
+      expect((await geo()).region).toBe('NY');
+      expect(await flag('beta')).toBe('on');
+      expect(await flag('other', 7)).toBe(7);
+      const meta = await devtoolsMeta();
+      expect(decodeFlagsHeader(meta['hypdriv:flags'])).toEqual({ beta: 'on' });
+      expect(meta).toEqual({
+        'hypdriv:request': 'req-9',
+        'hypdriv:flags': meta['hypdriv:flags'],
+        'hypdriv:runner': 'proxy',
+        'hypdriv:route': 'app:/products/[id]',
+      });
+    });
+  });
+
+  it('defer() schedules work on the pipeline waitUntil', async () => {
+    const { ctx, pending } = pipelineContext({});
+    let ran = false;
+    runWithContext(ctx, () =>
+      defer(async () => {
+        ran = true;
+      }),
+    );
+    await Promise.all(pending);
+    expect(ran).toBe(true);
+  });
+});
+
+describe('jobHandler()', () => {
+  const secret = 'internal-secret-with-enough-entropy-0123456789';
+
+  async function call(request: Request, env: Record<string, unknown>, handler = vi.fn(async () => ({ processed: 2 }))) {
+    const { ctx } = pipelineContext({}, env);
+    const route = jobHandler({}, handler);
+    const response = await runWithContext(ctx, () => route(request));
+    return { response, handler };
+  }
+
+  it('accepts signed internal requests and passes the job payload', async () => {
+    const body = JSON.stringify({ job: 'digest', cron: '0 9 * * 1', payload: { week: 44 } });
+    const request = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/digest', { method: 'POST', headers: { 'content-type': 'application/json' }, body }), secret);
+    const { response, handler } = await call(request, { HYPDRIV_INTERNAL_SECRET: secret });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, job: 'digest', result: { processed: 2 } });
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'digest', cron: '0 9 * * 1', payload: { week: 44 } }));
+  });
+
+  it('passes queue messages through', async () => {
+    const messages = [{ id: 'm1', timestamp: '2026-10-30T00:00:00.000Z', body: { to: 'a@example.com' }, attempts: 1 }];
+    const request = await signing.signInternalRequest(
+      new Request('https://app.example.com/api/queues/emails', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ job: 'emails', messages }) }),
+      secret,
+    );
+    const { handler } = await call(request, { HYPDRIV_INTERNAL_SECRET: secret });
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'emails', messages }));
+  });
+
+  it('rejects unsigned and tampered requests', async () => {
+    const unsigned = new Request('https://app.example.com/api/jobs/digest', { method: 'POST' });
+    expect((await call(unsigned, { HYPDRIV_INTERNAL_SECRET: secret })).response.status).toBe(401);
+
+    const signed = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/digest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"job":"a"}' }), secret);
+    const tampered = new Request(signed.url, { method: 'POST', headers: signed.headers, body: '{"job":"b"}' });
+    const { response, handler } = await call(tampered, { HYPDRIV_INTERNAL_SECRET: secret });
+    expect(response.status).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('refuses to run without a secret outside development', async () => {
+    const previous = env.NODE_ENV;
+    env.NODE_ENV = 'production';
+    try {
+      const { response } = await call(new Request('https://app.example.com/api/jobs/digest', { method: 'POST' }), {});
+      expect(response.status).toBe(503);
+    } finally {
+      env.NODE_ENV = previous;
+    }
+  });
+
+  it('reports handler failures as JSON errors', async () => {
+    const request = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/x', { method: 'POST' }), secret);
+    const { response } = await call(
+      request,
+      { HYPDRIV_INTERNAL_SECRET: secret },
+      vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ ok: false, message: 'boom' });
+  });
+});

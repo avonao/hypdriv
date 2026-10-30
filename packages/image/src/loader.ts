@@ -83,9 +83,36 @@ export function configureImageLoader(config: ImageLoaderConfig | null): void {
   else g[GLOBAL_KEY] = { ...(g[GLOBAL_KEY] ?? {}), ...config };
 }
 
-/** Current global loader configuration (empty object when none was set). */
+let inlined: ImageLoaderConfig | null | undefined;
+
+/**
+ * Build-time configuration: `withHypDriv` sets `env.HYPDRIV_IMAGES` in `next.config`, which Next.js
+ * inlines into server and client bundles (the global below does not reach the browser).
+ */
+function inlinedConfig(): ImageLoaderConfig | null {
+  if (inlined !== undefined) return inlined;
+  try {
+    // Written literally so the bundler replaces it with the JSON string at build time.
+    const raw = process.env.HYPDRIV_IMAGES;
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    inlined = parsed && typeof parsed === 'object' ? (parsed as ImageLoaderConfig) : null;
+  } catch {
+    inlined = null;
+  }
+  return inlined;
+}
+
+/** Current loader configuration: build-time `HYPDRIV_IMAGES` overlaid with `configureImageLoader()` (empty when neither is set). */
 export function getImageLoaderConfig(): ImageLoaderConfig {
-  return (globalThis as ImageGlobals)[GLOBAL_KEY] ?? {};
+  const fromGlobal = (globalThis as ImageGlobals)[GLOBAL_KEY];
+  const fromBuild = inlinedConfig();
+  if (!fromBuild) return fromGlobal ?? {};
+  return fromGlobal ? { ...fromBuild, ...fromGlobal } : fromBuild;
+}
+
+/** Test seam: forget the cached build-time configuration. */
+export function resetInlinedImageConfig(): void {
+  inlined = undefined;
 }
 
 function isProductionBuild(): boolean {

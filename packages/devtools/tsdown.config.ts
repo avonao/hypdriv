@@ -2,7 +2,7 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
-      'index': 'src/index.tsx'
+    index: 'src/index.tsx',
   },
   format: ['esm'],
   platform: 'browser',

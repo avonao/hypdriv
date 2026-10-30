@@ -64,7 +64,10 @@ export interface ProxyMatcher {
 }
 
 export interface PurserManifest {
+  /** Project-relative path of the stylesheet Purser writes (e.g. `app/purser.css`). */
   stylesheet: string;
+  /** Public URL of the CSS chunk Next.js emitted for it (e.g. `/_next/static/css/abc.css`), when found. */
+  asset?: string;
   stylesheetHash: string;
   atoms: number;
   prefix: string;

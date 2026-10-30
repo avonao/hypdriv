@@ -17,7 +17,13 @@ import {
   type ThemeConfig,
   themeClientHints,
 } from './axes';
-import { type CompiledTheme, compileTheme, type ResolvedTheme, resolveCompiledTheme, THEME_KEY } from './resolve';
+import {
+  type CompiledTheme,
+  compileTheme,
+  type ResolvedTheme,
+  resolveCompiledTheme,
+  THEME_KEY,
+} from './resolve';
 
 /** The full resolution (values, classes, sources, header), for DevTools and the edge stages. */
 export const THEME_RESOLVED_KEY: StateKey<ResolvedTheme> = stateKey<ResolvedTheme>('purser.theme.resolved');

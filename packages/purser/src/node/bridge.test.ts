@@ -2,8 +2,19 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HypDrivError, type ResolvedPurser, resolveConfig } from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createFakeProject, type FakeProject, FIXTURE_CSS, fakePurserState, resetFakePurser } from './__fixtures__/project';
-import { closeAllPurserWatchers, createPurserBridge, formatPurserDiagnostic, purserBuildOptions } from './bridge';
+import {
+  createFakeProject,
+  type FakeProject,
+  FIXTURE_CSS,
+  fakePurserState,
+  resetFakePurser,
+} from './__fixtures__/project';
+import {
+  closeAllPurserWatchers,
+  createPurserBridge,
+  formatPurserDiagnostic,
+  purserBuildOptions,
+} from './bridge';
 import type { PurserBuildResult } from './purser-types';
 
 const projects: FakeProject[] = [];
@@ -43,7 +54,11 @@ describe('createPurserBridge', () => {
     expect(bridge.tokensFile).toBe(join(p.dir, 'lib', 'tokens.ts'));
     expect(bridge.detection.installed).toBe(true);
     expect(
-      purserBuildOptions('/root', purserConfig({ project: 'web', tokens: 'design/tokens.ts' }), 'lib/tokens.ts'),
+      purserBuildOptions(
+        '/root',
+        purserConfig({ project: 'web', tokens: 'design/tokens.ts' }),
+        'lib/tokens.ts',
+      ),
     ).toMatchObject({ projectDir: join('/root', 'web'), tokens: 'design/tokens.ts' });
     expect(purserBuildOptions('/root', purserConfig(), null).tokens).toBeUndefined();
   });
@@ -63,8 +78,12 @@ describe('createPurserBridge', () => {
     expect('out' in calls[1]!.options).toBe(false);
     expect(bridge.hasErrors(built)).toBe(false);
     expect(bridge.formatDiagnostics(built)).toBe('lib/tokens.ts:3:5: warning: axis "mode" is not exhaustive');
-    expect(bridge.formatSummary(built)).toBe('purser: wrote app/purser.css (2 files, 3 classes, 4 rules, 1 tokens, 1 keyframes)');
-    expect(bridge.formatSummary(checked)).toBe('purser: ok (2 files, 3 classes, 4 rules, 1 tokens, 1 keyframes)');
+    expect(bridge.formatSummary(built)).toBe(
+      'purser: wrote app/purser.css (2 files, 3 classes, 4 rules, 1 tokens, 1 keyframes)',
+    );
+    expect(bridge.formatSummary(checked)).toBe(
+      'purser: ok (2 files, 3 classes, 4 rules, 1 tokens, 1 keyframes)',
+    );
   });
 
   it('writes .hypdriv/dev/purser.json with project-relative paths', async () => {
@@ -74,7 +93,13 @@ describe('createPurserBridge', () => {
       css: null,
       written: false,
       diagnostics: [
-        { severity: 'error', message: 'raw colour "#fff"', file: join(p.dir, 'components/button.tsx'), line: 9, column: 14 },
+        {
+          severity: 'error',
+          message: 'raw colour "#fff"',
+          file: join(p.dir, 'components/button.tsx'),
+          line: 9,
+          column: 14,
+        },
         { severity: 'error', message: 'self-check: !important found' },
       ],
     };
@@ -85,7 +110,13 @@ describe('createPurserBridge', () => {
     expect(json).toMatchObject({
       ok: false,
       diagnostics: [
-        { severity: 'error', message: 'raw colour "#fff"', file: 'components/button.tsx', line: 9, column: 14 },
+        {
+          severity: 'error',
+          message: 'raw colour "#fff"',
+          file: 'components/button.tsx',
+          line: 9,
+          column: 14,
+        },
         { severity: 'error', message: 'self-check: !important found', file: null, line: null, column: null },
       ],
       stats: { files: 2, atoms: 3, rules: 4, keyframes: 1, tokens: 1 },
@@ -99,7 +130,10 @@ describe('createPurserBridge', () => {
     expect(bridge.hasErrors(result)).toBe(true);
 
     const ok = await bridge.writeDevDiagnostics(await bridge.build());
-    const good = JSON.parse(readFileSync(ok, 'utf8')) as { ok: boolean; stylesheet: { atoms: number; hash: string; layers: string[]; bytes: number } };
+    const good = JSON.parse(readFileSync(ok, 'utf8')) as {
+      ok: boolean;
+      stylesheet: { atoms: number; hash: string; layers: string[]; bytes: number };
+    };
     expect(good.ok).toBe(true);
     expect(good.stylesheet.atoms).toBe(3);
     expect(good.stylesheet.hash).toMatch(/^[0-9a-f]{16}$/);
@@ -150,11 +184,17 @@ describe('createPurserBridge', () => {
 
   it('throws E_UNSUPPORTED on TypeScript 7 hosts and names the typescript6 alias', async () => {
     const p = project({ typescript: '7.0.2', files: { 'lib/tokens.ts': '' } });
-    const err = await createPurserBridge({ projectDir: p.dir, config: purserConfig() }).catch((e: unknown) => e);
+    const err = await createPurserBridge({ projectDir: p.dir, config: purserConfig() }).catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(HypDrivError);
     expect((err as HypDrivError).code).toBe('E_UNSUPPORTED');
     expect((err as HypDrivError).message).toContain('@typescript/typescript6');
-    const bridge = await createPurserBridge({ projectDir: p.dir, config: purserConfig(), skipTypeScriptCheck: true });
+    const bridge = await createPurserBridge({
+      projectDir: p.dir,
+      config: purserConfig(),
+      skipTypeScriptCheck: true,
+    });
     expect(bridge.detection.typescriptCompatible).toBe(false);
   });
 
@@ -170,10 +210,12 @@ describe('createPurserBridge', () => {
 
 describe('formatPurserDiagnostic', () => {
   it('prints Purser CLI style lines', () => {
-    expect(formatPurserDiagnostic({ severity: 'error', message: 'm', file: '/p/a.ts', line: 2, column: 7 }, '/p')).toBe(
-      'a.ts:2:7: error: m',
+    expect(
+      formatPurserDiagnostic({ severity: 'error', message: 'm', file: '/p/a.ts', line: 2, column: 7 }, '/p'),
+    ).toBe('a.ts:2:7: error: m');
+    expect(formatPurserDiagnostic({ severity: 'error', message: 'm', file: '/p/a.ts', line: 2 }, '/p')).toBe(
+      'a.ts:2:1: error: m',
     );
-    expect(formatPurserDiagnostic({ severity: 'error', message: 'm', file: '/p/a.ts', line: 2 }, '/p')).toBe('a.ts:2:1: error: m');
     expect(formatPurserDiagnostic({ severity: 'warning', message: 'm', file: '/elsewhere/a.ts' }, '/p')).toBe(
       '/elsewhere/a.ts: warning: m',
     );

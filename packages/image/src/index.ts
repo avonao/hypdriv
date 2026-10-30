@@ -16,6 +16,7 @@ export {
   cloudflareLoader,
   configureImageLoader,
   getImageLoaderConfig,
+  resetInlinedImageConfig,
   type ImageFit,
   type ImageFormat,
   type ImageGravity,

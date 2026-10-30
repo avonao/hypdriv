@@ -153,7 +153,9 @@ export async function auditOverrides(options: AuditOverridesOptions): Promise<Au
     client = createCdpClient(await (options.connect ?? webSocketConnect)(chrome.wsUrl), { timeoutMs });
     const info = await client.send<{ product?: string }>('Browser.getVersion');
     version = info.product ?? version;
-    const { targetId } = await client.send<{ targetId: string }>('Target.createTarget', { url: 'about:blank' });
+    const { targetId } = await client.send<{ targetId: string }>('Target.createTarget', {
+      url: 'about:blank',
+    });
     const { sessionId } = await client.send<{ sessionId: string }>('Target.attachToTarget', {
       targetId,
       flatten: true,
@@ -222,7 +224,12 @@ export async function auditOverrides(options: AuditOverridesOptions): Promise<Au
               }
               const json = await evaluate<string | null>(client, sessionId, strikeExpression);
               const report = json
-                ? (JSON.parse(json) as { count: number; struck: StruckDeclaration[]; rules: number; skipped: string[] })
+                ? (JSON.parse(json) as {
+                    count: number;
+                    struck: StruckDeclaration[];
+                    rules: number;
+                    skipped: string[];
+                  })
                 : null;
               if (!report) {
                 pages.push({

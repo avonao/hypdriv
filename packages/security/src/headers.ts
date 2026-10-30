@@ -39,7 +39,10 @@ export function serializePermissionsPolicy(policy: Record<string, string[]>): st
 type RouteOverride = Partial<Omit<SecurityHeadersConfig, 'routes'>>;
 
 /** Applies a per-route override (raw config shape) over the resolved header config. */
-export function applyHeaderOverride(base: ResolvedSecurityHeaders, o: RouteOverride): ResolvedSecurityHeaders {
+export function applyHeaderOverride(
+  base: ResolvedSecurityHeaders,
+  o: RouteOverride,
+): ResolvedSecurityHeaders {
   const out: ResolvedSecurityHeaders = { ...base, extra: { ...base.extra } };
   if (o.hsts !== undefined)
     out.hsts =
@@ -53,7 +56,8 @@ export function applyHeaderOverride(base: ResolvedSecurityHeaders, o: RouteOverr
   if (o.coop !== undefined) out.coop = o.coop === false ? null : o.coop;
   if (o.corp !== undefined) out.corp = o.corp === false ? null : o.corp;
   if (o.coep !== undefined) out.coep = o.coep === false ? null : o.coep;
-  if (o.referrerPolicy !== undefined) out.referrerPolicy = o.referrerPolicy === false ? null : o.referrerPolicy;
+  if (o.referrerPolicy !== undefined)
+    out.referrerPolicy = o.referrerPolicy === false ? null : o.referrerPolicy;
   if (o.permissionsPolicy !== undefined)
     out.permissionsPolicy =
       o.permissionsPolicy === false
@@ -78,7 +82,10 @@ export function applyHeaderOverride(base: ResolvedSecurityHeaders, o: RouteOverr
 }
 
 /** Resolves the effective header config for a pathname (first matching route override wins). */
-export function effectiveHeaderConfig(config: ResolvedSecurityHeaders, pathname: string): ResolvedSecurityHeaders {
+export function effectiveHeaderConfig(
+  config: ResolvedSecurityHeaders,
+  pathname: string,
+): ResolvedSecurityHeaders {
   for (const route of config.routes) {
     if (matchesAny(route.match, pathname)) return applyHeaderOverride(config, route.headers);
   }
@@ -110,7 +117,8 @@ export function buildSecurityHeaders(
   if (c.frameOptions) headers['X-Frame-Options'] = c.frameOptions;
   if (c.noSniff) headers['X-Content-Type-Options'] = 'nosniff';
   if (c.dnsPrefetchControl) headers['X-DNS-Prefetch-Control'] = c.dnsPrefetchControl;
-  if (c.permittedCrossDomainPolicies) headers['X-Permitted-Cross-Domain-Policies'] = c.permittedCrossDomainPolicies;
+  if (c.permittedCrossDomainPolicies)
+    headers['X-Permitted-Cross-Domain-Policies'] = c.permittedCrossDomainPolicies;
   if (c.originAgentCluster) headers['Origin-Agent-Cluster'] = '?1';
   for (const [k, v] of Object.entries(c.extra)) headers[k] = v;
   return headers;
@@ -167,7 +175,11 @@ export function securityHeadersStage(config: ResolvedConfig): Stage {
       if (!entry) {
         const effective = effectiveHeaderConfig(hc, ctx.url.pathname);
         entry = {
-          built: buildSecurityHeaders(effective, { development: ctx.development, https, pathname: ctx.url.pathname }),
+          built: buildSecurityHeaders(effective, {
+            development: ctx.development,
+            https,
+            pathname: ctx.url.pathname,
+          }),
           stripFingerprints: effective.stripFingerprints,
         };
         memo.set(key, entry);

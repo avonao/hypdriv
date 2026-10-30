@@ -1,4 +1,5 @@
 import {
+  type FlagDefinition,
   type FlagValue,
   HEADER,
   type HypContext,
@@ -9,11 +10,12 @@ import {
   getCurrentContext,
   parseCookies,
 } from '@hypdriv/core';
-import { decodeFlagsHeader } from '@hypdriv/flags';
+import { decodeFlagsHeader, encodeFlagsHeader, publicFlags } from '@hypdriv/flags';
+import { decodeThemeHeader, resolveTheme } from '@hypdriv/purser';
 import { signing } from '@hypdriv/security';
 import { type GeoInfo, decodeGeoHeader } from '../stages/geo';
 
-export { Speculation, HypDrivMeta } from './components';
+export { Speculation, HypDrivMeta, ThemeScript } from './components';
 export { safeAction, defineRoute, type ServerActionContext } from './actions';
 
 /** Request-scoped information HypDriv makes available to Server Components, Route Handlers and Server Actions. */
@@ -56,15 +58,17 @@ export function setCloudflareContextLoader(loader: (() => Promise<CloudflareCont
   cloudflareContextLoader = loader;
 }
 
+/**
+ * OpenNext publishes the per-request `{ env, ctx, cf }` on this global symbol (in the Worker entry and,
+ * in `next dev`, through `initOpenNextCloudflareForDev()`); reading it avoids a hard dependency on
+ * `@opennextjs/cloudflare` so the same code runs on plain Node hosts.
+ */
+const CLOUDFLARE_CONTEXT = Symbol.for('__cloudflare-context__');
+
 async function cloudflareContext(): Promise<CloudflareContextLike | null> {
   if (cloudflareContextLoader) return cloudflareContextLoader();
-  try {
-    const mod = (await import('@opennextjs/cloudflare')) as { getCloudflareContext?: (options: { async: true }) => Promise<CloudflareContextLike> };
-    if (!mod.getCloudflareContext) return null;
-    return await mod.getCloudflareContext({ async: true });
-  } catch {
-    return null;
-  }
+  const value = (globalThis as Record<symbol, unknown>)[CLOUDFLARE_CONTEXT];
+  return value && typeof value === 'object' && 'env' in value ? (value as CloudflareContextLike) : null;
 }
 
 async function requestHeaders(): Promise<Headers> {
@@ -78,6 +82,22 @@ async function afterFn(): Promise<((task: Promise<unknown> | (() => Promise<unkn
   try {
     const mod = (await import('next/server')) as { after?: (task: Promise<unknown> | (() => Promise<unknown>)) => void };
     return mod.after ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The theme selection: the `x-hypdriv-theme` header forwarded by the `theme` stage, or (for RSC
+ * navigations, which skip that stage) resolved from cookies/client hints when the config is at hand.
+ */
+function themeFor(headers: Headers, pipeline: HypContext | undefined): Record<string, string> | null {
+  const decoded = decodeThemeHeader(headers.get(HEADER.theme));
+  if (Object.keys(decoded).length) return decoded;
+  const config = pipeline?.config.purser?.theme;
+  if (!config) return null;
+  try {
+    return resolveTheme(config, { cookies: parseCookies(headers.get('cookie')), headers }).values;
   } catch {
     return null;
   }
@@ -100,8 +120,7 @@ export async function hyp(): Promise<HypServerContext> {
   const after = pipeline || cfCtx ? null : await afterFn();
   const geo = decodeGeoHeader(headers.get(HEADER.geo));
   const flags = decodeFlagsHeader(headers.get(HEADER.flags));
-  const themeHeader = headers.get(HEADER.theme);
-  const theme = themeHeader ? Object.fromEntries(themeHeader.split(';').filter(Boolean).map((kv) => kv.split('=') as [string, string])) : null;
+  const theme = themeFor(headers, pipeline);
   const log = pipeline?.log ?? createConsoleLogger({ fields: { requestId: headers.get(HEADER.hypRequestId) ?? undefined } });
 
   const flag = ((name: string, fallback?: FlagValue) => (name in flags ? flags[name] : fallback)) as HypServerContext['flag'];
@@ -192,14 +211,15 @@ export function jobHandler(options: JobHandlerOptions, handler: (input: JobInput
   const secretEnv = options.secretEnv ?? 'HYPDRIV_INTERNAL_SECRET';
   return async (request) => {
     const context = await hyp();
-    const secret = (context.env[secretEnv] as string | undefined) ?? processEnv()[secretEnv];
+    const fromEnv = context.env[secretEnv] ?? processEnv()[secretEnv];
+    const secret = typeof fromEnv === 'string' && fromEnv ? fromEnv : undefined;
     const development = processEnv().NODE_ENV === 'development';
     if (!secret) {
       if (!(development && options.allowUnsignedInDevelopment !== false)) {
         return Response.json({ error: 'internal_secret_missing', hint: `set ${secretEnv}` }, { status: 503 });
       }
     } else {
-      const ok = await signing.verifyInternalRequest(request.clone(), secret, { ttlSeconds: options.ttlSeconds ?? 300 });
+      const ok = await signing.verifyInternalRequest(request.clone() as Request, secret, { ttlSeconds: options.ttlSeconds ?? 300 });
       if (!ok) return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
     let payload: unknown = null;
@@ -229,14 +249,22 @@ export function jobHandler(options: JobHandlerOptions, handler: (input: JobInput
   };
 }
 
-/** Request headers HypDriv's `<HypDrivMeta/>` renders for DevTools (safe to expose to the browser). */
-export async function devtoolsMeta(): Promise<Record<string, string>> {
+/**
+ * Request facts HypDriv's `<HypDrivMeta/>` renders for the DevTools HUD (safe to expose to the browser).
+ * Flags are filtered through `publicFlags`, so `serverOnly` definitions never reach the page; without the
+ * flag definitions (no pipeline context and none passed) flags are omitted rather than risk a leak.
+ */
+export async function devtoolsMeta(options: { flagDefinitions?: Record<string, FlagDefinition> } = {}): Promise<Record<string, string>> {
   const h = await requestHeaders();
   const out: Record<string, string> = {};
   const id = h.get(HEADER.hypRequestId);
   if (id) out['hypdriv:request'] = id;
-  const flags = h.get(HEADER.flags);
-  if (flags) out['hypdriv:flags'] = flags;
+  const definitions = options.flagDefinitions ?? getCurrentContext()?.config.flags.definitions;
+  const rawFlags = h.get(HEADER.flags);
+  if (rawFlags && definitions) {
+    const visible = publicFlags(decodeFlagsHeader(rawFlags), definitions);
+    if (Object.keys(visible).length) out['hypdriv:flags'] = encodeFlagsHeader(visible);
+  }
   const locale = h.get(HEADER.locale);
   if (locale) out['hypdriv:locale'] = locale;
   const runner = h.get(HEADER.runner);

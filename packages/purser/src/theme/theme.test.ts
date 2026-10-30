@@ -91,7 +91,9 @@ describe('resolveTheme', () => {
 
   it('accepts a bare cookie value for a single-axis theme', () => {
     const single = theme({}, { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } });
-    expect(resolveTheme(single, { cookies: cookieFor('dark'), headers: headers() }).values).toEqual({ mode: 'dark' });
+    expect(resolveTheme(single, { cookies: cookieFor('dark'), headers: headers() }).values).toEqual({
+      mode: 'dark',
+    });
     expect(resolveTheme(single, { cookies: cookieFor('mode=dark'), headers: headers() }).values).toEqual({
       mode: 'dark',
     });
@@ -115,7 +117,9 @@ describe('resolveTheme', () => {
     const axes = themeAxes(theme());
     expect(decodeThemeHeader('contrast=high;mode=dark')).toEqual({ contrast: 'high', mode: 'dark' });
     expect(decodeThemeHeader(null)).toEqual({});
-    expect(encodeThemeCookieValue({ mode: 'dark', contrast: 'high' }, axes)).toBe('contrast%3Dhigh%3Bmode%3Ddark');
+    expect(encodeThemeCookieValue({ mode: 'dark', contrast: 'high' }, axes)).toBe(
+      'contrast%3Dhigh%3Bmode%3Ddark',
+    );
     expect(themeClientHints(axes)).toEqual(['prefers-contrast', 'prefers-color-scheme']);
   });
 });
@@ -200,12 +204,16 @@ describe('buildThemeScript', () => {
     expect(a).not.toMatch(/\s{2,}|\n/);
     expect(a).not.toContain('</script');
     expect(await themeScriptHash(theme())).toBe(await cspHash(a));
-    expect(themeScriptTag(theme(), 'abc+/=')).toBe(`<script data-hypdriv="theme" nonce="abc+/=">${a}</script>`);
+    expect(themeScriptTag(theme(), 'abc+/=')).toBe(
+      `<script data-hypdriv="theme" nonce="abc+/=">${a}</script>`,
+    );
     expect(themeScriptTag(theme())).toBe(`<script data-hypdriv="theme">${a}</script>`);
   });
 
   it('applies the cookie before paint and marks the document', () => {
-    const r = runScript(buildThemeScript(theme()), { cookie: 'other=1; hyp_theme=mode%3Ddark%3Bc%3Dhigh; x=y' });
+    const r = runScript(buildThemeScript(theme()), {
+      cookie: 'other=1; hyp_theme=mode%3Ddark%3Bc%3Dhigh; x=y',
+    });
     expect(r.classes).toEqual(['dark', 'hc']);
     expect(r.attrs['data-hypdriv-theme']).toBe('contrast=high;mode=dark');
   });

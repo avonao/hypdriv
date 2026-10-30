@@ -1,4 +1,11 @@
-import { createContext, HEADER, type HypDrivConfig, type PurserConfig, resolveConfig, runPipeline } from '@hypdriv/core';
+import {
+  createContext,
+  HEADER,
+  type HypDrivConfig,
+  type PurserConfig,
+  resolveConfig,
+  runPipeline,
+} from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { THEME_KEY } from './resolve';
 import { type HtmlRewriterElement, mergeThemeClasses, THEME_RESOLVED_KEY, themeStage } from './stage';
@@ -24,7 +31,10 @@ const themed: HypDrivConfig = {
 
 /** A minimal HTMLRewriter stand-in: rewrites the `<html>` start tag through the registered handler. */
 class FakeHTMLRewriter {
-  private readonly handlers: Array<{ selector: string; element(el: HtmlRewriterElement): void | Promise<void> }> = [];
+  private readonly handlers: Array<{
+    selector: string;
+    element(el: HtmlRewriterElement): void | Promise<void>;
+  }> = [];
   on(selector: string, handlers: { element(el: HtmlRewriterElement): void | Promise<void> }) {
     this.handlers.push({ selector, element: handlers.element });
     return this;
@@ -50,12 +60,19 @@ class FakeHTMLRewriter {
         controller.close();
       },
     });
-    return new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers });
+    return new Response(stream, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   }
 }
 
 const html = (body: string, init: ResponseInit = {}) =>
-  new Response(body, { ...init, headers: { 'content-type': 'text/html; charset=utf-8', ...(init.headers ?? {}) } });
+  new Response(body, {
+    ...init,
+    headers: { 'content-type': 'text/html; charset=utf-8', ...(init.headers ?? {}) },
+  });
 
 async function run(config: HypDrivConfig, request: Request, upstream: (req: Request) => Response) {
   const resolved = resolveConfig(config);
@@ -81,7 +98,9 @@ describe('themeStage', () => {
     (globalThis as { HTMLRewriter?: unknown }).HTMLRewriter = FakeHTMLRewriter;
     const { ctx, response, forwarded } = await run(
       themed,
-      new Request('https://x.test/', { headers: { cookie: 'hyp_theme=mode%3Ddark', 'sec-ch-prefers-reduced-motion': 'reduce' } }),
+      new Request('https://x.test/', {
+        headers: { cookie: 'hyp_theme=mode%3Ddark', 'sec-ch-prefers-reduced-motion': 'reduce' },
+      }),
       () => html('<!doctype html><html lang="en" class="__font"><body>hi</body></html>'),
     );
     expect(await response.text()).toBe(
@@ -90,17 +109,25 @@ describe('themeStage', () => {
     expect(forwarded.headers.get(HEADER.theme)).toBe('mode=dark;motion=reduced');
     expect(ctx.state.get(THEME_KEY)).toEqual({ mode: 'dark', motion: 'reduced' });
     expect(ctx.state.get(THEME_RESOLVED_KEY)?.sources).toEqual({ mode: 'cookie', motion: 'hint' });
-    expect(response.headers.get('accept-ch')).toBe('Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Reduced-Motion');
+    expect(response.headers.get('accept-ch')).toBe(
+      'Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Reduced-Motion',
+    );
     expect(response.headers.get('critical-ch')).toBe('Sec-CH-Prefers-Color-Scheme');
-    expect(response.headers.get('vary')).toBe('Cookie, Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Reduced-Motion');
+    expect(response.headers.get('vary')).toBe(
+      'Cookie, Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Reduced-Motion',
+    );
   });
 
   it('removes stale theme classes and merges with existing Vary', async () => {
     (globalThis as { HTMLRewriter?: unknown }).HTMLRewriter = FakeHTMLRewriter;
     const { response } = await run(themed, new Request('https://x.test/'), () =>
-      html('<html class="dark reduce-motion app"><body></body></html>', { headers: { vary: 'Accept-Encoding' } }),
+      html('<html class="dark reduce-motion app"><body></body></html>', {
+        headers: { vary: 'Accept-Encoding' },
+      }),
     );
-    expect(await response.text()).toBe('<html class="app" data-hypdriv-theme="mode=light;motion=full"><body></body></html>');
+    expect(await response.text()).toBe(
+      '<html class="app" data-hypdriv-theme="mode=light;motion=full"><body></body></html>',
+    );
     expect(response.headers.get('vary')).toBe(
       'Accept-Encoding, Cookie, Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Reduced-Motion',
     );
@@ -121,8 +148,10 @@ describe('themeStage', () => {
 
   it('leaves non-HTML responses and RSC requests alone', async () => {
     (globalThis as { HTMLRewriter?: unknown }).HTMLRewriter = FakeHTMLRewriter;
-    const json = await run(themed, new Request('https://x.test/api'), () =>
-      new Response('{}', { headers: { 'content-type': 'application/json' } }),
+    const json = await run(
+      themed,
+      new Request('https://x.test/api'),
+      () => new Response('{}', { headers: { 'content-type': 'application/json' } }),
     );
     expect(json.response.headers.get('vary')).toBeNull();
     expect(json.response.headers.get('accept-ch')).toBeNull();

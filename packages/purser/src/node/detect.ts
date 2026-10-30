@@ -93,9 +93,12 @@ export function detectPurser(projectDir: string): PurserDetection {
   const tokensFile = findTokensFile(dir);
 
   const problems: string[] = [];
-  if (!purserPkg) problems.push(`@avonao/purser is not installed in ${dir}. Install it with: ${PURSER_INSTALL_HINT}`);
-  if (!typescriptVersion) problems.push(`typescript is not installed in ${dir}; Purser parses your source with it.`);
-  else if (!typescriptCompatible) problems.push(`typescript ${typescriptVersion} found. ${TYPESCRIPT6_ALIAS_HINT}`);
+  if (!purserPkg)
+    problems.push(`@avonao/purser is not installed in ${dir}. Install it with: ${PURSER_INSTALL_HINT}`);
+  if (!typescriptVersion)
+    problems.push(`typescript is not installed in ${dir}; Purser parses your source with it.`);
+  else if (!typescriptCompatible)
+    problems.push(`typescript ${typescriptVersion} found. ${TYPESCRIPT6_ALIAS_HINT}`);
   if (purserPkg && !tokensFile)
     problems.push(
       `No tokens module found (looked for ${TOKENS_FILE_CANDIDATES.join(', ')}); set purser.tokens in hypdriv.config.ts.`,

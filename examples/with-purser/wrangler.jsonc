@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-with-purser",
+  "main": "hypdriv.worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "hypdriv-with-purser" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "hypdriv-with-purser-opennext-cache" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" },
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" }
+    ]
+  },
+  "migrations": [{ "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }]
+}

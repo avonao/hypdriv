@@ -49,7 +49,11 @@ describe('verifyBuild', () => {
 
   it('reports instead of failing with verify "warn" and skips the check with "off"', async () => {
     const p = project({ purser: false, files: { 'app/purser.css': FIXTURE_CSS } });
-    const warn = await verifyBuild({ projectDir: p.dir, config: config({ verify: 'warn' }), prerenderedHtml: html });
+    const warn = await verifyBuild({
+      projectDir: p.dir,
+      config: config({ verify: 'warn' }),
+      prerenderedHtml: html,
+    });
     expect(warn.ok).toBe(true);
     expect(warn.errors).toEqual([]);
     expect(warn.warnings.some((w) => w.includes('xzzzzz01'))).toBe(true);
@@ -73,7 +77,11 @@ describe('verifyBuild', () => {
       out: 'styles/p.css',
       theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } } },
     });
-    const result = await verifyBuild({ projectDir: p.dir, config: themed, prerenderedHtml: { '/': html['/'] } });
+    const result = await verifyBuild({
+      projectDir: p.dir,
+      config: themed,
+      prerenderedHtml: { '/': html['/'] },
+    });
     expect(result.ok).toBe(true);
     expect(result.manifest.themeScript).toBe(buildThemeScript(themed.theme!));
     expect(result.manifest.themeScriptHash).toBe(await cspHash(result.manifest.themeScript!));
@@ -92,7 +100,11 @@ describe('verifyBuild', () => {
     const missing = await verifyBuild({ projectDir: p.dir, config: config(), prerenderedHtml: html });
     expect(missing.ok).toBe(false);
     expect(missing.errors[0]).toContain('not found');
-    const warned = await verifyBuild({ projectDir: p.dir, config: config({ verify: 'warn' }), prerenderedHtml: html });
+    const warned = await verifyBuild({
+      projectDir: p.dir,
+      config: config({ verify: 'warn' }),
+      prerenderedHtml: html,
+    });
     expect(warned.ok).toBe(true);
     expect(warned.warnings[0]).toContain('not found');
     const explicit = await verifyBuild({
@@ -108,7 +120,11 @@ describe('verifyBuild', () => {
   it('warns when the stylesheet layers differ from the configuration', async () => {
     const css = FIXTURE_CSS.replace('@layer purser.tokens, purser.globals, purser.atoms;', '@layer a, b, c;');
     const p = project({ purser: false, files: { 'app/purser.css': css } });
-    const result = await verifyBuild({ projectDir: p.dir, config: config(), prerenderedHtml: { '/': html['/'] } });
+    const result = await verifyBuild({
+      projectDir: p.dir,
+      config: config(),
+      prerenderedHtml: { '/': html['/'] },
+    });
     expect(result.ok).toBe(true);
     expect(result.warnings[0]).toContain('declares layers a, b, c');
   });

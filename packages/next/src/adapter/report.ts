@@ -40,7 +40,7 @@ export function renderReport(manifest: HypManifest): string {
     lines.push('');
     lines.push('## Purser CSS');
     lines.push('');
-    lines.push(`- Stylesheet: \`${manifest.purser.stylesheet}\` (${manifest.purser.atoms} atoms, hash ${manifest.purser.stylesheetHash})`);
+    lines.push(`- Stylesheet: \`${manifest.purser.stylesheet}\`${manifest.purser.asset ? ` → \`${manifest.purser.asset}\`` : ''} (${manifest.purser.atoms} atoms, hash ${manifest.purser.stylesheetHash})`);
     const missing = Object.entries(manifest.purser.missingAtoms).filter(([, v]) => v.length);
     lines.push(`- Missing atoms: ${missing.length ? missing.map(([route, atoms]) => `${route}: ${atoms.join(' ')}`).join('; ') : 'none'}`);
     lines.push(`- Unused atoms: ${manifest.purser.unusedAtoms.length}`);

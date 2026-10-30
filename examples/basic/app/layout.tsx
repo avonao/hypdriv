@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { HypDrivMeta, Speculation } from '@hypdriv/next/server';
-import { HypDrivDevTools, VitalsReporter } from '@hypdriv/next/client';
+import { HypDrivMeta, Speculation } from 'hypdriv/server';
+import { HypDrivDevTools, VitalsReporter } from 'hypdriv/client';
 import './globals.css';
 
 export const metadata: Metadata = {

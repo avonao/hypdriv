@@ -93,5 +93,9 @@ export function resolveCompiledTheme(theme: CompiledTheme, input: ResolveThemeIn
 
 /** Structured-header token normalisation: trims, strips quotes, lower-cases (`"Dark"` → `dark`). */
 function normalizeHintValue(raw: string): string {
-  return raw.trim().replace(/^"(.*)"$/, '$1').trim().toLowerCase();
+  return raw
+    .trim()
+    .replace(/^"(.*)"$/, '$1')
+    .trim()
+    .toLowerCase();
 }

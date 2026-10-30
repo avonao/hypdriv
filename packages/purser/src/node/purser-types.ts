@@ -59,7 +59,10 @@ export interface PurserWatchHandle {
 export interface PurserBuildModule {
   build(options: PurserBuildOptions): Promise<PurserBuildResult>;
   check(options: Omit<PurserBuildOptions, 'out'>): Promise<PurserBuildResult>;
-  watch(options: PurserBuildOptions, onResult: (result: PurserBuildResult) => void): Promise<PurserWatchHandle>;
+  watch(
+    options: PurserBuildOptions,
+    onResult: (result: PurserBuildResult) => void,
+  ): Promise<PurserWatchHandle>;
   createBuilder?(options: PurserBuildOptions): {
     run(): Promise<PurserBuildResult>;
     projectDir: string;

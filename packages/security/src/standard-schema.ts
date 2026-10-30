@@ -29,7 +29,9 @@ export interface StandardSchemaV1Issue {
 }
 
 /** Output type of a Standard Schema. */
-export type InferOutput<Schema extends StandardSchemaV1> = NonNullable<Schema['~standard']['types']>['output'];
+export type InferOutput<Schema extends StandardSchemaV1> = NonNullable<
+  Schema['~standard']['types']
+>['output'];
 
 /** Input type of a Standard Schema. */
 export type InferInput<Schema extends StandardSchemaV1> = NonNullable<Schema['~standard']['types']>['input'];
@@ -49,7 +51,9 @@ export function issuesToFieldErrors(issues: ReadonlyArray<StandardSchemaV1Issue>
       .map((key) => String(key))
       .join('.');
     const key = path || FORM_ERROR_KEY;
-    (out[key] ??= []).push(issue.message);
+    const list = out[key] ?? [];
+    list.push(issue.message);
+    out[key] = list;
   }
   return out;
 }

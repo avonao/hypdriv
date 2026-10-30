@@ -36,25 +36,34 @@ The full list with baseline/upgrade behaviour per feature is in [`docs/feature-c
 
 ```ts
 // next.config.ts
-import { withHypDriv } from '@hypdriv/next/config';
+import { withHypDriv } from 'hypdriv/config';
 export default withHypDriv({ cacheComponents: true });
 ```
 
 ```ts
 // hypdriv.worker.ts  (wrangler.jsonc → "main")
-import { createWorker } from '@hypdriv/cloudflare';
+import { createWorker } from 'hypdriv/cloudflare';
 import config from './hypdriv.config';
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from './.open-next/worker.js';
-export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects';
-export default createWorker({ config, next: () => import('./.open-next/worker.js') });
+export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-objects';
+export default createWorker({
+  config,
+  next: () => import('./.open-next/worker.js'),
+  manifest: () => import('./.hypdriv/manifest.js'),
+});
 ```
 
 ```ts
 // proxy.ts  (the same stages on next dev / next start / any Node host)
-import { createProxy, matcher } from '@hypdriv/next/proxy';
-import config from './hypdriv.config';
-export default createProxy(config);
-export { matcher as config };
+import { createProxy } from 'hypdriv/proxy';
+import hypdrivConfig from './hypdriv.config';
+export default createProxy(hypdrivConfig);   // passes through inside the Worker, which already ran the stages
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|woff2?|ttf|otf|css|js|map|txt|xml|json)$).*)',
+    '/_hypdriv/:path*',
+  ],
+}; // Next.js parses this statically, so it must be a literal
 ```
 
 ```ts
@@ -70,8 +79,8 @@ export default defineConfig({
 
 ```tsx
 // anywhere on the server
-import { hyp, flag, safeAction, jobHandler } from '@hypdriv/next/server';
-import { revalidateTag } from '@hypdriv/next/cache';      // Next revalidation + edge purge
+import { hyp, flag, safeAction, jobHandler } from 'hypdriv/server';
+import { revalidateTag } from 'hypdriv/cache';      // Next revalidation + edge purge
 ```
 
 At build time the chained adapter writes `.hypdriv/manifest.json` — routes, classifications (static / isr / shell / dynamic / route), per-route assets, CSP hashes, Early Hints, the link graph for Speculation Rules, Purser atom usage, weights and budgets. At request time the **Drivetrain** pipeline runs the same ordered stages in the Worker and in `proxy.ts`:
@@ -98,7 +107,7 @@ Next.js 16.0 → 16.4+ (App Router first, Pages Router supported) · React 19.2+
 | [`hypdriv`](packages/hypdriv) | Umbrella: everything below plus the CLI |
 | [`@hypdriv/core`](packages/core) | Config schema, pipeline kernel, manifest, utilities |
 | [`@hypdriv/next`](packages/next) | `withHypDriv`, adapter chain, proxy, stages, server/client helpers |
-| [`@hypdriv/cloudflare`](packages/cloudflare) | Worker shell, handlers, Durable Objects, bindings |
+| [`hypdriv/cloudflare`](packages/cloudflare) | Worker shell, handlers, Durable Objects, bindings |
 | [`@hypdriv/cache`](packages/cache) | Edge cache engine |
 | [`@hypdriv/security`](packages/security) | CSP, headers, rate limiting, bots, actions, sessions, crypto |
 | [`@hypdriv/observe`](packages/observe) | Tracing, logging, Server-Timing, Web Vitals |

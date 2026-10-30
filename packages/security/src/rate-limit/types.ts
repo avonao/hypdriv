@@ -55,7 +55,10 @@ export interface RateLimiter {
 }
 
 /** Window arithmetic shared by every store. */
-export function windowBounds(now: number, windowSeconds: number): { index: number; start: number; resetAt: number } {
+export function windowBounds(
+  now: number,
+  windowSeconds: number,
+): { index: number; start: number; resetAt: number } {
   const windowMs = Math.max(1, Math.round(windowSeconds * 1000));
   const index = Math.floor(now / windowMs);
   const start = index * windowMs;

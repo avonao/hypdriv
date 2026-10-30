@@ -4,21 +4,26 @@ import {
   defineStage,
   getCookie,
   HEADER,
+  type HypContext,
   hmacSign,
   html,
-  type HypContext,
   json,
   matchesAny,
-  readEnv,
   type ResolvedBots,
   type ResolvedConfig,
+  readEnv,
+  type Stage,
   serializeCookie,
   shortHash,
-  type Stage,
   timingSafeEqual,
 } from '@hypdriv/core';
 import { BOT_KEY, type BotClassification } from './keys';
-import { readTurnstileToken, TURNSTILE_TOKEN_FIELD, turnstileChallengePage, verifyTurnstile } from './turnstile';
+import {
+  readTurnstileToken,
+  TURNSTILE_TOKEN_FIELD,
+  turnstileChallengePage,
+  verifyTurnstile,
+} from './turnstile';
 
 /** User agents of search and social crawlers treated as `verified` (spoofable without Bot Management). */
 export const VERIFIED_BOT_USER_AGENTS: ReadonlyArray<RegExp> = [
@@ -99,7 +104,8 @@ function secFetchInconsistency(headers: Headers, ua: string, method: string): st
     // Modern Chrome (80+) and Firefox (90+) always send Sec-Fetch-* on navigations.
     const chrome = /Chrome\/(\d+)/.exec(ua);
     const firefox = /Firefox\/(\d+)/.exec(ua);
-    if ((chrome && Number(chrome[1]) >= 80) || (firefox && Number(firefox[1]) >= 90)) return 'sec-fetch:missing';
+    if ((chrome && Number(chrome[1]) >= 80) || (firefox && Number(firefox[1]) >= 90))
+      return 'sec-fetch:missing';
   }
   return null;
 }
@@ -117,7 +123,11 @@ export interface BotClassifyOptions {
  * Automation tokens (`curl`, `okhttp`, `axios`, …) are `definite` on document requests and only `likely`
  * on API-style requests, so mobile apps and CLI clients keep working under the default `log` policy.
  */
-export function classifyRequest(ctx: HypContext, config: ResolvedBots, options: BotClassifyOptions = {}): BotClassification {
+export function classifyRequest(
+  ctx: HypContext,
+  config: ResolvedBots,
+  options: BotClassifyOptions = {},
+): BotClassification {
   const headers = ctx.request.headers;
   const ua = (headers.get('user-agent') ?? '').trim();
   const bm = ctx.cf?.botManagement;
@@ -127,7 +137,10 @@ export function classifyRequest(ctx: HypContext, config: ResolvedBots, options: 
   if (config.allowUserAgents.length && matchesUa(ua, config.allowUserAgents))
     return withScore({ verdict: 'human', reason: 'ua:allow-list' });
   if (bm?.verifiedBot === true || ctx.cf?.verifiedBotCategory)
-    return withScore({ verdict: 'verified', reason: `cf:verified-bot${ctx.cf?.verifiedBotCategory ? `:${ctx.cf.verifiedBotCategory}` : ''}` });
+    return withScore({
+      verdict: 'verified',
+      reason: `cf:verified-bot${ctx.cf?.verifiedBotCategory ? `:${ctx.cf.verifiedBotCategory}` : ''}`,
+    });
 
   const blocked = config.blockUserAgents.length ? matchesUa(ua, config.blockUserAgents) : null;
   if (blocked) return withScore({ verdict: 'definite', reason: `ua:block-list:${blocked}` });
@@ -139,18 +152,26 @@ export function classifyRequest(ctx: HypContext, config: ResolvedBots, options: 
   if (!ua && navigation) return { verdict: 'definite', reason: 'ua:empty' };
 
   const automation = matchesUa(ua, options.automationUserAgents ?? DEFAULT_AUTOMATION_USER_AGENTS);
-  if (automation) return withScore({ verdict: navigation ? 'definite' : 'likely', reason: `ua:${automation}` });
+  if (automation)
+    return withScore({ verdict: navigation ? 'definite' : 'likely', reason: `ua:${automation}` });
 
   const verified = matchesUa(ua, VERIFIED_BOT_USER_AGENTS);
   if (verified) {
-    if (bm && bm.verifiedBot === false) return withScore({ verdict: 'likely', reason: `ua:spoofed:${verified}` });
+    if (bm && bm.verifiedBot === false)
+      return withScore({ verdict: 'likely', reason: `ua:spoofed:${verified}` });
     return withScore({ verdict: 'verified', reason: `ua:${verified}` });
   }
   const crawler = matchesUa(ua, CRAWLER_USER_AGENTS);
   if (crawler) return withScore({ verdict: 'likely', reason: `ua:crawler:${crawler}` });
-  if (score !== undefined && score < config.scoreThreshold) return withScore({ verdict: 'likely', reason: 'cf:score' });
+  if (score !== undefined && score < config.scoreThreshold)
+    return withScore({ verdict: 'likely', reason: 'cf:score' });
 
-  if (ctx.request.method === 'GET' && ua.startsWith('Mozilla/') && !headers.has('accept') && !headers.has('accept-language'))
+  if (
+    ctx.request.method === 'GET' &&
+    ua.startsWith('Mozilla/') &&
+    !headers.has('accept') &&
+    !headers.has('accept-language')
+  )
     return withScore({ verdict: 'likely', reason: 'headers:missing-accept' });
   if (config.secFetchChecks) {
     const issue = secFetchInconsistency(headers, ua, ctx.request.method);
@@ -188,7 +209,12 @@ async function clearanceToken(secret: string, ua: string, exp: number): Promise<
   return `${payload}.${base64UrlEncode(await hmacSign(secret, `clearance:${payload}`))}`;
 }
 
-async function hasClearance(secret: string, value: string | undefined, ua: string, now: number): Promise<boolean> {
+async function hasClearance(
+  secret: string,
+  value: string | undefined,
+  ua: string,
+  now: number,
+): Promise<boolean> {
   if (!value) return false;
   const [exp, uaHash, sig] = value.split('.');
   if (!exp || !uaHash || !sig) return false;
@@ -237,20 +263,26 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
     });
   };
 
-  const challengeResponse = (ctx: HypContext): Response => {
+  const challengeResponse = (): Response => {
     const turnstile = bots?.turnstile;
     if (!turnstile)
-      return json({ error: 'forbidden', reason: 'challenge-unavailable' }, { status: 403, headers: { [HEADER.bot]: 'challenge' } });
+      return json(
+        { error: 'forbidden', reason: 'challenge-unavailable' },
+        { status: 403, headers: { [HEADER.bot]: 'challenge' } },
+      );
     const nonce = createNonce();
-    return html(turnstileChallengePage({ siteKey: turnstile.siteKey, nonce, action: turnstile.action, resubmitHeader }), {
-      status: 403,
-      headers: {
-        'cache-control': 'no-store',
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'`,
-        [HEADER.bot]: 'challenge',
-        vary: 'cookie',
+    return html(
+      turnstileChallengePage({ siteKey: turnstile.siteKey, nonce, action: turnstile.action, resubmitHeader }),
+      {
+        status: 403,
+        headers: {
+          'cache-control': 'no-store',
+          'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'`,
+          [HEADER.bot]: 'challenge',
+          vary: 'cookie',
+        },
       },
-    });
+    );
   };
 
   return defineStage({
@@ -293,7 +325,13 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
             : result.verdict === 'definite'
               ? bots.definitelyAutomated
               : 'allow';
-      const fields = { verdict: result.verdict, reason: result.reason, score: result.score, ua, path: ctx.url.pathname };
+      const fields = {
+        verdict: result.verdict,
+        reason: result.reason,
+        score: result.score,
+        ua,
+        path: ctx.url.pathname,
+      };
 
       switch (policy) {
         case 'allow':
@@ -303,11 +341,17 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
           return;
         case 'block':
           ctx.log.warn('bot blocked', fields);
-          return json({ error: 'forbidden', reason: 'automated' }, { status: 403, headers: { [HEADER.bot]: result.verdict } });
+          return json(
+            { error: 'forbidden', reason: 'automated' },
+            { status: 403, headers: { [HEADER.bot]: result.verdict } },
+          );
         case 'tarpit':
           ctx.log.warn('bot tarpitted', fields);
           await sleep(bots.tarpitMs, ctx.signal);
-          return json({ error: 'too_many_requests', reason: 'automated' }, { status: 429, headers: { [HEADER.bot]: result.verdict, 'retry-after': '60' } });
+          return json(
+            { error: 'too_many_requests', reason: 'automated' },
+            { status: 429, headers: { [HEADER.bot]: result.verdict, 'retry-after': '60' } },
+          );
         case 'challenge': {
           const token = bots.turnstile ? await readTurnstileToken(ctx.request, TURNSTILE_TOKEN_FIELD) : null;
           if (token && (await verify(ctx, token))) {
@@ -318,7 +362,7 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
             return;
           }
           ctx.log.info('bot challenged', fields);
-          return challengeResponse(ctx);
+          return challengeResponse();
         }
         default:
           return;

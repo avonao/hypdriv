@@ -106,10 +106,26 @@ describe('extractAtomClasses', () => {
 
   it('does not count :not() exclusions, keyframes names, declarations, strings or comments', () => {
     const atoms = extractAtomClasses(STYLESHEET, 'x');
-    for (const cls of ['xlyif4tl', 'xyyhqh81', 'xgxnnz45', 'x75vegj9', 'xfake001', 'xdead000', 'xcomment1', 'xce3dr7wextra'])
+    for (const cls of [
+      'xlyif4tl',
+      'xyyhqh81',
+      'xgxnnz45',
+      'x75vegj9',
+      'xfake001',
+      'xdead000',
+      'xcomment1',
+      'xce3dr7wextra',
+    ])
       expect(atoms.has(cls), cls).toBe(false);
     const analysis = analyzeStylesheet(STYLESHEET, 'x');
-    expect([...analysis.exclusions].sort()).toEqual(['x9qvl7nn', 'xce3dr7w', 'xgxnnz45', 'xlyif4tl', 'xo6613xh', 'xyyhqh81']);
+    expect([...analysis.exclusions].sort()).toEqual([
+      'x9qvl7nn',
+      'xce3dr7w',
+      'xgxnnz45',
+      'xlyif4tl',
+      'xo6613xh',
+      'xyyhqh81',
+    ]);
     expect(analysis.keyframes).toEqual(['x75vegj9', 'xfake001']);
     expect(analysis.layerStatement).toEqual(['purser.tokens', 'purser.globals', 'purser.atoms']);
     expect(analysis.layerBlocks).toEqual(['purser.tokens', 'purser.globals', 'purser.atoms']);
@@ -117,7 +133,8 @@ describe('extractAtomClasses', () => {
   });
 
   it('respects the prefix and identifier boundaries', () => {
-    const css = '.p1234567 { color: red } .x1234567 { color: red } .p1234567-x { color: red } .p12345 { color: red }';
+    const css =
+      '.p1234567 { color: red } .x1234567 { color: red } .p1234567-x { color: red } .p12345 { color: red }';
     expect([...extractAtomClasses(css, 'p')]).toEqual(['p1234567']);
     expect([...extractAtomClasses(css, 'x')]).toEqual(['x1234567']);
     expect([...extractAtomClasses('.my-x1234567{color:red}', 'x')]).toEqual([]);
@@ -129,7 +146,12 @@ describe('extractAtomClasses', () => {
   it('handles minified output and nested :not() groups', () => {
     const css =
       '@layer t,g,a;@layer a{.xaaaaaaa:not(:hover):not(.xbbbbbbb){color:red}@media (width>=768px){.xccccccc{display:flex}}:is(.xddddddd, .xeeeeeee):not(.xfffffff > .xggggggg){margin:0}}';
-    expect([...extractAtomClasses(css, 'x')].sort()).toEqual(['xaaaaaaa', 'xccccccc', 'xddddddd', 'xeeeeeee']);
+    expect([...extractAtomClasses(css, 'x')].sort()).toEqual([
+      'xaaaaaaa',
+      'xccccccc',
+      'xddddddd',
+      'xeeeeeee',
+    ]);
     expect(extractLayerStatement(css)).toEqual(['t', 'g', 'a']);
   });
 
@@ -141,7 +163,11 @@ describe('extractAtomClasses', () => {
 
   it('recognises Purser stylesheets, also minified and with custom layer names', () => {
     expect(isPurserStylesheet(STYLESHEET)).toBe(true);
-    expect(isPurserStylesheet('@layer purser-tokens,purser-globals,purser-atoms;@layer purser-atoms{.x1{color:red}}')).toBe(true);
+    expect(
+      isPurserStylesheet(
+        '@layer purser-tokens,purser-globals,purser-atoms;@layer purser-atoms{.x1{color:red}}',
+      ),
+    ).toBe(true);
     expect(
       isPurserStylesheet('@layer purser-tokens,purser-globals,purser-atoms;', {
         tokens: 'purser.tokens',
@@ -177,7 +203,8 @@ describe('extractHtmlClasses', () => {
   });
 
   it('reads standalone RSC payloads', () => {
-    const rsc = '0:["$","$L1",null,{"className":"xce3dr7w xstr0ng1","children":["$","p",null,{"className":"xq3vd17w"}]}]\n';
+    const rsc =
+      '0:["$","$L1",null,{"className":"xce3dr7w xstr0ng1","children":["$","p",null,{"className":"xq3vd17w"}]}]\n';
     expect([...extractHtmlClasses(rsc, 'x')].sort()).toEqual(['xce3dr7w', 'xq3vd17w', 'xstr0ng1']);
     expect(extractHtmlClasses('', 'x').size).toBe(0);
   });
@@ -188,7 +215,8 @@ describe('verifyAtoms', () => {
     const result = verifyAtoms({
       html: {
         '/': '<div class="xce3dr7w x27bzpr0 xzzzzz01"></div>',
-        '/blog/[slug]': '<p class="xq3vd17w"></p><script>["$",{\\"className\\":\\"xnest001 xzzzzz01 xzzzzz02\\"}]</script>',
+        '/blog/[slug]':
+          '<p class="xq3vd17w"></p><script>["$",{\\"className\\":\\"xnest001 xzzzzz01 xzzzzz02\\"}]</script>',
         '/empty': '<main></main>',
       },
       css: STYLESHEET,
@@ -215,7 +243,11 @@ describe('verifyAtoms', () => {
   });
 
   it('is clean when every referenced class is declared', () => {
-    const result = verifyAtoms({ html: { '/': '<i class="xce3dr7w"></i>' }, css: '.xce3dr7w{color:red}', prefix: 'x' });
+    const result = verifyAtoms({
+      html: { '/': '<i class="xce3dr7w"></i>' },
+      css: '.xce3dr7w{color:red}',
+      prefix: 'x',
+    });
     expect(result.missing).toEqual({});
     expect(result.unused).toEqual([]);
   });

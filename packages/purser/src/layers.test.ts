@@ -9,10 +9,12 @@ describe('layerStatement', () => {
     expect(layerStatement({ layers: top, before: ['a', 'b'], after: ['c'] })).toBe(
       '@layer a, b, purser-tokens, purser-globals, c, purser-atoms;',
     );
-    expect(layerStatement({ layers: top, after: ['theme', 'base', 'components', 'utilities', 'legacy'] })).toBe(
-      '@layer purser-tokens, purser-globals, theme, base, components, utilities, legacy, purser-atoms;',
+    expect(
+      layerStatement({ layers: top, after: ['theme', 'base', 'components', 'utilities', 'legacy'] }),
+    ).toBe('@layer purser-tokens, purser-globals, theme, base, components, utilities, legacy, purser-atoms;');
+    expect(layerStatement({ layers: DEFAULT_PURSER_LAYERS })).toBe(
+      '@layer purser.tokens, purser.globals, purser.atoms;',
     );
-    expect(layerStatement({ layers: DEFAULT_PURSER_LAYERS })).toBe('@layer purser.tokens, purser.globals, purser.atoms;');
     expect(layerStatement({ layers: DEFAULT_PURSER_LAYERS, before: ['reset'] })).toBe(
       '@layer reset, purser.tokens, purser.globals, purser.atoms;',
     );
@@ -26,9 +28,14 @@ describe('layerStatement', () => {
   });
 
   it('refuses sub-layer names that cannot be ordered around existing layers', () => {
-    expect(() => layerStatement({ layers: DEFAULT_PURSER_LAYERS, after: ['legacy'] })).toThrow(/top-level layer names/);
-    expect(layerStatement({ layers: { tokens: 'p.tokens', globals: 'p.globals', atoms: 'atoms' }, after: ['legacy'] })).toBe(
-      '@layer p.tokens, p.globals, legacy, atoms;',
+    expect(() => layerStatement({ layers: DEFAULT_PURSER_LAYERS, after: ['legacy'] })).toThrow(
+      /top-level layer names/,
     );
+    expect(
+      layerStatement({
+        layers: { tokens: 'p.tokens', globals: 'p.globals', atoms: 'atoms' },
+        after: ['legacy'],
+      }),
+    ).toBe('@layer p.tokens, p.globals, legacy, atoms;');
   });
 });

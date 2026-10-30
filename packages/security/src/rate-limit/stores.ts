@@ -3,8 +3,8 @@ import {
   type CounterResult,
   type CounterStore,
   slidingEstimate,
-  takeFromBucket,
   type TokenResult,
+  takeFromBucket,
   windowBounds,
 } from './types';
 
@@ -92,7 +92,10 @@ function resolveCache(explicit?: CacheLike): CacheLike {
   if (explicit) return explicit;
   const caches = (globalThis as { caches?: { default?: CacheLike } }).caches;
   if (caches?.default) return caches.default;
-  throw new HypDrivError('E_UNSUPPORTED', 'Cache API counter store: `caches.default` is not available in this runtime');
+  throw new HypDrivError(
+    'E_UNSUPPORTED',
+    'Cache API counter store: `caches.default` is not available in this runtime',
+  );
 }
 
 /**
@@ -102,7 +105,9 @@ function resolveCache(explicit?: CacheLike): CacheLike {
  * undercount; the Cache API may also evict entries early. Use the Durable Object limiter or the
  * Rate Limiting binding when exact counting matters.
  */
-export function createCacheApiCounterStore(options: { cache?: CacheLike; keyOrigin?: string } = {}): CounterStore {
+export function createCacheApiCounterStore(
+  options: { cache?: CacheLike; keyOrigin?: string } = {},
+): CounterStore {
   const origin = (options.keyOrigin ?? 'https://hypdriv.ratelimit').replace(/\/+$/, '');
   let cache: CacheLike | null = null;
   const getCache = () => {
@@ -121,7 +126,10 @@ export function createCacheApiCounterStore(options: { cache?: CacheLike; keyOrig
     getCache().put(
       url,
       new Response(text, {
-        headers: { 'cache-control': `max-age=${Math.max(1, Math.ceil(ttlSeconds))}`, 'content-type': 'text/plain' },
+        headers: {
+          'cache-control': `max-age=${Math.max(1, Math.ceil(ttlSeconds))}`,
+          'content-type': 'text/plain',
+        },
       }),
     );
 
@@ -152,7 +160,8 @@ export function createCacheApiCounterStore(options: { cache?: CacheLike; keyOrig
       if (hit) {
         try {
           const parsed = (await hit.json()) as { tokens?: number; updatedAt?: number };
-          if (typeof parsed.tokens === 'number' && typeof parsed.updatedAt === 'number') existing = parsed as never;
+          if (typeof parsed.tokens === 'number' && typeof parsed.updatedAt === 'number')
+            existing = parsed as never;
         } catch {
           existing = null;
         }
@@ -201,7 +210,8 @@ export function createKvCounterStore(kv: KVNamespaceLike, options: { prefix?: st
       if (raw) {
         try {
           const parsed = JSON.parse(raw) as { tokens?: number; updatedAt?: number };
-          if (typeof parsed.tokens === 'number' && typeof parsed.updatedAt === 'number') existing = parsed as never;
+          if (typeof parsed.tokens === 'number' && typeof parsed.updatedAt === 'number')
+            existing = parsed as never;
         } catch {
           existing = null;
         }

@@ -101,11 +101,19 @@ function absolutize(reportTo: string, origin: string): string {
 /** Policy headers computed for a decision. */
 export function policyHeadersFor(
   decision: CspDecision,
-  ctx: Pick<HypContext, 'development' | 'url' | 'state'>,
+  ctx: Pick<HypContext, 'development' | 'url' | 'state'> & Partial<Pick<HypContext, 'manifest'>>,
 ): { enforced?: string; reportOnly?: string } {
   if (decision.mode === 'off') return {};
-  // Edge-injected inline scripts are hashed into static policies; in nonce mode the injection covers them.
-  const extra = decision.mode === 'hash' ? (ctx.state.get(CSP_EXTRA_HASHES_KEY) ?? []) : [];
+  // Inline scripts injected by edge stages (speculation rules, theme pinning) are allowed by hash in both
+  // modes: in nonce mode the injected tags carry no nonce on uncached responses, and CSP3 permits hashes
+  // alongside 'strict-dynamic'. The 'unsafe-inline' fallback mode needs no hashes.
+  // The Purser theme fallback script is rendered without a nonce (so layouts stay prerenderable) and is
+  // byte-identical per build: allow it by its manifest hash on every route.
+  const themeHash = (ctx as { manifest?: HypContext['manifest'] }).manifest?.purser?.themeScriptHash;
+  const extra =
+    decision.mode === 'hash' || decision.mode === 'nonce'
+      ? [...(ctx.state.get(CSP_EXTRA_HASHES_KEY) ?? []), ...(themeHash ? [themeHash] : [])]
+      : [];
   const directives: CspDirectives = buildCspDirectives({
     config: decision.effective,
     mode: decision.mode,
@@ -200,12 +208,14 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
       const reportTo = decision.effective.reportTo;
       if (reportTo && decision.effective.reportingEndpoints)
         headers['reporting-endpoints'] = `hypdriv="${absolutize(reportTo, ctx.url.origin)}"`;
-      if (!isHtmlResponse(response)) return Object.keys(headers).length ? withHeaders(response, headers) : response;
+      if (!isHtmlResponse(response))
+        return Object.keys(headers).length ? withHeaders(response, headers) : response;
 
       const { enforced, reportOnly } = policyHeadersFor(decision, ctx);
       const appEnforced = response.headers.get('content-security-policy');
       const appReportOnly = response.headers.get('content-security-policy-report-only');
-      const appSet = (appEnforced && appEnforced !== enforced) || (appReportOnly && appReportOnly !== reportOnly);
+      const appSet =
+        (appEnforced && appEnforced !== enforced) || (appReportOnly && appReportOnly !== reportOnly);
       if (appSet) {
         headers[HEADER.cspMode] = 'app';
         ctx.timings.mark('csp', 'app');

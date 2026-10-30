@@ -4,6 +4,7 @@
     "rootDir": "src",
     "types": [
       "node",
+      "@cloudflare/workers-types",
       "react",
       "react-dom"
     ]

@@ -1,5 +1,5 @@
 import { connection } from 'next/server';
-import { hyp } from '@hypdriv/next/server';
+import { hyp } from 'hypdriv/server';
 
 export default async function Dashboard() {
   await connection();

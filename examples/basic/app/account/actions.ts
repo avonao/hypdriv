@@ -1,6 +1,6 @@
 'use server';
 
-import { safeAction } from '@hypdriv/next/server';
+import { safeAction } from 'hypdriv/server';
 
 const emailSchema = {
   '~standard': {

@@ -11,8 +11,7 @@ Next.js has no realtime primitive on serverless platforms. HypDriv's live channe
 ## Publish from the server
 
 ```ts
-import { publish } from '@hypdriv/live';
-import { hyp } from '@hypdriv/next/server';
+import { hyp, publish } from 'hypdriv/server';
 
 export async function addComment(formData: FormData) {
   'use server';
@@ -27,7 +26,7 @@ export async function addComment(formData: FormData) {
 ```tsx
 'use client';
 import { useRouter } from 'next/navigation';
-import { useLive, useLiveRefresh } from '@hypdriv/next/client';
+import { useLive, useLiveRefresh } from 'hypdriv/client';
 
 export function LiveComments({ postId }: { postId: string }) {
   const router = useRouter();

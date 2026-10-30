@@ -4,8 +4,8 @@ import {
   matchesAny,
   type ResolvedConfig,
   type ResolvedShield,
-  safeDecodePath,
   type Stage,
+  safeDecodePath,
   text,
 } from '@hypdriv/core';
 
@@ -22,7 +22,12 @@ function hostAllowed(hostHeader: string, allowed: string[]): boolean {
   const host = hostHeader.trim().toLowerCase().replace(/:\d+$/, '');
   if (!host) return false;
   for (const entry of allowed) {
-    const pattern = entry.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    const pattern = entry
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '')
+      .replace(/:\d+$/, '');
     if (!pattern) continue;
     if (pattern.startsWith('*.')) {
       const suffix = pattern.slice(1);
@@ -39,15 +44,23 @@ export function evaluateShield(
   input: { request: Request; url: URL; siteOrigin: string | null },
 ): ShieldRejection | null {
   const { request, url } = input;
-  const host = request.headers.get('host');
+  // Fetch-API Requests carry no Host header off the wire; the URL authority is the equivalent signal.
+  const host = request.headers.get('host') || url.host;
   if (!host) return { status: 400, reason: 'missing-host' };
   const method = request.method.toUpperCase();
-  if (!shield.methods.includes(method)) return { status: 405, reason: 'method', allow: shield.methods.join(', ') };
+  if (!shield.methods.includes(method))
+    return { status: 405, reason: 'method', allow: shield.methods.join(', ') };
   if (request.url.length > shield.maxUrlLength) return { status: 414, reason: 'url-too-long' };
-  if (shield.blockTraversal && safeDecodePath(url.pathname) === null) return { status: 400, reason: 'traversal' };
-  if (shield.blockedPaths.length && matchesAny(shield.blockedPaths, url)) return { status: 404, reason: 'blocked-path' };
+  if (shield.blockTraversal && safeDecodePath(url.pathname) === null)
+    return { status: 400, reason: 'traversal' };
+  if (shield.blockedPaths.length && matchesAny(shield.blockedPaths, url))
+    return { status: 404, reason: 'blocked-path' };
   if (shield.enforceHost) {
-    const allowed = shield.enforceHost.length ? shield.enforceHost : input.siteOrigin ? [input.siteOrigin] : [];
+    const allowed = shield.enforceHost.length
+      ? shield.enforceHost
+      : input.siteOrigin
+        ? [input.siteOrigin]
+        : [];
     if (allowed.length && !hostAllowed(host, allowed)) return { status: 421, reason: 'host' };
   }
   const length = Number(request.headers.get('content-length') ?? '');
@@ -80,6 +93,7 @@ export function shieldResponse(rejection: ShieldRejection): Response {
 /**
  * The `shield` stage (WAF-lite): method allow-list, URL length, encoded traversal / null bytes, hidden
  * and backup paths, optional host enforcement and declared body size limits. Runs on internal paths too.
+ * A missing `Host` header falls back to the request URL's authority (Fetch-API `Request`s never carry one).
  * Bodies without `Content-Length` (chunked uploads) cannot be sized here; enforce limits in handlers.
  */
 export function shieldStage(config: ResolvedConfig): Stage {
@@ -89,10 +103,18 @@ export function shieldStage(config: ResolvedConfig): Stage {
     runOnInternal: true,
     pre(ctx) {
       if (!shield) return;
-      const rejection = evaluateShield(shield, { request: ctx.request, url: ctx.url, siteOrigin: config.site.origin });
+      const rejection = evaluateShield(shield, {
+        request: ctx.request,
+        url: ctx.url,
+        siteOrigin: config.site.origin,
+      });
       if (!rejection) return;
       ctx.timings.mark('shield', rejection.reason);
-      ctx.log.info('shield rejected request', { reason: rejection.reason, status: rejection.status, path: ctx.url.pathname });
+      ctx.log.info('shield rejected request', {
+        reason: rejection.reason,
+        status: rejection.status,
+        path: ctx.url.pathname,
+      });
       return shieldResponse(rejection);
     },
   });

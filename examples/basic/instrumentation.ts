@@ -1,3 +1,4 @@
-import { createInstrumentation } from '@hypdriv/next/instrumentation';
+import { createInstrumentation } from 'hypdriv/instrumentation';
+import config from './hypdriv.config';
 
-export const { register, onRequestError } = createInstrumentation();
+export const { register, onRequestError } = createInstrumentation({ config });

@@ -31,9 +31,14 @@ export async function deriveKey(secret: string): Promise<{ kid: string; key: Cry
   if (hit) return hit;
   const promise = (async () => {
     if (!secret || secret.length < 16)
-      throw new HypDrivError('E_CRYPTO', 'Encryption secret must be at least 16 characters (32+ recommended)');
+      throw new HypDrivError(
+        'E_CRYPTO',
+        'Encryption secret must be at least 16 characters (32+ recommended)',
+      );
     const kid = await keyId(secret);
-    const ikm = await subtle().importKey('raw', utf8Encode(secret) as BufferSource, 'HKDF', false, ['deriveKey']);
+    const ikm = await subtle().importKey('raw', utf8Encode(secret) as BufferSource, 'HKDF', false, [
+      'deriveKey',
+    ]);
     const key = await subtle().deriveKey(
       {
         name: 'HKDF',
@@ -70,7 +75,9 @@ export async function encrypt(secret: string, plaintext: string | Uint8Array, aa
 }
 
 /** Parses a token without decrypting it. */
-export function parseEncryptedToken(token: string): { kid: string; iv: Uint8Array; ciphertext: Uint8Array } | null {
+export function parseEncryptedToken(
+  token: string,
+): { kid: string; iv: Uint8Array; ciphertext: Uint8Array } | null {
   const parts = token.split('.');
   if (parts.length !== 4 || parts[0] !== TOKEN_VERSION) return null;
   const [, kid, ivText, ctText] = parts as [string, string, string, string];
@@ -89,7 +96,11 @@ export function parseEncryptedToken(token: string): { kid: string; iv: Uint8Arra
  * Decrypts a token produced by `encrypt`. Tries every secret whose key id matches (rotation: pass the
  * current secret first, previous ones after). Returns `null` for malformed, tampered or foreign tokens.
  */
-export async function decrypt(secrets: string | string[], token: string, aad?: string): Promise<Uint8Array | null> {
+export async function decrypt(
+  secrets: string | string[],
+  token: string,
+  aad?: string,
+): Promise<Uint8Array | null> {
   const parsed = parseEncryptedToken(token);
   if (!parsed) return null;
   const list = Array.isArray(secrets) ? secrets : [secrets];
@@ -115,7 +126,11 @@ export async function decrypt(secrets: string | string[], token: string, aad?: s
 }
 
 /** `decrypt` returning UTF-8 text. */
-export async function decryptToString(secrets: string | string[], token: string, aad?: string): Promise<string | null> {
+export async function decryptToString(
+  secrets: string | string[],
+  token: string,
+  aad?: string,
+): Promise<string | null> {
   const bytes = await decrypt(secrets, token, aad);
   return bytes ? utf8Decode(bytes) : null;
 }

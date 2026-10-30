@@ -27,9 +27,14 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
   const failOpen = options.failOpen ?? true;
 
   const storeFor = (policy: ResolvedRateLimitPolicy): CounterStore =>
-    (policy.store !== 'auto' && policy.store !== 'binding' && options.stores?.[policy.store]) || options.store;
+    (policy.store !== 'auto' && policy.store !== 'binding' && options.stores?.[policy.store]) ||
+    options.store;
 
-  async function evaluate(policy: ResolvedRateLimitPolicy, key: string, now: number): Promise<RateLimitResult> {
+  async function evaluate(
+    policy: ResolvedRateLimitPolicy,
+    key: string,
+    now: number,
+  ): Promise<RateLimitResult> {
     const windowSeconds = policy.windowSeconds;
     if (policy.store === 'binding' && options.binding) {
       // The binding only reports success; remaining is unknown (1 while allowed, 0 once limited).

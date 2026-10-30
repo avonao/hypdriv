@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   HypDrivError,
@@ -27,11 +27,14 @@ export const PHASE = {
 
 type NextConfigFn = (phase: string, ctx: { defaultConfig: NextConfig }) => NextConfig | Promise<NextConfig>;
 
+/** The subset of `@hypdriv/purser/node`'s `PurserBridge` that `withHypDriv` uses. */
 export interface PurserBridgeLike {
   build(): Promise<PurserBuildResultLike>;
-  watch(onResult: (result: PurserBuildResultLike) => void): Promise<{ close(): void }>;
-  writeDevDiagnostics(result: PurserBuildResultLike): Promise<void>;
+  /** Starts (or joins) the per-process watcher; `devDiagnostics` writes `.hypdriv/dev/purser.json` for the HUD. */
+  watch(onResult?: (result: PurserBuildResultLike) => void, options?: { devDiagnostics?: boolean }): Promise<{ close(): void }>;
   formatDiagnostics?(result: PurserBuildResultLike): string;
+  formatSummary?(result: PurserBuildResultLike): string;
+  hasErrors?(result: PurserBuildResultLike): boolean;
   outFile: string | null;
 }
 
@@ -64,7 +67,7 @@ export interface WithHypDrivOptions {
   deploymentId?: () => string | null;
 }
 
-const WATCHERS = Symbol.for('hypdriv.purser.watchers');
+const WATCHERS = Symbol.for('hypdriv.next.purser-subscriptions');
 type WatcherRegistry = Map<string, { close(): void }>;
 
 function watcherRegistry(): WatcherRegistry {
@@ -114,61 +117,81 @@ async function resolveHypDrivConfig(projectDir: string, options: WithHypDrivOpti
   if (typeof options.configFile === 'string') {
     const file = isAbsolute(options.configFile) ? options.configFile : join(projectDir, options.configFile);
     if (!existsSync(file)) throw new HypDrivError('E_CONFIG', `hypdriv: config file not found: ${file}`);
-    const mod = (await import(`${new URL(`file://${file}`).href}`)) as { default?: HypDrivConfig };
-    const input = mod.default ?? {};
-    return { input, resolved: loadConfig(input), file };
+    const loaded = await loadConfigFile(projectDir, file);
+    return { input: loaded.config, resolved: loaded.resolved, file };
   }
   const loaded = await loadConfigFile(projectDir);
   return { input: loaded.config, resolved: loaded.resolved, file: loaded.file };
 }
 
 async function defaultPurserBridge(projectDir: string, config: ResolvedConfig, log: Logger): Promise<PurserBridgeLike | null> {
-  if (!config.purser) return null;
+  const purser = config.purser;
+  if (!purser || purser.enabled === false) return null;
+  const explicit = purser.enabled === true;
+  let mod: {
+    detectPurser: (dir: string) => { installed: boolean; tokensFile: string | null; typescriptCompatible: boolean; typescriptVersion: string | null; message?: string };
+    createPurserBridge: (options: { projectDir: string; config: NonNullable<ResolvedConfig['purser']>; log?: Logger }) => Promise<PurserBridgeLike>;
+  };
   try {
-    const mod = (await import('@hypdriv/purser/node')) as {
-      detectPurser: (dir: string) => { installed: boolean; tokensFile: string | null; typescriptCompatible: boolean; typescriptVersion: string | null };
-      createPurserBridge: (options: { projectDir: string; config: NonNullable<ResolvedConfig['purser']>; log?: Logger }) => Promise<PurserBridgeLike>;
-    };
-    const detected = mod.detectPurser(projectDir);
-    const wanted = config.purser.enabled === true || (config.purser.enabled === 'auto' && detected.installed && (config.purser.tokens !== null || detected.tokensFile !== null));
-    if (!wanted) return null;
-    if (!detected.installed) throw new HypDrivError('E_UNSUPPORTED', 'hypdriv: purser is enabled but @avonao/purser is not installed (pnpm add @avonao/purser)');
-    if (!detected.typescriptCompatible) {
-      log.warn(`hypdriv: Purser needs TypeScript's programmatic API (found ${detected.typescriptVersion ?? 'unknown'}); install typescript@6 or the @typescript/typescript6 alias for the build.`);
-    }
-    return mod.createPurserBridge({ projectDir, config: config.purser, log });
+    mod = (await import('@hypdriv/purser/node')) as unknown as typeof mod;
   } catch (err) {
-    if (err instanceof HypDrivError) throw err;
-    log.warn(`hypdriv: Purser bridge unavailable (${(err as Error).message})`);
+    if (explicit) throw new HypDrivError('E_UNSUPPORTED', `hypdriv: purser is enabled but @hypdriv/purser could not be loaded (${(err as Error).message})`);
     return null;
   }
+  const detected = mod.detectPurser(projectDir);
+  const wanted = explicit || (detected.installed && (purser.tokens !== null || detected.tokensFile !== null));
+  if (!wanted) return null;
+  if (!detected.installed) throw new HypDrivError('E_UNSUPPORTED', detected.message ?? 'hypdriv: purser is enabled but @avonao/purser is not installed (pnpm add @avonao/purser)');
+  try {
+    return await mod.createPurserBridge({ projectDir, config: purser, log });
+  } catch (err) {
+    // Explicitly enabled: surface the problem (TypeScript 7 without the TS 6 alias, broken install). Auto: skip.
+    if (explicit) throw err;
+    log.warn(`hypdriv: Purser detected but the bridge is unavailable (${(err as Error).message}); skipping the CSS build.`);
+    return null;
+  }
+}
+
+function formatPurserDiagnostics(bridge: PurserBridgeLike, result: PurserBuildResultLike): string {
+  return bridge.formatDiagnostics?.(result) ?? result.diagnostics.map((d) => `${d.file ? `${d.file}${d.line ? `:${d.line}:${d.column ?? 1}` : ''}: ` : ''}${d.severity}: ${d.message}`).join('\n');
+}
+
+function purserHasErrors(bridge: PurserBridgeLike, result: PurserBuildResultLike): boolean {
+  return bridge.hasErrors?.(result) ?? result.diagnostics.some((d) => d.severity === 'error');
 }
 
 async function runPurser(phase: string, projectDir: string, config: ResolvedConfig, options: WithHypDrivOptions, log: Logger): Promise<void> {
   if (options.purser === false) return;
   const factory = options.purserBridge ?? ((dir, cfg) => defaultPurserBridge(dir, cfg, log));
-  const bridge = await factory(projectDir, config);
-  if (!bridge) return;
-  const format = (r: PurserBuildResultLike) => bridge.formatDiagnostics?.(r) ?? r.diagnostics.map((d) => `${d.file ? `${d.file}${d.line ? `:${d.line}:${d.column ?? 1}` : ''}: ` : ''}${d.severity}: ${d.message}`).join('\n');
   if (phase === PHASE.productionBuild || phase === PHASE.export) {
+    const bridge = await factory(projectDir, config);
+    if (!bridge) return;
     const result = await bridge.build();
-    const errors = result.diagnostics.filter((d) => d.severity === 'error');
-    for (const d of result.diagnostics) (d.severity === 'error' ? log.error : log.warn).call(log, `purser: ${d.message}`, { file: d.file, line: d.line });
-    if (errors.length) throw new HypDrivError('E_CONFIG', `hypdriv: Purser build failed\n${format(result)}`);
-    log.info(`hypdriv: Purser stylesheet ${result.written ? 'written' : 'up to date'} (${result.outFile ?? bridge.outFile ?? 'memory'})`);
+    if (purserHasErrors(bridge, result)) throw new HypDrivError('E_CONFIG', `hypdriv: Purser build failed\n${formatPurserDiagnostics(bridge, result)}`);
+    // The bridge logs warnings and the build summary through the logger it was created with.
     return;
   }
   if (phase === PHASE.developmentServer) {
+    // next.config is evaluated more than once per dev process; subscribe exactly once per project.
     const registry = watcherRegistry();
     if (registry.has(projectDir)) return;
-    const handle = await bridge.watch((result) => {
-      void bridge.writeDevDiagnostics(result);
-      const errors = result.diagnostics.filter((d) => d.severity === 'error');
-      if (errors.length) log.error(`purser: ${errors.length} error(s)\n${format(result)}`);
-      else if (result.written) log.info('purser: stylesheet updated');
-    });
-    registry.set(projectDir, handle);
-    process.once('exit', () => handle.close());
+    const bridge = await factory(projectDir, config);
+    if (!bridge) return;
+    registry.set(projectDir, { close() {} });
+    try {
+      const handle = await bridge.watch(
+        (result) => {
+          if (purserHasErrors(bridge, result)) log.error(`purser: build errors\n${formatPurserDiagnostics(bridge, result)}`);
+          else if (result.written) log.info('purser: stylesheet updated');
+        },
+        { devDiagnostics: true },
+      );
+      registry.set(projectDir, handle);
+      process.once('exit', () => handle.close());
+    } catch (err) {
+      registry.delete(projectDir);
+      throw err;
+    }
   }
 }
 
@@ -185,7 +208,15 @@ function applySafeDefaults(out: NextConfig, config: ResolvedConfig, phase: strin
   }
   if (config.images.loader === 'cloudflare' && !out.images?.loaderFile && out.images?.loader !== 'custom' && !out.images?.unoptimized) {
     const loader = resolveImageLoaderPath();
-    if (loader) out.images = { ...(out.images ?? {}), loader: 'custom', loaderFile: loader };
+    if (loader) {
+      // Next.js resolves `loaderFile` against the project directory, so it must be relative.
+      const rel = relative(projectDir, loader).split('\\').join('/');
+      out.images = { ...(out.images ?? {}), loader: 'custom', loaderFile: rel.startsWith('.') ? rel : `./${rel}` };
+      // Inlined by Next into server and client bundles; read by `@hypdriv/image/loader`.
+      const format = config.images.formats.length === 1 && config.images.formats[0] !== 'auto' ? config.images.formats[0] : 'auto';
+      const loaderConfig = { cdnCgi: config.images.cdnCgi, quality: config.images.quality, format, ...(out.basePath ? { basePath: out.basePath } : {}) };
+      out.env = { ...(out.env ?? {}), HYPDRIV_IMAGES: JSON.stringify(loaderConfig) };
+    }
   }
 }
 

@@ -1,5 +1,11 @@
-import { type AnalyticsEngineLike, createConsoleLogger, HYPDRIV_VERSION, type Logger, toError } from '@hypdriv/core';
-import type { AttributeValue, Attributes, Span, SpanKind } from './span';
+import {
+  type AnalyticsEngineLike,
+  createConsoleLogger,
+  HYPDRIV_VERSION,
+  type Logger,
+  toError,
+} from '@hypdriv/core';
+import type { Attributes, AttributeValue, Span, SpanKind } from './span';
 import type { SpanExporter } from './tracer';
 
 /** Exporter that drops everything (tracing disabled). */
@@ -119,7 +125,7 @@ export function toOtlpPayload(spans: Span[], resource: Record<string, string> = 
                 name: span.name,
                 kind: SPAN_KINDS[span.kind] ?? 1,
                 startTimeUnixNano: toUnixNano(span.start),
-                endTimeUnixNano: toUnixNano(span.end ?? span.start),
+                endTimeUnixNano: toUnixNano(span.endTime ?? span.start),
                 attributes: otlpAttributes(span.attributes),
                 events: span.events.map((e) => ({
                   timeUnixNano: toUnixNano(e.time),

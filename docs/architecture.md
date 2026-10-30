@@ -92,11 +92,15 @@ Because OpenNext Cloudflare currently consumes the standalone build rather than 
 `hypdriv init` writes `hypdriv.worker.ts` and points `wrangler.jsonc#main` at it:
 
 ```ts
-import { createWorker } from '@hypdriv/cloudflare';
+import { createWorker } from 'hypdriv/cloudflare';
 import config from './hypdriv.config';
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from './.open-next/worker.js';
-export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects';
-export default createWorker({ config, next: () => import('./.open-next/worker.js') });
+export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-objects';
+export default createWorker({
+  config,
+  next: () => import('./.open-next/worker.js'),
+  manifest: () => import('./.hypdriv/manifest.js'),
+});
 ```
 
 `createWorker` returns an `ExportedHandler` with `fetch`, `scheduled`, `queue`, `email` and `tail`. The OpenNext worker is imported lazily so that HypDriv's own startup cost stays in the low-millisecond range and the Worker still meets the 1 s global-scope limit on large applications.
@@ -108,18 +112,18 @@ export default createWorker({ config, next: () => import('./.open-next/worker.js
 For deployments that are not on Workers, and for `next dev`, the same stages run inside `proxy.ts`:
 
 ```ts
-import { createProxy, stages } from '@hypdriv/next/proxy';
-import config from './hypdriv.config';
-export default createProxy(config, [
-  stages.requestId(),
-  stages.security(),
-  stages.flags(),
-  stages.earlyHints(),
-]);
-export { matcher as config } from '@hypdriv/next/proxy';
+import { createProxy } from 'hypdriv/proxy';
+import hypdrivConfig from './hypdriv.config';
+export default createProxy(hypdrivConfig, (defaults, platform) => [...defaults /*, customStage(platform) */]);
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|woff2?|ttf|otf|css|js|map|txt|xml|json)$).*)',
+    '/_hypdriv/:path*',
+  ],
+}; // Next.js parses this statically, so it must be a literal
 ```
 
-Proxy runs on the Node runtime in Next.js 16, so the manifest is read lazily from disk and cached. Stages that need a response body (HTML transforms) are marked `edgeOnly` and are no-ops in proxy; the manifest-driven header stages are identical in both places.
+Proxy runs on the Node runtime in Next.js 16, so the manifest is read lazily from disk (`process.cwd()/.hypdriv/manifest.json`, a statically scoped path so Next's file tracing stays small) and cached. Inside the Worker the proxy sees the shell's request context through `AsyncLocalStorage` and passes through, so the stages run exactly once per request; both runners strip client-supplied `x-hypdriv-*`, nonce and `x-middleware-*` headers first. Stages that need a response body (HTML transforms) are marked `edgeOnly` and are no-ops in proxy; the manifest-driven header stages are identical in both places.
 
 ### 3.5 Application code
 

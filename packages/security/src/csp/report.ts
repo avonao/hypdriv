@@ -31,10 +31,14 @@ function num(value: unknown): number | undefined {
 }
 
 /** Normalises one report body (either shape) into a `CspReport`; returns null when unusable. */
-export function normalizeCspReport(body: unknown, meta: { userAgent?: string; ts?: number } = {}): CspReport | null {
+export function normalizeCspReport(
+  body: unknown,
+  meta: { userAgent?: string; ts?: number } = {},
+): CspReport | null {
   if (!body || typeof body !== 'object') return null;
   const raw = body as Raw;
-  const violated = str(raw['violated-directive']) ?? str(raw.violatedDirective) ?? str(raw.effectiveDirective);
+  const violated =
+    str(raw['violated-directive']) ?? str(raw.violatedDirective) ?? str(raw.effectiveDirective);
   const effective = str(raw['effective-directive']) ?? str(raw.effectiveDirective) ?? violated;
   if (!effective) return null;
   const dispositionRaw = str(raw.disposition);
@@ -135,7 +139,8 @@ const IGNORED_BLOCKED = new Set([
   'trusted-types-sink',
   'trusted-types-policy',
 ]);
-const IGNORED_SCHEMES = /^(?:chrome|chrome-extension|moz-extension|safari-extension|safari-web-extension|edge-extension|ms-browser-extension|opera-extension|about|javascript|resource|file):/i;
+const IGNORED_SCHEMES =
+  /^(?:chrome|chrome-extension|moz-extension|safari-extension|safari-web-extension|edge-extension|ms-browser-extension|opera-extension|about|javascript|resource|file):/i;
 const SCHEME_SOURCES = new Set(['data', 'blob', 'filesystem', 'mediastream', 'ws', 'wss']);
 
 /** Maps a blocked URI to a CSP source expression, or null when it should be ignored. */
@@ -175,7 +180,8 @@ export function suggestPolicy(
     let directive = (report.effectiveDirective || report.violatedDirective).toLowerCase();
     if (!directive) continue;
     // Browsers report `script-src-elem`; fold into the base directive unless the policy sets the specific one.
-    if (ELEM_ATTR_SUFFIX.test(directive) && !(directive in current)) directive = directive.replace(ELEM_ATTR_SUFFIX, '');
+    if (ELEM_ATTR_SUFFIX.test(directive) && !(directive in current))
+      directive = directive.replace(ELEM_ATTR_SUFFIX, '');
     const source = sourceForBlockedUri(report.blockedUri, report.documentUri);
     if (!source) continue;
     const existing = current[directive];

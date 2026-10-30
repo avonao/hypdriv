@@ -15,7 +15,8 @@ export const FAKE_PURSER_KEY = '__hypdrivFakePurser';
 
 export function fakePurserState(): FakePurserState {
   const g = globalThis as Record<string, unknown>;
-  if (!g[FAKE_PURSER_KEY]) g[FAKE_PURSER_KEY] = { calls: [], watchers: [], next: null } satisfies FakePurserState;
+  if (!g[FAKE_PURSER_KEY])
+    g[FAKE_PURSER_KEY] = { calls: [], watchers: [], next: null } satisfies FakePurserState;
   return g[FAKE_PURSER_KEY] as FakePurserState;
 }
 
@@ -144,7 +145,11 @@ export function createFakeProject(options: FakeProjectOptions = {}): FakeProject
   if (options.typescript !== null) {
     write(
       'node_modules/typescript/package.json',
-      JSON.stringify({ name: 'typescript', version: options.typescript ?? '5.9.3', main: './lib/typescript.js' }),
+      JSON.stringify({
+        name: 'typescript',
+        version: options.typescript ?? '5.9.3',
+        main: './lib/typescript.js',
+      }),
     );
     write('node_modules/typescript/lib/typescript.js', 'module.exports = {};\n');
   }

@@ -77,4 +77,9 @@ export type {
   PurserDiagnostic,
   PurserWatchHandle,
 } from './purser-types';
-export { type PrerenderedHtml, type VerifyBuildOptions, type VerifyBuildResult, verifyBuild } from './verify-build';
+export {
+  type PrerenderedHtml,
+  type VerifyBuildOptions,
+  type VerifyBuildResult,
+  verifyBuild,
+} from './verify-build';

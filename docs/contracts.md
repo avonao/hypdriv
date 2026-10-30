@@ -8,6 +8,7 @@ The public API each package must expose so that the others integrate. Signatures
 | --- | --- | --- | --- |
 | `NONCE_KEY` | security | `string` | csp stage (nonce mode) |
 | `CSP_MODE_KEY` | security | `'nonce' \| 'hash' \| 'report-only' \| 'off'` | csp stage |
+| `CSP_EXTRA_HASHES_KEY` | security | `string[]` (`'sha256-…'` source expressions) | stages that inject deterministic inline scripts at the edge (speculation, theme); merged into `script-src` by csp stage in hash mode |
 | `RATE_LIMIT_KEY` | security | `{ policy: string; remaining: number; limit: number; reset: number }[]` | rate-limit stage |
 | `BOT_KEY` | security | `{ verdict: 'human' \| 'verified' \| 'likely' \| 'definite'; score?: number; reason: string }` | bots stage |
 | `CACHE_DECISION_KEY` | cache | `CacheDecision` | edge-cache stage |

@@ -7,10 +7,13 @@ import cloudflareLoaderDefault, {
   getImageLoaderConfig,
   isCdnCgiEnabled,
   isPassthroughSource,
+  resetInlinedImageConfig,
 } from './loader';
 
 afterEach(() => {
   configureImageLoader(null);
+  delete process.env.HYPDRIV_IMAGES;
+  resetInlinedImageConfig();
   delete (globalThis as { __HYPDRIV_IMAGE_CDN_CGI__?: boolean }).__HYPDRIV_IMAGE_CDN_CGI__;
 });
 
@@ -117,6 +120,23 @@ describe('cloudflareLoader', () => {
   it('configureImageLoader(null) resets', () => {
     configureImageLoader({ cdnCgi: true });
     configureImageLoader(null);
+    expect(getImageLoaderConfig()).toEqual({});
+  });
+});
+
+describe('build-time configuration (env.HYPDRIV_IMAGES)', () => {
+  it('reads the JSON that withHypDriv inlines and lets the global override it', () => {
+    process.env.HYPDRIV_IMAGES = JSON.stringify({ cdnCgi: true, quality: 82, basePath: '/shop' });
+    resetInlinedImageConfig();
+    expect(getImageLoaderConfig()).toEqual({ cdnCgi: true, quality: 82, basePath: '/shop' });
+    expect(cloudflareLoader({ src: '/a.png', width: 320 })).toBe('/cdn-cgi/image/width=320,quality=82,format=auto,fit=scale-down/a.png');
+    configureImageLoader({ cdnCgi: false });
+    expect(getImageLoaderConfig()).toMatchObject({ cdnCgi: false, quality: 82 });
+  });
+
+  it('ignores malformed values', () => {
+    process.env.HYPDRIV_IMAGES = '{not json';
+    resetInlinedImageConfig();
     expect(getImageLoaderConfig()).toEqual({});
   });
 });

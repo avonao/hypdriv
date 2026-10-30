@@ -61,7 +61,8 @@ interface Envelope<T> {
  */
 export function createSessionStore<T extends object>(options: SessionStoreOptions): SessionStore<T> {
   const secrets = (Array.isArray(options.secret) ? options.secret : [options.secret]).filter(Boolean);
-  if (!secrets.length) throw new HypDrivError('E_CRYPTO', 'createSessionStore: at least one secret is required');
+  if (!secrets.length)
+    throw new HypDrivError('E_CRYPTO', 'createSessionStore: at least one secret is required');
   const current = secrets[0]!;
   const name = options.cookie ?? COOKIE.session;
   const ttl = options.ttlSeconds ?? 7 * 86400;

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { HYPDRIV_VERSION, type HypDrivConfig, type Logger, type ResolvedConfig, createConsoleLogger, loadConfig } from '@hypdriv/core';
+import { HYPDRIV_VERSION, type HypDrivConfig, type Logger, type PurserManifest, type ResolvedConfig, createConsoleLogger, loadConfig } from '@hypdriv/core';
 import { loadConfigFile, writeManifest } from '@hypdriv/core/node';
 import { ADAPTER_CONFIG_FILE, BASE_ADAPTER_ENV, PROJECT_DIR_ENV, reviveConfig } from '../config/serialize';
 import { type BuildManifestInput, type PurserVerifier, type SecretsScanner, buildManifest } from './build-manifest';
@@ -11,7 +11,7 @@ import type { AdapterNextConfig, ModifyConfigContext, NextAdapterLike, OnBuildCo
 
 export * from './types';
 export { buildManifest } from './build-manifest';
-export type { BuildManifestInput, BuildManifestResult, PurserVerifier, SecretsScanner } from './build-manifest';
+export type { BuildManifestInput, BuildManifestResult, PurserVerifier, PurserVerifierInput, PurserVerifierResult, SecretsScanner } from './build-manifest';
 export { createNodeFs, rerootPaths, type AdapterFs } from './fs';
 export { classifyOutputs, staticFileRoutes } from './classify';
 export { renderReport } from './report';
@@ -31,9 +31,14 @@ export interface CreateAdapterOptions {
 
 async function importAdapter(spec: string): Promise<NextAdapterLike | null> {
   const url = spec.startsWith('file:') ? spec : spec.startsWith('/') || /^[A-Za-z]:[\\/]/.test(spec) ? pathToFileURL(spec).href : spec;
-  const mod = (await import(url)) as { default?: NextAdapterLike | { default?: NextAdapterLike } } & Partial<NextAdapterLike>;
-  const candidate = (mod.default && 'default' in mod.default ? mod.default.default : mod.default) ?? (mod.name ? (mod as NextAdapterLike) : null);
-  return candidate ?? null;
+  const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ url)) as { default?: unknown } & Partial<NextAdapterLike>;
+  const isAdapter = (value: unknown): value is NextAdapterLike => !!value && typeof value === 'object' && typeof (value as NextAdapterLike).name === 'string';
+  // ESM default, CJS interop (`default.default`), or a module whose named exports form the adapter.
+  const first = mod.default;
+  if (isAdapter(first)) return first;
+  const nested = first && typeof first === 'object' ? (first as { default?: unknown }).default : undefined;
+  if (isAdapter(nested)) return nested;
+  return isAdapter(mod) ? mod : null;
 }
 
 async function resolveHypConfig(projectDir: string, explicit: HypDrivConfig | undefined, log: Logger): Promise<ResolvedConfig> {
@@ -55,25 +60,58 @@ async function resolveHypConfig(projectDir: string, explicit: HypDrivConfig | un
   }
 }
 
+interface PurserNodeModule {
+  verifyBuild: (input: {
+    projectDir: string;
+    config: NonNullable<ResolvedConfig['purser']>;
+    prerenderedHtml: Record<string, string> | (() => Promise<Record<string, string>>);
+  }) => Promise<{ ok: boolean; manifest: PurserManifest; errors: string[]; warnings: string[]; skipped: boolean }>;
+  detectPurser: (projectDir: string) => { installed: boolean; message?: string };
+  collectPrerenderedHtml: (distDir: string, options?: { includeRsc?: boolean; log?: Logger }) => Promise<Record<string, string>>;
+}
+
+interface PurserRuntimeModule {
+  isPurserStylesheet: (css: string, layers?: { tokens: string; globals: string; atoms: string }) => boolean;
+}
+
+/**
+ * Verifies the Purser stylesheet against every prerendered document and RSC payload (the unstyled-atom
+ * guard), locates the CSS chunk Next.js emitted for it and returns the manifest section.
+ */
 async function defaultPurserVerifier(): Promise<PurserVerifier | null> {
+  let node: PurserNodeModule;
+  let runtime: PurserRuntimeModule;
   try {
-    const mod = (await import('@hypdriv/purser/node')) as {
-      verifyBuild?: (input: { projectDir: string; config: NonNullable<ResolvedConfig['purser']>; prerenderedHtml: Record<string, string>; log?: Logger }) => Promise<{ manifest: import('@hypdriv/core').PurserManifest | null; ok: boolean; warnings: string[] }>;
-      detectPurser?: (projectDir: string) => { installed: boolean };
-    };
-    if (!mod.verifyBuild || !mod.detectPurser) return null;
-    return async ({ html, config, projectDir, log }) => {
-      if (!config.purser) return { manifest: null, ok: true, warnings: [] };
-      const detected = mod.detectPurser!(projectDir);
-      if (!detected.installed) {
-        if (config.purser.enabled === true) return { manifest: null, ok: false, warnings: ['Purser is enabled but @avonao/purser is not installed.'] };
-        return { manifest: null, ok: true, warnings: [] };
-      }
-      return mod.verifyBuild!({ projectDir, config: config.purser, prerenderedHtml: html, log });
-    };
+    node = (await import('@hypdriv/purser/node')) as unknown as PurserNodeModule;
+    runtime = (await import('@hypdriv/purser')) as unknown as PurserRuntimeModule;
   } catch {
     return null;
   }
+  if (typeof node.verifyBuild !== 'function' || typeof node.detectPurser !== 'function') return null;
+  return async ({ html, config, projectDir, distDir, cssAssets, readAsset, log }) => {
+    const purser = config.purser;
+    if (!purser || purser.enabled === false) return { manifest: null, ok: true, warnings: [] };
+    const detected = node.detectPurser(projectDir);
+    if (!detected.installed) {
+      if (purser.enabled === true) return { manifest: null, ok: false, warnings: [], errors: [detected.message ?? 'Purser is enabled but @avonao/purser is not installed.'] };
+      return { manifest: null, ok: true, warnings: [] };
+    }
+    const prerenderedHtml = async (): Promise<Record<string, string>> => {
+      if (typeof node.collectPrerenderedHtml !== 'function') return html;
+      const collected = await node.collectPrerenderedHtml(distDir, { includeRsc: true, log });
+      return Object.keys(collected).length ? collected : html;
+    };
+    const result = await node.verifyBuild({ projectDir, config: purser, prerenderedHtml });
+    const manifest: PurserManifest = { ...result.manifest };
+    if (typeof runtime.isPurserStylesheet === 'function') {
+      const asset = cssAssets.find((href) => {
+        const css = readAsset(href);
+        return css !== null && runtime.isPurserStylesheet(css, purser.layers);
+      });
+      if (asset) manifest.asset = asset;
+    }
+    return { manifest, ok: result.ok, warnings: result.warnings, errors: result.ok ? [] : result.errors };
+  };
 }
 
 async function defaultSecretsScanner(): Promise<SecretsScanner | null> {

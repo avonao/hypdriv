@@ -8,7 +8,7 @@ export {
   type RateLimiter,
   type RateLimitResult,
   slidingEstimate,
-  takeFromBucket,
   type TokenResult,
+  takeFromBucket,
   windowBounds,
 } from './types';

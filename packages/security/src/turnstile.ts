@@ -57,12 +57,16 @@ export async function verifyTurnstile(
 }
 
 /** Reads a Turnstile token from the header, or from a form body for `POST` form submissions. */
-export async function readTurnstileToken(request: Request, field = TURNSTILE_TOKEN_FIELD): Promise<string | null> {
+export async function readTurnstileToken(
+  request: Request,
+  field = TURNSTILE_TOKEN_FIELD,
+): Promise<string | null> {
   const fromHeader = request.headers.get(field);
   if (fromHeader) return fromHeader;
   if (request.method === 'GET' || request.method === 'HEAD') return null;
   const type = (request.headers.get('content-type') ?? '').toLowerCase();
-  if (!type.includes('application/x-www-form-urlencoded') && !type.includes('multipart/form-data')) return null;
+  if (!type.includes('application/x-www-form-urlencoded') && !type.includes('multipart/form-data'))
+    return null;
   try {
     const form = await request.clone().formData();
     const value = form.get(field);

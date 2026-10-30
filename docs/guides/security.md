@@ -26,7 +26,7 @@ Roll out safely: `reportOnly: true` first, read violations with `hypdriv csp sug
 Third-party scripts you render yourself need the nonce on dynamic routes:
 
 ```tsx
-import { nonce } from '@hypdriv/next/server';
+import { nonce } from 'hypdriv/server';
 export default async function Analytics() {
   const n = await nonce();
   return <script nonce={n} src="https://js.stripe.com/v3/" />;
@@ -69,7 +69,7 @@ Method allow-list (405), URL length (414), encoded traversal and null bytes (400
 
 ```ts
 'use server';
-import { safeAction } from '@hypdriv/next/server';
+import { safeAction } from 'hypdriv/server';
 import { z } from 'zod';
 
 export const createPost = safeAction({

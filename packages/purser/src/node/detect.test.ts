@@ -27,7 +27,9 @@ describe('detectPurser', () => {
       message: null,
     });
     expect(d.packageDir).toBe(join(p.dir, 'node_modules', '@avonao', 'purser'));
-    expect(d.strikeScriptFile).toBe(join(p.dir, 'node_modules', '@avonao', 'purser', 'scripts', 'strike-count.js'));
+    expect(d.strikeScriptFile).toBe(
+      join(p.dir, 'node_modules', '@avonao', 'purser', 'scripts', 'strike-count.js'),
+    );
   });
 
   it('flags TypeScript 7 as incompatible and points to the typescript6 alias', () => {
@@ -41,7 +43,12 @@ describe('detectPurser', () => {
 
   it('reports a missing Purser or TypeScript with install hints', () => {
     const none = detectPurser(project({ purser: false, typescript: null }).dir);
-    expect(none).toMatchObject({ installed: false, version: null, typescriptVersion: null, typescriptCompatible: false });
+    expect(none).toMatchObject({
+      installed: false,
+      version: null,
+      typescriptVersion: null,
+      typescriptCompatible: false,
+    });
     expect(none.message).toContain('@avonao/purser is not installed');
     expect(none.message).toContain('typescript is not installed');
 

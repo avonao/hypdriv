@@ -1,4 +1,10 @@
-import { rateVital, type RscNavigation, rscNavigationFromEntry, type VitalName, type VitalSample } from './readers';
+import {
+  type RscNavigation,
+  rateVital,
+  rscNavigationFromEntry,
+  type VitalName,
+  type VitalSample,
+} from './readers';
 
 type Listener = (sample: VitalSample) => void;
 
@@ -13,7 +19,11 @@ function observerCtor(): ObserverCtor | null {
   return typeof ctor === 'function' ? ctor : null;
 }
 
-function observe(type: string, callback: (entries: unknown[]) => void, extra: { durationThreshold?: number } = {}): (() => void) | null {
+function observe(
+  type: string,
+  callback: (entries: unknown[]) => void,
+  extra: { durationThreshold?: number } = {},
+): (() => void) | null {
   const Ctor = observerCtor();
   if (!Ctor) return null;
   try {
@@ -75,7 +85,8 @@ export function observeVitals(listener: Listener): () => void {
 
   const paint = observe('paint', (entries) => {
     for (const e of entries as Array<{ name?: string; startTime?: number }>) {
-      if (e.name === 'first-contentful-paint' && typeof e.startTime === 'number') emit('FCP', e.startTime, false);
+      if (e.name === 'first-contentful-paint' && typeof e.startTime === 'number')
+        emit('FCP', e.startTime, false);
     }
   });
   if (paint) stops.push(paint);
