@@ -1,0 +1,20 @@
+import { defineConfig } from 'tsdown';
+
+export default defineConfig({
+  entry: {
+    index: 'src/index.ts',
+    'node/index': 'src/node/index.ts',
+  },
+  format: ['esm'],
+  platform: 'neutral',
+  target: 'es2023',
+  external: [/^node:/],
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  treeshake: true,
+  unbundle: false,
+  define: {
+    __HYPDRIV_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+  },
+});

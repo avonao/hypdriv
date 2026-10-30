@@ -1,0 +1,42 @@
+name: Dependency freshness
+
+# Daily check for updates to every dependency used across the monorepo.
+# Safe (patch/minor) updates are applied automatically in a pull request;
+# major updates are reported with a proposal, never applied blindly.
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Report outdated dependencies
+        id: report
+        run: |
+          node packages/cli/dist/bin.js deps --root . --json > deps-report.json || true
+          node scripts/deps-summary.mjs deps-report.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply safe updates
+        run: node packages/cli/dist/bin.js deps --root . --update safe
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build && pnpm test
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/deps-freshness
+          title: "chore(deps): apply safe dependency updates"
+          commit-message: "chore(deps): apply safe dependency updates"
+          body-path: deps-report.md
+          labels: dependencies
