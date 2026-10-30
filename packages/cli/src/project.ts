@@ -15,9 +15,48 @@ import {
 import { parseVersion } from './semver';
 import { type SourceScanResult, scanSources } from './source-scan';
 import { exists, firstExisting, isDirectory, readJsonFile, readText } from './util/fs';
-import { parseWranglerConfig, type WranglerConfig, type WranglerFormat } from './wrangler-config';
+import { parseVercelJson, readVercelTs, type VercelConfig } from './vercel-config';
+import { parseJsonc, parseWranglerConfig, type WranglerConfig, type WranglerFormat } from './wrangler-config';
 
 export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
+
+/** Deployment target. `node` = Next.js without Cloudflare or Vercel tooling (`next start`, containers). */
+export type DeployPlatform = 'cloudflare' | 'vercel' | 'node' | 'unknown';
+export const DEPLOY_PLATFORMS: readonly DeployPlatform[] = ['cloudflare', 'vercel', 'node', 'unknown'];
+
+/** HypDriv's runtime package per platform (the Worker shell, the Vercel runtime, none for plain Node). */
+export const PLATFORM_RUNTIME_PACKAGE: Record<DeployPlatform, string | null> = {
+  cloudflare: '@hypdriv/cloudflare',
+  vercel: '@hypdriv/vercel',
+  node: null,
+  unknown: null,
+};
+
+export interface PlatformDetection {
+  platform: DeployPlatform;
+  /** `--platform` forced the value. */
+  explicit: boolean;
+  /** Evidence per platform, e.g. `wrangler.jsonc`, `VERCEL env`. */
+  signals: { cloudflare: string[]; vercel: string[] };
+}
+
+export interface VercelInfo {
+  configFile: string | null;
+  format: 'json' | 'ts' | null;
+  config: VercelConfig | null;
+  parseError: string | null;
+  /** `.vercel/project.json` exists (`vercel link` / `vercel pull`). */
+  linked: boolean;
+  /** `.vercel/output` (Build Output API) exists. */
+  outputDir: string | null;
+  /** Installed `vercel` CLI package version. */
+  cli: string | null;
+}
+
+export interface EnvFileInfo {
+  file: string;
+  keys: string[];
+}
 
 export interface VersionInfo {
   /** Version from node_modules, or null when not installed. */
@@ -71,6 +110,13 @@ export interface PurserInfo {
 export interface ProjectInfo {
   root: string;
   repoRoot: string;
+  platform: DeployPlatform;
+  platformDetection: PlatformDetection;
+  vercel: VercelInfo;
+  /** `.env*` files (Next.js / Vercel) with their variable names; values are never read into memory beyond parsing. */
+  envFiles: EnvFileInfo[];
+  /** `tsconfig.json` excludes `hypdriv.worker.ts` (needed before `.open-next/` exists). */
+  tsconfigExcludesWorker: boolean | null;
   /** Running inside the HypDriv monorepo itself. */
   inHypDrivMonorepo: boolean;
   /** `pnpm-workspace.yaml` exists at the repo root. */
@@ -105,14 +151,58 @@ export interface ProjectInfo {
   sources: SourceScanResult;
 }
 
-const NEXT_CONFIG_FILES = ['next.config.ts', 'next.config.mts', 'next.config.mjs', 'next.config.js', 'next.config.cjs'];
-const PROXY_FILES = ['proxy.ts', 'proxy.mts', 'proxy.js', 'proxy.mjs', 'src/proxy.ts', 'src/proxy.mts', 'src/proxy.js', 'src/proxy.mjs'];
-const MIDDLEWARE_FILES = ['middleware.ts', 'middleware.js', 'middleware.mts', 'src/middleware.ts', 'src/middleware.js'];
-const INSTRUMENTATION_FILES = ['instrumentation.ts', 'instrumentation.js', 'src/instrumentation.ts', 'src/instrumentation.js'];
+const NEXT_CONFIG_FILES = [
+  'next.config.ts',
+  'next.config.mts',
+  'next.config.mjs',
+  'next.config.js',
+  'next.config.cjs',
+];
+const PROXY_FILES = [
+  'proxy.ts',
+  'proxy.mts',
+  'proxy.js',
+  'proxy.mjs',
+  'src/proxy.ts',
+  'src/proxy.mts',
+  'src/proxy.js',
+  'src/proxy.mjs',
+];
+const MIDDLEWARE_FILES = [
+  'middleware.ts',
+  'middleware.js',
+  'middleware.mts',
+  'src/middleware.ts',
+  'src/middleware.js',
+];
+const INSTRUMENTATION_FILES = [
+  'instrumentation.ts',
+  'instrumentation.js',
+  'src/instrumentation.ts',
+  'src/instrumentation.js',
+];
 const WORKER_FILES = ['hypdriv.worker.ts', 'hypdriv.worker.mts', 'hypdriv.worker.js', 'hypdriv.worker.mjs'];
-const OPEN_NEXT_CONFIG_FILES = ['open-next.config.ts', 'open-next.config.mts', 'open-next.config.js', 'open-next.config.mjs'];
-const LAYOUT_FILES = ['app/layout.tsx', 'app/layout.jsx', 'app/layout.js', 'src/app/layout.tsx', 'src/app/layout.jsx', 'src/app/layout.js'];
-export const TOKENS_FILE_CANDIDATES = ['lib/tokens.ts', 'lib/tokens.js', 'src/lib/tokens.ts', 'app/tokens.ts', 'tokens.ts'];
+const OPEN_NEXT_CONFIG_FILES = [
+  'open-next.config.ts',
+  'open-next.config.mts',
+  'open-next.config.js',
+  'open-next.config.mjs',
+];
+const LAYOUT_FILES = [
+  'app/layout.tsx',
+  'app/layout.jsx',
+  'app/layout.js',
+  'src/app/layout.tsx',
+  'src/app/layout.jsx',
+  'src/app/layout.js',
+];
+export const TOKENS_FILE_CANDIDATES = [
+  'lib/tokens.ts',
+  'lib/tokens.js',
+  'src/lib/tokens.ts',
+  'app/tokens.ts',
+  'tokens.ts',
+];
 
 function declaredRange(pkg: PackageInfo | null, name: string): string | null {
   if (!pkg) return null;
@@ -148,7 +238,11 @@ export function analyzeNextConfig(file: string, source: string): NextConfigAnaly
   return {
     file,
     module: isCjs ? 'cjs' : 'esm',
-    importsWithHypDriv: /\bwithHypDriv\b/.test(source) && /(?:from\s+['"](?:@hypdriv\/next\/config|hypdriv\/config|hypdriv|@hypdriv\/next)['"]|require\(['"](?:@hypdriv\/next\/config|hypdriv\/config|hypdriv)['"]\))/.test(source),
+    importsWithHypDriv:
+      /\bwithHypDriv\b/.test(source) &&
+      /(?:from\s+['"](?:@hypdriv\/next\/config|hypdriv\/config|hypdriv|@hypdriv\/next)['"]|require\(['"](?:@hypdriv\/next\/config|hypdriv\/config|hypdriv)['"]\))/.test(
+        source,
+      ),
     wrapped: /(?:export\s+default|module\.exports\s*=)\s*withHypDriv\s*\(/.test(source),
     adapterPath: str(/\badapterPath\s*:\s*['"`]([^'"`]+)['"`]/),
     output: str(/\boutput\s*:\s*['"`]([^'"`]+)['"`]/),
@@ -175,15 +269,22 @@ function readDevVars(root: string): DevVarsInfo {
       if (!line || line.startsWith('#')) continue;
       const eq = line.indexOf('=');
       if (eq === -1) continue;
-      const key = line.slice(0, eq).trim().replace(/^export\s+/, '');
+      const key = line
+        .slice(0, eq)
+        .trim()
+        .replace(/^export\s+/, '');
       let value = line.slice(eq + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1);
       keys.push(key);
       lengths[key] = value.length;
     }
   }
-  const gitignore = readText(join(root, '.gitignore')) ?? readText(join(findRepoRoot(root), '.gitignore')) ?? '';
-  const gitignored = gitignore.split(/\r?\n/).some((l) => /^\s*\.dev\.vars(\*|\.\*)?\s*$/.test(l) || /^\s*\.dev\.vars\*?\s*$/.test(l));
+  const gitignore =
+    readText(join(root, '.gitignore')) ?? readText(join(findRepoRoot(root), '.gitignore')) ?? '';
+  const gitignored = gitignore
+    .split(/\r?\n/)
+    .some((l) => /^\s*\.dev\.vars(\*|\.\*)?\s*$/.test(l) || /^\s*\.dev\.vars\*?\s*$/.test(l));
   return { file, exampleFile, keys, lengths, gitignored };
 }
 
@@ -198,7 +299,13 @@ function readWrangler(root: string, pkg: PackageInfo | null): WranglerInfo {
     const file = join(root, name);
     if (!exists(file)) continue;
     try {
-      return { ...base, configFile: file, format, config: parseWranglerConfig(readFileSync(file, 'utf8'), format), parseError: null };
+      return {
+        ...base,
+        configFile: file,
+        format,
+        config: parseWranglerConfig(readFileSync(file, 'utf8'), format),
+        parseError: null,
+      };
     } catch (err) {
       return { ...base, configFile: file, format, config: null, parseError: (err as Error).message };
     }
@@ -223,10 +330,158 @@ function detectHypDrivMonorepo(repoRoot: string): boolean {
   return cli?.name === '@hypdriv/cli';
 }
 
+const ENV_FILES = [
+  '.env',
+  '.env.local',
+  '.env.development',
+  '.env.development.local',
+  '.env.production',
+  '.env.production.local',
+  '.vercel/.env.development.local',
+  '.vercel/.env.preview.local',
+  '.vercel/.env.production.local',
+];
+
+/** Variable names declared in a dotenv-style file. */
+export function parseEnvKeys(text: string): string[] {
+  const keys: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
+    if (m) keys.push(m[1]!);
+  }
+  return keys;
+}
+
+function readEnvFiles(root: string): EnvFileInfo[] {
+  const out: EnvFileInfo[] = [];
+  for (const name of ENV_FILES) {
+    const text = readText(join(root, name));
+    if (text !== null) out.push({ file: name, keys: parseEnvKeys(text) });
+  }
+  return out;
+}
+
+function readVercel(root: string): VercelInfo {
+  const json = join(root, 'vercel.json');
+  const ts = firstExisting(root, ['vercel.ts', 'vercel.mts']);
+  const base: VercelInfo = {
+    configFile: null,
+    format: null,
+    config: null,
+    parseError: null,
+    linked: exists(join(root, '.vercel', 'project.json')),
+    outputDir: isDirectory(join(root, '.vercel', 'output')) ? join(root, '.vercel', 'output') : null,
+    cli: installedVersion(root, 'vercel'),
+  };
+  if (exists(json)) {
+    try {
+      return {
+        ...base,
+        configFile: json,
+        format: 'json',
+        config: parseVercelJson(readFileSync(json, 'utf8')),
+      };
+    } catch (err) {
+      return { ...base, configFile: json, format: 'json', parseError: (err as Error).message };
+    }
+  }
+  if (ts) return { ...base, configFile: ts, format: 'ts', config: readVercelTs(readFileSync(ts, 'utf8')) };
+  return base;
+}
+
+function tsconfigExcludes(root: string, entry: string): boolean | null {
+  const text = readText(join(root, 'tsconfig.json'));
+  if (text === null) return null;
+  try {
+    const doc = parseJsonc(text) as { exclude?: unknown };
+    return Array.isArray(doc.exclude) && doc.exclude.some((e) => e === entry || e === `./${entry}`);
+  } catch {
+    return null;
+  }
+}
+
+interface PlatformInputs {
+  env: Record<string, string | undefined>;
+  wranglerConfig: string | null;
+  cloudflareConfig: string | null;
+  workerFile: string | null;
+  opennext: VersionInfo;
+  vercel: VercelInfo;
+  pkg: PackageInfo | null;
+  nextInstalled: boolean;
+}
+
+/**
+ * Picks the deployment platform from the project's tooling. A Vercel build environment (`VERCEL`)
+ * wins; otherwise the platform with the stronger evidence (config files and adapters weigh more than
+ * a linked `.vercel/` folder or incidental `@vercel/*` packages). Ties go to Cloudflare, HypDriv's
+ * reference target.
+ */
+export function detectPlatform(input: PlatformInputs, forced?: DeployPlatform | null): PlatformDetection {
+  const signals: PlatformDetection['signals'] = { cloudflare: [], vercel: [] };
+  let cf = 0;
+  let vc = 0;
+  const name = (file: string) => file.split(/[\\/]/).pop()!;
+  if (input.wranglerConfig) {
+    signals.cloudflare.push(name(input.wranglerConfig));
+    cf += 3;
+  }
+  if (input.opennext.installed || input.opennext.range) {
+    signals.cloudflare.push('@opennextjs/cloudflare');
+    cf += 3;
+  }
+  if (input.cloudflareConfig) {
+    signals.cloudflare.push(name(input.cloudflareConfig));
+    cf += 2;
+  }
+  if (input.workerFile) {
+    signals.cloudflare.push(name(input.workerFile));
+    cf += 2;
+  }
+  const deps = { ...(input.pkg?.dependencies ?? {}), ...(input.pkg?.devDependencies ?? {}) };
+  if (input.env.VERCEL === '1' || input.env.VERCEL === 'true' || input.env.VERCEL_ENV) {
+    signals.vercel.push('VERCEL environment');
+    vc += 10;
+  }
+  if (input.vercel.configFile) {
+    signals.vercel.push(name(input.vercel.configFile));
+    vc += 3;
+  }
+  if (deps['@hypdriv/vercel']) {
+    signals.vercel.push('@hypdriv/vercel');
+    vc += 3;
+  }
+  if (input.vercel.linked) {
+    signals.vercel.push('.vercel/project.json');
+    vc += 1;
+  }
+  if (input.vercel.outputDir) {
+    signals.vercel.push('.vercel/output');
+    vc += 1;
+  }
+  const vercelDeps = Object.keys(deps).filter((d) => d.startsWith('@vercel/') || d === 'vercel');
+  if (vercelDeps.length && cf === 0) {
+    signals.vercel.push(...vercelDeps.slice(0, 3));
+    vc += 1;
+  }
+  if (forced) return { platform: forced, explicit: true, signals };
+  let platform: DeployPlatform;
+  if (vc >= 10) platform = 'vercel';
+  else if (cf === 0 && vc === 0) platform = input.nextInstalled ? 'node' : 'unknown';
+  else platform = vc > cf ? 'vercel' : 'cloudflare';
+  return { platform, explicit: false, signals };
+}
+
 export interface DetectOptions {
   /** Skip the source scan (faster for commands that do not need it). */
   scan?: boolean;
   nodeVersion?: string;
+  /** Overrides platform detection (`--platform`). */
+  platform?: DeployPlatform | null;
+  /** Environment used for platform signals (default: `process.env`). */
+  env?: Record<string, string | undefined>;
 }
 
 /** Detects everything the commands and doctor checks need to know about a project. Pure reads; never writes. */
@@ -234,59 +489,114 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
   const root = findProjectRoot(resolve(start));
   const repoRoot = findRepoRoot(root);
   const pkg = readPackageJson(root);
-  const srcDir = isDirectory(join(root, 'src')) && !isDirectory(join(root, 'app')) && !isDirectory(join(root, 'pages'));
+  const srcDir =
+    isDirectory(join(root, 'src')) && !isDirectory(join(root, 'app')) && !isDirectory(join(root, 'pages'));
   const appDir = isDirectory(join(root, 'app')) || isDirectory(join(root, 'src', 'app'));
   const pagesDir = isDirectory(join(root, 'pages')) || isDirectory(join(root, 'src', 'pages'));
   const typescript = versionInfo(root, pkg, 'typescript');
   const buildIdFile = join(root, '.next', 'BUILD_ID');
   const hypdrivPackages: Record<string, string> = {};
-  for (const name of ['hypdriv', '@hypdriv/core', '@hypdriv/next', '@hypdriv/cloudflare', '@hypdriv/cli', '@hypdriv/security', '@hypdriv/purser']) {
+  for (const name of [
+    'hypdriv',
+    '@hypdriv/core',
+    '@hypdriv/next',
+    '@hypdriv/cloudflare',
+    '@hypdriv/vercel',
+    '@hypdriv/cli',
+    '@hypdriv/security',
+    '@hypdriv/purser',
+  ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;
   }
   const nextConfigFile = firstExisting(root, NEXT_CONFIG_FILES);
   const purserVersion = installedVersion(root, '@avonao/purser');
+  const wrangler = readWrangler(root, pkg);
+  const vercel = readVercel(root);
+  const opennext = versionInfo(root, pkg, '@opennextjs/cloudflare');
+  const next = versionInfo(root, pkg, 'next');
+  const cloudflareConfigFile = firstExisting(root, [
+    'cloudflare.config.ts',
+    'cloudflare.config.js',
+    'cloudflare.config.mjs',
+  ]);
+  const hypdrivWorkerFile = firstExisting(root, WORKER_FILES);
+  const platformDetection = detectPlatform(
+    {
+      env: options.env ?? process.env,
+      wranglerConfig: wrangler.configFile,
+      cloudflareConfig: cloudflareConfigFile,
+      workerFile: hypdrivWorkerFile,
+      opennext,
+      vercel,
+      pkg,
+      nextInstalled: next.installed !== null || next.range !== null,
+    },
+    options.platform ?? null,
+  );
   return {
     root,
     repoRoot,
+    platform: platformDetection.platform,
+    platformDetection,
+    vercel,
+    envFiles: readEnvFiles(root),
+    tsconfigExcludesWorker: tsconfigExcludes(root, 'hypdriv.worker.ts'),
     inHypDrivMonorepo: detectHypDrivMonorepo(repoRoot),
     workspace: exists(join(repoRoot, 'pnpm-workspace.yaml')),
-    packageManager: detectPackageManager(root),
+    // pnpm-workspace.yaml implies pnpm even before a lockfile exists
+    packageManager: ((pm) =>
+      pm === 'npm' && !pkg?.packageManager && exists(join(repoRoot, 'pnpm-workspace.yaml')) ? 'pnpm' : pm)(
+      detectPackageManager(root),
+    ),
     packageJson: pkg,
     name: pkg?.name ?? basename(root),
     srcDir,
     router: { app: appDir, pages: pagesDir },
     node: options.nodeVersion ?? process.versions.node,
     typescript: { ...typescript, major: parseVersion(typescript.installed)?.major ?? null },
-    next: versionInfo(root, pkg, 'next'),
+    next,
     react: versionInfo(root, pkg, 'react'),
-    opennext: versionInfo(root, pkg, '@opennextjs/cloudflare'),
-    wrangler: readWrangler(root, pkg),
-    cloudflareConfigFile: firstExisting(root, ['cloudflare.config.ts', 'cloudflare.config.js', 'cloudflare.config.mjs']),
+    opennext,
+    wrangler,
+    cloudflareConfigFile,
     nextConfig: nextConfigFile ? analyzeNextConfig(nextConfigFile, readText(nextConfigFile) ?? '') : null,
     proxyFile: firstExisting(root, PROXY_FILES),
     middlewareFile: firstExisting(root, MIDDLEWARE_FILES),
     instrumentationFile: firstExisting(root, INSTRUMENTATION_FILES),
     hypdrivConfigFile: findConfigFile(root),
-    hypdrivWorkerFile: firstExisting(root, WORKER_FILES),
+    hypdrivWorkerFile,
     openNextConfigFile: firstExisting(root, OPEN_NEXT_CONFIG_FILES),
-    openNextWorkerFile: exists(join(root, '.open-next', 'worker.js')) ? join(root, '.open-next', 'worker.js') : null,
-    nextBuild: isDirectory(join(root, '.next')) ? { dir: join(root, '.next'), buildId: readText(buildIdFile)?.trim() ?? null } : null,
+    openNextWorkerFile: exists(join(root, '.open-next', 'worker.js'))
+      ? join(root, '.open-next', 'worker.js')
+      : null,
+    nextBuild: isDirectory(join(root, '.next'))
+      ? { dir: join(root, '.next'), buildId: readText(buildIdFile)?.trim() ?? null }
+      : null,
     manifest: readManifestInfo(root),
     headersFile: exists(join(root, 'public', '_headers')) ? join(root, 'public', '_headers') : null,
     devVars: readDevVars(root),
     purser: {
       installed: purserVersion,
       tokensFile: TOKENS_FILE_CANDIDATES.find((c) => exists(join(root, c))) ?? null,
-      strikeScript: purserVersion !== null && exists(join(findPackageDir(root, '@avonao/purser') ?? '', 'scripts', 'strike-count.js')),
+      strikeScript:
+        purserVersion !== null &&
+        exists(join(findPackageDir(root, '@avonao/purser') ?? '', 'scripts', 'strike-count.js')),
     },
     hypdriv: {
-      installed: hypdrivPackages.hypdriv ?? hypdrivPackages['@hypdriv/next'] ?? hypdrivPackages['@hypdriv/core'] ?? null,
+      installed:
+        hypdrivPackages.hypdriv ??
+        hypdrivPackages['@hypdriv/next'] ??
+        hypdrivPackages['@hypdriv/core'] ??
+        null,
       range: declaredRange(pkg, 'hypdriv') ?? declaredRange(pkg, '@hypdriv/next') ?? null,
       packages: hypdrivPackages,
     },
     layoutFile: firstExisting(root, LAYOUT_FILES),
-    sources: options.scan === false ? { filesScanned: 0, truncated: false, edgeRuntime: [], nodeApis: [] } : scanSources(root),
+    sources:
+      options.scan === false
+        ? { filesScanned: 0, truncated: false, edgeRuntime: [], nodeApis: [] }
+        : scanSources(root),
   };
 }
 
@@ -303,7 +613,11 @@ export function findPackageDir(root: string, name: string): string | null {
 }
 
 /** Command prefix that runs a locally installed binary with the detected package manager. */
-export function execCommand(pm: PackageManager, bin: string, args: string[]): { command: string; args: string[] } {
+export function execCommand(
+  pm: PackageManager,
+  bin: string,
+  args: string[],
+): { command: string; args: string[] } {
   switch (pm) {
     case 'pnpm':
       return { command: 'pnpm', args: ['exec', bin, ...args] };

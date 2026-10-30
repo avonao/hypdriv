@@ -1,3 +1,5 @@
+import type { DeployTarget } from '../config/types';
+
 export type RuntimeKind = 'workerd' | 'node' | 'bun' | 'deno' | 'browser' | 'unknown';
 
 declare const navigator: { userAgent?: string } | undefined;
@@ -20,7 +22,8 @@ export function detectRuntime(): RuntimeKind {
     else if (typeof EdgeRuntime !== 'undefined') kind = 'workerd';
     else if (typeof Deno !== 'undefined') kind = 'deno';
     else if (typeof Bun !== 'undefined') kind = 'bun';
-    else if (typeof process !== 'undefined' && process?.versions?.node !== undefined) kind = 'node';
+    // Read through globalThis: bundlers for edge runtimes flag direct `process.versions` access.
+    else if ((globalThis as { process?: { versions?: Record<string, string> } }).process?.versions?.node !== undefined) kind = 'node';
     else if (typeof window !== 'undefined') kind = 'browser';
   } catch {
     kind = 'unknown';
@@ -77,4 +80,21 @@ export function now(): number {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
     : Date.now();
+}
+
+
+const VERCEL_REQUEST_CONTEXT = Symbol.for('@vercel/request-context');
+
+/**
+ * Resolves the deploy target: an explicit `platform` config wins; otherwise Vercel is detected from
+ * `VERCEL=1` / `NEXT_EDGE_RUNTIME_PROVIDER=vercel` or the Vercel request context, Cloudflare from the
+ * workerd runtime or `WORKERS_CI`/`CF_PAGES`, and everything else is a plain Node host.
+ */
+export function detectDeployTarget(env?: Record<string, unknown>, configured: 'auto' | DeployTarget = 'auto'): DeployTarget {
+  if (configured !== 'auto') return configured;
+  if (readEnv(env, 'VERCEL') === '1' || readEnv(env, 'NEXT_EDGE_RUNTIME_PROVIDER') === 'vercel') return 'vercel';
+  if ((globalThis as Record<symbol, unknown>)[VERCEL_REQUEST_CONTEXT] !== undefined) return 'vercel';
+  if (isWorkerd() && typeof (globalThis as { navigator?: { userAgent?: string } }).navigator?.userAgent === 'string') return 'cloudflare';
+  if (readEnv(env, 'WORKERS_CI') === '1' || readEnv(env, 'CF_PAGES') === '1') return 'cloudflare';
+  return 'node';
 }

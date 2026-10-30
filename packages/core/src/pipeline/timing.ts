@@ -42,13 +42,14 @@ export class Timings {
   }
 
   /**
-   * Renders the header. `compact` keeps `total`, `cache`, `csp` and any entry whose name starts with
-   * `app.`; `verbose` includes every stage. Names are sanitised to tokens, descriptions quoted.
+   * Renders the header. `compact` keeps `total`, `cache`, `csp`, the DevTools `hyp-*` facts and any entry
+   * whose name starts with `app.`; `verbose` includes every stage. Names are sanitised to tokens,
+   * descriptions quoted.
    */
   toHeader(mode: ServerTimingMode): string {
     if (mode === 'off') return '';
     const keep = (e: TimingEntry) =>
-      mode === 'verbose' || COMPACT_KEEP.has(e.name) || e.name.startsWith('app.');
+      mode === 'verbose' || COMPACT_KEEP.has(e.name) || e.name.startsWith('app.') || e.name.startsWith('hyp-');
     const merged = new Map<string, TimingEntry>();
     for (const e of this.entries) {
       if (!keep(e)) continue;
@@ -69,7 +70,8 @@ function serializeEntry(e: TimingEntry): string {
   const name = e.name.replace(/[^A-Za-z0-9_.-]/g, '_');
   let out = name;
   if (e.dur !== undefined) out += `;dur=${e.dur < 10 ? e.dur.toFixed(2) : e.dur.toFixed(1)}`;
-  if (e.desc) out += `;desc=${JSON.stringify(e.desc.replace(/[\r\n"]/g, ' ').slice(0, 120))}`;
+  // DevTools facts (`hyp-*`, e.g. encoded public flags) may be longer than ordinary descriptions.
+  if (e.desc) out += `;desc=${JSON.stringify(e.desc.replace(/[\r\n"]/g, ' ').slice(0, name.startsWith('hyp-') ? 1024 : 120))}`;
   return out;
 }
 

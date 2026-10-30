@@ -57,3 +57,4 @@ export type {
   Purger,
   TagIndex,
 } from './types';
+export { type EdgePurger, getEdgePurger, registerEdgePurger } from './registry';

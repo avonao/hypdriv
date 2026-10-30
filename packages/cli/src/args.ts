@@ -16,8 +16,16 @@ export type OptionSpec = Record<string, OptionDefinition>;
 
 /** Options every command accepts. */
 export const GLOBAL_OPTIONS: OptionSpec = {
-  json: { type: 'boolean', description: 'Machine-readable output: one JSON document on stdout, nothing else' },
+  json: {
+    type: 'boolean',
+    description: 'Machine-readable output: one JSON document on stdout, nothing else',
+  },
   root: { type: 'string', value: '<dir>', description: 'Project directory (default: nearest package.json)' },
+  platform: {
+    type: 'string',
+    value: '<name>',
+    description: 'Deployment target: cloudflare | vercel | node (default: detected)',
+  },
   help: { type: 'boolean', short: 'h', description: 'Show help for the command' },
   'no-color': { type: 'boolean', description: 'Disable colours (NO_COLOR=1 does the same)' },
 };
@@ -106,9 +114,12 @@ export function parseCommandArgs(argv: string[], spec: OptionSpec): ParsedArgs {
       if (raw === undefined || raw === '') return fallback;
       const n = Number(raw);
       if (!Number.isFinite(n)) throw new UsageError(`--${name} expects a number, got "${raw}"`);
-      if (opts.integer !== false && !Number.isInteger(n)) throw new UsageError(`--${name} expects an integer`);
-      if (opts.min !== undefined && n < opts.min) throw new UsageError(`--${name} must be at least ${opts.min}`);
-      if (opts.max !== undefined && n > opts.max) throw new UsageError(`--${name} must be at most ${opts.max}`);
+      if (opts.integer !== false && !Number.isInteger(n))
+        throw new UsageError(`--${name} expects an integer`);
+      if (opts.min !== undefined && n < opts.min)
+        throw new UsageError(`--${name} must be at least ${opts.min}`);
+      if (opts.max !== undefined && n > opts.max)
+        throw new UsageError(`--${name} must be at most ${opts.max}`);
       return n;
     },
     list(name) {
@@ -138,7 +149,8 @@ export interface CommandInfo {
 function optionLines(spec: OptionSpec): string[] {
   const rows = Object.entries(spec).map(([name, def]) => {
     const flag = `${def.short ? `-${def.short}, ` : '    '}--${name}${def.type === 'string' ? ` ${def.value ?? '<value>'}` : ''}`;
-    const extra = def.default !== undefined && def.default !== false ? ` (default: ${String(def.default)})` : '';
+    const extra =
+      def.default !== undefined && def.default !== false ? ` (default: ${String(def.default)})` : '';
     return [flag, `${def.description}${extra}`] as const;
   });
   const width = Math.max(0, ...rows.map(([flag]) => flag.length));

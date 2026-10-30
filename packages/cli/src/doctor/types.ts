@@ -2,13 +2,14 @@ import type { HypManifest } from '@hypdriv/core';
 import type { AnalyzeSnapshot } from '../analyze/weights';
 import type { LoadedConfig } from '../context';
 import type { IO } from '../io';
-import type { ProjectInfo } from '../project';
+import type { DeployPlatform, ProjectInfo } from '../project';
 
 export type CheckCategory =
   | 'environment'
   | 'nextjs'
   | 'opennext'
   | 'wrangler'
+  | 'vercel'
   | 'workers-compat'
   | 'hypdriv'
   | 'size'
@@ -21,6 +22,7 @@ export const CHECK_CATEGORIES: CheckCategory[] = [
   'nextjs',
   'opennext',
   'wrangler',
+  'vercel',
   'workers-compat',
   'hypdriv',
   'size',
@@ -34,6 +36,7 @@ export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   nextjs: 'Next.js',
   opennext: 'OpenNext',
   wrangler: 'Wrangler',
+  vercel: 'Vercel',
   'workers-compat': 'Workers compatibility',
   hypdriv: 'HypDriv',
   size: 'Size and startup',
@@ -82,6 +85,8 @@ export interface Check {
   category: CheckCategory;
   /** Worst status this check produces when it finds something. */
   severity: CheckSeverity;
+  /** Platforms the check applies to (default: all). Elsewhere it reports `skip`. */
+  platforms?: DeployPlatform[];
   run(ctx: CheckContext): Promise<CheckResult> | CheckResult;
 }
 
@@ -90,6 +95,7 @@ export interface CheckReport {
   title: string;
   category: CheckCategory;
   severity: CheckSeverity;
+  platforms: DeployPlatform[] | 'all';
   status: CheckStatus;
   message: string;
   details?: string[];
@@ -101,10 +107,26 @@ export interface CheckReport {
 }
 
 /** Convenience constructors. */
-export const pass = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({ status: 'pass', message, ...extra });
-export const warn = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({ status: 'warn', message, ...extra });
-export const fail = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({ status: 'fail', message, ...extra });
-export const skip = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({ status: 'skip', message, ...extra });
+export const pass = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({
+  status: 'pass',
+  message,
+  ...extra,
+});
+export const warn = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({
+  status: 'warn',
+  message,
+  ...extra,
+});
+export const fail = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({
+  status: 'fail',
+  message,
+  ...extra,
+});
+export const skip = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({
+  status: 'skip',
+  message,
+  ...extra,
+});
 export const info = (message: string, extra: Partial<CheckResult> = {}): CheckResult => ({
   status: 'pass',
   message,

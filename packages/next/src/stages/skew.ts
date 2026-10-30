@@ -1,4 +1,11 @@
-import { HEADER, type ResolvedConfig, type Stage, defineStage, isHtmlLike, isRscRequest } from '@hypdriv/core';
+import {
+  defineStage,
+  HEADER,
+  isHtmlLike,
+  isRscRequest,
+  type ResolvedConfig,
+  type Stage,
+} from '@hypdriv/core';
 
 /**
  * Skew protection assist. Next.js sends `x-deployment-id` on client fetches when `deploymentId` is
@@ -22,16 +29,26 @@ export function skewStage(config: ResolvedConfig): Stage | null {
       // A non-RSC response to an RSC request triggers a hard navigation in the Next.js client.
       return new Response('', {
         status: 200,
-        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', [HEADER.skew]: '1', [HEADER.deploymentId]: current },
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          [HEADER.skew]: '1',
+          [HEADER.deploymentId]: current,
+        },
       });
     },
     post(ctx, response) {
       const current = ctx.manifest.deploymentId ?? skew.deploymentId;
-      if (!current || !isHtmlLike(ctx, response) || response.headers.has(HEADER.deploymentId)) return response;
+      if (!current || !isHtmlLike(ctx, response) || response.headers.has(HEADER.deploymentId))
+        return response;
       const headers = new Headers(response.headers);
       headers.set(HEADER.deploymentId, current);
       headers.set('x-hypdriv-build', ctx.manifest.buildId);
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     },
   });
 }

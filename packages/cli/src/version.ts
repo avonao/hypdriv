@@ -17,7 +17,10 @@ export function cliVersion(): string {
     let dir = dirname(fileURLToPath(import.meta.url));
     for (let i = 0; i < 4; i++) {
       try {
-        const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name?: string; version?: string };
+        const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+          name?: string;
+          version?: string;
+        };
         if (pkg.name === '@hypdriv/cli' && pkg.version) {
           cached = pkg.version;
           return cached;

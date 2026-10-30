@@ -14,6 +14,8 @@ export interface TemplateOptions {
   srcDir: boolean;
   /** Cron jobs already declared in an existing config (for the wrangler template). */
   crons?: string[];
+  /** Deployment target (default `cloudflare`). */
+  platform?: 'cloudflare' | 'vercel' | 'node';
 }
 
 /** Sanitises a package name into a Worker name (`@acme/shop` → `acme-shop`). */
@@ -70,8 +72,8 @@ export default defineConfig({
   },
   observe: { tracing: { exporter: 'console' }, vitals: { sink: 'log' } },
   // flags: { definitions: { newHero: { description: 'New landing hero', default: false } } },
-  // jobs: { cron: { digest: { cron: '0 9 * * 1', path: '/api/jobs/digest' } } },
-  budgets: { routes: { '/**': { js: '300kb' } }, worker: { gzip: '3mb' } },
+  // jobs: { cron: { digest: { cron: '0 9 * * 1', path: '/api/jobs/digest' } } },${o.platform === 'vercel' ? ' // + `hypdriv doctor --fix` syncs vercel.json crons' : ''}
+  budgets: { routes: { '/**': { js: '300kb' } }${(o.platform ?? 'cloudflare') === 'cloudflare' ? ", worker: { gzip: '3mb' }" : ''} },
 ${purser}});
 `;
 }
@@ -129,6 +131,17 @@ export function headersTemplate(): string {
   return HEADERS_RULE;
 }
 
+/** `.env.example` for Vercel / Node deployments (Vercel env vars mirror these names). */
+export function envExampleTemplate(o: { crons: boolean }): string {
+  return `# Copy to .env.local for \`next dev\`; on Vercel set them with \`vercel env add <NAME>\`.
+HYPDRIV_SESSION_SECRET=change-me-32-bytes-minimum-please-really
+HYPDRIV_INTERNAL_SECRET=change-me-too
+${o.crons ? '' : '# '}CRON_SECRET=change-me-16-chars-min
+# CACHE_PURGE_API_TOKEN=
+# TURNSTILE_SECRET_KEY=
+`;
+}
+
 export function devVarsExampleTemplate(): string {
   return `NEXTJS_ENV=development
 HYPDRIV_SESSION_SECRET=change-me-32-bytes-minimum-please-really
@@ -171,13 +184,22 @@ export function wranglerTemplate(o: TemplateOptions & { compatibilityDate: strin
 `;
 }
 
-/** Scripts added to package.json. */
-export function scriptsTemplate(): Record<string, string> {
+/** Scripts added to package.json (the audit targets the platform's local preview server). */
+export function scriptsTemplate(
+  platform: 'cloudflare' | 'vercel' | 'node' = 'cloudflare',
+): Record<string, string> {
+  if (platform === 'cloudflare') {
+    return {
+      'cf-typegen': 'wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts',
+      'hypdriv:doctor': 'hypdriv doctor',
+      'hypdriv:analyze': 'hypdriv analyze',
+      'hypdriv:audit': 'hypdriv audit all --url http://localhost:8787',
+    };
+  }
   return {
-    'cf-typegen': 'wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts',
     'hypdriv:doctor': 'hypdriv doctor',
     'hypdriv:analyze': 'hypdriv analyze',
-    'hypdriv:audit': 'hypdriv audit all --url http://localhost:8787',
+    'hypdriv:audit': 'hypdriv audit all --url http://localhost:3000',
   };
 }
 

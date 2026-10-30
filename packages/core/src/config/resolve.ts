@@ -536,6 +536,7 @@ export function resolveConfig(input: HypDrivConfig = {}): ResolvedConfig {
   const jobs = input.jobs ?? {};
   const budgets = input.budgets ?? {};
   const cf = input.cloudflare ?? {};
+  const vc = input.vercel ?? {};
   const redirects = input.redirects ?? {};
   const maintenance = input.maintenance ?? {};
   const flags = input.flags ?? {};
@@ -577,7 +578,7 @@ export function resolveConfig(input: HypDrivConfig = {}): ResolvedConfig {
       authorize: live.authorize ?? null,
     },
     images: {
-      loader: images.loader ?? 'cloudflare',
+      loader: images.loader ?? 'auto',
       cdnCgi: images.cdnCgi ?? 'auto',
       quality: images.quality ?? 75,
       formats: arr(images.formats, ['auto']),
@@ -644,6 +645,28 @@ export function resolveConfig(input: HypDrivConfig = {}): ResolvedConfig {
       internalPathPrefix: cf.internalPathPrefix ?? INTERNAL_PATH_PREFIX,
       skipStaticAssets: cf.skipStaticAssets ?? true,
       health: cf.health ?? true,
+    },
+    platform: input.platform ?? 'auto',
+    vercel: {
+      cdn: vc.cdn === false ? null : { downstream: typeof vc.cdn === 'object' ? (vc.cdn.downstream ?? false) : false },
+      globalConfig: vc.globalConfig === false ? null : { connectionEnv: vc.globalConfig?.connectionEnv ?? ['GLOBAL_CONFIG', 'EDGE_CONFIG'] },
+      redis:
+        vc.redis === false
+          ? null
+          : {
+              urlEnv: vc.redis?.urlEnv ?? ['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL'],
+              tokenEnv: vc.redis?.tokenEnv ?? ['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN'],
+              prefix: vc.redis?.prefix ?? 'hypdriv:',
+            },
+      firewall: { rateLimitRules: { ...(vc.firewall?.rateLimitRules ?? {}) } },
+      botId: vc.botId ? { checkLevel: vc.botId.checkLevel ?? 'basic' } : null,
+      purge: {
+        tokenEnv: vc.purge?.tokenEnv ?? 'VERCEL_TOKEN',
+        teamIdEnv: vc.purge?.teamIdEnv ?? 'VERCEL_TEAM_ID',
+        projectIdEnv: vc.purge?.projectIdEnv ?? 'VERCEL_PROJECT_ID',
+      },
+      cronSecretEnv: vc.cronSecretEnv ?? 'CRON_SECRET',
+      queues: { ...(vc.queues ?? {}) },
     },
     devtools: {
       enabled: devtools.enabled ?? 'development',

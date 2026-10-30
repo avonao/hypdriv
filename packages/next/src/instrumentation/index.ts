@@ -1,6 +1,19 @@
-import { type HypDrivConfig, type HypDrivEnv, type Logger, type ResolvedConfig, detectCapabilities, loadConfig } from '@hypdriv/core';
-import { type NextOnRequestError, type RequestErrorEvent, type Tracer, createLogger, onRequestError as observeOnRequestError } from '@hypdriv/observe';
-import { createConfiguredTracer } from '../stages';
+import {
+  detectCapabilities,
+  type HypDrivConfig,
+  type HypDrivEnv,
+  type Logger,
+  loadConfig,
+  type ResolvedConfig,
+} from '@hypdriv/core';
+import {
+  createLogger,
+  type NextOnRequestError,
+  onRequestError as observeOnRequestError,
+  type RequestErrorEvent,
+  type Tracer,
+} from '@hypdriv/observe';
+import { createConfiguredTracer } from '../shared/tracer';
 
 export interface InstrumentationOptions {
   config?: HypDrivConfig | ResolvedConfig;
@@ -29,9 +42,16 @@ function isResolved(config: HypDrivConfig | ResolvedConfig | undefined): config 
  * `observe.errors.sink`: `'log'` logs a redacted, structured error event; `'otlp'` additionally records
  * it as an exception span parented to the request's `traceparent`; `'none'` disables the hook.
  */
-export function createInstrumentation(options: InstrumentationOptions = {}): { register(): Promise<void>; onRequestError: NextOnRequestError } {
-  const resolved = isResolved(options.config) ? options.config : loadConfig((options.config as HypDrivConfig | undefined) ?? {});
-  const log = options.log ?? createLogger(resolved.observe.logging, { service: resolved.site.name, component: 'instrumentation' });
+export function createInstrumentation(options: InstrumentationOptions = {}): {
+  register(): Promise<void>;
+  onRequestError: NextOnRequestError;
+} {
+  const resolved = isResolved(options.config)
+    ? options.config
+    : loadConfig((options.config as HypDrivConfig | undefined) ?? {});
+  const log =
+    options.log ??
+    createLogger(resolved.observe.logging, { service: resolved.site.name, component: 'instrumentation' });
   const errors = resolved.observe.errors;
   if (errors.sink === 'none') {
     return {
@@ -46,8 +66,18 @@ export function createInstrumentation(options: InstrumentationOptions = {}): { r
     if (!built) {
       let tracer = options.tracer;
       if (tracer === undefined) {
-        tracer = errors.sink === 'otlp' ? createConfiguredTracer(resolved, env, detectCapabilities(env as Record<string, unknown>, resolved)) : null;
-        if (errors.sink === 'otlp' && !tracer) log.warn('hypdriv: observe.errors.sink is "otlp" but observe.tracing is not configured; errors are logged only');
+        tracer =
+          errors.sink === 'otlp'
+            ? createConfiguredTracer(
+                resolved,
+                env,
+                detectCapabilities(env as Record<string, unknown>, resolved),
+              )
+            : null;
+        if (errors.sink === 'otlp' && !tracer)
+          log.warn(
+            'hypdriv: observe.errors.sink is "otlp" but observe.tracing is not configured; errors are logged only',
+          );
       }
       built = observeOnRequestError({
         log,
@@ -61,7 +91,10 @@ export function createInstrumentation(options: InstrumentationOptions = {}): { r
   };
   return {
     async register() {
-      log.debug('hypdriv instrumentation registered', { runtime: (typeof process !== 'undefined' && process.env.NEXT_RUNTIME) || 'nodejs', errors: errors.sink });
+      log.debug('hypdriv instrumentation registered', {
+        runtime: (typeof process !== 'undefined' && process.env.NEXT_RUNTIME) || 'nodejs',
+        errors: errors.sink,
+      });
     },
     onRequestError: hook,
   };
@@ -71,7 +104,9 @@ export function createInstrumentation(options: InstrumentationOptions = {}): { r
  * Helper for `instrumentation-client.ts`: reports navigation timings to the console in development.
  * Returns the function to assign to `onRouterTransitionStart`.
  */
-export function createClientInstrumentation(options: { log?: (message: string, fields: Record<string, unknown>) => void } = {}) {
+export function createClientInstrumentation(
+  options: { log?: (message: string, fields: Record<string, unknown>) => void } = {},
+) {
   const log = options.log ?? ((m: string, f: Record<string, unknown>) => console.debug(m, f));
   let started = 0;
   return {

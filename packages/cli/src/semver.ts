@@ -89,9 +89,10 @@ export function rangeBase(range: string | null | undefined): RangeBase | null {
   const text = range.trim();
   if (!text || text === '*' || text === 'latest' || text === 'x') return null;
   if (text.includes('||') || text.includes(' - ') || /\s/.test(text)) return null;
-  const m = /^(\^|~|>=|>|=|<=|<)?v?(\d+)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
-    text,
-  );
+  const m =
+    /^(\^|~|>=|>|=|<=|<)?v?(\d+)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
+      text,
+    );
   if (!m) return null;
   const operator = m[1] ?? '';
   if (operator === '<' || operator === '<=') return null;
@@ -111,7 +112,10 @@ export function rangeBase(range: string | null | undefined): RangeBase | null {
  * Classifies `latest` against the base of `currentRange`. Prereleases are ignored unless the current
  * version is itself a prerelease.
  */
-export function classifyUpdate(currentRange: string | null | undefined, latest: string | null | undefined): UpdateDiff {
+export function classifyUpdate(
+  currentRange: string | null | undefined,
+  latest: string | null | undefined,
+): UpdateDiff {
   const base = rangeBase(currentRange);
   const next = parseVersion(latest);
   if (!base || !next) return 'unknown';
@@ -126,7 +130,10 @@ export function classifyUpdate(currentRange: string | null | undefined, latest: 
 }
 
 /** Highest stable version in a list (prereleases ignored unless nothing else exists). */
-export function highestVersion(versions: string[], options: { allowPrerelease?: boolean } = {}): string | null {
+export function highestVersion(
+  versions: string[],
+  options: { allowPrerelease?: boolean } = {},
+): string | null {
   let best: SemVer | null = null;
   let bestAny: SemVer | null = null;
   for (const raw of versions) {

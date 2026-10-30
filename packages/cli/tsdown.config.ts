@@ -2,12 +2,14 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
-      'index': 'src/index.ts',
-      'bin': 'src/bin.ts'
+    index: 'src/index.ts',
+    bin: 'src/bin.ts',
   },
   format: ['esm'],
   platform: 'node',
   target: 'es2023',
+  // package.json maps the bin and exports to `dist/*.js` (the package is `"type": "module"`).
+  fixedExtension: false,
   external: [/^node:/, /^cloudflare:/],
   dts: true,
   sourcemap: true,

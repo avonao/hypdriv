@@ -51,7 +51,14 @@ export function scriptSources(directives: CspDirectives): string[] {
   return Array.isArray(own) ? own : [];
 }
 
-const EXECUTABLE_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module', 'speculationrules', 'importmap']);
+const EXECUTABLE_TYPES = new Set([
+  '',
+  'text/javascript',
+  'application/javascript',
+  'module',
+  'speculationrules',
+  'importmap',
+]);
 const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 const ATTR_RE = /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 

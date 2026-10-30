@@ -1,4 +1,13 @@
-import { type GeoProperties, HEADER, type HypContext, type ResolvedConfig, type Stage, base64UrlEncode, defineStage, stateKey } from '@hypdriv/core';
+import {
+  base64UrlEncode,
+  defineStage,
+  type GeoProperties,
+  HEADER,
+  type HypContext,
+  type ResolvedConfig,
+  type Stage,
+  stateKey,
+} from '@hypdriv/core';
 
 export interface GeoInfo {
   country: string | null;
@@ -15,12 +24,40 @@ export interface GeoInfo {
   asOrganization: string | null;
   isEU: boolean;
   /** Where the data came from. */
-  source: 'cloudflare' | 'headers' | 'none';
+  source: 'cloudflare' | 'vercel' | 'headers' | 'none';
 }
 
 export const GEO_KEY = stateKey<GeoInfo>('next.geo');
 
-const EU = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
+const EU = new Set([
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DK',
+  'EE',
+  'FI',
+  'FR',
+  'DE',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LV',
+  'LT',
+  'LU',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SK',
+  'SI',
+  'ES',
+  'SE',
+]);
 
 function num(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -56,7 +93,8 @@ export function geoFrom(cf: GeoProperties | undefined, headers: Headers): GeoInf
       source: 'cloudflare',
     };
   }
-  const country = headers.get('cf-ipcountry') ?? headers.get('x-vercel-ip-country') ?? headers.get('x-country-code');
+  const country =
+    headers.get('cf-ipcountry') ?? headers.get('x-vercel-ip-country') ?? headers.get('x-country-code');
   if (country && country !== 'XX' && country !== 'T1') {
     const decode = (v: string | null) => {
       if (!v) return null;
@@ -66,24 +104,43 @@ export function geoFrom(cf: GeoProperties | undefined, headers: Headers): GeoInf
         return v;
       }
     };
+    const vercel = headers.has('x-vercel-ip-country');
+    // `x-vercel-id` is `<edge region>::<function region>::<id>`; the first hop is the closest PoP.
+    const vercelPop = vercel ? (headers.get('x-vercel-id')?.split('::')[0] ?? null) : null;
+    const subdivision = decode(headers.get('x-vercel-ip-country-region'));
     return {
       country,
-      region: decode(headers.get('x-vercel-ip-country-region')),
-      regionCode: null,
+      region: subdivision,
+      regionCode: subdivision,
       city: decode(headers.get('cf-ipcity') ?? headers.get('x-vercel-ip-city')),
       continent: headers.get('cf-ipcontinent') ?? headers.get('x-vercel-ip-continent'),
-      postalCode: null,
+      postalCode: decode(headers.get('x-vercel-ip-postal-code')),
       timezone: headers.get('x-vercel-ip-timezone'),
       latitude: num(headers.get('cf-iplatitude') ?? headers.get('x-vercel-ip-latitude')),
       longitude: num(headers.get('cf-iplongitude') ?? headers.get('x-vercel-ip-longitude')),
-      colo: null,
+      colo: vercelPop,
       asn: null,
       asOrganization: null,
       isEU: EU.has(country),
-      source: 'headers',
+      source: vercel ? 'vercel' : 'headers',
     };
   }
-  return { country: null, region: null, regionCode: null, city: null, continent: null, postalCode: null, timezone: null, latitude: null, longitude: null, colo: null, asn: null, asOrganization: null, isEU: false, source: 'none' };
+  return {
+    country: null,
+    region: null,
+    regionCode: null,
+    city: null,
+    continent: null,
+    postalCode: null,
+    timezone: null,
+    latitude: null,
+    longitude: null,
+    colo: null,
+    asn: null,
+    asOrganization: null,
+    isEU: false,
+    source: 'none',
+  };
 }
 
 /** Encodes geo info for the `x-hypdriv-geo` request header. */

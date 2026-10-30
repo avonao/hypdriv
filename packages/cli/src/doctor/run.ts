@@ -41,7 +41,33 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-async function runOne(check: Check, ctx: CheckContext, timeoutMs: number): Promise<{ result: CheckResult; durationMs: number }> {
+const PLATFORM_LABEL: Record<string, string> = {
+  cloudflare: 'Cloudflare Workers',
+  vercel: 'Vercel',
+  node: 'Node.js (next start)',
+  unknown: 'an unknown platform',
+};
+
+/** `true` when a check applies to the project's platform. */
+export function appliesTo(check: Check, platform: CheckContext['project']['platform']): boolean {
+  return !check.platforms || check.platforms.includes(platform);
+}
+
+async function runOne(
+  check: Check,
+  ctx: CheckContext,
+  timeoutMs: number,
+): Promise<{ result: CheckResult; durationMs: number }> {
+  if (check.platforms && !appliesTo(check, ctx.project.platform)) {
+    const targets = check.platforms!.map((p) => PLATFORM_LABEL[p] ?? p).join(' / ');
+    return {
+      result: {
+        status: 'skip',
+        message: `applies to ${targets}; detected platform: ${ctx.project.platform} (use --platform to override).`,
+      },
+      durationMs: 0,
+    };
+  }
   const started = performance.now();
   try {
     const result = await withTimeout(Promise.resolve(check.run(ctx)), timeoutMs, check.id);
@@ -60,6 +86,7 @@ function toReport(check: Check, result: CheckResult, durationMs: number): CheckR
     title: check.title,
     category: check.category,
     severity: check.severity,
+    platforms: check.platforms ?? 'all',
     status: result.status,
     message: result.message,
     ...(result.details?.length ? { details: result.details } : {}),
@@ -71,7 +98,11 @@ function toReport(check: Check, result: CheckResult, durationMs: number): CheckR
 }
 
 /** Runs the checks sequentially (they share file-system state) and optionally applies fixes. */
-export async function runDoctor(checks: Check[], ctx: CheckContext, options: DoctorRunOptions = {}): Promise<DoctorRun> {
+export async function runDoctor(
+  checks: Check[],
+  ctx: CheckContext,
+  options: DoctorRunOptions = {},
+): Promise<DoctorRun> {
   const timeoutMs = options.timeoutMs ?? 30_000;
   const selected = options.only?.length ? checks.filter((c) => options.only!.includes(c.id)) : checks;
   const reports: CheckReport[] = [];
@@ -79,20 +110,36 @@ export async function runDoctor(checks: Check[], ctx: CheckContext, options: Doc
   for (const check of selected) {
     const { result, durationMs } = await runOne(check, ctx, timeoutMs);
     let report = toReport(check, result, durationMs);
-    if (options.fix && result.status !== 'pass' && result.fix?.apply) {
+    if (options.fix && (result.status !== 'pass' || result.informational) && result.fix?.apply) {
       try {
         await result.fix.apply();
         ctx.refresh?.();
         const rerun = await runOne(check, ctx, timeoutMs);
-        report = { ...toReport(check, rerun.result, durationMs + rerun.durationMs), fix: result.fix.description, fixable: true, fixed: rerun.result.status === 'pass' };
+        report = {
+          ...toReport(check, rerun.result, durationMs + rerun.durationMs),
+          fix: result.fix.description,
+          fixable: true,
+          fixed: rerun.result.status === 'pass',
+        };
         if (report.fixed) fixed++;
       } catch (err) {
-        report = { ...report, message: `${report.message} (fix failed: ${(err as Error).message})`, fixed: false };
+        report = {
+          ...report,
+          message: `${report.message} (fix failed: ${(err as Error).message})`,
+          fixed: false,
+        };
       }
     }
     reports.push(report);
   }
   const count = (status: CheckStatus) => reports.filter((r) => r.status === status).length;
-  const summary: DoctorSummary = { pass: count('pass'), warn: count('warn'), fail: count('fail'), skip: count('skip'), total: reports.length, fixed };
+  const summary: DoctorSummary = {
+    pass: count('pass'),
+    warn: count('warn'),
+    fail: count('fail'),
+    skip: count('skip'),
+    total: reports.length,
+    fixed,
+  };
   return { reports, summary, exitCode: summary.fail > 0 ? 1 : 0 };
 }

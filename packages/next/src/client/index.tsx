@@ -1,8 +1,8 @@
 'use client';
 
-import { type ComponentType, type ReactElement, Suspense, lazy, useEffect } from 'react';
+import { type ComponentType, lazy, type ReactElement, Suspense, useEffect } from 'react';
 
-export { FlagsProvider, useFlag, useFlags, Flag } from '@hypdriv/flags/react';
+export { Flag, FlagsProvider, useFlag, useFlags } from '@hypdriv/flags/react';
 
 export interface VitalsReporterProps {
   endpoint?: string;
@@ -20,7 +20,11 @@ export function VitalsReporter(props: VitalsReporterProps = {}): null {
     let cancelled = false;
     void import('@hypdriv/observe/client').then((mod) => {
       if (cancelled) return;
-      stop = mod.reportVitals({ ...(props.endpoint ? { endpoint: props.endpoint } : {}), ...(props.sampleRate !== undefined ? { sampleRate: props.sampleRate } : {}), ...(props.attribution !== undefined ? { attribution: props.attribution } : {}) });
+      stop = mod.reportVitals({
+        ...(props.endpoint ? { endpoint: props.endpoint } : {}),
+        ...(props.sampleRate !== undefined ? { sampleRate: props.sampleRate } : {}),
+        ...(props.attribution !== undefined ? { attribution: props.attribution } : {}),
+      });
     });
     return () => {
       cancelled = true;
@@ -39,7 +43,9 @@ export interface DevToolsProps {
   force?: boolean;
 }
 
-const LazyDevTools = lazy(() => import('@hypdriv/devtools').then((m) => ({ default: m.HypDrivDevTools as ComponentType<DevToolsProps> })));
+const LazyDevTools = lazy(() =>
+  import('@hypdriv/devtools').then((m) => ({ default: m.HypDrivDevTools as ComponentType<DevToolsProps> })),
+);
 
 /** The HypDriv DevTools HUD, loaded lazily and only outside production unless `force` is set. */
 export function HypDrivDevTools(props: DevToolsProps = {}): ReactElement | null {
@@ -52,4 +58,4 @@ export function HypDrivDevTools(props: DevToolsProps = {}): ReactElement | null 
   );
 }
 
-export { useLive, useLiveValue, useLiveRefresh, LiveProvider } from '@hypdriv/live/react';
+export { LiveProvider, useLive, useLiveRefresh, useLiveValue } from '@hypdriv/live/react';

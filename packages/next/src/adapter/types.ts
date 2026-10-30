@@ -146,6 +146,9 @@ export interface ModifyConfigContext {
 /** Shape of an adapter module (default export or named exports). */
 export interface NextAdapterLike {
   name: string;
-  modifyConfig?: (config: AdapterNextConfig, ctx: ModifyConfigContext) => Promise<AdapterNextConfig> | AdapterNextConfig;
+  modifyConfig?: (
+    config: AdapterNextConfig,
+    ctx: ModifyConfigContext,
+  ) => Promise<AdapterNextConfig> | AdapterNextConfig;
   onBuildComplete?: (ctx: OnBuildCompleteContext) => Promise<void> | void;
 }

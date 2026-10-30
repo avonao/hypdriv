@@ -64,9 +64,23 @@ export function parseWorkspaceYaml(text: string): YamlInfo {
     if (indent === 0) {
       const m = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
       if (!m) continue;
-      section = m[1] === 'packages' ? 'packages' : m[1] === 'catalog' ? 'catalog' : m[1] === 'catalogs' ? 'catalogs' : null;
+      section =
+        m[1] === 'packages'
+          ? 'packages'
+          : m[1] === 'catalog'
+            ? 'catalog'
+            : m[1] === 'catalogs'
+              ? 'catalogs'
+              : null;
       namedCatalog = null;
-      if (section === 'packages' && m[2]?.startsWith('[')) info.patterns.push(...m[2].replace(/^\[|\]$/g, '').split(',').map((p) => unquote(p)).filter(Boolean));
+      if (section === 'packages' && m[2]?.startsWith('['))
+        info.patterns.push(
+          ...m[2]
+            .replace(/^\[|\]$/g, '')
+            .split(',')
+            .map((p) => unquote(p))
+            .filter(Boolean),
+        );
       continue;
     }
     if (section === 'packages') {
@@ -76,7 +90,11 @@ export function parseWorkspaceYaml(text: string): YamlInfo {
     }
     if (section === 'catalog') {
       const m = /^\s*("[^"]+"|'[^']+'|[^:\s]+)\s*:\s*(.+)$/.exec(line);
-      if (m) (info.catalogs.default ??= {})[unquote(m[1]!)] = { range: unquote(m[2]!), line: i + 1 };
+      if (m) {
+        const catalog = info.catalogs.default ?? {};
+        catalog[unquote(m[1]!)] = { range: unquote(m[2]!), line: i + 1 };
+        info.catalogs.default = catalog;
+      }
       continue;
     }
     if (section === 'catalogs') {
@@ -87,7 +105,8 @@ export function parseWorkspaceYaml(text: string): YamlInfo {
         continue;
       }
       const m = /^\s*("[^"]+"|'[^']+'|[^:\s]+)\s*:\s*(.+)$/.exec(line);
-      if (m && namedCatalog) info.catalogs[namedCatalog]![unquote(m[1]!)] = { range: unquote(m[2]!), line: i + 1 };
+      if (m && namedCatalog)
+        info.catalogs[namedCatalog]![unquote(m[1]!)] = { range: unquote(m[2]!), line: i + 1 };
     }
   }
   return info;
@@ -118,7 +137,8 @@ export function expandPatterns(root: string, patterns: string[]): string[] {
     const clean = pattern.replace(/\/+$/, '');
     if (clean.endsWith('/**')) for (const d of listDirs(join(root, clean.slice(0, -3)), 4)) dirs.add(d);
     else if (clean.endsWith('/*')) for (const d of listDirs(join(root, clean.slice(0, -2)), 1)) dirs.add(d);
-    else if (clean === '*' || clean === '**') for (const d of listDirs(root, clean === '**' ? 4 : 1)) dirs.add(d);
+    else if (clean === '*' || clean === '**')
+      for (const d of listDirs(root, clean === '**' ? 4 : 1)) dirs.add(d);
     else dirs.add(join(root, clean));
   }
   const excluded = (dir: string) => {
@@ -126,17 +146,34 @@ export function expandPatterns(root: string, patterns: string[]): string[] {
     return exclude.some((e) => {
       const clean = e.replace(/\/+$/, '');
       if (clean.endsWith('/**')) return relPath.startsWith(clean.slice(0, -3));
-      if (clean.endsWith('/*')) return relPath.startsWith(`${clean.slice(0, -2)}/`) && !relPath.slice(clean.length - 1).includes('/');
+      if (clean.endsWith('/*'))
+        return relPath.startsWith(`${clean.slice(0, -2)}/`) && !relPath.slice(clean.length - 1).includes('/');
       return relPath === clean;
     });
   };
   return [...dirs].filter((d) => existsSync(join(d, 'package.json')) && !excluded(d)).sort();
 }
 
-const SKIP_PREFIXES = ['workspace:', 'link:', 'file:', 'git+', 'git:', 'github:', 'http:', 'https:', 'portal:', 'patch:'];
+const SKIP_PREFIXES = [
+  'workspace:',
+  'link:',
+  'file:',
+  'git+',
+  'git:',
+  'github:',
+  'http:',
+  'https:',
+  'portal:',
+  'patch:',
+];
 
 /** Parses one package.json specifier into a dependency record (null when it cannot be updated). */
-export function parseSpecifier(name: string, raw: string, section: DependencySection, catalogs: Workspace['catalogs']): WorkspaceDependency | null {
+export function parseSpecifier(
+  name: string,
+  raw: string,
+  section: DependencySection,
+  catalogs: Workspace['catalogs'],
+): WorkspaceDependency | null {
   if (SKIP_PREFIXES.some((p) => raw.startsWith(p))) return null;
   if (raw === 'catalog:' || raw.startsWith('catalog:')) {
     const catalog = raw === 'catalog:' ? 'default' : raw.slice('catalog:'.length);
@@ -147,19 +184,36 @@ export function parseSpecifier(name: string, raw: string, section: DependencySec
   return parseAlias(name, raw, raw, section, null);
 }
 
-function parseAlias(name: string, range: string, raw: string, section: DependencySection, catalog: string | null): WorkspaceDependency | null {
+function parseAlias(
+  name: string,
+  range: string,
+  raw: string,
+  section: DependencySection,
+  catalog: string | null,
+): WorkspaceDependency | null {
   if (range.startsWith('npm:')) {
     const spec = range.slice(4);
     const at = spec.lastIndexOf('@');
     if (at <= 0) return { name: spec, range: 'latest', raw, section, catalog, alias: spec };
-    return { name: spec.slice(0, at), range: spec.slice(at + 1), raw, section, catalog, alias: spec.slice(0, at) };
+    return {
+      name: spec.slice(0, at),
+      range: spec.slice(at + 1),
+      raw,
+      section,
+      catalog,
+      alias: spec.slice(0, at),
+    };
   }
   if (SKIP_PREFIXES.some((p) => range.startsWith(p))) return null;
   return { name, range, raw, section, catalog, alias: null };
 }
 
 /** Reads a package.json into a workspace package record. */
-export function readWorkspacePackage(root: string, dir: string, catalogs: Workspace['catalogs']): WorkspacePackage | null {
+export function readWorkspacePackage(
+  root: string,
+  dir: string,
+  catalogs: Workspace['catalogs'],
+): WorkspacePackage | null {
   const file = join(dir, 'package.json');
   let pkg: Record<string, unknown>;
   try {
@@ -178,7 +232,13 @@ export function readWorkspacePackage(root: string, dir: string, catalogs: Worksp
     }
   }
   const relPath = relative(root, dir).split(sep).join('/') || '.';
-  return { name: typeof pkg.name === 'string' ? pkg.name : basename(dir), dir, file, path: relPath, dependencies };
+  return {
+    name: typeof pkg.name === 'string' ? pkg.name : basename(dir),
+    dir,
+    file,
+    path: relPath,
+    dependencies,
+  };
 }
 
 /**
@@ -190,7 +250,12 @@ export function readWorkspace(root: string, options: { includeWorkspace?: boolea
   const hasYaml = existsSync(yamlFile);
   const yaml = hasYaml ? parseWorkspaceYaml(readFileSync(yamlFile, 'utf8')) : { patterns: [], catalogs: {} };
   const catalogs = yaml.catalogs;
-  const dirs = hasYaml && options.includeWorkspace !== false ? [root, ...expandPatterns(root, yaml.patterns).filter((d) => d !== root)] : [root];
-  const packages = dirs.map((d) => readWorkspacePackage(root, d, catalogs)).filter((p): p is WorkspacePackage => p !== null);
+  const dirs =
+    hasYaml && options.includeWorkspace !== false
+      ? [root, ...expandPatterns(root, yaml.patterns).filter((d) => d !== root)]
+      : [root];
+  const packages = dirs
+    .map((d) => readWorkspacePackage(root, d, catalogs))
+    .filter((p): p is WorkspacePackage => p !== null);
   return { root, yamlFile: hasYaml ? yamlFile : null, packages, catalogs };
 }

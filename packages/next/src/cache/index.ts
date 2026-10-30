@@ -1,20 +1,7 @@
+import { getEdgePurger } from '@hypdriv/cache';
 import { getCurrentContext, readEnv } from '@hypdriv/core';
 
-export interface EdgePurger {
-  purgeTags(tags: string[]): Promise<number | void>;
-  purgeUrls(urls: string[]): Promise<number | void>;
-}
-
-const KEY = Symbol.for('hypdriv.edge-purger');
-
-/** Registers the edge cache purger for `purgeEdge()` (the Worker shell does this at startup). */
-export function registerEdgePurger(purger: EdgePurger | null): void {
-  (globalThis as Record<symbol, unknown>)[KEY] = purger ?? undefined;
-}
-
-export function getEdgePurger(): EdgePurger | undefined {
-  return (globalThis as Record<symbol, unknown>)[KEY] as EdgePurger | undefined;
-}
+export { type EdgePurger, getEdgePurger, registerEdgePurger } from '@hypdriv/cache';
 
 async function zonePurge(body: Record<string, unknown>): Promise<boolean> {
   const ctx = getCurrentContext();
@@ -31,7 +18,10 @@ async function zonePurge(body: Record<string, unknown>): Promise<boolean> {
 }
 
 /** Purges HypDriv's edge cache (and the Cloudflare zone cache when credentials exist) by tags or URLs. */
-export async function purgeEdge(options: { tags?: string[]; urls?: string[] }): Promise<{ edge: boolean; zone: boolean }> {
+export async function purgeEdge(options: {
+  tags?: string[];
+  urls?: string[];
+}): Promise<{ edge: boolean; zone: boolean }> {
   const purger = getEdgePurger();
   let edge = false;
   if (purger) {
@@ -78,5 +68,10 @@ export async function revalidatePath(path: string, type?: 'page' | 'layout'): Pr
   await cache.revalidatePath(path, type);
   const ctx = getCurrentContext();
   const origin = ctx?.url.origin;
-  schedule(purgeEdge({ tags: [`route:app:${path}`, `path:${path}`], ...(origin ? { urls: [`${origin}${path}`] } : {}) }));
+  schedule(
+    purgeEdge({
+      tags: [`route:app:${path}`, `path:${path}`],
+      ...(origin ? { urls: [`${origin}${path}`] } : {}),
+    }),
+  );
 }

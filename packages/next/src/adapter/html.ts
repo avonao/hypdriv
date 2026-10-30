@@ -59,7 +59,14 @@ export function scanTags(html: string): HtmlTag[] {
   return tags;
 }
 
-const EXECUTABLE_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module', 'speculationrules', 'importmap']);
+const EXECUTABLE_TYPES = new Set([
+  '',
+  'text/javascript',
+  'application/javascript',
+  'module',
+  'speculationrules',
+  'importmap',
+]);
 
 /** Inline `<script>` bodies that CSP `script-src` governs (executable types only, no `src`). */
 export function extractInlineScripts(html: string): string[] {
@@ -92,7 +99,14 @@ export interface HtmlAssets {
 
 /** Resource references in the document head/body. */
 export function extractAssets(html: string): HtmlAssets {
-  const assets: HtmlAssets = { stylesheets: [], scripts: [], modulePreloads: [], preloads: [], fonts: [], preconnects: [] };
+  const assets: HtmlAssets = {
+    stylesheets: [],
+    scripts: [],
+    modulePreloads: [],
+    preloads: [],
+    fonts: [],
+    preconnects: [],
+  };
   const push = (list: string[], value: string | undefined) => {
     if (value && !list.includes(value)) list.push(value);
   };
@@ -108,9 +122,15 @@ export function extractAssets(html: string): HtmlAssets {
     else if (rel.includes('preload')) {
       const as = (t.attrs.as ?? '').toLowerCase();
       if (!assets.preloads.some((p) => p.href === href)) {
-        assets.preloads.push({ href, as, ...(t.attrs.type ? { type: t.attrs.type } : {}), ...(t.attrs.crossorigin !== undefined ? { crossorigin: t.attrs.crossorigin } : {}) });
+        assets.preloads.push({
+          href,
+          as,
+          ...(t.attrs.type ? { type: t.attrs.type } : {}),
+          ...(t.attrs.crossorigin !== undefined ? { crossorigin: t.attrs.crossorigin } : {}),
+        });
       }
-      if (as === 'font' && !assets.fonts.some((f) => f.href === href)) assets.fonts.push({ href, ...(t.attrs.type ? { type: t.attrs.type } : {}) });
+      if (as === 'font' && !assets.fonts.some((f) => f.href === href))
+        assets.fonts.push({ href, ...(t.attrs.type ? { type: t.attrs.type } : {}) });
     }
   }
   return assets;
@@ -125,7 +145,14 @@ export function extractLinks(html: string, options: { origin?: string; basePath?
     const href = t.attrs.href;
     if (!href) continue;
     const lower = href.toLowerCase();
-    if (lower.startsWith('mailto:') || lower.startsWith('tel:') || lower.startsWith('javascript:') || lower.startsWith('#') || lower.startsWith('data:')) continue;
+    if (
+      lower.startsWith('mailto:') ||
+      lower.startsWith('tel:') ||
+      lower.startsWith('javascript:') ||
+      lower.startsWith('#') ||
+      lower.startsWith('data:')
+    )
+      continue;
     let pathname: string;
     if (href.startsWith('/') && !href.startsWith('//')) pathname = href;
     else {

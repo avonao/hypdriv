@@ -28,6 +28,7 @@ catalog:
   # Small, standards-based deps
   "@standard-schema/spec": ^1.1.0
   web-vitals: ^6.2.3
+  zod: ^4.6.7
 
 # pnpm's supply-chain delay (minimumReleaseAge) is bypassed for these very recent releases.
 minimumReleaseAgeExclude:

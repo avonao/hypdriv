@@ -121,6 +121,12 @@ export interface HypManifest {
   staticFiles: { count: number; immutablePrefixes: string[] };
   earlyHints: Record<string, string[]>;
   csp: Record<string, { scriptHashes: string[]; styleHashes: string[] }>;
+  /**
+   * CSP hashes of HypDriv-owned inline scripts that render identically on every route (the `<Speculation/>`
+   * document rules, the Purser theme fallback script). The CSP stage allows them in hash and nonce mode,
+   * so these components never need a request nonce and layouts stay prerenderable.
+   */
+  inlineScriptHashes?: string[];
   speculation: { graph: Record<string, string[]>; excluded: string[] };
   purser?: PurserManifest;
   weights: { client: Record<string, { js: number; css: number }>; worker?: WorkerWeight };

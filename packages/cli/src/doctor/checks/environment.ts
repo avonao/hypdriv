@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { readPackageJson } from '@hypdriv/core/node';
 import { atLeast } from '../../semver';
 import { type Check, type CheckContext, fail, info, pass, skip, warn } from '../types';
 
@@ -12,7 +13,9 @@ export function purserActive(ctx: CheckContext): boolean {
   if (!p) return false;
   if (p.enabled === true) return true;
   if (p.enabled === false) return false;
-  return ctx.project.purser.installed !== null && (p.tokens !== null || ctx.project.purser.tokensFile !== null);
+  return (
+    ctx.project.purser.installed !== null && (p.tokens !== null || ctx.project.purser.tokensFile !== null)
+  );
 }
 
 export const environmentChecks: Check[] = [
@@ -23,8 +26,12 @@ export const environmentChecks: Check[] = [
     severity: 'error',
     run(ctx) {
       const v = ctx.project.node;
-      if (!atLeast(v, MIN_NODE)) return fail(`Node.js ${v} is too old; HypDriv needs ${MIN_NODE}+ (22+ recommended).`);
-      if (!atLeast(v, RECOMMENDED_NODE)) return pass(`Node.js ${v} (22+ recommended: native TypeScript config loading and WebSocket for audits).`);
+      if (!atLeast(v, MIN_NODE))
+        return fail(`Node.js ${v} is too old; HypDriv needs ${MIN_NODE}+ (22+ recommended).`);
+      if (!atLeast(v, RECOMMENDED_NODE))
+        return pass(
+          `Node.js ${v} (22+ recommended: native TypeScript config loading and WebSocket for audits).`,
+        );
       return pass(`Node.js ${v}`);
     },
   },
@@ -35,8 +42,14 @@ export const environmentChecks: Check[] = [
     severity: 'info',
     run(ctx) {
       const pm = ctx.project.packageManager;
-      const pinned = ctx.project.packageJson?.packageManager ?? null;
-      if (!pinned) return info(`${pm} detected from lockfiles; pin it with the "packageManager" field in package.json for reproducible installs.`);
+      const pinned =
+        ctx.project.packageJson?.packageManager ??
+        readPackageJson(ctx.project.repoRoot)?.packageManager ??
+        null;
+      if (!pinned)
+        return info(
+          `${pm} detected from lockfiles; pin it with the "packageManager" field in package.json for reproducible installs.`,
+        );
       return pass(`${pm} (${pinned})`);
     },
   },
@@ -47,9 +60,17 @@ export const environmentChecks: Check[] = [
     severity: 'info',
     run(ctx) {
       const files = ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock', 'bun.lockb'];
-      const found = [...new Set(files.filter((f) => existsSync(join(ctx.project.repoRoot, f)) || existsSync(join(ctx.root, f))))];
-      if (found.length === 0) return info('No lockfile found; commit one so CI installs the versions you tested.');
-      if (found.length > 1) return warn(`Several lockfiles found (${found.join(', ')}); keep only the one for ${ctx.project.packageManager}.`);
+      const found = [
+        ...new Set(
+          files.filter((f) => existsSync(join(ctx.project.repoRoot, f)) || existsSync(join(ctx.root, f))),
+        ),
+      ];
+      if (found.length === 0)
+        return info('No lockfile found; commit one so CI installs the versions you tested.');
+      if (found.length > 1)
+        return warn(
+          `Several lockfiles found (${found.join(', ')}); keep only the one for ${ctx.project.packageManager}.`,
+        );
       return pass(found[0]!);
     },
   },
@@ -60,8 +81,14 @@ export const environmentChecks: Check[] = [
     severity: 'warn',
     run(ctx) {
       const ts = ctx.project.typescript;
-      if (!ts.installed) return warn('TypeScript is not installed; next.config.ts, hypdriv.config.ts and hypdriv.worker.ts need it (pnpm add -D typescript).');
-      if (!atLeast(ts.installed, '5.9.0')) return warn(`TypeScript ${ts.installed} is older than the supported 5.9+; upgrade for Next.js 16 types.`);
+      if (!ts.installed)
+        return warn(
+          'TypeScript is not installed; next.config.ts, hypdriv.config.ts and hypdriv.worker.ts need it (pnpm add -D typescript).',
+        );
+      if (!atLeast(ts.installed, '5.9.0'))
+        return warn(
+          `TypeScript ${ts.installed} is older than the supported 5.9+; upgrade for Next.js 16 types.`,
+        );
       return pass(`TypeScript ${ts.installed}`);
     },
   },
@@ -73,7 +100,8 @@ export const environmentChecks: Check[] = [
     run(ctx) {
       if (!purserActive(ctx)) return skip('Purser is not active.');
       const major = ctx.project.typescript.major;
-      if (major === null) return warn('Purser needs TypeScript (programmatic compiler API); install typescript@^6.');
+      if (major === null)
+        return warn('Purser needs TypeScript (programmatic compiler API); install typescript@^6.');
       if (major >= 7)
         return fail(
           `TypeScript ${ctx.project.typescript.installed} has no programmatic compiler API, which Purser needs. Install TypeScript 6 under the "typescript" name ("typescript": "npm:@typescript/typescript6@^6") or pin typescript@^6 for the build.`,

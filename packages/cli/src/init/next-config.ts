@@ -26,7 +26,6 @@ export function scanExpressionEnd(source: string, start: number): number {
   const isDeclaration = /^(?:async\s+)?function\b|^class\b/.test(head);
   let depth = 0;
   let sawBody = false;
-  const templateStack: number[] = [];
   let i = start;
   while (i < n) {
     const ch = source[i]!;
@@ -138,7 +137,13 @@ export function insertImport(source: string, line: string, module: 'esm' | 'cjs'
   // skip leading comments / directives
   while (i < lines.length) {
     const t = lines[i]!.trim();
-    if (t === '' || t.startsWith('//') || t.startsWith('/*') || t.startsWith('*') || /^['"]use \w+['"];?$/.test(t)) {
+    if (
+      t === '' ||
+      t.startsWith('//') ||
+      t.startsWith('/*') ||
+      t.startsWith('*') ||
+      /^['"]use \w+['"];?$/.test(t)
+    ) {
       i++;
       continue;
     }
@@ -151,7 +156,12 @@ export function insertImport(source: string, line: string, module: 'esm' | 'cjs'
     if (importRe.test(t)) {
       // multi-line import: advance to the terminating line
       let j = i;
-      if (module === 'esm' && !/from\s+['"][^'"]+['"];?\s*$/.test(t) && !/^import\s+['"][^'"]+['"];?\s*$/.test(t) && !/^import\s+type\s*\{[^}]*\}\s*from/.test(t)) {
+      if (
+        module === 'esm' &&
+        !/from\s+['"][^'"]+['"];?\s*$/.test(t) &&
+        !/^import\s+['"][^'"]+['"];?\s*$/.test(t) &&
+        !/^import\s+type\s*\{[^}]*\}\s*from/.test(t)
+      ) {
         while (j < lines.length && !/from\s+['"][^'"]+['"];?\s*$/.test(lines[j]!)) j++;
       }
       lastImport = j;
@@ -171,7 +181,8 @@ export function insertImport(source: string, line: string, module: 'esm' | 'cjs'
 
 /** Adds the `withHypDriv` import and wraps the config export. Safe to call repeatedly. */
 export function wrapNextConfig(source: string): WrapResult {
-  if (/\bwithHypDriv\s*\(/.test(source)) return { changed: false, content: source, reason: 'already wrapped in withHypDriv()' };
+  if (/\bwithHypDriv\s*\(/.test(source))
+    return { changed: false, content: source, reason: 'already wrapped in withHypDriv()' };
   const quote = detectQuote(source);
   const semi = detectSemicolons(source) ? ';' : '';
   const esmExport = /export\s+default\s+/.exec(source);
@@ -188,12 +199,14 @@ export function wrapNextConfig(source: string): WrapResult {
     return {
       changed: false,
       content: source,
-      reason: 'no `export default` or `module.exports =` found; wrap the config manually: `export default withHypDriv(nextConfig)`',
+      reason:
+        'no `export default` or `module.exports =` found; wrap the config manually: `export default withHypDriv(nextConfig)`',
     };
   }
   const exprEnd = scanExpressionEnd(source, exprStart);
   const expression = source.slice(exprStart, exprEnd).trim();
-  if (!expression) return { changed: false, content: source, reason: 'empty default export; wrap the config manually' };
+  if (!expression)
+    return { changed: false, content: source, reason: 'empty default export; wrap the config manually' };
   const head = expression.slice(0, 40);
   const shape: WrapResult['shape'] = /^(?:async\s+)?function\b/.test(head)
     ? 'function'
@@ -214,7 +227,14 @@ export function wrapNextConfig(source: string): WrapResult {
     module === 'esm'
       ? `import { withHypDriv } from ${quote}hypdriv/config${quote}${semi}`
       : `const { withHypDriv } = require(${quote}hypdriv/config${quote})${semi}`;
-  const alreadyImported = /\bwithHypDriv\b[^\n]*from\s+['"](?:@hypdriv\/next\/config|hypdriv\/config)['"]/.test(content) || /\bwithHypDriv\b[^\n]*require\(['"](?:@hypdriv\/next\/config|hypdriv\/config)['"]\)/.test(content);
+  const alreadyImported =
+    /\bwithHypDriv\b[^\n]*from\s+['"](?:@hypdriv\/next\/config|hypdriv\/config)['"]/.test(content) ||
+    /\bwithHypDriv\b[^\n]*require\(['"](?:@hypdriv\/next\/config|hypdriv\/config)['"]\)/.test(content);
   if (!alreadyImported) content = insertImport(content, importLine, module);
-  return { changed: true, content, reason: `wrapped the ${shape === 'cjs' ? 'module.exports' : 'default export'} (${shape}) in withHypDriv()`, shape };
+  return {
+    changed: true,
+    content,
+    reason: `wrapped the ${shape === 'cjs' ? 'module.exports' : 'default export'} (${shape}) in withHypDriv()`,
+    shape,
+  };
 }

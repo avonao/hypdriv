@@ -21,7 +21,9 @@ export function toPublicAssetPath(file: string, basePath = ''): string {
 }
 
 /** Parses `globalThis.__RSC_MANIFEST["/page"] = {...}` client reference manifests. */
-export function parseClientReferenceManifest(source: string): { entryCSSFiles: string[]; entryJSFiles: string[] } | null {
+export function parseClientReferenceManifest(
+  source: string,
+): { entryCSSFiles: string[]; entryJSFiles: string[] } | null {
   const idx = source.indexOf('__RSC_MANIFEST[');
   if (idx === -1) return null;
   const eq = source.indexOf('=', source.indexOf(']', idx));
@@ -50,7 +52,10 @@ export function parseClientReferenceManifest(source: string): { entryCSSFiles: s
     }
   }
   if (end === -1) return null;
-  let parsed: { entryCSSFiles?: Record<string, Array<string | { path: string; inlined?: boolean }>>; entryJSFiles?: Record<string, string[]> };
+  let parsed: {
+    entryCSSFiles?: Record<string, Array<string | { path: string; inlined?: boolean }>>;
+    entryJSFiles?: Record<string, string[]>;
+  };
   try {
     parsed = JSON.parse(source.slice(start, end));
   } catch {
@@ -64,7 +69,8 @@ export function parseClientReferenceManifest(source: string): { entryCSSFiles: s
     }
   }
   const js: string[] = [];
-  for (const files of Object.values(parsed.entryJSFiles ?? {})) for (const f of files) if (!js.includes(f)) js.push(f);
+  for (const files of Object.values(parsed.entryJSFiles ?? {}))
+    for (const f of files) if (!js.includes(f)) js.push(f);
   return { entryCSSFiles: css, entryJSFiles: js };
 }
 
@@ -88,15 +94,32 @@ function readJson<T>(fs: AdapterFs, path: string): T | null {
  * Client assets for an App Router entry (`sourcePage` like `/blog/[slug]/page`) from the per-route
  * manifests Next.js 16 writes under `.next/server/app/<entry>/`.
  */
-export function appRouteAssets(distDir: string, sourcePage: string, fs: AdapterFs, basePath = ''): RouteAssetSources {
+export function appRouteAssets(
+  distDir: string,
+  sourcePage: string,
+  fs: AdapterFs,
+  basePath = '',
+): RouteAssetSources {
   const entryDir = join(distDir, 'server', 'app', sourcePage.replace(/^\//, ''));
-  const buildManifest = readJson<BuildManifestLike>(fs, join(entryDir, 'build-manifest.json')) ?? readJson<BuildManifestLike>(fs, join(distDir, 'build-manifest.json'));
-  const crmPath = join(distDir, 'server', 'app', `${sourcePage.replace(/^\//, '')}_client-reference-manifest.js`);
+  const buildManifest =
+    readJson<BuildManifestLike>(fs, join(entryDir, 'build-manifest.json')) ??
+    readJson<BuildManifestLike>(fs, join(distDir, 'build-manifest.json'));
+  const crmPath = join(
+    distDir,
+    'server',
+    'app',
+    `${sourcePage.replace(/^\//, '')}_client-reference-manifest.js`,
+  );
   const crm = fs.exists(crmPath) ? parseClientReferenceManifest(fs.readText(crmPath)) : null;
-  const main = uniq([...(buildManifest?.rootMainFiles ?? []), ...(buildManifest?.pagesChunkGroupBootstrapParams?.[sourcePage]?.otherChunks ?? [])]);
+  const main = uniq([
+    ...(buildManifest?.rootMainFiles ?? []),
+    ...(buildManifest?.pagesChunkGroupBootstrapParams?.[sourcePage]?.otherChunks ?? []),
+  ]);
   const js = uniq([...main, ...(crm?.entryJSFiles ?? []), ...(buildManifest?.polyfillFiles ?? [])]);
   const css = uniq(crm?.entryCSSFiles ?? []);
-  const fontManifest = readJson<{ app?: Record<string, string[]> }>(fs, join(entryDir, 'next-font-manifest.json')) ?? readJson<{ app?: Record<string, string[]> }>(fs, join(distDir, 'server', 'next-font-manifest.json'));
+  const fontManifest =
+    readJson<{ app?: Record<string, string[]> }>(fs, join(entryDir, 'next-font-manifest.json')) ??
+    readJson<{ app?: Record<string, string[]> }>(fs, join(distDir, 'server', 'next-font-manifest.json'));
   const fonts = uniq(Object.values(fontManifest?.app ?? {}).flat());
   return {
     js: js.map((f) => toPublicAssetPath(f, basePath)),
@@ -107,13 +130,21 @@ export function appRouteAssets(distDir: string, sourcePage: string, fs: AdapterF
 }
 
 /** Client assets for a Pages Router page from `.next/build-manifest.json`. */
-export function pagesRouteAssets(distDir: string, page: string, fs: AdapterFs, basePath = ''): RouteAssetSources {
+export function pagesRouteAssets(
+  distDir: string,
+  page: string,
+  fs: AdapterFs,
+  basePath = '',
+): RouteAssetSources {
   const buildManifest = readJson<BuildManifestLike>(fs, join(distDir, 'build-manifest.json'));
   const files = buildManifest?.pages?.[page] ?? [];
   const app = buildManifest?.pages?.['/_app'] ?? [];
   const js = uniq([...app, ...files].filter((f) => f.endsWith('.js')));
   const css = uniq([...app, ...files].filter((f) => f.endsWith('.css')));
-  const fontManifest = readJson<{ pages?: Record<string, string[]> }>(fs, join(distDir, 'server', 'next-font-manifest.json'));
+  const fontManifest = readJson<{ pages?: Record<string, string[]> }>(
+    fs,
+    join(distDir, 'server', 'next-font-manifest.json'),
+  );
   const fonts = uniq(Object.values(fontManifest?.pages ?? {}).flat());
   return {
     js: js.map((f) => toPublicAssetPath(f, basePath)),
@@ -124,13 +155,46 @@ export function pagesRouteAssets(distDir: string, page: string, fs: AdapterFs, b
 }
 
 /** Merges manifest-derived assets with what the prerendered HTML actually references (HTML wins for order). */
+/** Asset identity without Next's `?dpl=<deploymentId>` skew-protection query (and the hash fragment). */
+function assetIdentity(href: string): string {
+  const [path, query] = href.split('#')[0]!.split('?');
+  if (!query) return path!;
+  const kept = query.split('&').filter((pair) => !pair.startsWith('dpl='));
+  return kept.length ? `${path}?${kept.join('&')}` : path!;
+}
+
+/** De-duplicates assets that differ only by `?dpl=`; the first spelling wins (HTML spellings come first). */
+function uniqAssets(list: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const href of list) {
+    const id = assetIdentity(href);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(href);
+  }
+  return out;
+}
+
 export function mergeWithHtml(sources: RouteAssetSources, html: string | null): RouteAssetSources {
   if (!html) return sources;
   const fromHtml = extractAssets(html);
-  const js = uniq([...fromHtml.scripts, ...fromHtml.modulePreloads, ...fromHtml.preloads.filter((p) => p.as === 'script').map((p) => p.href), ...sources.js]);
-  const css = uniq([...fromHtml.stylesheets, ...fromHtml.preloads.filter((p) => p.as === 'style').map((p) => p.href), ...sources.css]);
-  const fonts = uniq([...fromHtml.fonts.map((f) => f.href), ...sources.fonts]);
-  return { js, css, fonts, main: sources.main.length ? sources.main : js.slice(0, 4) };
+  const js = uniqAssets([
+    ...fromHtml.scripts,
+    ...fromHtml.modulePreloads,
+    ...fromHtml.preloads.filter((p) => p.as === 'script').map((p) => p.href),
+    ...sources.js,
+  ]);
+  const css = uniqAssets([
+    ...fromHtml.stylesheets,
+    ...fromHtml.preloads.filter((p) => p.as === 'style').map((p) => p.href),
+    ...sources.css,
+  ]);
+  const fonts = uniqAssets([...fromHtml.fonts.map((f) => f.href), ...sources.fonts]);
+  // Preloads must use the exact URL the document requests (including `?dpl=`), or the browser fetches twice.
+  const spelling = new Map(js.map((href) => [assetIdentity(href), href]));
+  const main = sources.main.length ? uniqAssets(sources.main.map((href) => spelling.get(assetIdentity(href)) ?? href)) : js.slice(0, 4);
+  return { js, css, fonts, main };
 }
 
 /** Resolves a public `/_next/static/...` path to its file under distDir (null when not local). */

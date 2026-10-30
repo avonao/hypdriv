@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { inlineScriptsLocal, nonceOf, parseCspLocal, scriptHashesOf, scriptSources, scriptTags } from './csp-parse';
+import {
+  inlineScriptsLocal,
+  nonceOf,
+  parseCspLocal,
+  scriptHashesOf,
+  scriptSources,
+  scriptTags,
+} from './csp-parse';
 
 export type AuditLevel = 'pass' | 'warn' | 'fail';
 
@@ -50,15 +57,30 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
   const contentType = input.contentType ?? input.headers.get('content-type') ?? '';
   const isHtml = /text\/html/i.test(contentType);
   const scripts = { inline: 0, external: 0, withNonce: 0, hashed: 0, unmatched: 0 };
-  const base = (mode: CspAuditResult['mode']): CspAuditResult => ({ path: input.path, status: worst(findings), mode, expected: input.expected, findings, policy: policy ?? reportOnly, scripts });
+  const base = (mode: CspAuditResult['mode']): CspAuditResult => ({
+    path: input.path,
+    status: worst(findings),
+    mode,
+    expected: input.expected,
+    findings,
+    policy: policy ?? reportOnly,
+    scripts,
+  });
 
   if (input.expected === 'none') {
-    if (policy) findings.push({ level: 'warn', message: 'a CSP is set on a non-document response (harmless, but unnecessary)' });
+    if (policy)
+      findings.push({
+        level: 'warn',
+        message: 'a CSP is set on a non-document response (harmless, but unnecessary)',
+      });
     return base(policy ? 'nonce' : 'none');
   }
   if (!policy) {
     if (reportOnly) {
-      findings.push({ level: 'warn', message: 'only Content-Security-Policy-Report-Only is set; nothing is enforced' });
+      findings.push({
+        level: 'warn',
+        message: 'only Content-Security-Policy-Report-Only is set; nothing is enforced',
+      });
       return base('report-only');
     }
     findings.push({ level: 'fail', message: 'no Content-Security-Policy header' });
@@ -69,18 +91,44 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
   const lower = sources.map((s) => s.toLowerCase());
   const nonce = nonceOf(directives);
   const hashes = scriptHashesOf(directives);
-  const mode: CspAuditResult['mode'] = nonce ? 'nonce' : hashes.length ? 'hash' : lower.includes("'unsafe-inline'") ? 'unsafe-inline' : 'none';
+  const mode: CspAuditResult['mode'] = nonce
+    ? 'nonce'
+    : hashes.length
+      ? 'hash'
+      : lower.includes("'unsafe-inline'")
+        ? 'unsafe-inline'
+        : 'none';
 
-  if (!sources.length) findings.push({ level: 'fail', message: 'policy has neither script-src nor default-src' });
-  if (lower.includes("'unsafe-inline'") && !nonce && !hashes.length) findings.push({ level: 'fail', message: "script-src allows 'unsafe-inline' without nonces or hashes" });
-  if (lower.includes("'unsafe-eval'")) findings.push({ level: 'warn', message: "script-src allows 'unsafe-eval'" });
+  if (!sources.length)
+    findings.push({ level: 'fail', message: 'policy has neither script-src nor default-src' });
+  if (lower.includes("'unsafe-inline'") && !nonce && !hashes.length)
+    findings.push({ level: 'fail', message: "script-src allows 'unsafe-inline' without nonces or hashes" });
+  if (lower.includes("'unsafe-eval'"))
+    findings.push({ level: 'warn', message: "script-src allows 'unsafe-eval'" });
   const objectSrc = directives['object-src'];
-  const defaultNone = Array.isArray(directives['default-src']) && directives['default-src'].some((s) => s.toLowerCase() === "'none'");
-  if (!(Array.isArray(objectSrc) && objectSrc.some((s) => s.toLowerCase() === "'none'")) && !defaultNone) findings.push({ level: 'warn', message: "missing object-src 'none'" });
+  const defaultNone =
+    Array.isArray(directives['default-src']) &&
+    directives['default-src'].some((s) => s.toLowerCase() === "'none'");
+  if (!(Array.isArray(objectSrc) && objectSrc.some((s) => s.toLowerCase() === "'none'")) && !defaultNone)
+    findings.push({ level: 'warn', message: "missing object-src 'none'" });
   if (!directives['base-uri']) findings.push({ level: 'warn', message: 'missing base-uri' });
-  if (mode === 'nonce' && !lower.includes("'strict-dynamic'")) findings.push({ level: 'warn', message: "nonce mode without 'strict-dynamic' (dynamically inserted chunks need host allow-lists)" });
-  if (input.expected === 'hash' && mode === 'nonce') findings.push({ level: 'warn', message: 'static route served with a nonce policy (expected build-time hashes; the response is not cacheable as-is)' });
-  if (input.expected === 'nonce' && mode === 'hash') findings.push({ level: 'warn', message: 'dynamic route served with a hash policy; inline scripts that change per request will be blocked' });
+  if (mode === 'nonce' && !lower.includes("'strict-dynamic'"))
+    findings.push({
+      level: 'warn',
+      message: "nonce mode without 'strict-dynamic' (dynamically inserted chunks need host allow-lists)",
+    });
+  if (input.expected === 'hash' && mode === 'nonce')
+    findings.push({
+      level: 'warn',
+      message:
+        'static route served with a nonce policy (expected build-time hashes; the response is not cacheable as-is)',
+    });
+  if (input.expected === 'nonce' && mode === 'hash')
+    findings.push({
+      level: 'warn',
+      message:
+        'dynamic route served with a hash policy; inline scripts that change per request will be blocked',
+    });
 
   if (isHtml && input.body) {
     const tags = scriptTags(input.body);
@@ -90,11 +138,23 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
     if (mode === 'nonce') {
       const missing = executable.filter((t) => t.attrs.nonce !== nonce);
       scripts.withNonce = executable.length - missing.length;
-      const missingInline = missing.filter((t) => t.inline).length;
-      const missingExternal = missing.length - missingInline;
-      if (missingInline) findings.push({ level: 'fail', message: `${missingInline} inline script(s) lack the policy nonce and will be blocked` });
-      if (missingExternal && !lower.includes("'self'")) findings.push({ level: 'fail', message: `${missingExternal} external script(s) lack the nonce` });
-      else if (missingExternal) findings.push({ level: 'warn', message: `${missingExternal} external script(s) lack the nonce (allowed through 'self' only until 'strict-dynamic' applies)` });
+      // CSP3: inline scripts listed by hash run alongside nonces and 'strict-dynamic' (HypDriv's
+      // speculation rules and theme script are allowed this way).
+      const allowedHashes = new Set(hashes.filter((h) => h.startsWith('sha256-')).map((h) => h.slice(7)));
+      const missingInline = missing.filter((t) => t.inline && !allowedHashes.has(sha256Base64(t.content))).length;
+      const missingExternal = missing.filter((t) => !t.inline).length;
+      if (missingInline)
+        findings.push({
+          level: 'fail',
+          message: `${missingInline} inline script(s) lack the policy nonce and will be blocked`,
+        });
+      if (missingExternal && !lower.includes("'self'"))
+        findings.push({ level: 'fail', message: `${missingExternal} external script(s) lack the nonce` });
+      else if (missingExternal)
+        findings.push({
+          level: 'warn',
+          message: `${missingExternal} external script(s) lack the nonce (allowed through 'self' only until 'strict-dynamic' applies)`,
+        });
     } else if (mode === 'hash') {
       const extractor = options.extractInlineScripts ?? inlineScriptsLocal;
       const inline = extractor(input.body);
@@ -103,9 +163,17 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
       for (const body of inline) if (!sha.has(sha256Base64(body))) unmatched++;
       scripts.hashed = inline.length - unmatched;
       scripts.unmatched = unmatched;
-      if (unmatched) findings.push({ level: 'fail', message: `${unmatched} of ${inline.length} inline script(s) do not match any policy hash (stale manifest or per-request inline content)` });
+      if (unmatched)
+        findings.push({
+          level: 'fail',
+          message: `${unmatched} of ${inline.length} inline script(s) do not match any policy hash (stale manifest or per-request inline content)`,
+        });
     } else if (mode === 'unsafe-inline') {
-      findings.push({ level: 'warn', message: "inline scripts run under 'unsafe-inline' (the Node fallback for cached HTML); the Worker upgrades this to nonces" });
+      findings.push({
+        level: 'warn',
+        message:
+          "inline scripts run under 'unsafe-inline' (the Node fallback for cached HTML); the Worker upgrades this to nonces",
+      });
     }
   }
   return base(mode);

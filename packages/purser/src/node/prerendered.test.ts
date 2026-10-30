@@ -90,3 +90,29 @@ describe('collectPrerenderedHtml', () => {
     expect(pathnameFromPrerenderFile('/b/app', '/b/app/a.prefetch.rsc', '.prefetch.rsc')).toBe('/a');
   });
 });
+
+describe('Next.js 16.4 route-cache layout', () => {
+  it('reads prerenders from server/route-cache/APP_PAGE/<hash>/$ and skips segment payloads', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { collectPrerenderedHtml } = await import('./prerendered');
+    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-route-cache-'));
+    try {
+      const a = join(dir, '.next', 'server', 'route-cache', 'APP_PAGE', 'aaa', '$');
+      const b = join(dir, '.next', 'server', 'route-cache', 'APP_PAGE', 'bbb', '$', 'docs');
+      mkdirSync(join(a, 'index.segments'), { recursive: true });
+      mkdirSync(b, { recursive: true });
+      writeFileSync(join(a, 'index.html'), '<html class="x1234567"></html>');
+      writeFileSync(join(a, 'index.rsc'), '"className":"x7654321"');
+      writeFileSync(join(a, 'index.segments', '_full.segment.rsc'), 'ignored');
+      writeFileSync(join(b, 'guard.html'), '<p class="xabcdefg"></p>');
+      const docs = await collectPrerenderedHtml(dir, { includeRsc: true });
+      expect(Object.keys(docs)).toEqual(['/', '/docs/guard']);
+      expect(docs['/']).toContain('x7654321');
+      expect(docs['/']).not.toContain('ignored');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

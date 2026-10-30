@@ -11,8 +11,9 @@
  * - `@hypdriv/next/cache`           revalidateTag(), revalidatePath(), purgeEdge()
  * - `@hypdriv/next/instrumentation` createInstrumentation()
  */
-export { withHypDriv, PHASE, type WithHypDrivOptions } from './config/index';
-export { createProxy, matcher } from './proxy/index';
-export { buildDefaultStages, createPlatform, stages, type Platform } from './stages/index';
+
+export type { HypDrivConfig, HypManifest, ResolvedConfig } from '@hypdriv/core';
 export { defineConfig } from '@hypdriv/core';
-export type { HypDrivConfig, ResolvedConfig, HypManifest } from '@hypdriv/core';
+export { PHASE, type WithHypDrivOptions, withHypDriv } from './config/index';
+export { createProxy, matcher } from './proxy/index';
+export { buildDefaultStages, createPlatform, type Platform, stages } from './stages/index';

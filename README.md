@@ -85,7 +85,7 @@ import { revalidateTag } from 'hypdriv/cache';      // Next revalidation + edge 
 
 At build time the chained adapter writes `.hypdriv/manifest.json` — routes, classifications (static / isr / shell / dynamic / route), per-route assets, CSP hashes, Early Hints, the link graph for Speculation Rules, Purser atom usage, weights and budgets. At request time the **Drivetrain** pipeline runs the same ordered stages in the Worker and in `proxy.ts`:
 
-`request-id → maintenance → shield → bots → rate-limit → geo → i18n → flags → redirects → theme → csp → edge-cache → security-headers → early-hints → speculation → html-transforms → skew → observe`
+`request-id → maintenance → shield → bots → rate-limit → geo → i18n → flags → redirects → theme → speculation → csp → edge-cache → security-headers → early-hints → html-transforms → skew → devtools → observe`
 
 Every stage reports a `Server-Timing` entry, so its effect is visible on every response (and in the HUD).
 

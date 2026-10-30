@@ -46,13 +46,15 @@ export const NODE_API_RULES: ApiRule[] = [
     api: 'child_process',
     modules: ['child_process'],
     severity: 'error',
-    message: 'child_process is not available on workerd; move the work to a build step, a Queue consumer or an external service.',
+    message:
+      'child_process is not available on workerd; move the work to a build step, a Queue consumer or an external service.',
   },
   {
     api: 'worker_threads',
     modules: ['worker_threads'],
     severity: 'error',
-    message: 'worker_threads is not available on workerd; use Durable Objects, Queues or a separate Worker for parallel work.',
+    message:
+      'worker_threads is not available on workerd; use Durable Objects, Queues or a separate Worker for parallel work.',
   },
   {
     api: 'cluster',
@@ -70,7 +72,8 @@ export const NODE_API_RULES: ApiRule[] = [
     api: 'net',
     modules: ['net', 'tls'],
     severity: 'warn',
-    message: 'Only outbound connections (net.connect / connect() from cloudflare:sockets) work on workerd; servers and raw listeners do not.',
+    message:
+      'Only outbound connections (net.connect / connect() from cloudflare:sockets) work on workerd; servers and raw listeners do not.',
   },
   {
     api: 'vm',
@@ -89,26 +92,30 @@ export const NODE_API_RULES: ApiRule[] = [
     api: 'sharp',
     modules: ['sharp'],
     severity: 'error',
-    message: 'sharp (native) cannot run on workerd; use the Images binding or next/image through the Cloudflare loader.',
+    message:
+      'sharp (native) cannot run on workerd; use the Images binding or next/image through the Cloudflare loader.',
   },
   {
     api: 'canvas',
     modules: ['canvas', '@napi-rs/canvas', 'skia-canvas'],
     severity: 'error',
-    message: 'Native canvas packages cannot run on workerd; use @vercel/og / satori-based rendering or an external service.',
+    message:
+      'Native canvas packages cannot run on workerd; use @vercel/og / satori-based rendering or an external service.',
   },
   {
     api: 'bcrypt',
     modules: ['bcrypt'],
     severity: 'error',
-    message: 'bcrypt (native) cannot run on workerd; use passwords.hash() from @hypdriv/security (scrypt/PBKDF2) or bcryptjs.',
+    message:
+      'bcrypt (native) cannot run on workerd; use passwords.hash() from @hypdriv/security (scrypt/PBKDF2) or bcryptjs.',
   },
   {
     api: 'puppeteer',
     modules: ['puppeteer', 'puppeteer-core', 'playwright', 'playwright-core'],
     unless: ['@cloudflare/puppeteer', '@cloudflare/playwright'],
     severity: 'error',
-    message: 'Headless browsers need Browser Rendering (@cloudflare/puppeteer or @cloudflare/playwright) on Workers.',
+    message:
+      'Headless browsers need Browser Rendering (@cloudflare/puppeteer or @cloudflare/playwright) on Workers.',
   },
   {
     api: 'process.exit',
@@ -156,7 +163,9 @@ export function scanNodeApis(file: string, source: string, root: string): NodeAp
     if (rule.modules && !rule.pattern) {
       for (const spec of specs) {
         const base = normalizeModule(spec);
-        const moduleName = base.split('/')[0]!.startsWith('@') ? base.split('/').slice(0, 2).join('/') : base.split('/')[0]!;
+        const moduleName = base.split('/')[0]!.startsWith('@')
+          ? base.split('/').slice(0, 2).join('/')
+          : base.split('/')[0]!;
         if (!rule.modules.includes(base) && !rule.modules.includes(moduleName)) continue;
         const idx = source.indexOf(spec);
         findings.push({
@@ -191,22 +200,45 @@ export function scanNodeApis(file: string, source: string, root: string): NodeAp
 }
 
 const EDGE_SEGMENT_RE = /export\s+const\s+runtime\s*(?::\s*[^=]+)?=\s*['"]edge['"]/g;
-const EDGE_PAGES_RE = /export\s+const\s+config\s*(?::\s*[^=]+)?=\s*\{[^}]*runtime\s*:\s*['"](?:edge|experimental-edge)['"]/g;
+const EDGE_PAGES_RE =
+  /export\s+const\s+config\s*(?::\s*[^=]+)?=\s*\{[^}]*runtime\s*:\s*['"](?:edge|experimental-edge)['"]/g;
 
 /** Finds Edge runtime declarations in a route file. */
 export function scanEdgeRuntime(file: string, source: string, root: string): EdgeRuntimeFinding[] {
   const out: EdgeRuntimeFinding[] = [];
   const display = rel(root, file);
   for (const m of source.matchAll(EDGE_SEGMENT_RE))
-    out.push({ file: display, line: lineOf(source, m.index), snippet: snippetAt(source, m.index), kind: 'segment' });
+    out.push({
+      file: display,
+      line: lineOf(source, m.index),
+      snippet: snippetAt(source, m.index),
+      kind: 'segment',
+    });
   for (const m of source.matchAll(EDGE_PAGES_RE))
-    out.push({ file: display, line: lineOf(source, m.index), snippet: snippetAt(source, m.index), kind: 'pages-config' });
+    out.push({
+      file: display,
+      line: lineOf(source, m.index),
+      snippet: snippetAt(source, m.index),
+      kind: 'pages-config',
+    });
   return out;
 }
 
 /** Candidate source directories of a Next.js project. */
 export function sourceDirs(root: string): string[] {
-  const dirs = ['app', 'pages', 'src', 'components', 'lib', 'server', 'utils', 'hooks', 'proxy.ts', 'middleware.ts', 'instrumentation.ts'];
+  const dirs = [
+    'app',
+    'pages',
+    'src',
+    'components',
+    'lib',
+    'server',
+    'utils',
+    'hooks',
+    'proxy.ts',
+    'middleware.ts',
+    'instrumentation.ts',
+  ];
   return dirs.map((d) => join(root, d)).filter((p) => exists(p));
 }
 
@@ -219,11 +251,17 @@ export function scanSources(root: string, options: ScanOptions = {}): SourceScan
   const limit = options.limit ?? 5000;
   const files: string[] = [];
   for (const dir of sourceDirs(root)) {
-    if (isDirectory(dir)) files.push(...walkFiles(dir, { extensions: SOURCE_EXTENSIONS, limit: limit - files.length }));
+    if (isDirectory(dir))
+      files.push(...walkFiles(dir, { extensions: SOURCE_EXTENSIONS, limit: limit - files.length }));
     else files.push(dir);
     if (files.length >= limit) break;
   }
-  const result: SourceScanResult = { filesScanned: 0, truncated: files.length >= limit, edgeRuntime: [], nodeApis: [] };
+  const result: SourceScanResult = {
+    filesScanned: 0,
+    truncated: files.length >= limit,
+    edgeRuntime: [],
+    nodeApis: [],
+  };
   for (const file of files) {
     let source: string;
     try {
@@ -233,8 +271,13 @@ export function scanSources(root: string, options: ScanOptions = {}): SourceScan
     }
     result.filesScanned++;
     if (source.length > 2_000_000) continue;
-    const isRouteFile = /[\\/](?:app|pages|src[\\/]app|src[\\/]pages)[\\/]/.test(file) || /[\\/](?:app|pages)$/.test(file);
-    if (isRouteFile || /[\\/]proxy\.[cm]?[jt]sx?$/.test(file) || /[\\/]middleware\.[cm]?[jt]sx?$/.test(file)) {
+    const isRouteFile =
+      /[\\/](?:app|pages|src[\\/]app|src[\\/]pages)[\\/]/.test(file) || /[\\/](?:app|pages)$/.test(file);
+    if (
+      isRouteFile ||
+      /[\\/]proxy\.[cm]?[jt]sx?$/.test(file) ||
+      /[\\/]middleware\.[cm]?[jt]sx?$/.test(file)
+    ) {
       result.edgeRuntime.push(...scanEdgeRuntime(file, source, root));
     }
     if (/\.d\.ts$/.test(file) || /\.test\.|\.spec\./.test(file)) continue;

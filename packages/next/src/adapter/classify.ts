@@ -1,4 +1,11 @@
-import { type HypRoute, type HypRoutePrerender, type RouteClassification, cleanRoutePathname, routeId, routePatternToRegex } from '@hypdriv/core';
+import {
+  cleanRoutePathname,
+  type HypRoute,
+  type HypRoutePrerender,
+  type RouteClassification,
+  routeId,
+  routePatternToRegex,
+} from '@hypdriv/core';
 import type { AdapterOutputs, PrerenderOutput, SharedRouteFields } from './types';
 
 export interface ClassifiedRoute {
@@ -22,10 +29,18 @@ function isDynamicPattern(pathname: string): boolean {
   return /\[[^\]]+\]/.test(pathname);
 }
 
-function classifyPrerender(p: PrerenderOutput | null, concrete: PrerenderOutput[], dynamic: boolean): RouteClassification {
+function classifyPrerender(
+  p: PrerenderOutput | null,
+  concrete: PrerenderOutput[],
+  dynamic: boolean,
+): RouteClassification {
   if (p) {
     const revalidate = p.fallback?.initialRevalidate;
-    const hasShellBody = p.fallback?.filePath !== undefined && (p.compute === 'resuming' || p.config.renderingMode === 'PARTIALLY_STATIC' || p.config.partialFallback === true || !!p.fallback?.postponedState);
+    // `renderingMode: 'PARTIALLY_STATIC'` is reported for every route when Cache Components / PPR is on,
+    // so it says nothing about this prerender. A shell is a prerender with postponed (dynamic) holes.
+    const hasShellBody =
+      p.fallback?.filePath !== undefined &&
+      (p.compute === 'resuming' || p.config.partialFallback === true || !!p.fallback?.postponedState);
     if (hasShellBody) return 'shell';
     if (p.compute === 'resuming') return 'shell';
     if (p.compute === 'static') return revalidate === false || revalidate === undefined ? 'static' : 'isr';
@@ -33,7 +48,8 @@ function classifyPrerender(p: PrerenderOutput | null, concrete: PrerenderOutput[
       // Dynamic route rendered on demand; concrete prerenders tell us whether it is ISR-like.
       if (dynamic && concrete.length) {
         const anyStatic = concrete.some((c) => c.compute === 'static');
-        if (anyStatic) return concrete.some((c) => typeof c.fallback?.initialRevalidate === 'number') ? 'isr' : 'static';
+        if (anyStatic)
+          return concrete.some((c) => typeof c.fallback?.initialRevalidate === 'number') ? 'isr' : 'static';
       }
       return 'dynamic';
     }
@@ -45,14 +61,19 @@ function classifyPrerender(p: PrerenderOutput | null, concrete: PrerenderOutput[
   return 'dynamic';
 }
 
-function prerenderInfo(p: PrerenderOutput | null, concrete: PrerenderOutput[]): HypRoutePrerender | undefined {
+function prerenderInfo(
+  p: PrerenderOutput | null,
+  concrete: PrerenderOutput[],
+): HypRoutePrerender | undefined {
   if (!p && !concrete.length) return undefined;
   const source = p ?? concrete[0]!;
   const info: HypRoutePrerender = {};
   if (source.routeType) info.routeType = source.routeType;
   if (source.response) info.response = source.response;
   if (source.compute) info.compute = source.compute;
-  const revalidate = source.fallback?.initialRevalidate ?? concrete.find((c) => c.fallback?.initialRevalidate !== undefined)?.fallback?.initialRevalidate;
+  const revalidate =
+    source.fallback?.initialRevalidate ??
+    concrete.find((c) => c.fallback?.initialRevalidate !== undefined)?.fallback?.initialRevalidate;
   if (revalidate !== undefined) info.revalidate = revalidate;
   const expire = source.fallback?.initialExpiration;
   if (expire !== undefined) info.expire = expire;
@@ -97,7 +118,9 @@ export function classifyOutputs(outputs: AdapterOutputs, rscSuffix = '.rsc'): Cl
     const primary = primaryByRoute.get(pathname) ?? prerendersById.get(pathname) ?? null;
     const concrete = concreteByRoute.get(pathname) ?? [];
     const isRoute = kind === 'app-route' || kind === 'page-api';
-    const classification: RouteClassification = isRoute ? 'route' : classifyPrerender(primary && !isRoute ? primary : null, concrete, dynamic);
+    const classification: RouteClassification = isRoute
+      ? 'route'
+      : classifyPrerender(primary && !isRoute ? primary : null, concrete, dynamic);
     const route: HypRoute = {
       id,
       pathname,
@@ -114,7 +137,9 @@ export function classifyOutputs(outputs: AdapterOutputs, rscSuffix = '.rsc'): Cl
     if (output.config.maxDuration !== undefined || output.config.preferredRegion !== undefined) {
       route.segment = {
         ...(output.config.maxDuration !== undefined ? { maxDuration: output.config.maxDuration } : {}),
-        ...(output.config.preferredRegion !== undefined ? { preferredRegion: output.config.preferredRegion } : {}),
+        ...(output.config.preferredRegion !== undefined
+          ? { preferredRegion: output.config.preferredRegion }
+          : {}),
       };
     }
     out.push({ route, primaryPrerender: primary, concretePrerenders: concrete, output });
@@ -134,7 +159,11 @@ export function classifyOutputs(outputs: AdapterOutputs, rscSuffix = '.rsc'): Cl
 }
 
 /** Public (non-`_next`) static files become asset routes; `_next/static` is summarised. */
-export function staticFileRoutes(outputs: AdapterOutputs): { routes: HypRoute[]; count: number; immutablePrefixes: string[] } {
+export function staticFileRoutes(outputs: AdapterOutputs): {
+  routes: HypRoute[];
+  count: number;
+  immutablePrefixes: string[];
+} {
   const routes: HypRoute[] = [];
   const prefixes = new Set<string>();
   let count = 0;

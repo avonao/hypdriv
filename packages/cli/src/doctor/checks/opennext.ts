@@ -11,7 +11,10 @@ export const MIN_OPENNEXT = '1.15.0';
 export function satisfiesSimpleRange(version: string, range: string): boolean | null {
   const v = parseVersion(version);
   if (!v) return null;
-  const alternatives = range.split('||').map((r) => r.trim()).filter(Boolean);
+  const alternatives = range
+    .split('||')
+    .map((r) => r.trim())
+    .filter(Boolean);
   if (!alternatives.length) return null;
   let evaluated = false;
   for (const alt of alternatives) {
@@ -62,7 +65,11 @@ export const opennextChecks: Check[] = [
     severity: 'error',
     run(ctx) {
       const on = ctx.project.opennext;
-      if (!on.installed) return fail('@opennextjs/cloudflare is not installed. Run `npx @opennextjs/cloudflare@latest migrate` (existing project) or add it with wrangler.', { details: ['pnpm add @opennextjs/cloudflare && pnpm add -D wrangler'] });
+      if (!on.installed)
+        return fail(
+          '@opennextjs/cloudflare is not installed. Run `npx @opennextjs/cloudflare@latest migrate` (existing project) or add it with wrangler.',
+          { details: ['pnpm add @opennextjs/cloudflare && pnpm add -D wrangler'] },
+        );
       return pass(`@opennextjs/cloudflare ${on.installed}`);
     },
   },
@@ -74,7 +81,10 @@ export const opennextChecks: Check[] = [
     run(ctx) {
       const v = ctx.project.opennext.installed;
       if (!v) return skip('not installed.');
-      if (!atLeast(v, MIN_OPENNEXT)) return fail(`@opennextjs/cloudflare ${v} is too old; HypDriv needs ${MIN_OPENNEXT}+ (Next.js 16 support, Durable Object exports).`);
+      if (!atLeast(v, MIN_OPENNEXT))
+        return fail(
+          `@opennextjs/cloudflare ${v} is too old; HypDriv needs ${MIN_OPENNEXT}+ (Next.js 16 support, Durable Object exports).`,
+        );
       return pass(`@opennextjs/cloudflare ${v}`);
     },
   },
@@ -92,7 +102,10 @@ export const opennextChecks: Check[] = [
       if (!range) return skip('OpenNext declares no peer range for next.');
       const ok = satisfiesSimpleRange(next, range);
       if (ok === null) return info(`OpenNext declares next ${range}; verify it covers next ${next}.`);
-      if (!ok) return warn(`next ${next} is outside the range OpenNext ${ctx.project.opennext.installed} declares (${range}); upgrade @opennextjs/cloudflare.`);
+      if (!ok)
+        return warn(
+          `next ${next} is outside the range OpenNext ${ctx.project.opennext.installed} declares (${range}); upgrade @opennextjs/cloudflare.`,
+        );
       return pass(`next ${next} satisfies OpenNext's peer range ${range}.`);
     },
   },
@@ -103,7 +116,10 @@ export const opennextChecks: Check[] = [
     severity: 'warn',
     run(ctx) {
       const file = ctx.project.openNextConfigFile;
-      if (!file) return warn('No open-next.config.ts; `opennextjs-cloudflare build` needs it (defineCloudflareConfig with an incremental cache for ISR).');
+      if (!file)
+        return warn(
+          'No open-next.config.ts; `opennextjs-cloudflare build` needs it (defineCloudflareConfig with an incremental cache for ISR).',
+        );
       return pass(rel(ctx.root, file));
     },
   },
@@ -114,11 +130,17 @@ export const opennextChecks: Check[] = [
     severity: 'info',
     run(ctx) {
       const file = ctx.project.openNextWorkerFile;
-      if (!file) return info('No .open-next/worker.js yet; run `opennextjs-cloudflare build` before `hypdriv analyze` and the preview.');
+      if (!file)
+        return info(
+          'No .open-next/worker.js yet; run `opennextjs-cloudflare build` before `hypdriv analyze` and the preview.',
+        );
       const age = Date.now() - statSync(file).mtimeMs;
       const hours = Math.round(age / 3600000);
       const buildIdFile = ctx.project.nextBuild ? join(ctx.project.nextBuild.dir, 'BUILD_ID') : null;
-      if (buildIdFile && mtimeMs(buildIdFile) > statSync(file).mtimeMs) return warn('.next is newer than .open-next/worker.js; rebuild with `opennextjs-cloudflare build` before previewing or analysing.');
+      if (buildIdFile && mtimeMs(buildIdFile) > statSync(file).mtimeMs)
+        return warn(
+          '.next is newer than .open-next/worker.js; rebuild with `opennextjs-cloudflare build` before previewing or analysing.',
+        );
       return pass(`.open-next/worker.js (${hours < 1 ? 'built within the hour' : `${hours} h old`})`);
     },
   },

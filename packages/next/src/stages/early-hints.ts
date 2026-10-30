@@ -1,4 +1,14 @@
-import { type HypContext, type LinkEntry, type ResolvedConfig, type Stage, appendLinkHeader, defineStage, isHtmlLike, isRscRequest, parseLink } from '@hypdriv/core';
+import {
+  appendLinkHeader,
+  defineStage,
+  type HypContext,
+  isHtmlLike,
+  isRscRequest,
+  type LinkEntry,
+  parseLink,
+  type ResolvedConfig,
+  type Stage,
+} from '@hypdriv/core';
 import { linkEntriesForRoute } from '../shared/hints';
 
 /**
@@ -17,7 +27,9 @@ export function earlyHintsStage(config: ResolvedConfig): Stage | null {
     const hit = cache.get(route.id);
     if (hit) return hit;
     const precomputed = ctx.manifest.earlyHints[route.id];
-    const entries = precomputed?.length ? precomputed.flatMap((v) => parseLink(v)) : linkEntriesForRoute(route, eh);
+    const entries = precomputed?.length
+      ? precomputed.flatMap((v) => parseLink(v))
+      : linkEntriesForRoute(route, eh);
     cache.set(route.id, entries);
     return entries;
   };
@@ -35,7 +47,11 @@ export function earlyHintsStage(config: ResolvedConfig): Stage | null {
       const headers = new Headers(response.headers);
       appendLinkHeader(headers, entries, eh.maxLinks);
       ctx.timings.mark('hints', String(entries.length));
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     },
   });
 }

@@ -208,23 +208,29 @@ interface Stage {
 
 Execution order is fixed by the stage list the application passes (or by the default list built from `hypdriv.config.ts`). The default order is:
 
-| #   | Stage             | pre                                                                        | post                                        |
-| --- | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
-| 1   | `requestId`       | assign id, start timings, create logger/span                               | `x-request-id`, `Server-Timing`             |
-| 2   | `maintenance`     | serve maintenance page when enabled                                        | —                                           |
-| 3   | `shield`          | WAF-lite rules, method allow-list, path traversal, body limits, bot policy | —                                           |
-| 4   | `rateLimit`       | per-policy limiters                                                        | `RateLimit-*` headers                       |
-| 5   | `geo`             | geo/locale context headers                                                 | —                                           |
-| 6   | `flags`           | evaluate flags → `x-hypdriv-flags`                                         | set bucketing cookie once                   |
-| 7   | `redirects`       | edge redirect table                                                        | —                                           |
-| 8   | `theme`           | read theme cookie / client hints                                           | pin `<html class>` (edge only)              |
-| 9   | `edgeCache`       | lookup / coalesce / serve stale                                            | store, `x-hypdriv-cache`                    |
-| 10  | `csp`             | pick mode (nonce/hash/report-only), set request CSP for nonce mode         | set response CSP                            |
-| 11  | `securityHeaders` | —                                                                          | HSTS, COOP, CORP, Permissions-Policy, …     |
-| 12  | `earlyHints`      | —                                                                          | `Link` headers from the manifest            |
-| 13  | `speculation`     | —                                                                          | inject Speculation Rules script (edge only) |
-| 14  | `htmlTransforms`  | —                                                                          | HTMLRewriter plug-ins (edge only)           |
-| 15  | `observe`         | —                                                                          | flush spans/logs in `waitUntil`             |
+| #   | Stage              | pre                                                                         | post                                                                 |
+| --- | ------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1   | `request-id`       | assign id, start timings, create logger/span                                | `x-request-id`, `x-hypdriv-request-id`, `Server-Timing`, end span    |
+| 2   | `maintenance`      | serve maintenance page when enabled                                         | —                                                                    |
+| 3   | `shield`           | WAF-lite rules, method allow-list, path traversal, body limits              | —                                                                    |
+| 4   | `bots`             | classify, Turnstile challenge, block/log                                    | `x-hypdriv-bot`                                                      |
+| 5   | `rate-limit`       | per-policy limiters (memory → Cache API → KV → Durable Object → binding)    | `RateLimit-*` headers                                                |
+| 6   | `geo`              | geo context → `x-hypdriv-geo`                                               | —                                                                    |
+| 7   | `i18n`             | negotiate locale, redirect                                                  | —                                                                    |
+| 8   | `flags`            | evaluate flags → `x-hypdriv-flags`                                          | set bucketing cookie once                                            |
+| 9   | `redirects`        | static + KV redirect table, canonical host, https                          | —                                                                    |
+| 10  | `theme`            | read theme cookie / client hints → `x-hypdriv-theme`                        | pin `<html class>` (HTMLRewriter), `Accept-CH`, `Vary`               |
+| 11  | `speculation`      | prepare per-route rules, register their CSP hash                            | replace the component's document rules with graph rules (edge)     |
+| 12  | `csp`              | pick mode (nonce/hash/report-only), set request CSP for nonce mode          | response CSP; nonce injection into cached HTML (edge)                |
+| 13  | `edge-cache`       | lookup / coalesce / serve stale                                             | store, `x-hypdriv-cache`, `Cache-Tag`                                 |
+| 14  | `security-headers` | —                                                                           | HSTS, COOP, CORP, Permissions-Policy, …                              |
+| 15  | `early-hints`      | —                                                                           | `Link` headers from the manifest                                     |
+| 16  | `html-transforms`  | —                                                                           | comment stripping, whitespace, priority hints (edge only)            |
+| 17  | `skew`             | detect deployment skew                                                      | reload instruction                                                   |
+| 18  | `devtools`         | —                                                                           | per-request facts as `Server-Timing` `hyp-*` entries (HUD)            |
+| 19  | `observe`          | —                                                                           | request log line, flush spans in `waitUntil`                          |
+
+Post steps run in reverse order: `edge-cache.post` stores the document exactly as Next.js produced it, then `csp.post`, `speculation.post` and `theme.post` apply the per-request work (nonce, edge rules, theme classes) on misses and hits alike, and `request-id.post` serialises the final `Server-Timing`.
 
 `HypContext` carries `request`, `url`, `route`, `env`, `cf`, `state` (typed slots written by stages, e.g. `nonce`, `cacheDecision`, `flags`), `timings`, `log`, `waitUntil` and `signal`.
 

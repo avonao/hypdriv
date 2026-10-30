@@ -36,13 +36,16 @@ export const DEFAULT_STAGE_ORDER = [
   'flags',
   'redirects',
   'theme',
+  // Before the cache: its pre runs on cache hits too (CSP hash for the injected rules) and its post
+  // injects into the response after the edge cache stored the untouched document.
+  'speculation',
   'csp',
   'edge-cache',
   'security-headers',
   'early-hints',
-  'speculation',
   'html-transforms',
   'skew',
+  'devtools',
   'observe',
 ] as const;
 

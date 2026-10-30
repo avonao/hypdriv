@@ -126,10 +126,12 @@ class TomlValueParser {
     if (ch === "'") return this.parseLiteralString();
     if (ch === '[') return this.parseArray();
     if (ch === '{') return this.parseInlineTable();
-    const m = /^(true|false|[+-]?(?:inf|nan)|[+-]?\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\d{4}-\d{2}-\d{2}(?:[T ][0-9:.]+(?:Z|[+-]\d{2}:\d{2})?)?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)/.exec(
-      this.text.slice(this.pos),
-    );
-    if (!m) throw new SyntaxError(`unsupported TOML value near "${this.text.slice(this.pos, this.pos + 20)}"`);
+    const m =
+      /^(true|false|[+-]?(?:inf|nan)|[+-]?\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\d{4}-\d{2}-\d{2}(?:[T ][0-9:.]+(?:Z|[+-]\d{2}:\d{2})?)?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)/.exec(
+        this.text.slice(this.pos),
+      );
+    if (!m)
+      throw new SyntaxError(`unsupported TOML value near "${this.text.slice(this.pos, this.pos + 20)}"`);
     this.pos += m[0].length;
     const token = m[0];
     if (token === 'true') return true;
@@ -418,7 +420,12 @@ export interface WranglerConfig {
   r2_buckets: WranglerBinding[];
   d1_databases: WranglerBinding[];
   durable_objects: { bindings: WranglerBinding[] };
-  migrations: Array<{ tag?: string; new_classes?: string[]; new_sqlite_classes?: string[]; deleted_classes?: string[] }>;
+  migrations: Array<{
+    tag?: string;
+    new_classes?: string[];
+    new_sqlite_classes?: string[];
+    deleted_classes?: string[];
+  }>;
   analytics_engine_datasets: WranglerBinding[];
   ratelimits: WranglerBinding[];
   queues: { producers: WranglerBinding[]; consumers: WranglerBinding[] };
@@ -485,10 +492,14 @@ export function normalizeWranglerConfig(doc: Record<string, JsonValue>): Wrangle
     analytics_engine_datasets: asArray(doc.analytics_engine_datasets),
     ratelimits: asArray(doc.ratelimits),
     queues: { producers: asArray(queues?.producers), consumers: asArray(queues?.consumers) },
-    ...(images ? { images: { ...(typeof images.binding === 'string' ? { binding: images.binding } : {}) } } : {}),
+    ...(images
+      ? { images: { ...(typeof images.binding === 'string' ? { binding: images.binding } : {}) } }
+      : {}),
     ...(ai ? { ai: { ...(typeof ai.binding === 'string' ? { binding: ai.binding } : {}) } } : {}),
     vars: obj(doc.vars) ?? {},
-    ...(placement ? { placement: { ...(typeof placement.mode === 'string' ? { mode: placement.mode } : {}) } } : {}),
+    ...(placement
+      ? { placement: { ...(typeof placement.mode === 'string' ? { mode: placement.mode } : {}) } }
+      : {}),
     env: obj(doc.env) ?? {},
     raw: doc,
   };
@@ -499,7 +510,8 @@ export type WranglerFormat = 'jsonc' | 'json' | 'toml';
 /** Parses the text of a wrangler config file in any supported format. Throws on syntax errors. */
 export function parseWranglerConfig(text: string, format: WranglerFormat): WranglerConfig {
   const doc = format === 'toml' ? parseTomlSubset(text) : parseJsonc(text);
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new SyntaxError('wrangler config must be an object');
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc))
+    throw new SyntaxError('wrangler config must be an object');
   return normalizeWranglerConfig(doc as Record<string, JsonValue>);
 }
 

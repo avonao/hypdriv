@@ -1,9 +1,16 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { HEADER, type HypContext, createContext, loadConfig, runWithContext, setContextStore } from '@hypdriv/core';
+import {
+  createContext,
+  HEADER,
+  type HypContext,
+  loadConfig,
+  runWithContext,
+  setContextStore,
+} from '@hypdriv/core';
 import { decodeFlagsHeader } from '@hypdriv/flags';
 import { signing } from '@hypdriv/security';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { type GeoInfo, encodeGeoHeader } from '../stages/geo';
+import { encodeGeoHeader, type GeoInfo } from '../stages/geo';
 import { defer, devtoolsMeta, flag, geo, hyp, jobHandler, nonce, setCloudflareContextLoader } from './index';
 
 const als = new AsyncLocalStorage<HypContext>();
@@ -37,7 +44,11 @@ afterAll(() => {
   setCloudflareContextLoader(null);
 });
 
-function pipelineContext(headers: Record<string, string>, env: Record<string, unknown> = {}, config = loadConfig({})): { ctx: HypContext; pending: Promise<unknown>[] } {
+function pipelineContext(
+  headers: Record<string, string>,
+  env: Record<string, unknown> = {},
+  config = loadConfig({}),
+): { ctx: HypContext; pending: Promise<unknown>[] } {
   const pending: Promise<unknown>[] = [];
   const ctx = createContext({
     request: new Request('https://shop.example.com/products/1', { headers }),
@@ -84,7 +95,9 @@ describe('hyp()', () => {
   });
 
   it('resolves the theme from cookies when the theme stage did not run (RSC navigations)', async () => {
-    const config = loadConfig({ purser: { theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } } } } });
+    const config = loadConfig({
+      purser: { theme: { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } } } },
+    });
     const { ctx } = pipelineContext({ cookie: 'hyp_theme=dark' }, {}, config);
     const result = await runWithContext(ctx, () => hyp());
     expect(result.theme).toEqual({ mode: 'dark' });
@@ -92,7 +105,11 @@ describe('hyp()', () => {
 
   it('uses the OpenNext Cloudflare context outside the pipeline', async () => {
     const waitUntil = vi.fn();
-    setCloudflareContextLoader(async () => ({ env: { SECRET: 'x' }, cf: { country: 'DE' }, ctx: { waitUntil } }));
+    setCloudflareContextLoader(async () => ({
+      env: { SECRET: 'x' },
+      cf: { country: 'DE' },
+      ctx: { waitUntil },
+    }));
     // Outside a pipeline, request headers come from next/headers; provide them through a context with no store.
     setContextStore(null);
     vi.doMock('next/headers', () => ({ headers: async () => new Headers({ 'cf-ipcountry': 'DE' }) }));
@@ -116,15 +133,19 @@ describe('request helpers', () => {
   it('nonce(), geo(), flag() and devtoolsMeta() read the forwarded headers', async () => {
     const { ctx } = pipelineContext(
       {
-      [HEADER.nonce]: 'n0nce',
-      [HEADER.geo]: encodeGeoHeader(geoOf({ country: 'US', region: 'NY' })),
-      [HEADER.flags]: JSON.stringify({ beta: 'on' }),
-      [HEADER.hypRequestId]: 'req-9',
-      [HEADER.runner]: 'proxy',
-      [HEADER.route]: 'app:/products/[id]',
+        [HEADER.nonce]: 'n0nce',
+        [HEADER.geo]: encodeGeoHeader(geoOf({ country: 'US', region: 'NY' })),
+        [HEADER.flags]: JSON.stringify({ beta: 'on' }),
+        [HEADER.hypRequestId]: 'req-9',
+        [HEADER.runner]: 'proxy',
+        [HEADER.route]: 'app:/products/[id]',
       },
       {},
-      loadConfig({ flags: { definitions: { beta: { default: 'off' }, internalPricing: { default: false, serverOnly: true } } } }),
+      loadConfig({
+        flags: {
+          definitions: { beta: { default: 'off' }, internalPricing: { default: false, serverOnly: true } },
+        },
+      }),
     );
     ctx.requestHeaders.set(HEADER.flags, JSON.stringify({ beta: 'on', internalPricing: true }));
     await runWithContext(ctx, async () => {
@@ -159,7 +180,11 @@ describe('request helpers', () => {
 describe('jobHandler()', () => {
   const secret = 'internal-secret-with-enough-entropy-0123456789';
 
-  async function call(request: Request, env: Record<string, unknown>, handler = vi.fn(async () => ({ processed: 2 }))) {
+  async function call(
+    request: Request,
+    env: Record<string, unknown>,
+    handler = vi.fn(async () => ({ processed: 2 })),
+  ) {
     const { ctx } = pipelineContext({}, env);
     const route = jobHandler({}, handler);
     const response = await runWithContext(ctx, () => route(request));
@@ -168,17 +193,32 @@ describe('jobHandler()', () => {
 
   it('accepts signed internal requests and passes the job payload', async () => {
     const body = JSON.stringify({ job: 'digest', cron: '0 9 * * 1', payload: { week: 44 } });
-    const request = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/digest', { method: 'POST', headers: { 'content-type': 'application/json' }, body }), secret);
+    const request = await signing.signInternalRequest(
+      new Request('https://app.example.com/api/jobs/digest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      }),
+      secret,
+    );
     const { response, handler } = await call(request, { HYPDRIV_INTERNAL_SECRET: secret });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, job: 'digest', result: { processed: 2 } });
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'digest', cron: '0 9 * * 1', payload: { week: 44 } }));
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'digest', cron: '0 9 * * 1', payload: { week: 44 } }),
+    );
   });
 
   it('passes queue messages through', async () => {
-    const messages = [{ id: 'm1', timestamp: '2026-10-30T00:00:00.000Z', body: { to: 'a@example.com' }, attempts: 1 }];
+    const messages = [
+      { id: 'm1', timestamp: '2026-10-30T00:00:00.000Z', body: { to: 'a@example.com' }, attempts: 1 },
+    ];
     const request = await signing.signInternalRequest(
-      new Request('https://app.example.com/api/queues/emails', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ job: 'emails', messages }) }),
+      new Request('https://app.example.com/api/queues/emails', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ job: 'emails', messages }),
+      }),
       secret,
     );
     const { handler } = await call(request, { HYPDRIV_INTERNAL_SECRET: secret });
@@ -189,8 +229,19 @@ describe('jobHandler()', () => {
     const unsigned = new Request('https://app.example.com/api/jobs/digest', { method: 'POST' });
     expect((await call(unsigned, { HYPDRIV_INTERNAL_SECRET: secret })).response.status).toBe(401);
 
-    const signed = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/digest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"job":"a"}' }), secret);
-    const tampered = new Request(signed.url, { method: 'POST', headers: signed.headers, body: '{"job":"b"}' });
+    const signed = await signing.signInternalRequest(
+      new Request('https://app.example.com/api/jobs/digest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"job":"a"}',
+      }),
+      secret,
+    );
+    const tampered = new Request(signed.url, {
+      method: 'POST',
+      headers: signed.headers,
+      body: '{"job":"b"}',
+    });
     const { response, handler } = await call(tampered, { HYPDRIV_INTERNAL_SECRET: secret });
     expect(response.status).toBe(401);
     expect(handler).not.toHaveBeenCalled();
@@ -200,15 +251,33 @@ describe('jobHandler()', () => {
     const previous = env.NODE_ENV;
     env.NODE_ENV = 'production';
     try {
-      const { response } = await call(new Request('https://app.example.com/api/jobs/digest', { method: 'POST' }), {});
+      const { response } = await call(
+        new Request('https://app.example.com/api/jobs/digest', { method: 'POST' }),
+        {},
+      );
       expect(response.status).toBe(503);
     } finally {
       env.NODE_ENV = previous;
     }
   });
 
+  it('accepts Vercel Cron calls authenticated with CRON_SECRET', async () => {
+    const request = new Request('https://app.example.com/api/jobs/digest', {
+      method: 'GET',
+      headers: { authorization: 'Bearer cron-secret-value-1234567890', 'x-vercel-cron-schedule': '0 9 * * 1', 'user-agent': 'vercel-cron/1.0' },
+    });
+    const { response, handler } = await call(request, { CRON_SECRET: 'cron-secret-value-1234567890' });
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'digest', cron: '0 9 * * 1' }));
+    const wrong = new Request('https://app.example.com/api/jobs/digest', { headers: { authorization: 'Bearer nope' } });
+    expect((await call(wrong, { CRON_SECRET: 'cron-secret-value-1234567890', HYPDRIV_INTERNAL_SECRET: secret })).response.status).toBe(401);
+  });
+
   it('reports handler failures as JSON errors', async () => {
-    const request = await signing.signInternalRequest(new Request('https://app.example.com/api/jobs/x', { method: 'POST' }), secret);
+    const request = await signing.signInternalRequest(
+      new Request('https://app.example.com/api/jobs/x', { method: 'POST' }),
+      secret,
+    );
     const { response } = await call(
       request,
       { HYPDRIV_INTERNAL_SECRET: secret },

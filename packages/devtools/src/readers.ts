@@ -468,9 +468,36 @@ export interface DevToolsData {
   state: DevState | null;
 }
 
+/**
+ * Per-request facts the `devtools` stage writes as `Server-Timing` entries (`hyp-request`, `hyp-runner`,
+ * `hyp-route`, `hyp-locale`, `hyp-flags`, `hyp-build`, `hyp-deployment`, `hyp-next`, `hyp-version`),
+ * keyed without the `hyp-` prefix.
+ */
+export function readRequestFacts(entries: readonly TimingEntry[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const e of entries) if (e.name.startsWith('hyp-') && e.desc) out[e.name.slice(4)] = e.desc;
+  return out;
+}
+
+/** Build info from meta tags overlaid with the per-request `Server-Timing` facts (which win). */
+export function mergeBuildInfo(meta: BuildInfo, facts: Record<string, string>): BuildInfo {
+  return {
+    ...meta,
+    build: facts.build ?? meta.build,
+    route: facts.route ?? meta.route,
+    runner: facts.runner ?? meta.runner,
+    deployment: facts.deployment ?? meta.deployment,
+    requestId: facts.request ?? meta.requestId,
+    locale: facts.locale ?? meta.locale,
+    nextVersion: facts.next ?? meta.nextVersion,
+    hypdrivVersion: facts.version ?? meta.hypdrivVersion,
+  };
+}
+
 /** Synchronous part of the snapshot (timings, meta tags, resource entries). */
 export function collectDevToolsData(document?: DocumentLike): DevToolsData {
   const entries = readServerTimingEntries();
+  const facts = readRequestFacts(entries);
   const ttfb = readTtfb();
   return {
     request: summarizeRequest(entries),
@@ -479,8 +506,8 @@ export function collectDevToolsData(document?: DocumentLike): DevToolsData {
         ? {}
         : { TTFB: { name: 'TTFB', value: ttfb, rating: rateVital('TTFB', ttfb), provisional: false } },
     navigations: readRscNavigations(),
-    flags: readFlagsMeta(document),
-    build: readBuildMeta(document),
+    flags: decodeFlags(facts.flags) ?? readFlagsMeta(document),
+    build: mergeBuildInfo(readBuildMeta(document), facts),
     purser: null,
     state: null,
   };

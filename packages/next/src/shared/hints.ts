@@ -27,9 +27,22 @@ export function linkEntriesForRoute(
     add({ href: origin, rel: 'preconnect', crossorigin: 'anonymous' });
   }
   if (config.styles) for (const css of route.assets.css) add({ href: css, rel: 'preload', as: 'style' });
-  if (config.fonts) for (const font of route.assets.fonts) add({ href: font, rel: 'preload', as: 'font', crossorigin: 'anonymous', ...(fontType(font) ? { type: fontType(font) } : {}) });
+  if (config.fonts)
+    for (const font of route.assets.fonts)
+      add({
+        href: font,
+        rel: 'preload',
+        as: 'font',
+        crossorigin: 'anonymous',
+        ...(fontType(font) ? { type: fontType(font) } : {}),
+      });
   if (config.scripts) {
-    const scripts = config.scripts === 'main' ? (options.main?.length ? options.main : route.assets.js.slice(0, 4)) : route.assets.js;
+    const scripts =
+      config.scripts === 'main'
+        ? options.main?.length
+          ? options.main
+          : route.assets.js.slice(0, 4)
+        : route.assets.js;
     for (const js of scripts) add({ href: js, rel: 'preload', as: 'script' });
   }
   return entries;

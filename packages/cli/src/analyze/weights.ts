@@ -1,10 +1,12 @@
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import type { BudgetResult, HypManifest, WorkerWeight } from '@hypdriv/core';
+import type { DeployPlatform } from '../project';
 import { readJsonFile, writeText } from '../util/fs';
 import type { MetafileSummary } from './metafile';
 import { aggregatePackages } from './packages';
 import { attributeBytes, type SourceMapV3, sourcePath } from './sourcemap';
+import type { VercelAnalysis } from './vercel';
 
 export const ANALYZE_FILE = '.hypdriv/analyze.json';
 /** Cloudflare's uncompressed Worker size limit. */
@@ -24,7 +26,11 @@ export interface AnalyzeSnapshot {
   version: 1;
   generatedAt: string;
   buildId: string | null;
+  /** Platform the server bundle was measured for. */
+  platform?: DeployPlatform;
   worker: WorkerAnalysis | null;
+  /** Vercel function bundles (Build Output API), when the platform is Vercel. */
+  vercel?: VercelAnalysis | null;
   routes: Array<{ id: string; pathname: string; classification: string; js: number; css: number }>;
   budgets: BudgetResult[];
 }
@@ -142,7 +148,10 @@ export function analyzeWorkerBundle(input: AnalyzeBundleInput): WorkerAnalysis {
     };
   }
   const attribution = attributeBytes(input.code, input.map);
-  const entries = [...attribution.bySource.entries()].map(([index, bytes]) => ({ source: sourcePath(input.map!, index), bytes }));
+  const entries = [...attribution.bySource.entries()].map(([index, bytes]) => ({
+    source: sourcePath(input.map!, index),
+    bytes,
+  }));
   const largestModules = [...entries]
     .sort((a, b) => b.bytes - a.bytes)
     .slice(0, input.topModules ?? 25)
@@ -166,7 +175,9 @@ export function analyzeWorkerBundle(input: AnalyzeBundleInput): WorkerAnalysis {
 
 /** Parses the size summary wrangler prints (`Total Upload: 1234.56 KiB / gzip: 345.67 KiB`). */
 export function parseWranglerSizes(output: string): { total: number; gzip: number } | null {
-  const m = /Total Upload:\s*([\d.,]+)\s*(B|KiB|MiB|GiB)\s*\/\s*gzip:\s*([\d.,]+)\s*(B|KiB|MiB|GiB)/i.exec(output);
+  const m = /Total Upload:\s*([\d.,]+)\s*(B|KiB|MiB|GiB)\s*\/\s*gzip:\s*([\d.,]+)\s*(B|KiB|MiB|GiB)/i.exec(
+    output,
+  );
   if (!m) return null;
   const unit = (u: string) => (u === 'B' ? 1 : u === 'KiB' ? 1024 : u === 'MiB' ? 1024 ** 2 : 1024 ** 3);
   const num = (s: string) => Number(s.replace(/,/g, ''));

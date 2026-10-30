@@ -15,7 +15,10 @@ export interface PackageJsonEditResult {
 export function editPackageJson(source: string, options: PackageJsonEditOptions): PackageJsonEditResult {
   const pkg = JSON.parse(source) as Record<string, unknown>;
   const changes: string[] = [];
-  const scripts = (pkg.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {}) as Record<string, string>;
+  const scripts = (pkg.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {}) as Record<
+    string,
+    string
+  >;
   for (const [name, command] of Object.entries(options.scripts)) {
     if (scripts[name] !== undefined) continue;
     scripts[name] = command;
@@ -23,13 +26,21 @@ export function editPackageJson(source: string, options: PackageJsonEditOptions)
   }
   if (!pkg.scripts && changes.length) pkg.scripts = scripts;
   if (options.dependency) {
-    const deps = (pkg.dependencies && typeof pkg.dependencies === 'object' ? pkg.dependencies : {}) as Record<string, string>;
-    const devDeps = (pkg.devDependencies && typeof pkg.devDependencies === 'object' ? pkg.devDependencies : {}) as Record<string, string>;
+    const deps = (pkg.dependencies && typeof pkg.dependencies === 'object' ? pkg.dependencies : {}) as Record<
+      string,
+      string
+    >;
+    const devDeps = (
+      pkg.devDependencies && typeof pkg.devDependencies === 'object' ? pkg.devDependencies : {}
+    ) as Record<string, string>;
     const declared = [...Object.keys(deps), ...Object.keys(devDeps)];
-    const hasHypDriv = declared.includes(options.dependency.name) || declared.some((d) => d.startsWith('@hypdriv/'));
+    const hasHypDriv =
+      declared.includes(options.dependency.name) || declared.some((d) => d.startsWith('@hypdriv/'));
     if (!hasHypDriv) {
       deps[options.dependency.name] = options.dependency.range;
-      const sorted = Object.fromEntries(Object.entries(deps).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+      const sorted = Object.fromEntries(
+        Object.entries(deps).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      );
       pkg.dependencies = sorted;
       changes.push(`dependency "${options.dependency.name}": "${options.dependency.range}"`);
     }
@@ -43,10 +54,17 @@ export function editPackageJson(source: string, options: PackageJsonEditOptions)
 }
 
 /** Ensures the immutable `_headers` rule exists (append when the file exists without it). */
-export function ensureHeadersRule(existing: string | null, rule: string): { content: string; changed: boolean } {
+export function ensureHeadersRule(
+  existing: string | null,
+  rule: string,
+): { content: string; changed: boolean } {
   if (existing === null) return { content: rule, changed: true };
   const normalized = existing.replace(/\r\n/g, '\n');
-  if (/^\/_next\/static\/\*\s*$/m.test(normalized) && /max-age=31536000/.test(normalized) && /immutable/.test(normalized)) {
+  if (
+    /^\/_next\/static\/\*\s*$/m.test(normalized) &&
+    /max-age=31536000/.test(normalized) &&
+    /immutable/.test(normalized)
+  ) {
     return { content: existing, changed: false };
   }
   const sep = normalized.endsWith('\n') || normalized === '' ? '' : '\n';

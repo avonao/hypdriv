@@ -22,7 +22,10 @@ export function concretePaths(route: HypRoute, basePath = ''): string[] {
  * Chooses the paths an audit should hit: static and ISR pages first, then one concrete path per
  * dynamic route, then `/`, de-duplicated and capped at `limit`. Explicit `--paths` win.
  */
-export function choosePaths(manifest: HypManifest | null, options: { paths?: string[]; limit?: number; includeRoutes?: boolean } = {}): AuditPath[] {
+export function choosePaths(
+  manifest: HypManifest | null,
+  options: { paths?: string[]; limit?: number; includeRoutes?: boolean } = {},
+): AuditPath[] {
   const limit = options.limit ?? 20;
   const out: AuditPath[] = [];
   const seen = new Set<string>();
@@ -40,10 +43,13 @@ export function choosePaths(manifest: HypManifest | null, options: { paths?: str
     push('/', null);
     return out;
   }
-  const pages = manifest.routes.filter((r) => (isPageRoute(r) || (options.includeRoutes && r.kind === 'app-route')) && !HIDDEN.has(r.pathname));
+  const pages = manifest.routes.filter(
+    (r) => (isPageRoute(r) || (options.includeRoutes && r.kind === 'app-route')) && !HIDDEN.has(r.pathname),
+  );
   const cached = pages.filter((r) => r.classification === 'static' || r.classification === 'isr');
   const rest = pages.filter((r) => !cached.includes(r));
-  for (const route of cached) for (const p of concretePaths(route, manifest.basePath).slice(0, route.dynamic ? 2 : 1)) push(p, route);
+  for (const route of cached)
+    for (const p of concretePaths(route, manifest.basePath).slice(0, route.dynamic ? 2 : 1)) push(p, route);
   for (const route of rest) {
     const first = concretePaths(route, manifest.basePath)[0];
     if (first) push(first, route);
@@ -55,8 +61,13 @@ export function choosePaths(manifest: HypManifest | null, options: { paths?: str
 /** Finds the route for a concrete path (exact pathname or regex match). */
 export function findRoute(manifest: HypManifest, path: string): HypRoute | null {
   const pathname = path.split('?')[0]!.split('#')[0]!;
-  const stripped = manifest.basePath && pathname.startsWith(manifest.basePath) ? pathname.slice(manifest.basePath.length) || '/' : pathname;
-  const exact = manifest.routes.find((r) => !r.dynamic && r.pathname === stripped && r.kind !== 'static-file');
+  const stripped =
+    manifest.basePath && pathname.startsWith(manifest.basePath)
+      ? pathname.slice(manifest.basePath.length) || '/'
+      : pathname;
+  const exact = manifest.routes.find(
+    (r) => !r.dynamic && r.pathname === stripped && r.kind !== 'static-file',
+  );
   if (exact) return exact;
   for (const r of manifest.routes) {
     if (!r.dynamic || !r.regex) continue;

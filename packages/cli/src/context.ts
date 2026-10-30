@@ -2,8 +2,15 @@ import { resolve } from 'node:path';
 import { type HypDrivConfig, type HypManifest, loadConfig, type ResolvedConfig } from '@hypdriv/core';
 import { findProjectRoot, loadConfigFile } from '@hypdriv/core/node';
 import type { ParsedArgs } from './args';
+import { UsageError } from './args';
 import type { IO } from './io';
-import { type DetectOptions, detectProject, type ProjectInfo } from './project';
+import {
+  DEPLOY_PLATFORMS,
+  type DeployPlatform,
+  type DetectOptions,
+  detectProject,
+  type ProjectInfo,
+} from './project';
 import { createUi, type Ui } from './ui';
 
 export interface LoadedConfig {
@@ -37,8 +44,18 @@ export interface CommandContext {
   requireManifest(): HypManifest;
 }
 
+/** Validates `--platform`. */
+export function platformOption(args: ParsedArgs): DeployPlatform | null {
+  const value = args.string('platform');
+  if (value === undefined) return null;
+  if (!DEPLOY_PLATFORMS.includes(value as DeployPlatform) || value === 'unknown')
+    throw new UsageError(`--platform must be one of cloudflare, vercel, node (got "${value}")`);
+  return value as DeployPlatform;
+}
+
 export function createContext(args: ParsedArgs, io: IO): CommandContext {
   const root = findProjectRoot(resolve(io.cwd, args.root ?? '.'));
+  const platform = platformOption(args);
   const ui = createUi(io, { json: args.json, ...(args.color === false ? { color: false } : {}) });
   let projectCache: { scanned: boolean; info: ProjectInfo } | null = null;
   let configPromise: Promise<LoadedConfig> | null = null;
@@ -50,7 +67,7 @@ export function createContext(args: ParsedArgs, io: IO): CommandContext {
     project(options = {}) {
       const wantScan = options.scan !== false;
       if (projectCache && (projectCache.scanned || !wantScan)) return projectCache.info;
-      const info = detectProject(root, options);
+      const info = detectProject(root, { platform, env: io.env, ...options });
       projectCache = { scanned: wantScan, info };
       return info;
     },
@@ -77,8 +94,13 @@ export function createContext(args: ParsedArgs, io: IO): CommandContext {
     requireManifest() {
       const info = ctx.project({ scan: false });
       if (info.manifest?.data) return info.manifest.data;
-      if (info.manifest?.error) throw new CliError(`.hypdriv/manifest.json is invalid: ${info.manifest.error}. Rebuild with \`next build\`.`);
-      throw new CliError('No .hypdriv/manifest.json found. Run `next build` (with next.config wrapped in withHypDriv) first.');
+      if (info.manifest?.error)
+        throw new CliError(
+          `.hypdriv/manifest.json is invalid: ${info.manifest.error}. Rebuild with \`next build\`.`,
+        );
+      throw new CliError(
+        'No .hypdriv/manifest.json found. Run `next build` (with next.config wrapped in withHypDriv) first.',
+      );
     },
   };
   return ctx;

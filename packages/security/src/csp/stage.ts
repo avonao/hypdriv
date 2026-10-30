@@ -107,12 +107,13 @@ export function policyHeadersFor(
   // Inline scripts injected by edge stages (speculation rules, theme pinning) are allowed by hash in both
   // modes: in nonce mode the injected tags carry no nonce on uncached responses, and CSP3 permits hashes
   // alongside 'strict-dynamic'. The 'unsafe-inline' fallback mode needs no hashes.
-  // The Purser theme fallback script is rendered without a nonce (so layouts stay prerenderable) and is
-  // byte-identical per build: allow it by its manifest hash on every route.
-  const themeHash = (ctx as { manifest?: HypContext['manifest'] }).manifest?.purser?.themeScriptHash;
+  // HypDriv's own route-independent inline scripts (speculation document rules, the Purser theme
+  // fallback) render without a nonce so layouts stay prerenderable; the manifest carries their hashes.
+  const manifest = (ctx as { manifest?: HypContext['manifest'] }).manifest;
+  const manifestHashes = [...(manifest?.inlineScriptHashes ?? []), ...(manifest?.purser?.themeScriptHash ? [manifest.purser.themeScriptHash] : [])];
   const extra =
     decision.mode === 'hash' || decision.mode === 'nonce'
-      ? [...(ctx.state.get(CSP_EXTRA_HASHES_KEY) ?? []), ...(themeHash ? [themeHash] : [])]
+      ? [...new Set([...(ctx.state.get(CSP_EXTRA_HASHES_KEY) ?? []), ...manifestHashes])]
       : [];
   const directives: CspDirectives = buildCspDirectives({
     config: decision.effective,
@@ -120,7 +121,8 @@ export function policyHeadersFor(
     nonce: decision.nonce,
     hashes: decision.hashes,
     extraScriptHashes: extra,
-    development: ctx.development,
+    // 'unsafe-eval' is only for `next dev`; the Worker always serves a production build of Next.js.
+    development: ctx.development && (ctx as { runner?: string }).runner !== 'worker',
     origin: ctx.url.origin,
   });
   const policy = serializeCsp(directives);
@@ -184,7 +186,7 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
             config: effective,
             mode: 'nonce',
             nonce,
-            development: ctx.development,
+            development: ctx.development && ctx.runner !== 'worker',
             origin: ctx.url.origin,
           }),
         );

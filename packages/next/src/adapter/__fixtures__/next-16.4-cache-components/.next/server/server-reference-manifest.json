@@ -1,0 +1,16 @@
+{
+  "node": {
+    "c07346fe867d4442451283df8989b4597928806859": {
+      "workers": {
+        "app/docs/[slug]/page": {
+          "moduleId": 71862,
+          "async": false
+        }
+      },
+      "filename": "examples/with-purser/app/docs/[slug]/page.tsx",
+      "exportedName": "$$RSC_SERVER_CACHE_0"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "QqPyCDjMfeNXkydJeDlAFAD8HP1jwA2LVdYLUlIe1W0="
+}

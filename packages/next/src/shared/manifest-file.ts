@@ -1,4 +1,4 @@
-import { type HypManifest, assertManifest } from '@hypdriv/core';
+import { assertManifest, type HypManifest } from '@hypdriv/core';
 
 let cached: { at: number; manifest: HypManifest | null } | null = null;
 
@@ -17,7 +17,9 @@ export async function readManifestFile(ttlMs = 5000): Promise<HypManifest | null
     if (proc?.versions?.node && typeof proc.cwd === 'function') {
       const { readFile } = await import('node:fs/promises');
       const { join } = await import('node:path');
-      const parsed = JSON.parse(await readFile(join(proc.cwd(), '.hypdriv', 'manifest.json'), 'utf8')) as HypManifest;
+      const parsed = JSON.parse(
+        await readFile(join(proc.cwd(), '.hypdriv', 'manifest.json'), 'utf8'),
+      ) as HypManifest;
       assertManifest(parsed);
       manifest = parsed;
     }

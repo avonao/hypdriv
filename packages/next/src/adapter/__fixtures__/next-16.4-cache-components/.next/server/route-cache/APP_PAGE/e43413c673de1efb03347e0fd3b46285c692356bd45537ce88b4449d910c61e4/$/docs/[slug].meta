@@ -1,0 +1,43 @@
+{
+  "status": 200,
+  "headers": {
+    "link": "</_next/static/chunks/02flsrlw_ny3m.css?dpl=111fbd2093ab>; rel=preload; as=\"style\"",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/docs/layout,_N_T_/docs/[slug]/layout,_N_T_/docs/[slug]/page"
+  },
+  "postponed": "2865:8[\"slug\"][0,{\"nextSegmentId\":0,\"rootFormatContext\":{\"insertionMode\":0,\"selectedValue\":null,\"tagScope\":0,\"viewTransition\":null},\"progressiveChunkSize\":12800,\"resumableState\":{\"idPrefix\":\"\",\"nextFormID\":0,\"streamingFormat\":0,\"bootstrapScriptContent\":\"(globalThis[\\\"TURBOPACK\\\"] || (globalThis[\\\"TURBOPACK\\\"] = [])).push({\\\"otherChunks\\\":[\\\"static/chunks/2lsr9mcqbogg-.js\\\",\\\"static/chunks/244m3fsiwzoxl.js\\\",\\\"static/chunks/1i9fq8k2g_g79.js\\\"],\\\"runtimeModuleIds\\\":[82382]});\",\"bootstrapScripts\":[{\"src\":\"/_next/static/chunks/2lsr9mcqbogg-.js?dpl=111fbd2093ab\"}],\"instructions\":0,\"hasBody\":false,\"hasHtml\":false,\"unknownResources\":{\"font\":{}},\"dnsResources\":{},\"connectResources\":{\"default\":{},\"anonymous\":{},\"credentials\":{}},\"imageResources\":{},\"styleResources\":{\"/_next/static/chunks/02flsrlw_ny3m.css?dpl=111fbd2093ab\":[]},\"scriptResources\":{},\"moduleUnknownResources\":{},\"moduleScriptResources\":{}},\"replayNodes\":[[\"sl\",0,[[\"Context\",0,[[\"Context\",0,[[\"ServerInsertedHTMLProvider\",0,[[\"Context\",0,[[\"io\",0,[[\"aV\",0,[[\"az\",0,[[\"aq\",0,[[\"is\",0,[[\"Fragment\",0,[[\"Context\",2,[[\"Context\",0,[[\"Context\",0,[[\"Context\",0,[[\"Context\",0,[[\"Context\",0,[[\"Context\",0,[[\"aV\",0,[[\"az\",0,[[\"aq\",0,[[\"ai\",0,[[\"aa\",0,[[\"ii\",\"/docs/$d$slug/__PAGE__/_head\",[[\"Fragment\",\"h\",[[\"__next_metadata_boundary__\",2,[[\"div\",0,[[\"Suspense\",0,[],0,[\"Suspense Fallback\",0,[],null],0]],null]],null]],null]],null],[\"__next_root_layout_boundary__\",1,[[\"Fragment\",\"c\",[[\"html\",1,[[\"body\",1,[[\"main\",1,[[null,0,[[\"Activity\",\"docs\",[[\"Context\",\"docs\",[[null,2,[[\"Fragment\",0,[[\"E\",0,[[\"D\",0,[[\"Fragment\",0,[[\"n\",0,[[\"Fragment\",0,[[\"G\",0,[[\"Fragment\",0,[[null,0,[[\"l\",0,[[\"x\",0,[[\"w\",0,[[\"F\",0,[[\"Context\",0,[[\"Fragment\",\"c\",[[null,1,[[\"Activity\",\"slug|d\",[[\"Context\",\"slug|d\",[[null,2,[[\"Fragment\",0,[[\"E\",0,[[\"D\",0,[[\"Fragment\",0,[[\"n\",0,[[\"Fragment\",0,[[\"G\",0,[[\"Fragment\",0,[[null,0,[[\"Fragment\",0,[[\"x\",0,[[\"w\",0,[[\"F\",0,[[\"Context\",0,[[\"Fragment\",\"c\",[[null,1,[[\"Activity\",\"__PAGE__\",[[\"Context\",\"__PAGE__\",[[null,2,[[\"Fragment\",0,[[\"E\",0,[[\"D\",0,[[\"Fragment\",0,[[\"n\",0,[[\"Fragment\",0,[[\"G\",0,[[\"Fragment\",0,[[null,0,[[\"Fragment\",0,[[\"x\",0,[[\"w\",0,[[\"F\",0,[[\"Context\",0,[[\"Fragment\",\"c\",[[\"__next_outlet_boundary__\",2,[[\"Suspense\",0,[],2,[\"Suspense Fallback\",0,[],null],2]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],null]],\"replaySlots\":-1}]eJxVUluPojAY/S99JhtuAiWZh8EZOxB1VokIVR9KWwGnXAKVBY3/fcM4D7tPX7+eS85JewedrFsO3Ds4c0lz4N4fCqCE5t93hyOgqm2Y1pk7ls1M09TNmaY7Bjs70IGpOYM21B1HtZwZPALlcAQy5yXvjuA0LZqmnVOmq9Ag6RGcTpMnr2Q7ToeeiCsHLli91UXw/jr4WT18Vl3BkFBTtCs+iwClaHEjaBDUWGUM5SLdRze/+FMkJfzioW/5YttjnXU49L6SOGh9pPUY7bLU8DOCREXm3iXVZyotFzc295q08FSCdhlBUY5RNPpoccVzb8T7oU/2G8v/2NY49OLUCFoc+xlF4krHpybRh5waa0FHr6QllD/cmsfe+Zlt4sCe6EIs594t/dHhUozU2GQULZq02mTJfhjxfvHFQ69O4mcv/yNosJ6rPlr3KYIarVZXf8EahvKexZssCacesCX7Xecv1iIZtbdwrm1oGZU4Dm7L3bduXEbrC0GRxKGXp+Um2+nRZblb+8to6ogFrVZyo8Mr+wjyKRNG0YXst2JZBHCevbwABUiSdcA9AFbTDijTcJ9vCk4K6CQRHLiGqipAFiXvJCkb4Go2NAzL1KGp2uov2zZ0BfChKaaf5VjmxG55T0TBiJzklqo+FJCT7n1oREELuf0Hle2V/we+/zg9gZYTtq1r+Zu0pFyTKZh7OD0eCuAVbcdGcubV14q9tlOP++Px+AuRx/X8",
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/_index",
+    "/docs/$d$slug/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 49152,
+    "slots": {
+      "children": {
+        "hints": 49216,
+        "slots": {
+          "children": {
+            "hints": 49248,
+            "slots": {
+              "children": {
+                "hints": 49312,
+                "slots": null
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/e43413c673de1efb03347e0fd3b46285c692356bd45537ce88b4449d910c61e4/$/docs/[slug]",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/docs/[slug]/page"
+    },
+    "isFallback": true
+  }
+}

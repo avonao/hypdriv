@@ -29,13 +29,14 @@ export function decodeVlq(segment: string): number[] {
     const digit = code < 128 ? LOOKUP[code]! : -1;
     if (digit < 0) throw new SyntaxError(`invalid base64 VLQ character "${segment[i]}"`);
     const continuation = digit & 32;
-    value += (digit & 31) << shift;
+    // Arithmetic instead of bit shifts: values beyond 2^31 must not wrap.
+    value += (digit & 31) * 2 ** shift;
     if (continuation) {
       shift += 5;
       continue;
     }
-    const negative = value & 1;
-    value >>>= 1;
+    const negative = value % 2 === 1;
+    value = Math.floor(value / 2);
     out.push(negative ? -value : value);
     value = 0;
     shift = 0;
@@ -48,11 +49,11 @@ export function decodeVlq(segment: string): number[] {
 export function encodeVlq(values: number[]): string {
   let out = '';
   for (const value of values) {
-    let vlq = value < 0 ? (-value << 1) | 1 : value << 1;
+    let vlq = value < 0 ? -value * 2 + 1 : value * 2;
     do {
-      let digit = vlq & 31;
-      vlq >>>= 5;
-      if (vlq > 0) digit |= 32;
+      let digit = vlq % 32;
+      vlq = Math.floor(vlq / 32);
+      if (vlq > 0) digit += 32;
       out += BASE64[digit];
     } while (vlq > 0);
   }
@@ -97,7 +98,13 @@ export function decodeMappings(mappings: string): MappingSegment[][] {
         sourceLine += fields[2]!;
         sourceColumn += fields[3]!;
         if (fields.length === 5) name += fields[4]!;
-        segments.push({ generatedColumn, source, sourceLine, sourceColumn, name: fields.length === 5 ? name : null });
+        segments.push({
+          generatedColumn,
+          source,
+          sourceLine,
+          sourceColumn,
+          name: fields.length === 5 ? name : null,
+        });
       }
     }
     lines.push(segments);

@@ -177,3 +177,20 @@ describe('SingleFlight', () => {
     expect(await m.get('x')).toBe(3);
   });
 });
+
+describe('detectDeployTarget', () => {
+  it('honours explicit configuration and detects Vercel and Cloudflare from the environment', async () => {
+    const { detectDeployTarget } = await import('./runtime');
+    expect(detectDeployTarget({}, 'cloudflare')).toBe('cloudflare');
+    expect(detectDeployTarget({ VERCEL: '1' })).toBe('vercel');
+    expect(detectDeployTarget({ NEXT_EDGE_RUNTIME_PROVIDER: 'vercel' })).toBe('vercel');
+    expect(detectDeployTarget({ WORKERS_CI: '1' })).toBe('cloudflare');
+    const previous = process.env.VERCEL;
+    delete process.env.VERCEL;
+    try {
+      expect(detectDeployTarget({})).toBe('node');
+    } finally {
+      if (previous !== undefined) process.env.VERCEL = previous;
+    }
+  });
+});

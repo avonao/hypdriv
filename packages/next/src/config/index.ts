@@ -3,18 +3,19 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  HypDrivError,
-  type HypDrivConfig,
-  type Logger,
-  type ResolvedConfig,
   createConsoleLogger,
+  type DeployTarget,
+  type HypDrivConfig,
+  HypDrivError,
+  type Logger,
   loadConfig,
+  type ResolvedConfig,
 } from '@hypdriv/core';
-import { findConfigFile, loadConfigFile } from '@hypdriv/core/node';
+import { findConfigFile, installedVersion, loadConfigFile } from '@hypdriv/core/node';
 import type { NextConfig } from 'next';
 import { ADAPTER_CONFIG_FILE, BASE_ADAPTER_ENV, serializeConfig } from './serialize';
 
-export { serializeConfig, reviveConfig, ADAPTER_CONFIG_FILE, BASE_ADAPTER_ENV } from './serialize';
+export { ADAPTER_CONFIG_FILE, BASE_ADAPTER_ENV, reviveConfig, serializeConfig } from './serialize';
 
 export const PHASE = {
   developmentServer: 'phase-development-server',
@@ -31,7 +32,10 @@ type NextConfigFn = (phase: string, ctx: { defaultConfig: NextConfig }) => NextC
 export interface PurserBridgeLike {
   build(): Promise<PurserBuildResultLike>;
   /** Starts (or joins) the per-process watcher; `devDiagnostics` writes `.hypdriv/dev/purser.json` for the HUD. */
-  watch(onResult?: (result: PurserBuildResultLike) => void, options?: { devDiagnostics?: boolean }): Promise<{ close(): void }>;
+  watch(
+    onResult?: (result: PurserBuildResultLike) => void,
+    options?: { devDiagnostics?: boolean },
+  ): Promise<{ close(): void }>;
   formatDiagnostics?(result: PurserBuildResultLike): string;
   formatSummary?(result: PurserBuildResultLike): string;
   hasErrors?(result: PurserBuildResultLike): boolean;
@@ -40,7 +44,13 @@ export interface PurserBridgeLike {
 
 export interface PurserBuildResultLike {
   css: string | null;
-  diagnostics: Array<{ severity: 'error' | 'warning'; message: string; file?: string; line?: number; column?: number }>;
+  diagnostics: Array<{
+    severity: 'error' | 'warning';
+    message: string;
+    file?: string;
+    line?: number;
+    column?: number;
+  }>;
   stats: unknown;
   written: boolean;
   outFile: string | null;
@@ -63,6 +73,8 @@ export interface WithHypDrivOptions {
   log?: Logger;
   /** Test seam: supplies the Purser bridge instead of loading `@hypdriv/purser/node`. */
   purserBridge?: (projectDir: string, config: ResolvedConfig) => Promise<PurserBridgeLike | null>;
+  /** Deploy target override (default: `resolveBuildTarget`). */
+  target?: DeployTarget;
   /** Test seam: deployment id resolver. */
   deploymentId?: () => string | null;
 }
@@ -105,13 +117,23 @@ export function defaultDeploymentId(projectDir: string): string | null {
     env.COMMIT_SHA;
   if (fromEnv) return fromEnv.slice(0, 12);
   try {
-    return execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: projectDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || null;
+    return (
+      execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+        cwd: projectDir,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .toString()
+        .trim() || null
+    );
   } catch {
     return null;
   }
 }
 
-async function resolveHypDrivConfig(projectDir: string, options: WithHypDrivOptions): Promise<{ input: HypDrivConfig; resolved: ResolvedConfig; file: string | null }> {
+async function resolveHypDrivConfig(
+  projectDir: string,
+  options: WithHypDrivOptions,
+): Promise<{ input: HypDrivConfig; resolved: ResolvedConfig; file: string | null }> {
   if (options.config) return { input: options.config, resolved: loadConfig(options.config), file: null };
   if (options.configFile === false) return { input: {}, resolved: loadConfig({}), file: null };
   if (typeof options.configFile === 'string') {
@@ -124,50 +146,93 @@ async function resolveHypDrivConfig(projectDir: string, options: WithHypDrivOpti
   return { input: loaded.config, resolved: loaded.resolved, file: loaded.file };
 }
 
-async function defaultPurserBridge(projectDir: string, config: ResolvedConfig, log: Logger): Promise<PurserBridgeLike | null> {
+async function defaultPurserBridge(
+  projectDir: string,
+  config: ResolvedConfig,
+  log: Logger,
+): Promise<PurserBridgeLike | null> {
   const purser = config.purser;
   if (!purser || purser.enabled === false) return null;
   const explicit = purser.enabled === true;
   let mod: {
-    detectPurser: (dir: string) => { installed: boolean; tokensFile: string | null; typescriptCompatible: boolean; typescriptVersion: string | null; message?: string };
-    createPurserBridge: (options: { projectDir: string; config: NonNullable<ResolvedConfig['purser']>; log?: Logger }) => Promise<PurserBridgeLike>;
+    detectPurser: (dir: string) => {
+      installed: boolean;
+      tokensFile: string | null;
+      typescriptCompatible: boolean;
+      typescriptVersion: string | null;
+      message?: string;
+    };
+    createPurserBridge: (options: {
+      projectDir: string;
+      config: NonNullable<ResolvedConfig['purser']>;
+      log?: Logger;
+    }) => Promise<PurserBridgeLike>;
   };
   try {
     mod = (await import('@hypdriv/purser/node')) as unknown as typeof mod;
   } catch (err) {
-    if (explicit) throw new HypDrivError('E_UNSUPPORTED', `hypdriv: purser is enabled but @hypdriv/purser could not be loaded (${(err as Error).message})`);
+    if (explicit)
+      throw new HypDrivError(
+        'E_UNSUPPORTED',
+        `hypdriv: purser is enabled but @hypdriv/purser could not be loaded (${(err as Error).message})`,
+      );
     return null;
   }
   const detected = mod.detectPurser(projectDir);
   const wanted = explicit || (detected.installed && (purser.tokens !== null || detected.tokensFile !== null));
   if (!wanted) return null;
-  if (!detected.installed) throw new HypDrivError('E_UNSUPPORTED', detected.message ?? 'hypdriv: purser is enabled but @avonao/purser is not installed (pnpm add @avonao/purser)');
+  if (!detected.installed)
+    throw new HypDrivError(
+      'E_UNSUPPORTED',
+      detected.message ??
+        'hypdriv: purser is enabled but @avonao/purser is not installed (pnpm add @avonao/purser)',
+    );
   try {
     return await mod.createPurserBridge({ projectDir, config: purser, log });
   } catch (err) {
     // Explicitly enabled: surface the problem (TypeScript 7 without the TS 6 alias, broken install). Auto: skip.
     if (explicit) throw err;
-    log.warn(`hypdriv: Purser detected but the bridge is unavailable (${(err as Error).message}); skipping the CSS build.`);
+    log.warn(
+      `hypdriv: Purser detected but the bridge is unavailable (${(err as Error).message}); skipping the CSS build.`,
+    );
     return null;
   }
 }
 
 function formatPurserDiagnostics(bridge: PurserBridgeLike, result: PurserBuildResultLike): string {
-  return bridge.formatDiagnostics?.(result) ?? result.diagnostics.map((d) => `${d.file ? `${d.file}${d.line ? `:${d.line}:${d.column ?? 1}` : ''}: ` : ''}${d.severity}: ${d.message}`).join('\n');
+  return (
+    bridge.formatDiagnostics?.(result) ??
+    result.diagnostics
+      .map(
+        (d) =>
+          `${d.file ? `${d.file}${d.line ? `:${d.line}:${d.column ?? 1}` : ''}: ` : ''}${d.severity}: ${d.message}`,
+      )
+      .join('\n')
+  );
 }
 
 function purserHasErrors(bridge: PurserBridgeLike, result: PurserBuildResultLike): boolean {
   return bridge.hasErrors?.(result) ?? result.diagnostics.some((d) => d.severity === 'error');
 }
 
-async function runPurser(phase: string, projectDir: string, config: ResolvedConfig, options: WithHypDrivOptions, log: Logger): Promise<void> {
+async function runPurser(
+  phase: string,
+  projectDir: string,
+  config: ResolvedConfig,
+  options: WithHypDrivOptions,
+  log: Logger,
+): Promise<void> {
   if (options.purser === false) return;
   const factory = options.purserBridge ?? ((dir, cfg) => defaultPurserBridge(dir, cfg, log));
   if (phase === PHASE.productionBuild || phase === PHASE.export) {
     const bridge = await factory(projectDir, config);
     if (!bridge) return;
     const result = await bridge.build();
-    if (purserHasErrors(bridge, result)) throw new HypDrivError('E_CONFIG', `hypdriv: Purser build failed\n${formatPurserDiagnostics(bridge, result)}`);
+    if (purserHasErrors(bridge, result))
+      throw new HypDrivError(
+        'E_CONFIG',
+        `hypdriv: Purser build failed\n${formatPurserDiagnostics(bridge, result)}`,
+      );
     // The bridge logs warnings and the build summary through the logger it was created with.
     return;
   }
@@ -181,7 +246,8 @@ async function runPurser(phase: string, projectDir: string, config: ResolvedConf
     try {
       const handle = await bridge.watch(
         (result) => {
-          if (purserHasErrors(bridge, result)) log.error(`purser: build errors\n${formatPurserDiagnostics(bridge, result)}`);
+          if (purserHasErrors(bridge, result))
+            log.error(`purser: build errors\n${formatPurserDiagnostics(bridge, result)}`);
           else if (result.written) log.info('purser: stylesheet updated');
         },
         { devDiagnostics: true },
@@ -195,26 +261,77 @@ async function runPurser(phase: string, projectDir: string, config: ResolvedConf
   }
 }
 
-function applySafeDefaults(out: NextConfig, config: ResolvedConfig, phase: string, projectDir: string, options: WithHypDrivOptions, log: Logger): void {
+/**
+ * The deploy target for this build: `platform` from the HypDriv config when set; otherwise Vercel when the
+ * build runs on Vercel (`VERCEL=1`, `NEXT_EDGE_RUNTIME_PROVIDER=vercel`) or the project has a Vercel
+ * config, Cloudflare when the project has a wrangler config or `@opennextjs/cloudflare`, else a Node host.
+ */
+export function resolveBuildTarget(projectDir: string, config: Pick<ResolvedConfig, 'platform'>, env: Record<string, string | undefined> = process.env): DeployTarget {
+  if (config.platform !== 'auto') return config.platform;
+  if (env.VERCEL === '1' || env.NEXT_EDGE_RUNTIME_PROVIDER === 'vercel') return 'vercel';
+  const has = (name: string) => existsSync(join(projectDir, name));
+  if (has('wrangler.jsonc') || has('wrangler.json') || has('wrangler.toml') || has('cloudflare.config.ts') || installedVersion(projectDir, '@opennextjs/cloudflare')) return 'cloudflare';
+  if (has('vercel.json') || has('vercel.ts') || has('vercel.toml') || has('.vercel')) return 'vercel';
+  return 'node';
+}
+
+function applySafeDefaults(
+  out: NextConfig,
+  config: ResolvedConfig,
+  phase: string,
+  projectDir: string,
+  options: WithHypDrivOptions,
+  log: Logger,
+): void {
+  const target = options.target ?? resolveBuildTarget(projectDir, config);
   out.poweredByHeader = false;
   out.reactStrictMode ??= true;
   if (config.security.sri) {
-    out.experimental = { ...(out.experimental ?? {}), sri: { algorithm: config.security.sri.algorithm } } as NextConfig['experimental'];
+    out.experimental = {
+      ...(out.experimental ?? {}),
+      sri: { algorithm: config.security.sri.algorithm },
+    } as NextConfig['experimental'];
   }
-  if (config.performance.skewProtection && !out.deploymentId) {
-    const id = config.performance.skewProtection.deploymentId ?? (options.deploymentId ?? (() => defaultDeploymentId(projectDir)))();
+  // Vercel assigns the deployment id itself (skew protection via NEXT_DEPLOYMENT_ID / VERCEL_DEPLOYMENT_ID).
+  if (config.performance.skewProtection && !out.deploymentId && target !== 'vercel') {
+    const id =
+      config.performance.skewProtection.deploymentId ??
+      (options.deploymentId ?? (() => defaultDeploymentId(projectDir)))();
     if (id) out.deploymentId = id;
-    else if (phase === PHASE.productionBuild) log.warn('hypdriv: skew protection is on but no deployment id could be derived (set HYPDRIV_DEPLOYMENT_ID or build from a git checkout).');
+    else if (phase === PHASE.productionBuild)
+      log.warn(
+        'hypdriv: skew protection is on but no deployment id could be derived (set HYPDRIV_DEPLOYMENT_ID or build from a git checkout).',
+      );
   }
-  if (config.images.loader === 'cloudflare' && !out.images?.loaderFile && out.images?.loader !== 'custom' && !out.images?.unoptimized) {
+  // `auto`: the Cloudflare loader only on Cloudflare; on Vercel a custom loader would bypass Vercel Image
+  // Optimization, and on Node hosts Next's own optimizer is the right default.
+  const imageLoader = config.images.loader === 'auto' ? (target === 'cloudflare' ? 'cloudflare' : 'next') : config.images.loader;
+  if (
+    imageLoader === 'cloudflare' &&
+    !out.images?.loaderFile &&
+    out.images?.loader !== 'custom' &&
+    !out.images?.unoptimized
+  ) {
     const loader = resolveImageLoaderPath();
     if (loader) {
       // Next.js resolves `loaderFile` against the project directory, so it must be relative.
       const rel = relative(projectDir, loader).split('\\').join('/');
-      out.images = { ...(out.images ?? {}), loader: 'custom', loaderFile: rel.startsWith('.') ? rel : `./${rel}` };
+      out.images = {
+        ...(out.images ?? {}),
+        loader: 'custom',
+        loaderFile: rel.startsWith('.') ? rel : `./${rel}`,
+      };
       // Inlined by Next into server and client bundles; read by `@hypdriv/image/loader`.
-      const format = config.images.formats.length === 1 && config.images.formats[0] !== 'auto' ? config.images.formats[0] : 'auto';
-      const loaderConfig = { cdnCgi: config.images.cdnCgi, quality: config.images.quality, format, ...(out.basePath ? { basePath: out.basePath } : {}) };
+      const format =
+        config.images.formats.length === 1 && config.images.formats[0] !== 'auto'
+          ? config.images.formats[0]
+          : 'auto';
+      const loaderConfig = {
+        cdnCgi: config.images.cdnCgi,
+        quality: config.images.quality,
+        format,
+        ...(out.basePath ? { basePath: out.basePath } : {}),
+      };
       out.env = { ...(out.env ?? {}), HYPDRIV_IMAGES: JSON.stringify(loaderConfig) };
     }
   }
@@ -224,11 +341,15 @@ function applySafeDefaults(out: NextConfig, config: ResolvedConfig, phase: strin
  * Wraps a Next.js config with HypDriv (ADR 0001/0002). Returns an async config function, so it can run
  * the Purser build before the bundler starts and install the adapter chain.
  */
-export function withHypDriv(nextConfig: NextConfig | NextConfigFn = {}, options: WithHypDrivOptions = {}): NextConfigFn {
+export function withHypDriv(
+  nextConfig: NextConfig | NextConfigFn = {},
+  options: WithHypDrivOptions = {},
+): NextConfigFn {
   return async (phase, ctx) => {
     const log = options.log ?? createConsoleLogger({ format: 'pretty', fields: { component: 'hypdriv' } });
     const projectDir = resolve(options.projectDir ?? process.cwd());
-    const base: NextConfig = typeof nextConfig === 'function' ? await nextConfig(phase, ctx) : { ...nextConfig };
+    const base: NextConfig =
+      typeof nextConfig === 'function' ? await nextConfig(phase, ctx) : { ...nextConfig };
     const { input, resolved, file } = await resolveHypDrivConfig(projectDir, options);
 
     // Share the configuration with the adapter process (functions are dropped, RegExps preserved).
@@ -248,13 +369,22 @@ export function withHypDriv(nextConfig: NextConfig | NextConfigFn = {}, options:
     if (options.safeDefaults !== false) applySafeDefaults(out, resolved, phase, projectDir, options, log);
 
     // Adapter chain.
-    const baseAdapter = options.adapter === null ? null : (options.adapter ?? base.adapterPath ?? process.env.NEXT_ADAPTER_PATH ?? null);
-    if (baseAdapter) process.env[BASE_ADAPTER_ENV] = isAbsolute(baseAdapter) || baseAdapter.startsWith('.') ? resolve(projectDir, baseAdapter) : baseAdapter;
+    const baseAdapter =
+      options.adapter === null
+        ? null
+        : (options.adapter ?? base.adapterPath ?? process.env.NEXT_ADAPTER_PATH ?? null);
+    if (baseAdapter)
+      process.env[BASE_ADAPTER_ENV] =
+        isAbsolute(baseAdapter) || baseAdapter.startsWith('.')
+          ? resolve(projectDir, baseAdapter)
+          : baseAdapter;
     else delete process.env[BASE_ADAPTER_ENV];
     out.adapterPath = options.adapterPath ?? resolveAdapterPath();
 
     if (phase === PHASE.productionBuild) {
-      log.info(`hypdriv: config ${file ? `from ${file}` : options.config ? 'inline' : 'defaults'}; adapter chain → ${baseAdapter ?? 'none'}`);
+      log.info(
+        `hypdriv: config ${file ? `from ${file}` : options.config ? 'inline' : 'defaults'}; adapter chain → ${baseAdapter ?? 'none'}`,
+      );
     }
     return out;
   };

@@ -144,7 +144,11 @@ export function createMemoryIO(options: MemoryIOOptions = {}): MemoryIO {
       }),
     exec:
       options.exec ??
-      (async (command) => ({ code: 127, stdout: '', stderr: `exec is not available in this context (${command})` })),
+      (async (command) => ({
+        code: 127,
+        stdout: '',
+        stderr: `exec is not available in this context (${command})`,
+      })),
     isTTY: options.isTTY ?? false,
     now: options.now ?? (() => performance.now()),
     date: options.date ?? (() => new Date()),

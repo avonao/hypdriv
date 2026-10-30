@@ -1,4 +1,4 @@
-import { HEADER, clientIp } from '@hypdriv/core';
+import { clientIp, HEADER } from '@hypdriv/core';
 import { defineRoute as baseDefineRoute, safeAction as baseSafeAction } from '@hypdriv/security';
 import { decodeGeoHeader } from '../stages/geo';
 

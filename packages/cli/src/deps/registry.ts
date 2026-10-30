@@ -37,10 +37,20 @@ export async function fetchPackageInfo(name: string, options: RegistryOptions): 
   const base = (options.registry ?? NPM_REGISTRY).replace(/\/$/, '');
   const url = `${base}/${name.startsWith('@') ? `@${encodeURIComponent(name.slice(1))}` : encodeURIComponent(name)}`;
   const timeout = options.timeoutMs ?? 10_000;
-  const empty: RegistryInfo = { name, latest: null, latestStable: null, publishedAt: null, modified: null, error: null };
+  const empty: RegistryInfo = {
+    name,
+    latest: null,
+    latestStable: null,
+    publishedAt: null,
+    modified: null,
+    error: null,
+  };
   try {
     const res = await options.fetch(url, {
-      headers: { accept: 'application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*', ...(options.headers ?? {}) },
+      headers: {
+        accept: 'application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*',
+        ...(options.headers ?? {}),
+      },
       signal: AbortSignal.timeout(timeout),
     });
     if (!res.ok) return { ...empty, error: `HTTP ${res.status}` };
@@ -62,7 +72,10 @@ export async function fetchPackageInfo(name: string, options: RegistryOptions): 
 }
 
 /** Looks up many packages with bounded concurrency (default 8). */
-export async function fetchPackageInfos(names: string[], options: RegistryOptions): Promise<Map<string, RegistryInfo>> {
+export async function fetchPackageInfos(
+  names: string[],
+  options: RegistryOptions,
+): Promise<Map<string, RegistryInfo>> {
   const unique = [...new Set(names)];
   const results = new Map<string, RegistryInfo>();
   const concurrency = Math.max(1, options.concurrency ?? 8);

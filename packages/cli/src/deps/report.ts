@@ -33,7 +33,11 @@ export interface DepsReport {
 }
 
 /** Builds the report from the workspace and registry lookups. */
-export function buildDepsReport(workspace: Workspace, infos: Map<string, RegistryInfo>, options: { only?: string[]; generatedAt: string }): DepsReport {
+export function buildDepsReport(
+  workspace: Workspace,
+  infos: Map<string, RegistryInfo>,
+  options: { only?: string[]; generatedAt: string },
+): DepsReport {
   const packages: PackageReport[] = [];
   const errors: Record<string, string> = {};
   const current: Record<string, number> = {};
@@ -88,7 +92,12 @@ function eligible(entry: OutdatedEntry, mode: UpdateMode, only: string[] | undef
 }
 
 /** Rewrites ranges in package.json files and `catalog:` lines in pnpm-workspace.yaml. Returns what changed. */
-export function applyUpdates(workspace: Workspace, report: DepsReport, mode: UpdateMode, options: { only?: string[]; dryRun?: boolean } = {}): UpdateChange[] {
+export function applyUpdates(
+  workspace: Workspace,
+  report: DepsReport,
+  mode: UpdateMode,
+  options: { only?: string[]; dryRun?: boolean } = {},
+): UpdateChange[] {
   const changes: UpdateChange[] = [];
   const yamlEdits = new Map<number, { name: string; from: string; to: string }>();
   for (const pkgReport of report.packages) {
@@ -105,12 +114,19 @@ export function applyUpdates(workspace: Workspace, report: DepsReport, mode: Upd
         if (!catalog) continue;
         const to = entry.alias ? `npm:${entry.alias}@${next}` : next;
         yamlEdits.set(catalog.line, { name: entry.name, from: catalog.range, to });
-        changes.push({ file: workspace.yamlFile ?? 'pnpm-workspace.yaml', name: entry.name, from: catalog.range, to });
+        changes.push({
+          file: workspace.yamlFile ?? 'pnpm-workspace.yaml',
+          name: entry.name,
+          from: catalog.range,
+          to,
+        });
         continue;
       }
       const section = json[entry.section];
       if (!section) continue;
-      const key = entry.alias ? Object.keys(section).find((k) => section[k] === `npm:${entry.alias}@${entry.current}`) : entry.name;
+      const key = entry.alias
+        ? Object.keys(section).find((k) => section[k] === `npm:${entry.alias}@${entry.current}`)
+        : entry.name;
       if (!key) continue;
       const to = entry.alias ? `npm:${entry.alias}@${next}` : next;
       changes.push({ file: pkg.file, name: entry.name, from: section[key]!, to });

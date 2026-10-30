@@ -1,68 +1,74 @@
-import { HEADER, type HypDrivConfig, type HypManifest, loadConfig } from '@hypdriv/core';
-import type { ReactElement } from 'react';
+import { HYPDRIV_VERSION, type HypDrivConfig, loadConfig } from '@hypdriv/core';
 import { buildThemeScript } from '@hypdriv/purser';
-import { readManifestFile } from '../shared/manifest-file';
-import { buildSpeculationRules, speculationScript } from '../shared/speculation';
-import { devtoolsMeta } from './index';
+import type { ReactElement } from 'react';
+import { componentSpeculationRules, speculationScript } from '../shared/speculation';
 
-async function requestHeaders(): Promise<Headers> {
-  const mod = (await import('next/headers')) as { headers(): Promise<Headers> | Headers };
-  return new Headers(await mod.headers());
+/** Next.js inlines the configured `basePath` into server bundles under this name. */
+function nextBasePath(): string {
+  try {
+    return process.env.__NEXT_ROUTER_BASEPATH ?? '';
+  } catch {
+    return '';
+  }
 }
 
 export interface SpeculationProps {
-  /** Explicit rules; otherwise derived from the manifest for the current route. */
+  /** Explicit rules; otherwise the document rules derived from `performance.speculation`. */
   rules?: Record<string, unknown>;
   /** HypDriv config (only `performance.speculation` is used); defaults apply when omitted. */
   config?: Parameters<typeof loadConfig>[0];
-  /** Current pathname when it cannot be read from headers (static rendering). */
-  pathname?: string;
+  /** Override the Next.js `basePath` (read from the build by default). */
+  basePath?: string;
+}
+
+const speculationScripts = new Map<string, string | null>();
+
+/**
+ * Server Component that renders Speculation Rules (`<script type="speculationrules">`).
+ *
+ * It reads no request data, so it never turns a static route dynamic: it renders the route-independent
+ * document rules for `performance.speculation`, whose CSP hash the build records in the manifest. Inside the
+ * HypDriv Worker the `speculation` stage swaps them for the route's link-graph-aware rules at the edge.
+ */
+export function Speculation(props: SpeculationProps = {}): ReactElement | null {
+  let script: string | null;
+  if (props.rules) {
+    script = speculationScript(props.rules as never);
+  } else {
+    const key = JSON.stringify([props.config ?? null, props.basePath ?? null]);
+    if (!speculationScripts.has(key)) {
+      const spec = loadConfig(props.config ?? {}).performance.speculation;
+      const rules =
+        spec && spec.inject !== 'off'
+          ? componentSpeculationRules(spec, props.basePath ?? nextBasePath())
+          : null;
+      speculationScripts.set(key, rules ? speculationScript(rules) : null);
+    }
+    script = speculationScripts.get(key) ?? null;
+  }
+  if (!script) return null;
+  return (
+    <script
+      type="speculationrules"
+      data-hypdriv="speculation"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: the JSON is produced by HypDriv, not user input.
+      dangerouslySetInnerHTML={{ __html: script }}
+    />
+  );
 }
 
 /**
- * Server Component that renders a `<script type="speculationrules">` for the current route.
- * Renders nothing when the Worker already injected the rules at the edge.
+ * Server Component rendering build-level `<meta name="hypdriv:*">` tags for the DevTools HUD. Per-request
+ * facts (request id, runner, route, locale, public flags) reach the HUD through `Server-Timing` entries
+ * written by the `devtools` stage, so this component reads no request data and keeps routes static.
  */
-export async function Speculation(props: SpeculationProps = {}): Promise<ReactElement | null> {
-  let headers: Headers | null = null;
-  try {
-    headers = await requestHeaders();
-  } catch {
-    headers = null;
-  }
-  if (headers?.get('x-hypdriv-speculation') === 'edge') return null;
-  const nonce = headers?.get(HEADER.nonce) ?? undefined;
-  let rules = props.rules;
-  if (!rules) {
-    const resolved = loadConfig(props.config ?? {});
-    const spec = resolved.performance.speculation;
-    if (!spec || spec.inject === 'off') return null;
-    const manifest = await readManifestFile();
-    const pathname = props.pathname ?? headers?.get('x-hypdriv-pathname') ?? '/';
-    const built = buildSpeculationRules({ manifest: manifest ?? { speculation: { graph: {}, excluded: [] }, basePath: '' }, config: spec, pathname });
-    if (!built) return null;
-    rules = built as unknown as Record<string, unknown>;
-  }
-  const script = speculationScript(rules as never);
-  // biome-ignore lint/security/noDangerouslySetInnerHtml: the JSON is produced by HypDriv, not user input.
-  return <script type="speculationrules" nonce={nonce} dangerouslySetInnerHTML={{ __html: script }} />;
-}
-
-/** Server Component rendering the `<meta name="hypdriv:*">` tags the DevTools HUD and vitals reporter read. */
-export async function HypDrivMeta(props: { config?: HypDrivConfig } = {}): Promise<ReactElement | null> {
-  let meta: Record<string, string>;
-  try {
-    meta = await devtoolsMeta(props.config ? { flagDefinitions: loadConfig(props.config).flags.definitions } : {});
-  } catch {
-    return null;
-  }
-  const entries = Object.entries(meta);
-  if (!entries.length) return null;
+export function HypDrivMeta(props: { config?: HypDrivConfig } = {}): ReactElement | null {
+  const resolved = loadConfig(props.config ?? {});
+  if (resolved.devtools.enabled === false) return null;
   return (
     <>
-      {entries.map(([name, content]) => (
-        <meta key={name} name={name} content={content} />
-      ))}
+      <meta name="hypdriv:version" content={HYPDRIV_VERSION} />
+      <meta name="hypdriv:devtools" content={resolved.devtools.endpoint} />
     </>
   );
 }
@@ -72,23 +78,18 @@ const themeScripts = new WeakMap<object, string>();
 /**
  * Server Component rendering Purser's theme fallback script (`purser.theme` in the HypDriv config).
  * The Worker pins the theme classes on `<html>` at the edge; this script covers other runners (`next dev`,
- * Node hosts) and first visits without client hints. It is byte-identical for equal configuration, so
- * static routes allow it by hash and dynamic routes by nonce. Put `suppressHydrationWarning` on `<html>`.
+ * Node hosts) and first visits without client hints. It carries no nonce and is byte-identical for equal
+ * configuration: the build records its hash and the CSP stage allows it on every route, so the layout stays
+ * prerenderable. Put `suppressHydrationWarning` on `<html>`.
  */
-export async function ThemeScript(props: { config: HypDrivConfig }): Promise<ReactElement | null> {
-  const theme = loadConfig(props.config).purser?.theme;
-  if (!theme || !theme.fallbackScript) return null;
+export function ThemeScript(props: { config: HypDrivConfig }): ReactElement | null {
   let script = themeScripts.get(props.config);
-  if (!script) {
-    script = buildThemeScript(theme);
+  if (script === undefined) {
+    const theme = loadConfig(props.config).purser?.theme;
+    script = theme?.fallbackScript ? buildThemeScript(theme) : '';
     themeScripts.set(props.config, script);
   }
-  let nonce: string | undefined;
-  try {
-    nonce = (await requestHeaders()).get(HEADER.nonce) ?? undefined;
-  } catch {
-    nonce = undefined;
-  }
+  if (!script) return null;
   // biome-ignore lint/security/noDangerouslySetInnerHtml: generated by HypDriv from configuration, never user input.
-  return <script nonce={nonce} data-hypdriv="theme" dangerouslySetInnerHTML={{ __html: script }} />;
+  return <script data-hypdriv="theme" dangerouslySetInnerHTML={{ __html: script }} />;
 }

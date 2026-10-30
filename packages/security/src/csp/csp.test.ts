@@ -263,6 +263,23 @@ describe('cspStage mode selection', () => {
     expect(r2.response.headers.get(HEADER.cspMode)).toBeNull();
   });
 
+  it('allows manifest inline-script hashes (speculation rules, Purser theme) on every route', async () => {
+    const withHashes = {
+      ...manifest,
+      inlineScriptHashes: ["'sha256-speculation-doc'"],
+      purser: { themeScriptHash: "'sha256-theme'" },
+    };
+    for (const r of [staticRoute, dynamicRoute]) {
+      const ctx = makeCtx({ route: r, manifest: withHashes as never });
+      const stage = cspStage(ctx.config);
+      await stage.pre!(ctx);
+      const response = await stage.post!(ctx, htmlNext());
+      const scriptSrc = parseCsp(response.headers.get('content-security-policy'))['script-src'];
+      expect(scriptSrc).toContain("'sha256-speculation-doc'");
+      expect(scriptSrc).toContain("'sha256-theme'");
+    }
+  });
+
   it('merges CSP_EXTRA_HASHES_KEY into script-src in hash and nonce mode', async () => {
     const ctx = makeCtx({ route: staticRoute, manifest });
     const stage = cspStage(ctx.config);

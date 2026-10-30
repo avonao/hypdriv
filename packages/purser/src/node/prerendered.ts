@@ -41,8 +41,8 @@ export function pathnameFromPrerenderFile(root: string, file: string, extension:
 }
 
 /**
- * Reads the prerendered documents of a Next.js build: `.next/server/app/**\/*.html` and
- * `.next/server/pages/**\/*.html`, keyed by the pathname derived from the file path (`/index.html`
+ * Reads the prerendered documents of a Next.js build: `.next/server/app/**\/*.html`,
+ * `.next/server/pages/**\/*.html` and (Next.js 16.4+) `.next/server/route-cache/APP_PAGE/*\/$/**`, keyed by the pathname derived from the file path (`/index.html`
  * → `/`, `/blog/[slug].html` stays the pattern path). With `includeRsc`, `*.rsc` and `*.prefetch.rsc`
  * payloads are appended to the same key so `className` strings in RSC output count for the route.
  * Reads at most `maxFiles` files of at most `maxBytes` each; keys are sorted. `distDir` is the `.next`
@@ -62,12 +62,23 @@ export async function collectPrerenderedHtml(
   let count = 0;
   let truncated = false;
 
-  for (const sub of ['app', 'pages'] as const) {
-    const base = join(root, 'server', sub);
+  // Next.js ≤ 16.3 writes prerenders next to the route modules (`server/app`, `server/pages`); 16.4 keeps
+  // App Router prerenders in `server/route-cache/APP_PAGE/<hash>/$/…` (one root per route).
+  const bases = [join(root, 'server', 'app'), join(root, 'server', 'pages')];
+  const routeCache = join(root, 'server', 'route-cache', 'APP_PAGE');
+  if (existsSync(routeCache)) {
+    for (const entry of (await readdir(routeCache, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const base = join(routeCache, entry.name, '$');
+      if (entry.isDirectory() && existsSync(base)) bases.push(base);
+    }
+  }
+
+  for (const base of bases) {
     if (!existsSync(base)) continue;
     const files: string[] = [];
     await walk(base, files);
     for (const file of files) {
+      if (file.includes('.segments')) continue;
       const isHtml = file.endsWith('.html');
       const isRsc = options.includeRsc === true && (file.endsWith('.rsc') || file.endsWith('.prefetch.rsc'));
       if (!isHtml && !isRsc) continue;

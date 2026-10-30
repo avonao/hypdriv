@@ -306,3 +306,21 @@ describe('dev endpoint readers', () => {
     });
   });
 });
+
+describe('request facts from Server-Timing', () => {
+  it('reads hyp-* entries and lets them override meta tags', async () => {
+    const { mergeBuildInfo, readRequestFacts } = await import('./readers');
+    const facts = readRequestFacts([
+      { name: 'hyp-request', desc: 'req-1' },
+      { name: 'hyp-runner', desc: 'worker' },
+      { name: 'hyp-route', desc: 'app:/' },
+      { name: 'cache', desc: 'HIT' },
+    ]);
+    expect(facts).toEqual({ request: 'req-1', runner: 'worker', route: 'app:/' });
+    const merged = mergeBuildInfo(
+      { build: 'b1', route: null, runner: 'proxy', deployment: null, requestId: null, locale: null, cache: null, csp: null, nextVersion: null, hypdrivVersion: '0.1.0', extra: {} },
+      facts,
+    );
+    expect(merged).toMatchObject({ build: 'b1', route: 'app:/', runner: 'worker', requestId: 'req-1', hypdrivVersion: '0.1.0' });
+  });
+});

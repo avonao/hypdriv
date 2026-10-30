@@ -1,13 +1,40 @@
-import { type HypManifest, emptyManifest, routePatternToRegex } from '@hypdriv/core';
+import { emptyManifest, type HypManifest, routePatternToRegex } from '@hypdriv/core';
 import { describe, expect, it, vi } from 'vitest';
 import { createProxy, matcher } from './index';
 
 const manifest: HypManifest = emptyManifest({
   buildId: 'b1',
   routes: [
-    { id: 'app:/', pathname: '/', regex: routePatternToRegex('/'), kind: 'app-page', classification: 'static', runtime: 'nodejs', dynamic: false, assets: { js: ['/_next/static/chunks/main.js'], css: ['/_next/static/css/app.css'], fonts: [] } },
-    { id: 'app:/account', pathname: '/account', regex: routePatternToRegex('/account'), kind: 'app-page', classification: 'dynamic', runtime: 'nodejs', dynamic: true, assets: { js: [], css: [], fonts: [] } },
-    { id: 'route:/api/items', pathname: '/api/items', regex: routePatternToRegex('/api/items'), kind: 'app-route', classification: 'route', runtime: 'nodejs', dynamic: true, assets: { js: [], css: [], fonts: [] } },
+    {
+      id: 'app:/',
+      pathname: '/',
+      regex: routePatternToRegex('/'),
+      kind: 'app-page',
+      classification: 'static',
+      runtime: 'nodejs',
+      dynamic: false,
+      assets: { js: ['/_next/static/chunks/main.js'], css: ['/_next/static/css/app.css'], fonts: [] },
+    },
+    {
+      id: 'app:/account',
+      pathname: '/account',
+      regex: routePatternToRegex('/account'),
+      kind: 'app-page',
+      classification: 'dynamic',
+      runtime: 'nodejs',
+      dynamic: true,
+      assets: { js: [], css: [], fonts: [] },
+    },
+    {
+      id: 'route:/api/items',
+      pathname: '/api/items',
+      regex: routePatternToRegex('/api/items'),
+      kind: 'app-route',
+      classification: 'route',
+      runtime: 'nodejs',
+      dynamic: true,
+      assets: { js: [], css: [], fonts: [] },
+    },
   ],
 });
 
@@ -37,7 +64,18 @@ describe('createProxy', () => {
   it('runs the stages and forwards HypDriv headers to the application', async () => {
     const { next, seen } = markerNext();
     const proxy = createProxy({ site: { name: 'shop' } }, undefined, { manifest, env: {}, next });
-    const response = await proxy(new Request('https://shop.example.com/', { headers: { 'cf-ipcountry': 'US', accept: 'text/html', 'accept-language': 'en-US,en;q=0.9', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15' } }), event());
+    const response = await proxy(
+      new Request('https://shop.example.com/', {
+        headers: {
+          'cf-ipcountry': 'US',
+          accept: 'text/html',
+          'accept-language': 'en-US,en;q=0.9',
+          'user-agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
+        },
+      }),
+      event(),
+    );
     expect(next).toHaveBeenCalledTimes(1);
     const forwarded = seen[0]!.headers;
     expect(forwarded.get('x-hypdriv-runner')).toBe('proxy');
@@ -53,8 +91,15 @@ describe('createProxy', () => {
 
   it('short-circuits with the maintenance page and lets health checks through', async () => {
     const { next } = markerNext();
-    const proxy = createProxy({ maintenance: { enabled: true, bypassPaths: ['/api/health'] } }, undefined, { manifest, env: {}, next });
-    const blocked = await proxy(new Request('https://shop.example.com/account', { headers: { accept: 'text/html' } }), event());
+    const proxy = createProxy({ maintenance: { enabled: true, bypassPaths: ['/api/health'] } }, undefined, {
+      manifest,
+      env: {},
+      next,
+    });
+    const blocked = await proxy(
+      new Request('https://shop.example.com/account', { headers: { accept: 'text/html' } }),
+      event(),
+    );
     expect(blocked.status).toBe(503);
     expect(blocked.headers.get('retry-after')).toBeTruthy();
     expect(await blocked.text()).toContain('<html');
@@ -63,7 +108,11 @@ describe('createProxy', () => {
 
   it('answers configured redirects before rendering', async () => {
     const { next } = markerNext();
-    const proxy = createProxy({ redirects: { rules: [{ from: '/old/:slug', to: '/new/:slug', status: 308 }] } }, undefined, { manifest, env: {}, next });
+    const proxy = createProxy(
+      { redirects: { rules: [{ from: '/old/:slug', to: '/new/:slug', status: 308 }] } },
+      undefined,
+      { manifest, env: {}, next },
+    );
     const response = await proxy(new Request('https://shop.example.com/old/shoes?ref=x'), event());
     expect(response.status).toBe(308);
     expect(response.headers.get('location')).toBe('https://shop.example.com/new/shoes?ref=x');
@@ -72,15 +121,19 @@ describe('createProxy', () => {
 
   it('accepts a custom stage list and keeps going when a stage throws', async () => {
     const { next } = markerNext();
-    const proxy = createProxy({}, (defaults) => [
-      ...defaults,
-      {
-        name: 'broken',
-        pre() {
-          throw new Error('stage bug');
+    const proxy = createProxy(
+      {},
+      (defaults) => [
+        ...defaults,
+        {
+          name: 'broken',
+          pre() {
+            throw new Error('stage bug');
+          },
         },
-      },
-    ], { manifest, env: {}, next });
+      ],
+      { manifest, env: {}, next },
+    );
     const response = await proxy(new Request('https://shop.example.com/api/items'), event());
     expect(response.headers.get('x-middleware-next')).toBe('1');
     expect(next).toHaveBeenCalledTimes(1);
@@ -88,7 +141,10 @@ describe('createProxy', () => {
 
   it('initialises the platform once', async () => {
     const { next } = markerNext();
-    const factory = vi.fn((defaults: Parameters<Exclude<Parameters<typeof createProxy>[1], undefined | unknown[]>>[0]) => defaults);
+    const factory = vi.fn(
+      (defaults: Parameters<Exclude<Parameters<typeof createProxy>[1], undefined | unknown[]>>[0]) =>
+        defaults,
+    );
     const proxy = createProxy({}, factory as never, { manifest, env: {}, next });
     await proxy(new Request('https://shop.example.com/'), event());
     await proxy(new Request('https://shop.example.com/account'), event());
@@ -103,7 +159,9 @@ describe('createProxy', () => {
         throw new Error('upstream down');
       },
     });
-    await expect(proxy(new Request('https://shop.example.com/account'), event())).rejects.toThrow('upstream down');
+    await expect(proxy(new Request('https://shop.example.com/account'), event())).rejects.toThrow(
+      'upstream down',
+    );
   });
 });
 
@@ -123,7 +181,9 @@ describe('createProxy hardening', () => {
     const { next, seen } = markerNext();
     const proxy = createProxy({}, undefined, { manifest, env: {}, next });
     await proxy(
-      new Request('https://shop.example.com/api/items', { headers: { 'x-hypdriv-flags': '{"admin":true}', 'x-hypdriv-route': 'forged', 'x-nonce': 'attacker' } }),
+      new Request('https://shop.example.com/api/items', {
+        headers: { 'x-hypdriv-flags': '{"admin":true}', 'x-hypdriv-route': 'forged', 'x-nonce': 'attacker' },
+      }),
       event(),
     );
     const forwarded = seen[0]!.headers;
@@ -140,12 +200,38 @@ describe('createProxy hardening', () => {
     try {
       const { next } = markerNext();
       const proxy = createProxy({ maintenance: { enabled: true } }, undefined, { manifest, env: {}, next });
-      const workerCtx = createContext({ request: new Request('https://shop.example.com/account'), config: loadConfig({}), runner: 'worker' });
-      const response = await runWithContext(workerCtx, () => proxy(new Request('https://shop.example.com/account'), event()));
+      const workerCtx = createContext({
+        request: new Request('https://shop.example.com/account'),
+        config: loadConfig({}),
+        runner: 'worker',
+      });
+      const response = await runWithContext(workerCtx, () =>
+        proxy(new Request('https://shop.example.com/account'), event()),
+      );
       expect(response.status).toBe(200);
       expect(next).toHaveBeenCalledTimes(1);
     } finally {
       setContextStore(null);
     }
+  });
+});
+
+describe('internal routes on the proxy runner', () => {
+  it('answers /_hypdriv/health and keeps dev endpoints closed in production', async () => {
+    const { next } = markerNext();
+    const proxy = createProxy({ site: { name: 'shop' } }, undefined, { manifest, env: {}, next, development: false });
+    const health = await proxy(new Request('https://shop.example.com/_hypdriv/health'), event());
+    expect(health.status).toBe(200);
+    expect(await health.json()).toMatchObject({ ok: true, service: 'shop', build: 'b1', routes: 3 });
+    const dev = await proxy(new Request('https://shop.example.com/_hypdriv/dev/state'), event());
+    expect(dev.status).toBe(404);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('serves dev state with the proxy runner in development', async () => {
+    const { next } = markerNext();
+    const proxy = createProxy({}, undefined, { manifest, env: {}, next, development: true, devState: async () => ({ purser: { ok: true } }) });
+    const res = await proxy(new Request('https://shop.example.com/_hypdriv/dev/state'), event());
+    expect(await res.json()).toMatchObject({ runner: 'proxy', purser: { ok: true } });
   });
 });

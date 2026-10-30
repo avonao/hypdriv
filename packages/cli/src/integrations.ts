@@ -3,7 +3,14 @@
  * builds, tests and runs even when an optional sibling lacks an export; callers get `null` and print a
  * clear message instead of crashing.
  */
-import type { CspDirectives, HypManifest, Logger, ResolvedConfig, ResolvedCsp, ResolvedPurser } from '@hypdriv/core';
+import type {
+  CspDirectives,
+  HypManifest,
+  Logger,
+  ResolvedConfig,
+  ResolvedCsp,
+  ResolvedPurser,
+} from '@hypdriv/core';
 
 export interface CspReportLike {
   documentUri: string;
@@ -65,7 +72,13 @@ export interface SecurityNodeModule {
 
 export interface PurserBuildResultLike {
   css: string | null;
-  diagnostics: Array<{ severity: 'error' | 'warning'; message: string; file?: string; line?: number; column?: number }>;
+  diagnostics: Array<{
+    severity: 'error' | 'warning';
+    message: string;
+    file?: string;
+    line?: number;
+    column?: number;
+  }>;
   stats: { files: number; atoms: number; rules: number; keyframes: number; tokens: number } | null;
   written: boolean;
   outFile: string | null;
@@ -115,7 +128,11 @@ export interface PurserNodeModule {
     tokensFile: string | null;
     message?: string | null;
   };
-  createPurserBridge?: (options: { projectDir: string; config: ResolvedPurser; log?: Logger }) => Promise<PurserBridgeLike>;
+  createPurserBridge?: (options: {
+    projectDir: string;
+    config: ResolvedPurser;
+    log?: Logger;
+  }) => Promise<PurserBridgeLike>;
   auditOverrides?: (options: {
     urls: string[];
     widths: number[];
@@ -127,13 +144,18 @@ export interface PurserNodeModule {
     log?: Logger;
   }) => Promise<AuditReportLike>;
   formatAuditReport?: (report: AuditReportLike) => string;
-  collectPrerenderedHtml?: (options: { projectDir: string; distDir?: string }) => Promise<Record<string, string>>;
+  collectPrerenderedHtml?: (options: {
+    projectDir: string;
+    distDir?: string;
+  }) => Promise<Record<string, string>>;
 }
 
 export interface NextAdapterModule {
   extractInlineScripts?: (html: string) => string[];
   extractInlineStyles?: (html: string) => string[];
-  buildManifest?: (input: unknown) => Promise<{ manifest: HypManifest; failures: string[]; html: Record<string, string> }>;
+  buildManifest?: (
+    input: unknown,
+  ) => Promise<{ manifest: HypManifest; failures: string[]; html: Record<string, string> }>;
 }
 
 async function tryImport<T>(specifier: string): Promise<T | null> {
@@ -144,10 +166,14 @@ async function tryImport<T>(specifier: string): Promise<T | null> {
   }
 }
 
-export const loadSecurity = (): Promise<SecurityModule | null> => tryImport<SecurityModule>('@hypdriv/security');
-export const loadSecurityNode = (): Promise<SecurityNodeModule | null> => tryImport<SecurityNodeModule>('@hypdriv/security/node');
-export const loadPurserNode = (): Promise<PurserNodeModule | null> => tryImport<PurserNodeModule>('@hypdriv/purser/node');
-export const loadNextAdapter = (): Promise<NextAdapterModule | null> => tryImport<NextAdapterModule>('@hypdriv/next/adapter');
+export const loadSecurity = (): Promise<SecurityModule | null> =>
+  tryImport<SecurityModule>('@hypdriv/security');
+export const loadSecurityNode = (): Promise<SecurityNodeModule | null> =>
+  tryImport<SecurityNodeModule>('@hypdriv/security/node');
+export const loadPurserNode = (): Promise<PurserNodeModule | null> =>
+  tryImport<PurserNodeModule>('@hypdriv/purser/node');
+export const loadNextAdapter = (): Promise<NextAdapterModule | null> =>
+  tryImport<NextAdapterModule>('@hypdriv/next/adapter');
 
 /** Message for a missing optional integration. */
 export function missingExport(pkg: string, name: string): string {

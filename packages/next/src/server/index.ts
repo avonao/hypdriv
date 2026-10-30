@@ -1,22 +1,23 @@
 import {
+  createConsoleLogger,
   type FlagDefinition,
   type FlagValue,
+  getCurrentContext,
   HEADER,
   type HypContext,
   type HypDrivEnv,
   HypDrivError,
   type Logger,
-  createConsoleLogger,
-  getCurrentContext,
   parseCookies,
+  timingSafeEqual,
 } from '@hypdriv/core';
 import { decodeFlagsHeader, encodeFlagsHeader, publicFlags } from '@hypdriv/flags';
 import { decodeThemeHeader, resolveTheme } from '@hypdriv/purser';
 import { signing } from '@hypdriv/security';
-import { type GeoInfo, decodeGeoHeader } from '../stages/geo';
+import { decodeGeoHeader, type GeoInfo } from '../stages/geo';
 
-export { Speculation, HypDrivMeta, ThemeScript } from './components';
-export { safeAction, defineRoute, type ServerActionContext } from './actions';
+export { defineRoute, type ServerActionContext, safeAction } from './actions';
+export { HypDrivMeta, Speculation, ThemeScript } from './components';
 
 /** Request-scoped information HypDriv makes available to Server Components, Route Handlers and Server Actions. */
 export interface HypServerContext {
@@ -54,7 +55,9 @@ interface CloudflareContextLike {
 let cloudflareContextLoader: (() => Promise<CloudflareContextLike | null>) | null = null;
 
 /** Allows the Worker shell (or tests) to supply the Cloudflare context accessor without a hard dependency. */
-export function setCloudflareContextLoader(loader: (() => Promise<CloudflareContextLike | null>) | null): void {
+export function setCloudflareContextLoader(
+  loader: (() => Promise<CloudflareContextLike | null>) | null,
+): void {
   cloudflareContextLoader = loader;
 }
 
@@ -80,7 +83,9 @@ async function requestHeaders(): Promise<Headers> {
 
 async function afterFn(): Promise<((task: Promise<unknown> | (() => Promise<unknown>)) => void) | null> {
   try {
-    const mod = (await import('next/server')) as { after?: (task: Promise<unknown> | (() => Promise<unknown>)) => void };
+    const mod = (await import('next/server')) as {
+      after?: (task: Promise<unknown> | (() => Promise<unknown>)) => void;
+    };
     return mod.after ?? null;
   } catch {
     return null;
@@ -121,9 +126,12 @@ export async function hyp(): Promise<HypServerContext> {
   const geo = decodeGeoHeader(headers.get(HEADER.geo));
   const flags = decodeFlagsHeader(headers.get(HEADER.flags));
   const theme = themeFor(headers, pipeline);
-  const log = pipeline?.log ?? createConsoleLogger({ fields: { requestId: headers.get(HEADER.hypRequestId) ?? undefined } });
+  const log =
+    pipeline?.log ??
+    createConsoleLogger({ fields: { requestId: headers.get(HEADER.hypRequestId) ?? undefined } });
 
-  const flag = ((name: string, fallback?: FlagValue) => (name in flags ? flags[name] : fallback)) as HypServerContext['flag'];
+  const flag = ((name: string, fallback?: FlagValue) =>
+    name in flags ? flags[name] : fallback) as HypServerContext['flag'];
 
   return {
     requestId: headers.get(HEADER.hypRequestId) ?? headers.get(HEADER.requestId),
@@ -135,7 +143,7 @@ export async function hyp(): Promise<HypServerContext> {
     theme,
     cspMode: headers.get(HEADER.cspMode),
     speculation: (headers.get('x-hypdriv-speculation') as 'edge' | 'component' | null) ?? null,
-    runner: (headers.get(HEADER.runner) as HypServerContext['runner']) ?? (pipeline?.runner ?? null),
+    runner: (headers.get(HEADER.runner) as HypServerContext['runner']) ?? pipeline?.runner ?? null,
     headers,
     cookies: parseCookies(headers.get('cookie')),
     env,
@@ -198,6 +206,13 @@ export interface JobInput {
 export interface JobHandlerOptions {
   /** Environment variable holding the shared secret (default `HYPDRIV_INTERNAL_SECRET`). */
   secretEnv?: string;
+  /**
+   * Environment variable holding the secret Vercel Cron sends as `Authorization: Bearer <secret>`
+   * (default `CRON_SECRET`). Requests carrying it are accepted as cron invocations.
+   */
+  cronSecretEnv?: string;
+  /** Job name reported to the handler when the request does not name one (Vercel Cron calls). */
+  job?: string;
   /** Accept requests without a signature in development (default true). */
   allowUnsignedInDevelopment?: boolean;
   ttlSeconds?: number;
@@ -205,26 +220,47 @@ export interface JobHandlerOptions {
 
 /**
  * Wraps a Route Handler so it only accepts signed internal requests from the Worker's `scheduled`,
- * `queue` and `email` handlers (or from `hypdriv jobs run`).
+ * `queue` and `email` handlers (or from `hypdriv jobs run`), and Vercel Cron calls authenticated with
+ * `CRON_SECRET`. Export it as both `GET` (Vercel Cron) and `POST` (Cloudflare dispatch).
  */
-export function jobHandler(options: JobHandlerOptions, handler: (input: JobInput) => Promise<Response | unknown>): (request: Request) => Promise<Response> {
+export function jobHandler(
+  options: JobHandlerOptions,
+  handler: (input: JobInput) => Promise<Response | unknown>,
+): (request: Request) => Promise<Response> {
   const secretEnv = options.secretEnv ?? 'HYPDRIV_INTERNAL_SECRET';
+  const cronSecretEnv = options.cronSecretEnv ?? 'CRON_SECRET';
   return async (request) => {
     const context = await hyp();
-    const fromEnv = context.env[secretEnv] ?? processEnv()[secretEnv];
-    const secret = typeof fromEnv === 'string' && fromEnv ? fromEnv : undefined;
+    const readSecret = (name: string) => {
+      const value = context.env[name] ?? processEnv()[name];
+      return typeof value === 'string' && value ? value : undefined;
+    };
+    const secret = readSecret(secretEnv);
+    const cronSecret = readSecret(cronSecretEnv);
     const development = processEnv().NODE_ENV === 'development';
-    if (!secret) {
-      if (!(development && options.allowUnsignedInDevelopment !== false)) {
-        return Response.json({ error: 'internal_secret_missing', hint: `set ${secretEnv}` }, { status: 503 });
+    // Vercel Cron: GET with `Authorization: Bearer $CRON_SECRET` (compared in constant time).
+    const authorization = request.headers.get('authorization');
+    const viaVercelCron = !!cronSecret && !!authorization && timingSafeEqual(authorization, `Bearer ${cronSecret}`);
+    if (!viaVercelCron) {
+      if (!secret) {
+        if (!(development && options.allowUnsignedInDevelopment !== false)) {
+          return Response.json({ error: 'internal_secret_missing', hint: `set ${secretEnv} (or ${cronSecretEnv} for Vercel Cron)` }, { status: 503 });
+        }
+      } else {
+        const ok = await signing.verifyInternalRequest(request.clone() as Request, secret, {
+          ttlSeconds: options.ttlSeconds ?? 300,
+        });
+        if (!ok) return Response.json({ error: 'unauthorized' }, { status: 401 });
       }
-    } else {
-      const ok = await signing.verifyInternalRequest(request.clone() as Request, secret, { ttlSeconds: options.ttlSeconds ?? 300 });
-      if (!ok) return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
     let payload: unknown = null;
-    let job = request.headers.get('x-hypdriv-job') ?? new URL(request.url).searchParams.get('job') ?? 'default';
-    let cron: string | undefined;
+    let job =
+      request.headers.get('x-hypdriv-job') ??
+      new URL(request.url).searchParams.get('job') ??
+      options.job ??
+      new URL(request.url).pathname.split('/').filter(Boolean).pop() ??
+      'default';
+    let cron: string | undefined = viaVercelCron ? (request.headers.get('x-vercel-cron-schedule') ?? undefined) : undefined;
     let messages: JobInput['messages'];
     if (request.method !== 'GET' && request.headers.get('content-type')?.includes('application/json')) {
       try {
@@ -238,7 +274,13 @@ export function jobHandler(options: JobHandlerOptions, handler: (input: JobInput
       }
     }
     try {
-      const result = await handler({ request, job, payload, ...(cron ? { cron } : {}), ...(messages ? { messages } : {}) });
+      const result = await handler({
+        request,
+        job,
+        payload,
+        ...(cron ? { cron } : {}),
+        ...(messages ? { messages } : {}),
+      });
       if (result instanceof Response) return result;
       return Response.json({ ok: true, job, result: result ?? null });
     } catch (err) {
@@ -254,7 +296,9 @@ export function jobHandler(options: JobHandlerOptions, handler: (input: JobInput
  * Flags are filtered through `publicFlags`, so `serverOnly` definitions never reach the page; without the
  * flag definitions (no pipeline context and none passed) flags are omitted rather than risk a leak.
  */
-export async function devtoolsMeta(options: { flagDefinitions?: Record<string, FlagDefinition> } = {}): Promise<Record<string, string>> {
+export async function devtoolsMeta(
+  options: { flagDefinitions?: Record<string, FlagDefinition> } = {},
+): Promise<Record<string, string>> {
   const h = await requestHeaders();
   const out: Record<string, string> = {};
   const id = h.get(HEADER.hypRequestId);

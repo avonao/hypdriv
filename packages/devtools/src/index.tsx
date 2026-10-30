@@ -26,6 +26,7 @@ import {
   type RscNavigation,
   readDevState,
   readPurserDiagnostics,
+  readRequestFacts,
   type VitalSample,
 } from './readers';
 import {
@@ -65,6 +66,7 @@ export type {
 export {
   collectDevToolsData,
   decodeFlags,
+  mergeBuildInfo,
   normalizeDevState,
   normalizePurser,
   parseServerTimingHeader,
@@ -75,6 +77,7 @@ export {
   readFlagsMeta,
   readMeta,
   readPurserDiagnostics,
+  readRequestFacts,
   readRscNavigations,
   readServerTimingEntries,
   readTtfb,

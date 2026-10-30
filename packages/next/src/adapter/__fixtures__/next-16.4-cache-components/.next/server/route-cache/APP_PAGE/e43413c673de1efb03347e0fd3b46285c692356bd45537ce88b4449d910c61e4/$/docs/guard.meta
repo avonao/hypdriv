@@ -1,0 +1,41 @@
+{
+  "status": 200,
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/docs/layout,_N_T_/docs/[slug]/layout,_N_T_/docs/[slug]/page,_N_T_/docs/guard,docs,doc:guard"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/_index",
+    "/docs/$d$slug/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 49152,
+    "slots": {
+      "children": {
+        "hints": 49216,
+        "slots": {
+          "children": {
+            "hints": 49248,
+            "slots": {
+              "children": {
+                "hints": 49312,
+                "slots": null
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/e43413c673de1efb03347e0fd3b46285c692356bd45537ce88b4449d910c61e4/$/docs/guard",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/docs/[slug]/page"
+    },
+    "isFallback": false
+  }
+}

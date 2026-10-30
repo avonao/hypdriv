@@ -1,0 +1,59 @@
+{
+  "name": "@hypdriv/vercel",
+  "version": "0.1.0",
+  "description": "HypDriv on Vercel: CDN cache headers and tag purge, Upstash Redis and Global Config stores, WAF rate limits, BotID and Queues integration.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/vercel"
+  },
+  "keywords": [
+    "nextjs",
+    "vercel",
+    "cdn",
+    "upstash",
+    "edge-config",
+    "global-config",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@hypdriv/testing": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

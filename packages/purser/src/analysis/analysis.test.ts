@@ -252,3 +252,14 @@ describe('verifyAtoms', () => {
     expect(result.unused).toEqual([]);
   });
 });
+
+describe('isPurserStylesheet after bundling', () => {
+  it('recognises Lightning CSS output without the header comment or the ordering statement', async () => {
+    const { isPurserStylesheet } = await import('./stylesheet');
+    const bundled = '@layer purser.tokens{:root{--space-1:4px}}@layer purser.globals{body{margin:0}}@layer purser.atoms{.x1abcdef{display:flex}}';
+    expect(isPurserStylesheet(bundled)).toBe(true);
+    expect(isPurserStylesheet(bundled, { tokens: 'purser.tokens', globals: 'purser.globals', atoms: 'purser.atoms' })).toBe(true);
+    expect(isPurserStylesheet(bundled, { tokens: 'ds.tokens', globals: 'ds.globals', atoms: 'ds.atoms' })).toBe(false);
+    expect(isPurserStylesheet('.app{color:red}@layer base{a{color:blue}}')).toBe(false);
+  });
+});

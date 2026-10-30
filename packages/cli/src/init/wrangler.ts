@@ -83,7 +83,8 @@ function insertRootLine(source: string, line: string, afterKey?: string): string
   const open = rootOpenBrace(source);
   if (open === -1) throw new Error('wrangler config is not a JSON object');
   const rest = source.slice(open + 1);
-  if (/^\s*\}/.test(rest)) return `${source.slice(0, open + 1)}${eol}${indent}${line}${eol}${rest.trimStart()}`;
+  if (/^\s*\}/.test(rest))
+    return `${source.slice(0, open + 1)}${eol}${indent}${line}${eol}${rest.trimStart()}`;
   const newline = /^\r?\n/.test(rest) ? '' : eol;
   return `${source.slice(0, open + 1)}${eol}${indent}${line},${newline}${rest}`;
 }
@@ -145,7 +146,10 @@ export function editWranglerJsonc(source: string, options: WranglerEditOptions):
   const mainMatch = /("main"\s*:\s*)"([^"]*)"/.exec(out);
   if (mainMatch) {
     if (mainMatch[2] !== options.main) {
-      out = out.slice(0, mainMatch.index) + `${mainMatch[1]}"${options.main}"` + out.slice(mainMatch.index + mainMatch[0].length);
+      out =
+        out.slice(0, mainMatch.index) +
+        `${mainMatch[1]}"${options.main}"` +
+        out.slice(mainMatch.index + mainMatch[0].length);
       changes.push(`main: "${mainMatch[2]}" → "${options.main}"`);
     }
   } else {
@@ -168,7 +172,8 @@ export function editWranglerJsonc(source: string, options: WranglerEditOptions):
         out = `${out.slice(0, start)} { "enabled": true }${out.slice(end)}`;
         changes.push('observability.enabled: true set');
       } else if (/"enabled"\s*:\s*false/.test(block)) {
-        out = out.slice(0, start) + block.replace(/"enabled"\s*:\s*false/, '"enabled": true') + out.slice(end);
+        out =
+          out.slice(0, start) + block.replace(/"enabled"\s*:\s*false/, '"enabled": true') + out.slice(end);
         changes.push('observability.enabled: false → true');
       }
     }
@@ -181,14 +186,19 @@ export function editWranglerJsonc(source: string, options: WranglerEditOptions):
     if (cronsMatch) {
       let existing: string[] = [];
       try {
-        existing = (parseJsonc(cronsMatch[2]!) as unknown[]).filter((c): c is string => typeof c === 'string');
+        existing = (parseJsonc(cronsMatch[2]!) as unknown[]).filter(
+          (c): c is string => typeof c === 'string',
+        );
       } catch {
         existing = [];
       }
       const missing = wanted.filter((c) => !existing.includes(c));
       if (missing.length) {
         const merged = [...existing, ...missing];
-        out = out.slice(0, cronsMatch.index) + `${cronsMatch[1]}${JSON.stringify(merged)}` + out.slice(cronsMatch.index + cronsMatch[0].length);
+        out =
+          out.slice(0, cronsMatch.index) +
+          `${cronsMatch[1]}${JSON.stringify(merged)}` +
+          out.slice(cronsMatch.index + cronsMatch[0].length);
         changes.push(`triggers.crons: added ${missing.map((c) => `"${c}"`).join(', ')}`);
       }
     } else {
@@ -202,7 +212,11 @@ export function editWranglerJsonc(source: string, options: WranglerEditOptions):
         out = `${out.slice(0, braceAt + 1)} "crons": ${JSON.stringify(wanted)}${inner.trim() ? `,${inner}` : sep}${out.slice(end - 1)}`;
         changes.push(`triggers.crons: added ${wanted.map((c) => `"${c}"`).join(', ')}`);
       } else {
-        out = insertRootLine(out, `"triggers": { "crons": ${JSON.stringify(wanted)} }`, findRootKey(out, 'observability') ? 'observability' : 'main');
+        out = insertRootLine(
+          out,
+          `"triggers": { "crons": ${JSON.stringify(wanted)} }`,
+          findRootKey(out, 'observability') ? 'observability' : 'main',
+        );
         changes.push(`triggers.crons: added ${wanted.map((c) => `"${c}"`).join(', ')}`);
       }
     }

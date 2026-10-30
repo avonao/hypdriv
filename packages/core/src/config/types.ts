@@ -567,7 +567,11 @@ export interface LiveConfig {
 }
 
 export interface ImagesConfig {
-  loader?: 'cloudflare' | 'next' | 'none';
+  /**
+   * `auto` (default): the Cloudflare loader on Cloudflare, Next's built-in optimizer elsewhere (on Vercel a
+   * custom loader would bypass Vercel Image Optimization).
+   */
+  loader?: 'auto' | 'cloudflare' | 'next' | 'none';
   /** Use `/cdn-cgi/image/...` URLs (requires a zone) instead of `/_next/image` (default `auto`). */
   cdnCgi?: boolean | 'auto';
   quality?: number;
@@ -621,6 +625,35 @@ export interface CloudflareConfig {
   skipStaticAssets?: boolean;
   /** Respond to `/_hypdriv/health` (default true). */
   health?: boolean;
+}
+
+/** Where the application runs. `auto` detects it (Vercel env, workerd, otherwise Node). */
+export type DeployTarget = 'cloudflare' | 'vercel' | 'node';
+
+/**
+ * Vercel integration (used when the deploy target is `vercel`). Every entry is an optional upgrade over the
+ * zero-infrastructure baseline, detected from the environment at run time.
+ */
+export interface VercelConfig {
+  /**
+   * Express edge-cache policies as Vercel CDN headers (`Vercel-CDN-Cache-Control`, `Vercel-Cache-Tag`).
+   * `downstream: true` also emits `CDN-Cache-Control` for CDNs in front of Vercel. Default true.
+   */
+  cdn?: boolean | { downstream?: boolean };
+  /** Global Config (formerly Edge Config) as the read-only key-value source for flags, redirects and maintenance. Default env `GLOBAL_CONFIG`, then `EDGE_CONFIG`. */
+  globalConfig?: false | { connectionEnv?: string[] };
+  /** Redis over Upstash's REST API (Vercel Marketplace) as the KV store for rate limits, tag index and idempotency. */
+  redis?: false | { urlEnv?: string[]; tokenEnv?: string[]; prefix?: string };
+  /** Vercel WAF rate-limit rules (`@vercel/firewall`) to enforce per HypDriv rate-limit policy id. */
+  firewall?: { rateLimitRules?: Record<string, string> };
+  /** Vercel BotID verdicts in the bot stage (requires `botid` and `initBotId()` on the client). */
+  botId?: false | { checkLevel?: 'basic' | 'deepAnalysis' };
+  /** REST fallback for tag purges when `@vercel/functions` cannot purge (outside a Vercel function). */
+  purge?: { tokenEnv?: string; teamIdEnv?: string; projectIdEnv?: string };
+  /** Env holding the secret Vercel Cron sends as `Authorization: Bearer …` (default `CRON_SECRET`). */
+  cronSecretEnv?: string;
+  /** Vercel Queues topic per HypDriv queue name (default: the queue name). */
+  queues?: Record<string, string>;
 }
 
 export interface DevtoolsConfig {
@@ -707,7 +740,10 @@ export interface HypDrivConfig {
   images?: ImagesConfig;
   jobs?: JobsConfig;
   budgets?: BudgetsConfig;
+  /** Deploy target (default `auto`). */
+  platform?: 'auto' | DeployTarget;
   cloudflare?: CloudflareConfig;
+  vercel?: VercelConfig;
   devtools?: boolean | DevtoolsConfig;
   i18n?: I18nConfig;
   redirects?: RedirectsConfig;

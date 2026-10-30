@@ -2,7 +2,10 @@ import { packageOf } from './packages';
 
 /** The esbuild metafile shape (`handler.mjs.meta.json` written by OpenNext). */
 export interface EsbuildMetafile {
-  inputs: Record<string, { bytes: number; imports?: Array<{ path: string; kind?: string; external?: boolean }> }>;
+  inputs: Record<
+    string,
+    { bytes: number; imports?: Array<{ path: string; kind?: string; external?: boolean }> }
+  >;
   outputs: Record<
     string,
     {
@@ -40,7 +43,11 @@ export function parseMetafile(json: unknown): EsbuildMetafile | null {
 }
 
 /** Summarises a metafile: largest inputs (by output contribution) and package totals. */
-export function summarizeMetafile(meta: EsbuildMetafile, file: string, options: { limit?: number; packageLimit?: number } = {}): MetafileSummary {
+export function summarizeMetafile(
+  meta: EsbuildMetafile,
+  file: string,
+  options: { limit?: number; packageLimit?: number } = {},
+): MetafileSummary {
   const limit = options.limit ?? 15;
   const contribution = new Map<string, number>();
   let totalOutputBytes = 0;

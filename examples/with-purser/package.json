@@ -37,5 +37,11 @@
     "babel-plugin-react-compiler": "catalog:",
     "typescript": "catalog:",
     "wrangler": "catalog:"
-  }
+  },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 113",
+    "safari >= 16.4"
+  ]
 }

@@ -27,7 +27,9 @@ export interface ResolvedConfig {
   images: ResolvedImages;
   jobs: ResolvedJobs;
   budgets: ResolvedBudgets;
+  platform: 'auto' | 'cloudflare' | 'vercel' | 'node';
   cloudflare: ResolvedCloudflare;
+  vercel: ResolvedVercel;
   devtools: ResolvedDevtools;
   i18n: ResolvedI18n | null;
   redirects: ResolvedRedirects;
@@ -296,7 +298,7 @@ export interface ResolvedLive {
 }
 
 export interface ResolvedImages {
-  loader: 'cloudflare' | 'next' | 'none';
+  loader: 'auto' | 'cloudflare' | 'next' | 'none';
   cdnCgi: boolean | 'auto';
   quality: number;
   formats: Array<'avif' | 'webp' | 'auto'>;
@@ -337,6 +339,17 @@ export interface ResolvedCloudflare {
   internalPathPrefix: string;
   skipStaticAssets: boolean;
   health: boolean;
+}
+
+export interface ResolvedVercel {
+  cdn: null | { downstream: boolean };
+  globalConfig: null | { connectionEnv: string[] };
+  redis: null | { urlEnv: string[]; tokenEnv: string[]; prefix: string };
+  firewall: { rateLimitRules: Record<string, string> };
+  botId: null | { checkLevel: 'basic' | 'deepAnalysis' };
+  purge: { tokenEnv: string; teamIdEnv: string; projectIdEnv: string };
+  cronSecretEnv: string;
+  queues: Record<string, string>;
 }
 
 export interface ResolvedDevtools {

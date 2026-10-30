@@ -41,7 +41,10 @@ export interface PackageTotals {
 }
 
 /** Aggregates per-source byte counts into packages and detects duplicate installations. */
-export function aggregatePackages(entries: Array<{ source: string; bytes: number }>, total: number): PackageTotals {
+export function aggregatePackages(
+  entries: Array<{ source: string; bytes: number }>,
+  total: number,
+): PackageTotals {
   const totals = new Map<string, number>();
   const installs = new Map<string, Map<string, number>>();
   let appBytes = 0;

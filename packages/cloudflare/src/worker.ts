@@ -1,4 +1,4 @@
-import { UPSTREAM_KEY, createKvTagIndex } from '@hypdriv/cache';
+import { UPSTREAM_KEY, createKvTagIndex, registerEdgePurger } from '@hypdriv/cache';
 import {
   HEADER,
   type HypContext,
@@ -21,7 +21,6 @@ import {
   runPipeline,
   sanitizeInboundRequest,
 } from '@hypdriv/core';
-import { registerEdgePurger } from '@hypdriv/next/cache';
 import { type Platform, buildDefaultStages, createPlatform } from '@hypdriv/next/stages';
 import { runWithHypContext } from './context';
 import { edgeStages } from './edge-stages';
