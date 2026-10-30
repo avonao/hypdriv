@@ -29,13 +29,25 @@ All vitest configs now carry `ssr: { resolve: { conditions: ['source'] } }` (bef
    - Local Purser for testing: copy `/Users/apple.m5.pro/Workspace/purser` (`package.json src types bin scripts`) into `examples/with-purser/node_modules/@avonao/purser` (a symlink outside the project root breaks Turbopack). `@avonao/purser` is an `optionalDependency` so `pnpm install` works while it is unpublished.
 3. Edge-runtime warnings during `next build` (instrumentation is also compiled for Edge): `process.versions` and `node:crypto` in `@hypdriv/security` passwords — harmless but should be silenced (guard with `typeof EdgeRuntime` or split the passwords module out of the root entry).
 
+## New requirement (2026-10-30): Vercel support
+
+HypDriv must also work on **Vercel** deployments, not only Cloudflare Workers. Plan when resuming:
+
+- Treat Vercel as a first-class target next to Cloudflare: `withHypDriv` detects Vercel (`VERCEL`, `VERCEL_ENV`) and chains Vercel's own build adapter instead of OpenNext; the manifest, adapter output and CLI must not assume `.open-next/`.
+- Runtime on Vercel = `proxy.ts` (Node) + server helpers; there is no Worker shell, so edge-only stages (HTMLRewriter transforms, cached-HTML nonce injection) need a Vercel-native path or a documented fallback, and the edge cache maps to Vercel's CDN (`CDN-Cache-Control`/`Vercel-CDN-Cache-Control`, cache tags, `revalidateTag`) instead of the Cache API.
+- Bindings → Vercel equivalents as optional upgrades: KV-style store (Upstash/Redis via Marketplace), Edge Config for flags/redirects/maintenance, Vercel Cron for `jobs.cron`, Queues where available, Vercel Firewall/BotID next to HypDriv's bot shield, Speed Insights/OTel next to vitals and tracing.
+- `hypdriv init` / `doctor` / `analyze` / `audit` detect the platform and check the matching config (`vercel.json`/`vercel.ts`, crons, function regions — US-first `iad1`).
+- `create-hypdriv --platform cloudflare|vercel`, an `examples/vercel` app, a `docs/guides/vercel.md` guide, an ADR for the multi-platform runtime, and feature-catalog columns per platform.
+- Verify end to end with `vercel build` (and a preview deploy when credentials are available).
+
 ## Next (in order)
 
 1. Finish items 1–3 above.
-2. `create-hypdriv` (templates synced from `examples/*` at build time: resolve `catalog:`/`workspace:*` to real versions, `_gitignore`, `--pm`, `--purser`, `--no-install`, `--no-git`, tests).
-3. End-to-end on both examples: `next build` → `opennextjs-cloudflare build` → `wrangler dev` → `hypdriv audit all` and `audit css`. OpenNext bundles `proxy.ts` as experimental Node middleware — verify it passes through inside the Worker.
-4. `docs/feature-catalog.md`: replace the blanket ✅ with real statuses; changesets for every package; root CHANGELOG.
-5. Full gate: `pnpm lint && pnpm typecheck && pnpm build && pnpm test`, then commit and push.
+2. Vercel support (section above) — designed and built in full alongside the Cloudflare path.
+3. `create-hypdriv` (templates synced from `examples/*` at build time: resolve `catalog:`/`workspace:*` to real versions, `_gitignore`, `--pm`, `--purser`, `--no-install`, `--no-git`, tests).
+4. End-to-end on both examples: `next build` → `opennextjs-cloudflare build` → `wrangler dev` → `hypdriv audit all` and `audit css`. OpenNext bundles `proxy.ts` as experimental Node middleware — verify it passes through inside the Worker.
+5. `docs/feature-catalog.md`: replace the blanket ✅ with real statuses; changesets for every package; root CHANGELOG.
+6. Full gate: `pnpm lint && pnpm typecheck && pnpm build && pnpm test`, then commit and push.
 
 ## Where things live
 
