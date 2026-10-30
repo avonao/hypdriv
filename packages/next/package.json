@@ -1,0 +1,117 @@
+{
+  "name": "@hypdriv/next",
+  "version": "0.1.0",
+  "description": "HypDriv for Next.js 16+: withHypDriv config wrapper, adapter chain, proxy composables, server helpers and client components.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/next"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./config": {
+      "source": "./src/config/index.ts",
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./adapter": {
+      "source": "./src/adapter/index.ts",
+      "types": "./dist/adapter.d.ts",
+      "default": "./dist/adapter.js"
+    },
+    "./proxy": {
+      "source": "./src/proxy/index.ts",
+      "types": "./dist/proxy.d.ts",
+      "default": "./dist/proxy.js"
+    },
+    "./server": {
+      "source": "./src/server/index.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./client": {
+      "source": "./src/client/index.tsx",
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./cache": {
+      "source": "./src/cache/index.ts",
+      "types": "./dist/cache.d.ts",
+      "default": "./dist/cache.js"
+    },
+    "./instrumentation": {
+      "source": "./src/instrumentation/index.ts",
+      "types": "./dist/instrumentation.d.ts",
+      "default": "./dist/instrumentation.js"
+    },
+    "./stages": {
+      "source": "./src/stages/index.ts",
+      "types": "./dist/stages.d.ts",
+      "default": "./dist/stages.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/flags": "workspace:*",
+    "@hypdriv/purser": "workspace:*"
+  },
+  "peerDependencies": {
+    "next": ">=16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "next": "catalog:"
+  }
+}

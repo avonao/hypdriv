@@ -1,0 +1,71 @@
+{
+  "name": "@hypdriv/flags",
+  "version": "0.1.0",
+  "description": "HypDriv edge feature flags: deterministic bucketing, geo/cookie/percentage rules, providers (static, env, KV, OpenFeature) and React hooks.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/flags"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./react": {
+      "source": "./src/react/index.tsx",
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}

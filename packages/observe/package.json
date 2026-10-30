@@ -1,0 +1,68 @@
+{
+  "name": "@hypdriv/observe",
+  "version": "0.1.0",
+  "description": "HypDriv observability: tracing with OTLP export, structured logging, Server-Timing and Web Vitals collection.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/observe"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./client": {
+      "source": "./src/client/index.ts",
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "web-vitals": "^5.0.0 || ^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "web-vitals": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "web-vitals": "catalog:"
+  }
+}

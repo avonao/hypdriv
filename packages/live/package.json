@@ -1,0 +1,79 @@
+{
+  "name": "@hypdriv/live",
+  "version": "0.1.0",
+  "description": "HypDriv live channels: Durable Object pub/sub with WebSocket hibernation and SSE, polling fallback, and the useLive React hook.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/live"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./react": {
+      "source": "./src/react/index.tsx",
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./durable-object": {
+      "source": "./src/durable-object/index.ts",
+      "types": "./dist/durable-object.d.ts",
+      "default": "./dist/durable-object.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run && vitest run -c vitest.workers.config.ts"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

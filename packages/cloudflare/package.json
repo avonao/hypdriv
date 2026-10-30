@@ -1,0 +1,82 @@
+{
+  "name": "@hypdriv/cloudflare",
+  "version": "0.1.0",
+  "description": "HypDriv Worker shell for OpenNext on Cloudflare: Drivetrain pipeline, scheduled/queue/email/tail handlers, Durable Objects and binding adapters.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/cloudflare"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./durable-objects": {
+      "source": "./src/durable-objects/index.ts",
+      "types": "./dist/durable-objects.d.ts",
+      "default": "./dist/durable-objects.js"
+    },
+    "./context": {
+      "source": "./src/context.ts",
+      "types": "./dist/context.d.ts",
+      "default": "./dist/context.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run && vitest run -c vitest.workers.config.ts"
+  },
+  "dependencies": {
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/flags": "workspace:*",
+    "@hypdriv/live": "workspace:*",
+    "@hypdriv/next": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/security": "workspace:*"
+  },
+  "peerDependencies": {
+    "@opennextjs/cloudflare": ">=1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@opennextjs/cloudflare": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 // The root config only aggregates them so `pnpm test` runs everything.
 export default defineConfig({
   test: {
-    projects: ['packages/*/vitest.config.ts'],
+    projects: ['packages/*/vitest.config.ts', 'packages/*/vitest.workers.config.ts'],
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],
     coverage: {
       provider: 'v8',

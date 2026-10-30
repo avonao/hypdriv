@@ -1,0 +1,110 @@
+{
+  "name": "hypdriv",
+  "version": "0.1.0",
+  "description": "HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers. Umbrella package re-exporting every @hypdriv/* module and the hypdriv CLI.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/hypdriv"
+  },
+  "keywords": [
+    "nextjs",
+    "cloudflare",
+    "workers",
+    "edge",
+    "hypdriv"
+  ],
+  "bin": {
+    "hypdriv": "./bin/hypdriv.js"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./config": {
+      "source": "./src/config.ts",
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./next": {
+      "source": "./src/next.ts",
+      "types": "./dist/next.d.ts",
+      "default": "./dist/next.js"
+    },
+    "./cloudflare": {
+      "source": "./src/cloudflare.ts",
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./client": {
+      "source": "./src/client.tsx",
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/next": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/flags": "workspace:*",
+    "@hypdriv/live": "workspace:*",
+    "@hypdriv/image": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/devtools": "workspace:*",
+    "@hypdriv/cli": "workspace:*"
+  },
+  "peerDependencies": {
+    "next": ">=16.0.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}
