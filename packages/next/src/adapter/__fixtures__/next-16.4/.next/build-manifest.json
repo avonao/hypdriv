@@ -1,0 +1,104 @@
+{
+  "pages": {
+    "/_app": []
+  },
+  "devFiles": [],
+  "polyfillFiles": [
+    "static/chunks/0cz1d0mv5g_q7.js"
+  ],
+  "lowPriorityFiles": [
+    "static/I1wNd3pCoOLr16ruV6B_d/_buildManifest.js",
+    "static/I1wNd3pCoOLr16ruV6B_d/_ssgManifest.js",
+    "static/I1wNd3pCoOLr16ruV6B_d/_clientMiddlewareManifest.js"
+  ],
+  "rootMainFiles": [
+    "static/chunks/3cfn99dbrcvvp.js",
+    "static/chunks/0r-yur70-ku2o.js",
+    "static/chunks/3wbm-994r45kr.js",
+    "static/chunks/turbopack-3-ry682tkyiqk.js"
+  ],
+  "rootMainFilesTree": {},
+  "pagesChunkGroupBootstrapParams": {
+    "/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/_not-found/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/_global-error/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/(marketing)/pricing/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/blog/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/blog/[slug]/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/dashboard/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    },
+    "/docs/[...path]/page": {
+      "otherChunks": [
+        "static/chunks/3cfn99dbrcvvp.js",
+        "static/chunks/0r-yur70-ku2o.js",
+        "static/chunks/3wbm-994r45kr.js"
+      ],
+      "runtimeModuleIds": [
+        94553
+      ]
+    }
+  },
+  "chunkLoadingGlobal": "TURBOPACK"
+}

@@ -2,10 +2,10 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
-      'index': 'src/index.ts',
-      'loader': 'src/loader.ts',
-      'react': 'src/react/index.tsx',
-      'node': 'src/node/index.ts'
+    index: 'src/index.ts',
+    loader: 'src/loader.ts',
+    react: 'src/react/index.tsx',
+    node: 'src/node/index.ts',
   },
   format: ['esm'],
   platform: 'neutral',

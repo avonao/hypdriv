@@ -2,9 +2,9 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
-      'index': 'src/index.ts',
-      'react': 'src/react/index.tsx',
-      'durable-object': 'src/durable-object/index.ts'
+    index: 'src/index.ts',
+    react: 'src/react/index.tsx',
+    'durable-object': 'src/durable-object/index.ts',
   },
   format: ['esm'],
   platform: 'neutral',

@@ -1,0 +1,12 @@
+{
+  "/(marketing)/pricing/page": "/pricing",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/hello/route": "/api/hello",
+  "/api/users/[id]/route": "/api/users/[id]",
+  "/blog/[slug]/page": "/blog/[slug]",
+  "/blog/page": "/blog",
+  "/dashboard/page": "/dashboard",
+  "/docs/[...path]/page": "/docs/[...path]",
+  "/page": "/"
+}

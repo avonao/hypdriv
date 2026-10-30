@@ -83,12 +83,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hypdriv/core": "workspace:*",
     "@hypdriv/cache": "workspace:*",
-    "@hypdriv/security": "workspace:*",
-    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/devtools": "workspace:*",
     "@hypdriv/flags": "workspace:*",
-    "@hypdriv/purser": "workspace:*"
+    "@hypdriv/image": "workspace:*",
+    "@hypdriv/live": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/security": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=16.0.0",

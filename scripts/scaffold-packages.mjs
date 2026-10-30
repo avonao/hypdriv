@@ -100,6 +100,7 @@ const packages = {
       '@hypdriv/observe': 'workspace:*',
       '@hypdriv/flags': 'workspace:*',
       '@hypdriv/purser': 'workspace:*',
+      '@hypdriv/image': 'workspace:*',
     },
     peer: { next: '>=16.0.0', react: '^19.0.0', 'react-dom': '^19.0.0' },
     peerMeta: { react: { optional: false }, 'react-dom': { optional: true } },

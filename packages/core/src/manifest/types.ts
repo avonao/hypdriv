@@ -6,7 +6,15 @@
 export const MANIFEST_VERSION = 1 as const;
 
 export type RouteKind = 'app-page' | 'app-route' | 'page' | 'page-api' | 'static-file';
-export type RouteClassification = 'static' | 'shell' | 'dynamic' | 'route' | 'asset';
+/**
+ * - `static`: prerendered, never revalidates (immutable until the next deploy)
+ * - `isr`: prerendered, revalidates in the background (content may change between deploys)
+ * - `shell`: partially prerendered shell that resumes at request time (Cache Components / PPR)
+ * - `dynamic`: rendered per request
+ * - `route`: Route Handler / API route
+ * - `asset`: static file
+ */
+export type RouteClassification = 'static' | 'isr' | 'shell' | 'dynamic' | 'route' | 'asset';
 
 export interface HypRoutePrerender {
   routeType?: 'route' | 'fallback' | 'shell' | 'page';

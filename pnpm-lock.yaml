@@ -597,9 +597,18 @@ importers:
       '@hypdriv/core':
         specifier: workspace:*
         version: link:../core
+      '@hypdriv/devtools':
+        specifier: workspace:*
+        version: link:../devtools
       '@hypdriv/flags':
         specifier: workspace:*
         version: link:../flags
+      '@hypdriv/image':
+        specifier: workspace:*
+        version: link:../image
+      '@hypdriv/live':
+        specifier: workspace:*
+        version: link:../live
       '@hypdriv/observe':
         specifier: workspace:*
         version: link:../observe

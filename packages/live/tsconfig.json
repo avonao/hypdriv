@@ -2,16 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "types": [
-      "node",
-      "@cloudflare/workers-types",
-      "react",
-      "react-dom",
-      "@cloudflare/vitest-plugin/types"
-    ]
+    "types": ["node", "@cloudflare/workers-types", "react", "react-dom", "@cloudflare/vitest-plugin/types"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

@@ -2,6 +2,7 @@
 
 export * from './budgets';
 export * from './capabilities';
+export * from './bindings';
 export * from './config/defaults';
 export { type DefinedConfig, defineConfig, formatDiagnostics, loadConfig } from './config/define';
 export { resolveConfig, resolveEdgeCachePolicy } from './config/resolve';
@@ -28,6 +29,7 @@ export * from './manifest/types';
 // Pipeline
 export * from './pipeline/context';
 export * from './pipeline/run';
+export * from './pipeline/current';
 export * from './pipeline/stage';
 export { parseServerTiming, type ServerTimingMode, type TimingEntry, Timings } from './pipeline/timing';
 export * from './util/encoding';

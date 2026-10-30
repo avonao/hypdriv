@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-basic",
+  "main": "hypdriv.worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "hypdriv-basic" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "hypdriv-basic-opennext-cache" }],
+  "images": { "binding": "IMAGES" },
+  "triggers": { "crons": ["0 9 * * 1"] },
+  // Optional HypDriv upgrades. Each binding unlocks a capability (docs/guides/cloudflare.md):
+  "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "<create with: wrangler kv namespace create HYPDRIV_KV>" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" },
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" }
+    ]
+  },
+  "migrations": [{ "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }],
+  "analytics_engine_datasets": [{ "binding": "HYPDRIV_ANALYTICS", "dataset": "hypdriv_basic" }],
+  "ratelimits": [{ "name": "HYPDRIV_RATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }]
+}

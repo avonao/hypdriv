@@ -39,3 +39,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Test fixtures may contain captured build output
+!**/__fixtures__/**/.next/
+!**/__fixtures__/**/.open-next/
+!**/__fixtures__/**/.hypdriv/

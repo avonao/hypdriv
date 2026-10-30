@@ -1,0 +1,6 @@
+NEXTJS_ENV=development
+HYPDRIV_SESSION_SECRET=change-me-32-bytes-minimum-please-really
+HYPDRIV_INTERNAL_SECRET=change-me-too
+# CACHE_PURGE_ZONE_ID=
+# CACHE_PURGE_API_TOKEN=
+# TURNSTILE_SECRET_KEY=

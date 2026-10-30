@@ -66,6 +66,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
     } catch (err) {
       end('error');
       const recovered = await options.onStageError?.(toError(err), stage, 'pre', ctx);
+      if (recovered === 'continue') continue;
       if (recovered) {
         response = recovered;
         shortCircuitedBy = stage.name;
@@ -96,6 +97,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
     } catch (err) {
       end('error');
       const recovered = await options.onStageError?.(toError(err), stage, 'post', ctx);
+      if (recovered === 'continue') continue;
       if (recovered) response = recovered;
       else throw err;
     }

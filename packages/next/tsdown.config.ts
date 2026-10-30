@@ -9,7 +9,8 @@ export default defineConfig({
       'server': 'src/server/index.ts',
       'client': 'src/client/index.tsx',
       'cache': 'src/cache/index.ts',
-      'instrumentation': 'src/instrumentation/index.ts'
+      'instrumentation': 'src/instrumentation/index.ts',
+      'stages': 'src/stages/index.ts'
   },
   format: ['esm'],
   platform: 'neutral',
