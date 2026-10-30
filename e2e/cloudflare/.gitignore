@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.open-next/
+.hypdriv/
+.wrangler/
+next-env.d.ts
+cloudflare-env.d.ts
+*.tsbuildinfo
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env*.local
+wrangler.*.local.json*
+e2e-report.json
+*.secrets.local.json
+*.e2e.local.env

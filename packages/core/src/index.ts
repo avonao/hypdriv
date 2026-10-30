@@ -5,6 +5,7 @@ export * from './budgets';
 export * from './capabilities';
 export * from './config/defaults';
 export { type DefinedConfig, defineConfig, formatDiagnostics, loadConfig } from './config/define';
+export { queueConsumerFor } from './config/queues';
 export { isResolvedConfig, resolveConfig, resolveEdgeCachePolicy } from './config/resolve';
 export type * from './config/resolved';
 export * from './config/types';

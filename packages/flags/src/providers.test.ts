@@ -168,6 +168,17 @@ describe('kvProvider', () => {
     now += 1_001;
     expect((await p.load()).a).toEqual({ default: 1 });
   });
+
+  it('drops KV overrides once the key is deleted (found live: flags stuck on the last KV value)', async () => {
+    let now = 0;
+    const kv = fakeKv({ flags: JSON.stringify({ base: { default: false } }) });
+    const p = kvProvider(kv, 'flags', fallback, 1, { now: () => now });
+    expect((await p.load()).base).toEqual({ default: false });
+    kv.store.delete('flags');
+    now += 1_001;
+    expect(await p.load()).toBe(fallback);
+    expect((await p.load()).base).toEqual({ default: true });
+  });
 });
 
 describe('openFeatureProvider', () => {

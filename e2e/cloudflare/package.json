@@ -1,0 +1,34 @@
+{
+  "name": "@hypdriv/e2e-cloudflare",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Live end-to-end suite: a Next.js 16 app that exercises every HypDriv capability on a real Cloudflare account, and the runner that verifies it.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:worker": "opennextjs-cloudflare build",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/e2e.ts",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "typecheck": "tsc --noEmit",
+    "provision": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/provision.ts"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "catalog:",
+    "hypdriv": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/security": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

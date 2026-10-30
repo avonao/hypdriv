@@ -39,12 +39,33 @@ export interface CacheStore {
 }
 
 /** Tag → keys index used by `purgeTags`. */
+export interface TagIndexAddOptions {
+  /** When the response was requested from upstream (epoch ms): compared with purge tombstones. */
+  fetchedAt?: number;
+}
+
 export interface TagIndex {
-  add(key: string, tags: string[], ttl: number): Promise<void>;
+  /**
+   * Associates a key with tags. Indexes that keep purge tombstones answer `{ stale: true }` when one of
+   * the tags was purged at or after `fetchedAt`: the entry holds content generated before the purge and
+   * must be dropped instead of indexed.
+   */
+  add(
+    key: string,
+    tags: string[],
+    ttl: number,
+    options?: TagIndexAddOptions,
+  ): Promise<void | { stale?: boolean }>;
   keysFor(tags: string[]): Promise<string[]>;
   remove(keys: string[]): Promise<void>;
   /** Drops whole tag lists after a purge (implementations without a reverse index need this). */
   removeTags?(tags: string[]): Promise<void>;
+  /**
+   * Records purge tombstones: entries for these tags fetched up to `until` (epoch ms) are stale when they
+   * are indexed later. Closes the race between a purge and a request already in flight (or one that reads
+   * an upstream that has not applied the revalidation yet).
+   */
+  markPurged?(tags: string[], until: number): Promise<void>;
 }
 
 export type CacheStatus =
@@ -103,6 +124,12 @@ export interface EdgeCacheOptions {
   /** How long coalesced followers wait for the leader before rendering themselves (ms, default 10000). */
   coalesceTimeoutMs?: number;
   resolvers?: CacheDimensionResolvers;
+  /**
+   * After a purge, responses fetched within this window are not kept (default 5000 ms): upstreams such as
+   * Next.js apply `revalidateTag()` after the purge returns, so a request in between still receives old
+   * content. Needs a tag index with tombstones (Durable Object or memory).
+   */
+  purgeGraceMs?: number;
 }
 
 export interface EdgeCache {

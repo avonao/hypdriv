@@ -65,29 +65,66 @@ export function createKvTagIndex(kv: KVNamespaceLike, options: KvTagIndexOptions
     );
   };
 
-  return {
-    add(key, tags, ttl) {
-      const expiresAt = now() + Math.max(1, ttl) * 1000;
-      if (!batch) {
-        const pending = new Map<string, Map<string, number>>();
-        const current = {
-          tags: pending,
-          done: new Promise<void>((resolve) => setTimeout(resolve, batchDelayMs)).then(() => {
-            if (batch === current) batch = null;
-            return flush(pending);
-          }),
-        };
-        batch = current;
-      }
-      for (const tag of new Set(tags)) {
-        let adds = batch.tags.get(tag);
-        if (!adds) {
-          adds = new Map();
-          batch.tags.set(tag, adds);
+  const tombstoneKey = (tag: string) => `${prefix}purged:${tag}`;
+
+  /** Latest purge tombstone among the tags (epoch ms), 0 when none. */
+  const purgedUntil = async (tags: string[]): Promise<number> => {
+    const values = await Promise.all(
+      tags.map(async (tag) => {
+        try {
+          const raw = await kv.get(tombstoneKey(tag), 'text');
+          const n = typeof raw === 'string' ? Number(raw) : Number.NaN;
+          return Number.isFinite(n) ? n : 0;
+        } catch {
+          return 0;
         }
-        adds.set(key, expiresAt);
+      }),
+    );
+    return Math.max(0, ...values);
+  };
+
+  const enqueue = (key: string, tags: string[], ttl: number): Promise<void> => {
+    const expiresAt = now() + Math.max(1, ttl) * 1000;
+    if (!batch) {
+      const pending = new Map<string, Map<string, number>>();
+      const current = {
+        tags: pending,
+        done: new Promise<void>((resolve) => setTimeout(resolve, batchDelayMs)).then(() => {
+          if (batch === current) batch = null;
+          return flush(pending);
+        }),
+      };
+      batch = current;
+    }
+    for (const tag of new Set(tags)) {
+      let adds = batch.tags.get(tag);
+      if (!adds) {
+        adds = new Map();
+        batch.tags.set(tag, adds);
       }
-      return batch.done;
+      adds.set(key, expiresAt);
+    }
+    return batch.done;
+  };
+
+  return {
+    async add(key, tags, ttl, addOptions = {}) {
+      // Tombstones are read through KV's colo cache: exact in the colo that purged, eventually elsewhere.
+      if (
+        addOptions.fetchedAt !== undefined &&
+        (await purgedUntil([...new Set(tags)])) >= addOptions.fetchedAt
+      )
+        return { stale: true };
+      await enqueue(key, tags, ttl);
+    },
+    async markPurged(tags, until) {
+      await Promise.allSettled(
+        [...new Set(tags)].map((tag) =>
+          kv.put(tombstoneKey(tag), String(until), {
+            expiration: Math.ceil(Math.max(until + 3_600_000, now() + 120_000) / 1000),
+          }),
+        ),
+      );
     },
     async keysFor(tags) {
       const t = now();

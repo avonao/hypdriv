@@ -66,3 +66,7 @@ export const { register, onRequestError } = createInstrumentation();
 ## DevTools HUD
 
 `<HypDrivDevTools />` (from `hypdriv/client`) renders a floating panel in development and preview. Panels: request stages (from `Server-Timing`), Web Vitals, navigations (RSC fetches), flags, Purser diagnostics (from the bridge's dev endpoint), build info, capabilities. Toggle with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>. Nothing is injected into production HTML unless you pass `force`.
+
+## Tail Workers
+
+`createWorker()` exports a `tail` handler, so any HypDriv Worker can be the tail consumer of others (`"tail_consumers": [{ "service": "<this worker>" }]` in the producer's wrangler config). It logs the producer's exceptions (`tail exception`), `console.warn`/`console.error` lines (`tail log`) and invocations that ended abnormally without an exception — CPU, memory or wall-time limits, cancellations — as `tail outcome` with the script name and the path, cron or queue. The last kind leaves no trace in the producer's own logs.

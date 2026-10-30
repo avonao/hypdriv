@@ -1,4 +1,4 @@
-import { type Logger, loadConfig, type ResolvedConfig, silentLogger } from '@hypdriv/core';
+import { type Logger, loadConfig, queueConsumerFor, type ResolvedConfig, silentLogger } from '@hypdriv/core';
 import { signing } from '@hypdriv/security';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -10,6 +10,7 @@ import {
   forwardTail,
   type MessageBatchLike,
   type QueueMessageLike,
+  type TailEventLike,
 } from './handlers';
 
 const SECRET = 'internal-secret-0123456789-abcdefghijklmnop';
@@ -168,6 +169,7 @@ describe('dispatchQueue', () => {
     expect(retried).toEqual(['m2']);
     expect(seen[0]).toEqual({
       job: 'emails',
+      queue: 'emails',
       messages: [
         { id: 'm1', timestamp: '2026-10-30T00:00:00.000Z', body: { to: 'a@example.com' }, attempts: 1 },
         { id: 'm2', timestamp: '2026-10-30T00:00:00.000Z', body: { to: 'b@example.com' }, attempts: 1 },
@@ -185,6 +187,37 @@ describe('dispatchQueue', () => {
     await dispatchQueue(b.batch, dispatchContext(config, failing));
     expect(b.acked).toEqual(['m1']);
     expect(b.retried).toEqual([]);
+  });
+
+  it('maps per-environment queue names to the job (exact names before wildcards)', async () => {
+    const envConfig = loadConfig({
+      jobs: {
+        queues: {
+          jobs: { path: '/api/jobs/work', queues: ['*-jobs'] },
+          dead: { path: '/api/jobs/dead', queues: ['shop-jobs-dlq', 'shop-staging-jobs-dlq'] },
+          billing: { path: '/api/jobs/billing', queues: ['shop-billing'] },
+        },
+      },
+    });
+    const paths: string[] = [];
+    const bodies: Array<{ job: string; queue: string }> = [];
+    const invoke = vi.fn(async (request: Request) => {
+      paths.push(new URL(request.url).pathname);
+      bodies.push((await request.json()) as { job: string; queue: string });
+      return Response.json({ ok: true });
+    });
+    for (const queue of ['shop-staging-jobs', 'shop-jobs', 'shop-jobs-dlq', 'shop-billing'])
+      await dispatchQueue(batchOf(queue, [1]).batch, dispatchContext(envConfig, invoke));
+    expect(paths).toEqual(['/api/jobs/work', '/api/jobs/work', '/api/jobs/dead', '/api/jobs/billing']);
+    expect(bodies.map((b) => `${b.job}<-${b.queue}`)).toEqual([
+      'jobs<-shop-staging-jobs',
+      'jobs<-shop-jobs',
+      'dead<-shop-jobs-dlq',
+      'billing<-shop-billing',
+    ]);
+    expect(queueConsumerFor(envConfig, 'shop-jobs-dlq-extra')).toBeNull();
+    expect(envConfig.jobs.queues.billing?.queues).toEqual(['shop-billing']);
+    expect(loadConfig({ jobs: { queues: { a: { path: '/a' } } } }).jobs.queues.a?.queues).toEqual(['a']);
   });
 
   it('retries batches for queues without a consumer', async () => {
@@ -268,5 +301,39 @@ describe('forwardTail', () => {
       'warn:tail log',
       'error:tail log',
     ]);
+  });
+
+  it('reports invocations that hit a limit or were cancelled without an exception', () => {
+    const { log, lines } = recordingLogger();
+    const event = (outcome: string, extra: Partial<TailEventLike> = {}): TailEventLike => ({
+      scriptName: 'shop',
+      outcome,
+      eventTimestamp: 1,
+      event: { request: { url: 'https://shop.example.com/heavy?x=1', method: 'GET' } },
+      logs: [],
+      exceptions: [],
+      ...extra,
+    });
+    forwardTail(
+      [
+        event('ok'),
+        event('exceededCpu'),
+        event('canceled', { event: { cron: '* * * * *' } }),
+        event('exception', { exceptions: [{ name: 'Error', message: 'boom', timestamp: 2 }] }),
+      ],
+      { log },
+    );
+    expect(lines.map((l) => `${l.level}:${l.message}`)).toEqual([
+      'error:tail outcome',
+      'error:tail outcome',
+      'error:tail exception',
+    ]);
+    expect(lines[0]!.fields).toMatchObject({
+      outcome: 'exceededCpu',
+      path: '/heavy',
+      host: 'shop.example.com',
+      method: 'GET',
+    });
+    expect(lines[1]!.fields).toMatchObject({ outcome: 'canceled', cron: '* * * * *' });
   });
 });

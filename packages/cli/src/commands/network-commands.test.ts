@@ -195,6 +195,8 @@ describe('vitals', () => {
     expect(sql).toContain("INTERVAL '7' DAY");
     expect(sql).toContain("index1 = '/blog/[slug]\\''");
     expect(sql).toContain('GROUP BY route, metric');
+    // Spans from the Analytics Engine trace exporter may share the dataset; they never count as vitals.
+    expect(sql).toContain("blob1 IN ('LCP', 'INP', 'CLS', 'FCP', 'TTFB')");
     expect(() => vitalsSql('bad name;', { days: 1 })).toThrow();
     expect(rateVital('LCP', 2400)).toBe('good');
     expect(rateVital('INP', 300)).toBe('needs-improvement');

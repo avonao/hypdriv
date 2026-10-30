@@ -31,6 +31,45 @@ export default createWorker({
 
 `opennextjs-cloudflare build | preview | deploy` keep working unchanged: the build still writes `.open-next/worker.js`; wrangler bundles `hypdriv.worker.ts` and everything it imports.
 
+## OpenNext's cache setup
+
+OpenNext's defaults for the revalidation queue, the tag cache and cache purges are no-ops: without them, time-based ISR never regenerates a page and `revalidateTag()` / `revalidatePath()` change nothing on Cloudflare. The examples and the `create-hypdriv` templates ship the full setup; `hypdriv doctor` (`opennext.cache`) checks that each override has its binding and that the Worker entry exports its Durable Object.
+
+```ts
+// open-next.config.ts
+import { defineCloudflareConfig } from '@opennextjs/cloudflare';
+import purgeCache from '@opennextjs/cloudflare/overrides/cache-purge/index';
+import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
+import { withRegionalCache } from '@opennextjs/cloudflare/overrides/incremental-cache/regional-cache';
+import doQueue from '@opennextjs/cloudflare/overrides/queue/do-queue';
+import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
+
+export default defineCloudflareConfig({
+  incrementalCache: withRegionalCache(r2IncrementalCache, { mode: 'long-lived' }),
+  queue: doQueue,
+  tagCache: doShardedTagCache({ baseShardSize: 12 }),
+  cachePurge: purgeCache({ type: 'durableObject' }),
+});
+```
+
+```jsonc
+// wrangler.jsonc (additions)
+"r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "<app>-opennext-cache" }],
+"services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "<worker name>" }],
+"durable_objects": { "bindings": [
+  { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+  { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" },
+  { "name": "NEXT_CACHE_DO_PURGE", "class_name": "BucketCachePurge" }
+] },
+"migrations": [{ "tag": "opennext-v1", "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"] }]
+```
+
+Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone → Cache Purge) as secrets on custom domains: OpenNext's `BucketCachePurge` and HypDriv's edge cache both purge the zone by tag with them. On `*.workers.dev` the Cache API is a no-op, so the regional cache and HypDriv's Cache API tier only take effect on custom domains.
+
+**ISR revalidation through the Worker.** OpenNext's queue regenerates stale pages by requesting them through `WORKER_SELF_REFERENCE` with `x-prerender-revalidate: <previewModeId>`. The HypDriv Worker recognises these requests by a SHA-256 of the build's preview-mode id stored in the manifest (`manifest.revalidation`; the id itself never leaves the build output), sends them straight to Next.js — no edge cache, bot shield or rate limit in between — and, when Next.js answers `x-nextjs-cache: REVALIDATED`, purges the page's edge-cache copies by its `path:` tag. A request carrying the header with any other value runs through the Drivetrain like every other request.
+
+**Deployment ids.** Next.js 16 uses a constant `BUILD_ID` whenever `deploymentId` is set, and OpenNext keys its caches by the deployment id. HypDriv's default id is `<commit>-<build stamp>`, unique per build and per app ([ADR 0016](../adr/0016-deployment-ids-per-build.md)); never share one id between apps on the same zone (the Cache API is per zone) or between builds with different output.
+
 ## Request flow
 
 1. Static assets are served by Cloudflare before the Worker runs (unless `run_worker_first` is set).
@@ -83,7 +122,24 @@ import { jobHandler } from 'hypdriv/server';
 export const POST = jobHandler({}, async ({ job, cron, payload }) => ({ ok: true }));
 ```
 
+Queue names usually differ per environment (`shop-jobs-staging`, `shop-jobs`). Keep one logical name for `enqueue()` and list the deployed names the consumer receives batches from, `*` as a wildcard:
+
+```ts
+jobs: { queues: { jobs: { path: '/api/jobs/work', queues: ['*-jobs'] }, 'jobs-dead': { path: '/api/jobs/dead', queues: ['*-jobs-dlq'], retry: 'none' } } },
+cloudflare: { bindings: { queues: { jobs: 'JOBS' } } },   // producer binding for enqueue('jobs', …)
+```
+
+Batches report both names to the route (`{ job: 'jobs', queue: 'shop-jobs-staging', messages }`). `hypdriv doctor` (`wrangler.queues`) flags consumer queues that map to no job (their batches would be retried into the dead-letter queue), jobs without a consumer and producer bindings missing from `queues.producers`.
+
 The Worker signs internal requests with `HYPDRIV_INTERNAL_SECRET` (HMAC over timestamp, method, path and body hash, 5-minute window); `jobHandler` rejects anything else. Queue batches are posted as `{ job: '<queue>', messages: [...] }`; messages are acked or retried according to `retry` and the handler's response (`{ retry: ['id', ...] }` retries specific messages).
+
+## Tail Workers
+
+Every HypDriv Worker exports a `tail` handler. List it in another Worker's `tail_consumers` to receive that Worker's exceptions, `console.warn`/`console.error` lines and invocations that ended abnormally without an exception (`exceededCpu`, `exceededMemory`, `exceededWallTime`, `canceled`, …), logged as `tail exception`, `tail log` and `tail outcome` with the producer's script name, path or cron.
+
+## Edge-cache purges across isolates and colos
+
+`purgeEdge()`, `revalidateTag()` and `revalidatePath()` from `hypdriv/cache` delete the indexed entries in the isolate that runs them, purge the zone by tag when `CACHE_PURGE_ZONE_ID` / `CACHE_PURGE_API_TOKEN` are set (Cache API copies are stored with `Cache-Tag`, so every colo drops them), record purge tombstones in the tag index so a response requested before the purge is never stored afterwards, and purge once more two seconds later, after Next.js has applied the revalidation. Other isolates re-read the shared tiers within `cache.edge.memoryTtl` (default `10s`). Details: [ADR 0017](../adr/0017-purge-consistency.md).
 
 ## Limits that matter
 

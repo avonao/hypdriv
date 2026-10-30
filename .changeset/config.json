@@ -1,11 +1,16 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.3/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "avonao/hypdriv" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "avonao/hypdriv"
+    }
+  ],
   "commit": false,
   "fixed": [],
   "linked": [["hypdriv", "@hypdriv/*"]],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@hypdriv/example-*"]
+  "ignore": ["@hypdriv/example-*", "@hypdriv/e2e-*"]
 }

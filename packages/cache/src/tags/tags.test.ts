@@ -100,3 +100,30 @@ describe('kv tag index', () => {
     expect(warnings).toHaveLength(1);
   });
 });
+
+describe('purge tombstones', () => {
+  it('memory index: entries fetched before or inside the purge window are stale', async () => {
+    let now = NOW;
+    const index = createMemoryTagIndex({ now: () => now });
+    await index.markPurged!(['blog'], NOW + 5000);
+    expect(await index.add('k1', ['blog', 'home'], 60, { fetchedAt: NOW - 10 })).toEqual({ stale: true });
+    expect(await index.keysFor(['blog', 'home'])).toEqual([]);
+    expect(await index.add('k2', ['home'], 60, { fetchedAt: NOW - 10 })).toBeUndefined();
+    expect(await index.add('k3', ['blog'], 60, { fetchedAt: NOW + 5001 })).toBeUndefined();
+    expect(await index.add('k4', ['blog'], 60)).toBeUndefined();
+    expect((await index.keysFor(['blog', 'home'])).sort()).toEqual(['k2', 'k3', 'k4']);
+    // Tombstones expire after an hour.
+    now = NOW + 3_700_000;
+    expect(await index.add('k5', ['blog'], 60, { fetchedAt: NOW })).toBeUndefined();
+  });
+
+  it('kv index: tombstones are KV keys read before indexing', async () => {
+    const kv = fakeKv(() => NOW);
+    const index = createKvTagIndex(kv, { batchDelayMs: 0, now: () => NOW, prefix: 'tag:' });
+    await index.markPurged!(['blog'], NOW + 5000);
+    expect(await kv.get('tag:purged:blog', 'text')).toBe(String(NOW + 5000));
+    expect(await index.add('k1', ['blog'], 60, { fetchedAt: NOW })).toEqual({ stale: true });
+    expect(await index.add('k2', ['blog'], 60, { fetchedAt: NOW + 6000 })).toBeUndefined();
+    expect(await index.keysFor(['blog'])).toEqual(['k2']);
+  });
+});

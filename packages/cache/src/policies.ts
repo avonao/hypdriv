@@ -190,14 +190,33 @@ export function cacheControlFor(
   return parts.join(', ');
 }
 
-/** Tags attached to an entry: policy tags, `route:<id>` when a route matched, and `build:<buildId>`. */
+/** Longest pathname that still gets a `path:` tag (Cloudflare caps a single cache tag at 1,024 bytes). */
+export const MAX_PATH_TAG_LENGTH = 512;
+
+/**
+ * The per-path tag of an entry (`path:/blog/hello`): one tag for every variant of a page, so
+ * `revalidatePath()` and ISR revalidation drop them all. Trailing slashes are ignored; `null` for paths
+ * longer than {@link MAX_PATH_TAG_LENGTH}.
+ */
+export function pathTag(pathname: string): string | null {
+  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') || '/' : pathname || '/';
+  return normalized.length > MAX_PATH_TAG_LENGTH ? null : `path:${normalized}`;
+}
+
+/**
+ * Tags attached to an entry: policy tags, `route:<id>` when a route matched, `path:<pathname>` when the
+ * pathname is given, and `build:<buildId>`.
+ */
 export function effectiveTags(
   policy: ResolvedEdgeCachePolicy,
   route: RouteMatch | null,
   buildId: string,
+  pathname?: string,
 ): string[] {
   const tags = new Set<string>(policy.tags);
   if (route) tags.add(`route:${route.route.id}`);
+  const path = pathname === undefined ? null : pathTag(pathname);
+  if (path) tags.add(path);
   tags.add(`build:${buildId}`);
   return [...tags];
 }

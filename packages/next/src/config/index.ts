@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -104,30 +105,81 @@ export function resolveImageLoaderPath(): string | null {
   }
 }
 
-/** Deployment id for skew protection: an explicit env, a CI commit SHA, or the git HEAD; null when unknown. */
-export function defaultDeploymentId(projectDir: string): string | null {
+/** Environment variable that carries one build's deployment id to every process of that build. */
+export const BUILD_DEPLOYMENT_ID_ENV = '__HYPDRIV_BUILD_DEPLOYMENT_ID';
+
+const DEPLOYMENT_ID_CHARS = /[^a-zA-Z0-9_-]+/g;
+
+/** Next.js accepts letters, digits, `-` and `_` in `deploymentId`; HypDriv caps the length at 64. */
+export function sanitizeDeploymentId(id: string): string {
+  return id
+    .replace(DEPLOYMENT_ID_CHARS, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+/** The commit a build comes from: a CI commit SHA or the git HEAD (10 hex characters); null outside both. */
+export function buildCommit(projectDir: string): string | null {
   const env = process.env;
   const fromEnv =
-    env.HYPDRIV_DEPLOYMENT_ID ??
     env.WORKERS_CI_COMMIT_SHA ??
     env.CF_PAGES_COMMIT_SHA ??
     env.GITHUB_SHA ??
     env.VERCEL_GIT_COMMIT_SHA ??
     env.CI_COMMIT_SHA ??
     env.COMMIT_SHA;
-  if (fromEnv) return fromEnv.slice(0, 12);
+  if (fromEnv) return sanitizeDeploymentId(fromEnv).slice(0, 10) || null;
   try {
     return (
-      execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+      execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], {
         cwd: projectDir,
         stdio: ['ignore', 'pipe', 'ignore'],
       })
         .toString()
-        .trim() || null
+        .trim()
+        .slice(0, 10) || null
     );
   } catch {
     return null;
   }
+}
+
+export interface DeploymentIdOptions {
+  now?: () => number;
+  /** Four characters of randomness (base 36). */
+  random?: () => string;
+}
+
+/**
+ * Deployment id for skew protection (ADR 0016): `HYPDRIV_DEPLOYMENT_ID` verbatim when set, otherwise
+ * `<commit>-<build stamp>`, unique per build. Every process of one `next build` (config is evaluated in
+ * the main process and again in build workers) gets the same id through {@link BUILD_DEPLOYMENT_ID_ENV}.
+ *
+ * Uniqueness matters beyond skew protection: Next.js 16 sets a constant `BUILD_ID` whenever a deployment
+ * id exists, and OpenNext keys its incremental, regional and tag caches by the deployment id. Two apps built
+ * from one commit — or one commit built twice with different environment variables — must never share it,
+ * or they read each other's cached pages (the Cache API is shared by every Worker on a zone).
+ */
+export function defaultDeploymentId(projectDir: string, options: DeploymentIdOptions = {}): string {
+  const env = process.env;
+  const explicit = env.HYPDRIV_DEPLOYMENT_ID?.trim();
+  if (explicit) {
+    const id = sanitizeDeploymentId(explicit);
+    if (id) return id;
+  }
+  const scope = createHash('sha256').update(resolve(projectDir)).digest('hex').slice(0, 8);
+  const memo = env[BUILD_DEPLOYMENT_ID_ENV];
+  if (memo) {
+    const sep = memo.indexOf(':');
+    if (sep > 0 && memo.slice(0, sep) === scope && memo.length > sep + 1) return memo.slice(sep + 1);
+  }
+  const now = options.now ?? Date.now;
+  const random =
+    options.random ?? (() => randomBytes(4).readUInt32BE(0).toString(36).padStart(4, '0').slice(-4));
+  const stamp = `${Math.floor(now() / 1000).toString(36)}${random()}`;
+  const id = `${buildCommit(projectDir) ?? 'build'}-${stamp}`;
+  env[BUILD_DEPLOYMENT_ID_ENV] = `${scope}:${id}`;
+  return id;
 }
 
 async function resolveHypDrivConfig(

@@ -8,7 +8,7 @@ import {
 } from '@hypdriv/core';
 import { describe, expect, it } from 'vitest';
 import { makeCtx, makeManifest, makeRoute } from './__fixtures__/fakes';
-import { createEdgeCache } from './stage';
+import { createEdgeCache, DEFAULT_PURGE_GRACE_MS } from './stage';
 import { CACHE_DECISION_KEY, UPSTREAM_KEY } from './state';
 import { createMemoryStore } from './stores/memory';
 import { createMemoryTagIndex } from './tags/memory';
@@ -180,8 +180,12 @@ describe('edge-cache stage: miss, hit, stale', () => {
     expect(miss.decision).toMatchObject({ status: 'MISS', reason: 'store', key: expect.any(String) });
     expect(miss.response.headers.get('x-hypdriv-cache')).toBe('MISS');
     expect(miss.response.headers.get('x-hypdriv-cache-key')).toHaveLength(16);
-    expect(miss.response.headers.get('cache-tag')).toBe('route:app:/blog/[slug],build:build-1');
-    expect(miss.response.headers.get('surrogate-key')).toBe('route:app:/blog/[slug] build:build-1');
+    expect(miss.response.headers.get('cache-tag')).toBe(
+      'route:app:/blog/[slug],path:/blog/hello,build:build-1',
+    );
+    expect(miss.response.headers.get('surrogate-key')).toBe(
+      'route:app:/blog/[slug] path:/blog/hello build:build-1',
+    );
     expect(miss.response.headers.get('cache-control')).toBe(
       'public, max-age=0, s-maxage=60, stale-while-revalidate=120, stale-if-error=300',
     );
@@ -194,13 +198,15 @@ describe('edge-cache stage: miss, hit, stale', () => {
       status: 'HIT',
       reason: 'fresh',
       age: 0,
-      tags: ['route:app:/blog/[slug]', 'build:build-1'],
+      tags: ['route:app:/blog/[slug]', 'path:/blog/hello', 'build:build-1'],
     });
     expect(hit.shortCircuitedBy).toBe('edge-cache');
     expect(hit.response.headers.get('x-hypdriv-cache')).toBe('HIT');
     expect(hit.response.headers.get('age')).toBe('0');
     expect(hit.response.headers.get('content-type')).toBe('text/html');
-    expect(hit.response.headers.get('cache-tag')).toBe('route:app:/blog/[slug],build:build-1');
+    expect(hit.response.headers.get('cache-tag')).toBe(
+      'route:app:/blog/[slug],path:/blog/hello,build:build-1',
+    );
     expect(await text(hit.response)).toBe('body:0');
     expect(h.upstreamCalls).toHaveLength(1);
     expect(hit.ctx.timings.list()).toContainEqual({ name: 'cache', desc: 'HIT' });
@@ -731,6 +737,33 @@ describe('edge-cache purge', () => {
     expect(await h.edgeCache.purgeTags([])).toBe(0);
   });
 
+  it('drops a response fetched before a purge of its tags (purge tombstones)', async () => {
+    let clock = NOW;
+    const tagIndex = createMemoryTagIndex({ now: () => clock });
+    const h = harness({ tagIndex });
+    const advance = (ms: number) => {
+      clock += ms;
+      h.advance(ms);
+    };
+    // In flight: the response is out, the store write (waitUntil) has not run yet.
+    const inFlight = await h.request('https://x.test/search');
+    expect(inFlight.decision.status).toBe('MISS');
+    await h.edgeCache.purgeTags(['search']);
+    await inFlight.flush();
+    expect((await h.request('https://x.test/search')).decision.status).toBe('MISS');
+
+    // Within the grace window an upstream may still answer with pre-revalidation content: not kept.
+    const early = await h.request('https://x.test/search?q=1');
+    await early.flush();
+    expect((await h.request('https://x.test/search?q=1')).decision.status).toBe('MISS');
+
+    // After the window, responses are cached again.
+    advance(DEFAULT_PURGE_GRACE_MS + 1);
+    const later = await h.request('https://x.test/search?q=2');
+    await later.flush();
+    expect((await h.request('https://x.test/search?q=2')).decision.status).toBe('HIT');
+  });
+
   it('purges URLs by rebuilding the base key, resolving relative paths against the learned origin', async () => {
     const { calls, purger } = recordingPurger();
     const h = harness({ purger });
@@ -741,9 +774,33 @@ describe('edge-cache purge', () => {
     );
     expect(calls).toEqual([
       { kind: 'urls', values: ['https://x.test/blog/a', 'https://x.test/search', 'https://x.test/account'] },
+      // Every variant and every colo's copy: the path tags (stored as Cache-Tag by the Cache API store).
+      { kind: 'tags', values: ['path:/blog/a', 'path:/search', 'path:/account'] },
     ]);
     expect((await h.request('https://x.test/blog/a')).decision.status).toBe('MISS');
     expect((await h.request('https://x.test/search')).decision.status).toBe('MISS');
+  });
+
+  it('purgeUrls drops every variant of the path through the path tag', async () => {
+    const { purger } = recordingPurger();
+    const h = harness({
+      tagIndex: createMemoryTagIndex(),
+      purger,
+      config: {
+        cache: { edge: { policies: [{ match: '/**', ttl: 60, vary: { headers: ['accept-language'] } }] } },
+      },
+    });
+    for (const lang of ['en-US', 'de-DE', 'fr-FR'])
+      await (await h.request('https://x.test/docs', { headers: { 'accept-language': lang } })).flush();
+    expect(
+      (await h.request('https://x.test/docs', { headers: { 'accept-language': 'de-DE' } })).decision.status,
+    ).toBe('HIT');
+    // The base key (no accept-language) plus the three indexed variants.
+    expect(await h.edgeCache.purgeUrls(['https://x.test/docs'])).toBe(4);
+    for (const lang of ['en-US', 'de-DE', 'fr-FR'])
+      expect(
+        (await h.request('https://x.test/docs', { headers: { 'accept-language': lang } })).decision.status,
+      ).toBe('MISS');
   });
 
   it('purgeUrls works without any request when config and manifest are given', async () => {

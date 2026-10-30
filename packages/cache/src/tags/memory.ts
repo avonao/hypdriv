@@ -20,6 +20,8 @@ export function createMemoryTagIndex(options: MemoryTagIndexOptions = {}): Memor
   const now = options.now ?? (() => Date.now());
   const byTag = new Map<string, Map<string, number>>();
   const byKey = new Map<string, Set<string>>();
+  /** tag → purged-until (epoch ms). */
+  const purged = new Map<string, number>();
 
   const unlink = (tag: string, key: string) => {
     const keys = byTag.get(tag);
@@ -41,9 +43,19 @@ export function createMemoryTagIndex(options: MemoryTagIndexOptions = {}): Memor
     clear() {
       byTag.clear();
       byKey.clear();
+      purged.clear();
     },
-    async add(key, tags, ttl) {
-      const expiresAt = now() + Math.max(1, ttl) * 1000;
+    async add(key, tags, ttl, options = {}) {
+      const t = now();
+      if (options.fetchedAt !== undefined) {
+        for (const tag of tags) {
+          const until = purged.get(tag);
+          if (until === undefined) continue;
+          if (until < t - 3_600_000) purged.delete(tag);
+          else if (options.fetchedAt <= until) return { stale: true };
+        }
+      }
+      const expiresAt = t + Math.max(1, ttl) * 1000;
       for (const tag of new Set(tags)) {
         let keys = byTag.get(tag);
         if (!keys) {
@@ -97,6 +109,10 @@ export function createMemoryTagIndex(options: MemoryTagIndexOptions = {}): Memor
         if (!keys) continue;
         for (const key of [...keys.keys()]) unlink(tag, key);
       }
+    },
+    async markPurged(tags, until) {
+      for (const tag of tags) purged.set(tag, Math.max(purged.get(tag) ?? 0, until));
+      while (purged.size > maxTags) purged.delete(purged.keys().next().value as string);
     },
   };
 }

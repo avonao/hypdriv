@@ -6,6 +6,11 @@ export interface MemoryStoreOptions {
   maxEntries?: number;
   /** Approximate max bytes of bodies plus headers (default 64 MB). */
   maxBytes?: number;
+  /**
+   * Upper bound, in seconds, on how long an entry is served from this isolate's memory. Set when the memory
+   * store fronts shared tiers: a purge in another isolate becomes visible here within this window.
+   */
+  maxAgeSeconds?: number;
   /** Clock in epoch ms (tests). */
   now?: () => number;
 }
@@ -96,7 +101,10 @@ export function createMemoryStore(options: MemoryStoreOptions = {}): MemoryCache
         headers: [...headers.entries()],
         body: body.byteLength ? body : null,
         bytes: body.byteLength + headersSize(headers) + 256,
-        expiresAt: entry.meta.storedAt + lifetime * 1000,
+        expiresAt:
+          options.maxAgeSeconds !== undefined && options.maxAgeSeconds > 0
+            ? Math.min(entry.meta.storedAt + lifetime * 1000, now() + options.maxAgeSeconds * 1000)
+            : entry.meta.storedAt + lifetime * 1000,
       };
       remove(key);
       slots.set(key, slot);

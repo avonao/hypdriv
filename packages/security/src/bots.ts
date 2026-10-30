@@ -264,26 +264,25 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
     });
   };
 
-  const challengeResponse = (): Response => {
+  const challengeResponse = (ctx: HypContext): Response => {
     const turnstile = bots?.turnstile;
-    if (!turnstile)
+    const siteKey =
+      turnstile?.siteKey ?? (turnstile?.siteKeyEnv ? readEnv(ctx.env, turnstile.siteKeyEnv) : undefined);
+    if (!turnstile || !siteKey)
       return json(
         { error: 'forbidden', reason: 'challenge-unavailable' },
         { status: 403, headers: { [HEADER.bot]: 'challenge' } },
       );
     const nonce = createNonce();
-    return html(
-      turnstileChallengePage({ siteKey: turnstile.siteKey, nonce, action: turnstile.action, resubmitHeader }),
-      {
-        status: 403,
-        headers: {
-          'cache-control': 'no-store',
-          'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'`,
-          [HEADER.bot]: 'challenge',
-          vary: 'cookie',
-        },
+    return html(turnstileChallengePage({ siteKey, nonce, action: turnstile.action, resubmitHeader }), {
+      status: 403,
+      headers: {
+        'cache-control': 'no-store',
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'`,
+        [HEADER.bot]: 'challenge',
+        vary: 'cookie',
       },
-    );
+    });
   };
 
   return defineStage({
@@ -371,7 +370,7 @@ export function botsStage(config: ResolvedConfig, options: BotsStageOptions = {}
             return;
           }
           ctx.log.info('bot challenged', fields);
-          return challengeResponse();
+          return challengeResponse(ctx);
         }
         default:
           return;

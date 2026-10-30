@@ -14,6 +14,7 @@ import {
   workerName,
 } from './scaffold';
 import {
+  excluded,
   NAME,
   parseCatalog,
   syncTemplates,
@@ -57,6 +58,26 @@ describe('template sync', () => {
     expect(manifest.templates.vercel).toContain('vercel.json');
     expect(manifest.templates.vercel).not.toContain('wrangler.jsonc');
     expect(manifest.templates['vercel-purser']).toContain('lib/tokens.ts');
+    for (const files of Object.values(manifest.templates))
+      expect(files.filter((f) => /\.local\.|^\.dev\.vars\./.test(f) && f !== '.dev.vars.example')).toEqual(
+        [],
+      );
+  });
+
+  it('never copies account-specific configurations or local env files', () => {
+    for (const file of [
+      'wrangler.avonao-hypdriv-dev.local.jsonc',
+      'wrangler.prod.local.json',
+      'wrangler.staging.local.toml',
+      '.env.local',
+      '.env.production.local',
+      '.dev.vars',
+      '.dev.vars.production',
+      '.hypdriv/manifest.json',
+    ])
+      expect(excluded(file)).toBe(true);
+    for (const file of ['wrangler.jsonc', '.dev.vars.example', '.env.example', 'app/page.tsx'])
+      expect(excluded(file)).toBe(false);
   });
 
   it('pins catalog and workspace versions and drops the source condition', () => {

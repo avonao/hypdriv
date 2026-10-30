@@ -1,4 +1,4 @@
-import { type HypDrivEnv, type Logger, type ResolvedConfig, readEnv } from '@hypdriv/core';
+import { type HypDrivEnv, type Logger, queueConsumerFor, type ResolvedConfig, readEnv } from '@hypdriv/core';
 import { signing } from '@hypdriv/security';
 
 export type Invoke = (request: Request) => Promise<Response>;
@@ -133,8 +133,8 @@ export interface MessageBatchLike<Body = unknown> {
 
 /** Dispatches a queue batch to its consumer route; the route decides which messages to retry. */
 export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContext): Promise<void> {
-  const consumer = ctx.config.jobs.queues[batch.queue];
-  if (!consumer) {
+  const resolved = queueConsumerFor(ctx.config, batch.queue);
+  if (!resolved) {
     ctx.log.error('queue batch has no configured consumer', {
       queue: batch.queue,
       size: batch.messages.length,
@@ -142,8 +142,10 @@ export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContex
     batch.retryAll();
     return;
   }
+  const { name: job, consumer } = resolved;
   const payload = {
-    job: batch.queue,
+    job,
+    queue: batch.queue,
     messages: batch.messages.map((m) => ({
       id: m.id,
       timestamp: m.timestamp.toISOString(),
@@ -152,7 +154,7 @@ export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContex
     })),
   };
   try {
-    const request = await internalRequest(ctx, consumer.path, payload, { job: batch.queue });
+    const request = await internalRequest(ctx, consumer.path, payload, { job });
     const res = await ctx.invoke(request);
     if (!res.ok) throw new Error(`consumer responded ${res.status}`);
     let retry = new Set<string>();
@@ -167,12 +169,13 @@ export async function dispatchQueue(batch: MessageBatchLike, ctx: DispatchContex
       else m.ack();
     }
     ctx.log.info('queue batch processed', {
+      job,
       queue: batch.queue,
       size: batch.messages.length,
       retried: retry.size,
     });
   } catch (err) {
-    ctx.log.error('queue batch failed', { queue: batch.queue, error: (err as Error).message });
+    ctx.log.error('queue batch failed', { job, queue: batch.queue, error: (err as Error).message });
     if (consumer.retry === 'none') batch.ackAll();
     else batch.retryAll();
   }
@@ -228,9 +231,52 @@ export interface TailEventLike {
   exceptions: Array<{ name: string; message: string; timestamp: number }>;
 }
 
-/** Forwards tail events (from a tail consumer Worker) to structured logs. */
+/** Tail outcomes that mean the invocation did not complete normally. */
+const FAILED_OUTCOMES = new Set([
+  'exception',
+  'exceededCpu',
+  'exceededMemory',
+  'exceededWallTime',
+  'scriptNotFound',
+  'canceled',
+  'responseStreamDisconnected',
+  'loadSheddingError',
+  'killSwitch',
+  'daemonDown',
+  'unknown',
+]);
+
+function eventTarget(event: unknown): Record<string, string> {
+  const e = event as {
+    request?: { url?: unknown; method?: unknown };
+    cron?: unknown;
+    queue?: unknown;
+  } | null;
+  const out: Record<string, string> = {};
+  if (e?.request && typeof e.request.url === 'string') {
+    try {
+      const url = new URL(e.request.url);
+      out.path = url.pathname;
+      out.host = url.host;
+    } catch {
+      // not a URL
+    }
+    if (typeof e.request.method === 'string') out.method = e.request.method;
+  }
+  if (typeof e?.cron === 'string') out.cron = e.cron;
+  if (typeof e?.queue === 'string') out.queue = e.queue;
+  return out;
+}
+
+/**
+ * Forwards tail events (from a tail consumer Worker) to structured logs: exceptions, `warn`/`error`
+ * console lines, and invocations that ended abnormally without an exception (CPU, memory or wall-time
+ * limits, cancellations), which otherwise leave no trace in the producer's own logs.
+ */
 export function forwardTail(events: TailEventLike[], ctx: Pick<DispatchContext, 'log'>): void {
   for (const e of events) {
+    if (FAILED_OUTCOMES.has(e.outcome) && !e.exceptions.length)
+      ctx.log.error('tail outcome', { script: e.scriptName, outcome: e.outcome, ...eventTarget(e.event) });
     for (const ex of e.exceptions)
       ctx.log.error('tail exception', {
         script: e.scriptName,

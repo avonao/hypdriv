@@ -281,6 +281,27 @@ describe('botsStage', () => {
     expect(await response.json()).toEqual({ error: 'forbidden', reason: 'challenge-unavailable' });
   });
 
+  it('reads the Turnstile site key from the environment when configured per deployment', async () => {
+    const config = resolveConfig({
+      security: { bots: { likelyAutomated: 'challenge', turnstile: { siteKeyEnv: 'MY_SITE_KEY' } } },
+    });
+    expect(config.security.bots?.turnstile).toMatchObject({ siteKey: null, siteKeyEnv: 'MY_SITE_KEY' });
+    const headers = { 'user-agent': CHROME };
+    const withKey = await runStage(
+      botsStage(config),
+      makeCtx({ config, headers, env: { MY_SITE_KEY: '0x4AAAAenv' } }),
+      () => new Response('ok'),
+    );
+    expect(withKey.response.status).toBe(403);
+    expect(await withKey.response.text()).toContain('data-sitekey="0x4AAAAenv"');
+    const missing = await runStage(botsStage(config), makeCtx({ config, headers }), () => new Response('ok'));
+    expect(await missing.response.json()).toEqual({ error: 'forbidden', reason: 'challenge-unavailable' });
+    // Default variable when neither is set inline.
+    expect(
+      resolveConfig({ security: { bots: { turnstile: {} } } }).security.bots?.turnstile?.siteKeyEnv,
+    ).toBe('TURNSTILE_SITE_KEY');
+  });
+
   it('is a no-op when bots are disabled', async () => {
     const config = resolveConfig({ security: { bots: false } });
     const ctx = makeCtx({ config, headers: { 'user-agent': 'curl/8', accept: 'text/html' } });

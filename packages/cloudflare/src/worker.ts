@@ -1,6 +1,7 @@
 import { createKvTagIndex, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
 import {
   assertManifest,
+  cacheVersion,
   clientIp,
   createContext,
   detectCapabilities,
@@ -38,6 +39,7 @@ import {
   type TailEventLike,
 } from './handlers';
 import { internalRoutes } from './internal-routes';
+import { isRevalidationRequest, revalidatedTags, wasRevalidated } from './revalidation';
 import { createDoCounterStore, createDoTagIndex } from './stores';
 
 export interface NextWorkerModule {
@@ -160,7 +162,8 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
       ...(options.devState ? { devState: options.devState } : {}),
     });
     platform.log.info('hypdriv worker ready', {
-      build: manifest.buildId,
+      build: cacheVersion(manifest),
+      deployment: manifest.deploymentId ?? null,
       routes: manifest.routes.length,
       stages: stages.map((s) => s.name),
     });
@@ -248,6 +251,34 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
       ip,
       log: platform.log,
     });
+
+    // Next.js's own ISR revalidation (OpenNext's queue → WORKER_SELF_REFERENCE): straight to Next.js, then
+    // drop the edge cache's stale copies of the page so the next visitor gets the regenerated one.
+    if (await isRevalidationRequest(request, platform.manifest)) {
+      const started = Date.now();
+      const response = await runWithHypContext(ctx, () => invokeNext(request, env, exec));
+      const revalidated = wasRevalidated(response);
+      if (revalidated && platform.edgeCache) {
+        const tags = revalidatedTags(url.pathname);
+        if (tags.length)
+          exec.waitUntil(
+            platform.edgeCache.purgeTags(tags).catch((err: unknown) => {
+              platform.log.warn('isr revalidation: edge purge failed', {
+                path: url.pathname,
+                error: (err as Error)?.message,
+              });
+            }),
+          );
+      }
+      platform.log.info('isr revalidation', {
+        path: url.pathname,
+        status: response.status,
+        revalidated,
+        ms: Date.now() - started,
+      });
+      return response;
+    }
+
     ctx.route = platform.matcher.match(url.pathname);
     ctx.requestHeaders.set(HEADER.runner, 'worker');
     ctx.requestHeaders.set('x-hypdriv-pathname', url.pathname);

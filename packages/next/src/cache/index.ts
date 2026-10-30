@@ -1,4 +1,4 @@
-import { getEdgePurger } from '@hypdriv/cache';
+import { getEdgePurger, pathTag } from '@hypdriv/cache';
 import { getCurrentContext, readEnv } from '@hypdriv/core';
 
 export { type EdgePurger, getEdgePurger, registerEdgePurger } from '@hypdriv/cache';
@@ -37,6 +37,22 @@ export async function purgeEdge(options: {
   return { edge, zone };
 }
 
+/**
+ * Next.js applies `revalidateTag()` / `revalidatePath()` after the Route Handler or Server Action returns
+ * (pending revalidations run in `waitUntil`), so a request between the first edge purge and that commit can
+ * re-cache the old page. The edge cache purges again after this delay; with a Durable Object tag index the
+ * purge tombstones already cover the window (`purgeGraceMs`), elsewhere the second purge does.
+ */
+export const REPURGE_DELAY_MS = 2000;
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function purgeTwice(options: { tags?: string[]; urls?: string[] }): Promise<void> {
+  await purgeEdge(options);
+  await delay(REPURGE_DELAY_MS);
+  await purgeEdge(options);
+}
+
 function schedule(task: Promise<unknown>): void {
   const ctx = getCurrentContext();
   if (ctx) ctx.waitUntil(task);
@@ -53,24 +69,29 @@ async function nextCache(): Promise<NextCache> {
 }
 
 /**
- * `revalidateTag` from `next/cache` followed by an edge purge of the same tag, so HypDriv's edge
- * cache and Next's data cache stay in sync. Accepts Next 16's cache-life profile argument.
+ * `revalidateTag` from `next/cache` followed by an edge purge of the same tag (repeated once Next has
+ * applied the revalidation, see `REPURGE_DELAY_MS`), so HypDriv's edge cache and Next's data cache stay in
+ * sync. Accepts Next 16's cache-life profile argument.
  */
 export async function revalidateTag(tag: string, profile?: unknown): Promise<void> {
   const cache = await nextCache();
   await (profile === undefined ? cache.revalidateTag(tag) : cache.revalidateTag(tag, profile));
-  schedule(purgeEdge({ tags: [tag] }));
+  schedule(purgeTwice({ tags: [tag] }));
 }
 
-/** `revalidatePath` from `next/cache` followed by an edge purge of the path and its route tag. */
+/**
+ * `revalidatePath` from `next/cache` followed by an edge purge of the page: its `path:` tag (every cached
+ * variant), its route tag and its URL.
+ */
 export async function revalidatePath(path: string, type?: 'page' | 'layout'): Promise<void> {
   const cache = await nextCache();
   await cache.revalidatePath(path, type);
   const ctx = getCurrentContext();
   const origin = ctx?.url.origin;
+  const byPath = pathTag(path);
   schedule(
-    purgeEdge({
-      tags: [`route:app:${path}`, `path:${path}`],
+    purgeTwice({
+      tags: [`route:app:${path}`, ...(byPath ? [byPath] : [])],
       ...(origin ? { urls: [`${origin}${path}`] } : {}),
     }),
   );

@@ -1,4 +1,11 @@
-import { describeCapabilities, HYPDRIV_VERSION, type HypDrivEnv, json, readEnv } from '@hypdriv/core';
+import {
+  cacheVersion,
+  describeCapabilities,
+  HYPDRIV_VERSION,
+  type HypDrivEnv,
+  json,
+  readEnv,
+} from '@hypdriv/core';
 import { createLiveHandler } from '@hypdriv/live';
 import { analyticsEngineVitalsSink, logVitalsSink, vitalsHandler } from '@hypdriv/observe';
 import { type CspReport, cspReportHandler } from '@hypdriv/security';
@@ -82,7 +89,8 @@ export function internalRoutes(
           ok: true,
           service: platform.config.site.name,
           hypdriv: HYPDRIV_VERSION,
-          build: platform.manifest.buildId,
+          build: cacheVersion(platform.manifest),
+          deployment: platform.manifest.deploymentId ?? null,
           next: platform.manifest.nextVersion,
           routes: platform.manifest.routes.length,
           capabilities: describeCapabilities(platform.capabilities),
@@ -112,7 +120,9 @@ export function internalRoutes(
           {
             runner: platform.runner,
             development: platform.development,
-            build: platform.manifest.buildId,
+            build: cacheVersion(platform.manifest),
+            deployment: platform.manifest.deploymentId ?? null,
+            nextBuildId: platform.manifest.buildId,
             next: platform.manifest.nextVersion,
             hypdriv: HYPDRIV_VERSION,
             capabilities: platform.capabilities,

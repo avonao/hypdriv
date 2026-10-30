@@ -2,6 +2,7 @@ import { type CacheLike, type CacheStorageLike, HypDrivError } from '@hypdriv/co
 import { CACHE_KEY_ORIGIN, cacheKeyUrl } from '../keys';
 import type { CacheStore } from '../types';
 import {
+  cacheTagHeader,
   decodeMeta,
   encodeMeta,
   isNullBodyStatus,
@@ -25,7 +26,8 @@ export interface CacheApiStoreOptions {
  * Workers Cache API store (`caches.default`, per colo, zero configuration). Metadata travels in the
  * `x-hypdriv-meta` header; the stored copy carries `cache-control: public, s-maxage=<lifetime>` so
  * workerd keeps it for the whole fresh + stale window, and the origin's caching headers are restored
- * on read. `set-cookie` is never stored.
+ * on read. The entry's tags are stored as `Cache-Tag`, so zone purges by tag reach every colo.
+ * `set-cookie` is never stored.
  */
 export function createCacheApiStore(options: CacheApiStoreOptions = {}): CacheStore {
   const keyOrigin = options.keyOrigin ?? CACHE_KEY_ORIGIN;
@@ -50,6 +52,8 @@ export function createCacheApiStore(options: CacheApiStoreOptions = {}): CacheSt
       headers.delete(META_HEADER);
       headers.delete('cache-control');
       headers.delete('expires');
+      // Index for zone purge-by-tag only; the stage emits the client-facing tags itself.
+      headers.delete('cache-tag');
       const originCc = headers.get(ORIGIN_CACHE_CONTROL_HEADER);
       const originExpires = headers.get(ORIGIN_EXPIRES_HEADER);
       headers.delete(ORIGIN_CACHE_CONTROL_HEADER);
@@ -81,6 +85,11 @@ export function createCacheApiStore(options: CacheApiStoreOptions = {}): CacheSt
       headers.delete('pragma');
       if (headers.get('vary')?.trim() === '*') headers.delete('vary');
       headers.set('cache-control', `public, s-maxage=${lifetime}`);
+      // Cloudflare indexes `Cache-Tag` on `cache.put()`: a zone purge by tag (the purger configured with
+      // CACHE_PURGE_ZONE_ID / CACHE_PURGE_API_TOKEN) then drops this copy in every data centre, not only
+      // in the one where the purge ran.
+      const tags = cacheTagHeader(entry.meta.tags);
+      if (tags) headers.set('cache-tag', tags);
       headers.set(META_HEADER, encodeMeta({ ...entry.meta, key }));
       const status = entry.response.status;
       const stored = new Response(isNullBodyStatus(status) ? null : entry.response.body, {

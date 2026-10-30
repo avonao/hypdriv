@@ -1,4 +1,5 @@
 import {
+  cacheVersion,
   defineStage,
   HEADER,
   isHtmlLike,
@@ -43,7 +44,8 @@ export function skewStage(config: ResolvedConfig): Stage | null {
         return response;
       const headers = new Headers(response.headers);
       headers.set(HEADER.deploymentId, current);
-      headers.set('x-hypdriv-build', ctx.manifest.buildId);
+      // Next's BUILD_ID is a constant whenever a deployment id exists; the content fingerprint identifies the build.
+      headers.set('x-hypdriv-build', cacheVersion(ctx.manifest));
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

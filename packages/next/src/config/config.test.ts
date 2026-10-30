@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { silentLogger } from '@hypdriv/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { defaultDeploymentId, PHASE, withHypDriv } from './index';
+import { BUILD_DEPLOYMENT_ID_ENV, defaultDeploymentId, PHASE, withHypDriv } from './index';
 import { reviveConfig, serializeConfig } from './serialize';
 
 let dir: string;
@@ -267,9 +267,39 @@ describe('withHypDriv', () => {
     expect(devDiagnostics).toBe(true);
   });
 
-  it('derives a deployment id from the environment', () => {
-    process.env.HYPDRIV_DEPLOYMENT_ID = 'deploy-1234567890abc';
-    expect(defaultDeploymentId(dir)).toBe('deploy-12345');
+  it('uses HYPDRIV_DEPLOYMENT_ID verbatim (sanitised)', () => {
+    process.env.HYPDRIV_DEPLOYMENT_ID = 'release 2026.10/30#1';
+    expect(defaultDeploymentId(dir)).toBe('release-2026-10-30-1');
     delete process.env.HYPDRIV_DEPLOYMENT_ID;
+  });
+
+  it('derives a deployment id unique per build and stable across the processes of one build', () => {
+    const saved = { sha: process.env.GITHUB_SHA, memo: process.env[BUILD_DEPLOYMENT_ID_ENV] };
+    delete process.env[BUILD_DEPLOYMENT_ID_ENV];
+    process.env.GITHUB_SHA = '5808b80d95c9a1b2c3d4e5f60718293a4b5c6d7e';
+    try {
+      const first = defaultDeploymentId(dir, { now: () => 1_793_396_400_000, random: () => 'a1b2' });
+      expect(first).toBe(`5808b80d95-${Math.floor(1_793_396_400).toString(36)}a1b2`);
+      expect(first).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+      // A build worker evaluating next.config again gets the same id.
+      expect(defaultDeploymentId(dir, { now: () => 0, random: () => 'zzzz' })).toBe(first);
+      // Another app built from the same commit in the same process tree gets its own.
+      const other = defaultDeploymentId(join(dir, 'other-app'), {
+        now: () => 1_793_396_400_000,
+        random: () => 'c3d4',
+      });
+      expect(other).not.toBe(first);
+      expect(other.startsWith('5808b80d95-')).toBe(true);
+      // A new build (fresh process environment) of the same commit gets a new id.
+      delete process.env[BUILD_DEPLOYMENT_ID_ENV];
+      expect(defaultDeploymentId(dir, { now: () => 1_793_396_460_000, random: () => 'e5f6' })).not.toBe(
+        first,
+      );
+    } finally {
+      if (saved.sha === undefined) delete process.env.GITHUB_SHA;
+      else process.env.GITHUB_SHA = saved.sha;
+      if (saved.memo === undefined) delete process.env[BUILD_DEPLOYMENT_ID_ENV];
+      else process.env[BUILD_DEPLOYMENT_ID_ENV] = saved.memo;
+    }
   });
 });

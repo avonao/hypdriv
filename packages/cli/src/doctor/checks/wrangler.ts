@@ -1,4 +1,5 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { queueConsumerFor } from '@hypdriv/core';
 import { BACKUP_SUFFIX } from '../../init/plan';
 import { editWranglerJsonc } from '../../init/wrangler';
 import { atLeast, monthsBetween } from '../../semver';
@@ -273,21 +274,42 @@ export const wranglerChecks: Check[] = [
   },
   {
     id: 'wrangler.queues',
-    title: 'Queue consumers match jobs.queues',
+    title: 'Queue consumers and producers match jobs.queues',
     category: 'wrangler',
     severity: 'warn',
     run(ctx) {
-      const queues = Object.keys(ctx.config.resolved.jobs.queues);
-      if (!queues.length) return pass('No queue consumers configured.');
+      const resolved = ctx.config.resolved;
+      const jobs = Object.keys(resolved.jobs.queues);
       const cfg = ctx.project.wrangler.config;
-      if (!cfg) return skip('no wrangler config.');
-      const consumers = cfg.queues.consumers.map((c) => c.queue).filter(Boolean);
-      const missing = queues.filter((q) => !consumers.includes(q));
-      if (missing.length)
-        return warn(
-          `queues.consumers lacks ${missing.join(', ')}; add consumer entries so batches reach the job routes.`,
-        );
-      return pass(`${queues.length} queue consumer(s) declared.`);
+      if (!cfg) return jobs.length ? skip('no wrangler config.') : pass('No queue consumers configured.');
+      const consumers = cfg.queues.consumers
+        .map((c) => c.queue)
+        .filter((q): q is string => typeof q === 'string' && !!q);
+      if (!jobs.length && !consumers.length) return pass('No queue consumers configured.');
+      const problems: string[] = [];
+      const served = new Set<string>();
+      for (const queue of consumers) {
+        const match = queueConsumerFor(resolved, queue);
+        if (match) served.add(match.name);
+        else
+          problems.push(
+            `consumer queue "${queue}" maps to no jobs.queues entry: its batches are retried until they land in the dead-letter queue (add the job, or list "${queue}" in a job's \`queues\`).`,
+          );
+      }
+      for (const job of jobs)
+        if (!served.has(job))
+          problems.push(
+            `jobs.queues.${job} has no queues.consumers entry (${resolved.jobs.queues[job]!.queues.join(', ')}); batches never reach ${resolved.jobs.queues[job]!.path}.`,
+          );
+      const producers = new Set(cfg.queues.producers.map((p) => p.binding).filter(Boolean));
+      for (const [job, binding] of Object.entries(resolved.cloudflare.bindings.queues))
+        if (!producers.has(binding))
+          problems.push(
+            `cloudflare.bindings.queues.${job} → ${binding}, but no queues.producers entry binds ${binding}; enqueue("${job}") falls back to calling the consumer route inline.`,
+          );
+      if (problems.length)
+        return warn(`${problems.length} queue configuration issue(s).`, { details: problems });
+      return pass(`${jobs.length} queue job(s) consumed (${consumers.length} queue(s)).`);
     },
   },
   {

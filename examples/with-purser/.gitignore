@@ -16,3 +16,6 @@ next-env.d.ts
 # backups written by `hypdriv init`
 *.hypdriv.bak
 app/purser.css
+
+# local wrangler configurations for your own accounts (wrangler.<name>.local.jsonc)
+wrangler.*.local.json*

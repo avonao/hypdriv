@@ -64,10 +64,12 @@ Every response carries `x-hypdriv-cache` and a `cache` entry in `Server-Timing`:
 
 | Store | Scope | When |
 | --- | --- | --- |
-| memory | per isolate | Node / tests / tiny deployments |
-| Cache API | per colo | default on Workers; zero configuration |
-| KV | global, eventually consistent | with `HYPDRIV_KV`; used as the lower tier of the tiered store |
+| memory | per isolate | Node / tests / tiny deployments; in front of shared tiers it serves an entry for at most `memoryTtl` (default `10s`, `0` removes it) |
+| Cache API | per colo | default on Workers; zero configuration; copies carry `Cache-Tag` so zone purges by tag reach every colo |
+| KV | global, eventually consistent (≈60 s) | with `HYPDRIV_KV`; used as the lower tier of the tiered store |
 | tiered | memory → Cache API → KV | automatic when KV exists |
+
+Caching a dynamic page (one that reads cookies or headers) needs `respectOrigin: false` on its policy: Next.js marks such responses `private, no-store`. Pair it with a `vary` that captures what the page reads (`vary: { geo: ['country'] }` for a per-country page).
 
 ## Purging
 
@@ -79,7 +81,9 @@ await revalidatePath('/blog/hello-world');   // Next.js + edge purge of the path
 await purgeEdge({ tags: ['route:app:/'] });  // edge only
 ```
 
-How exact a tag purge is depends on the tag index: memory (per isolate), KV (`HYPDRIV_KV`) or the `HypDrivIndex` Durable Object (exact). Without an index, purges rely on TTL/SWR bounds and the zone purge API (`CACHE_PURGE_ZONE_ID` + `CACHE_PURGE_API_TOKEN`). Every entry carries the tags `route:<routeId>` and `build:<buildId>` automatically.
+How exact a tag purge is depends on the tag index: memory (per isolate), KV (`HYPDRIV_KV`) or the `HypDrivIndex` Durable Object (exact). Without an index, purges rely on TTL/SWR bounds and the zone purge API (`CACHE_PURGE_ZONE_ID` + `CACHE_PURGE_API_TOKEN`). Every entry carries the tags `route:<routeId>`, `path:<pathname>` (every variant of a page) and `build:<buildId>` automatically.
+
+A purge also records **tombstones** in the tag index: a response that was requested before the purge (or within `purgeGraceMs`, 5 s, after it, while Next.js is still applying the same revalidation) is dropped instead of cached when it arrives. `revalidateTag()` and `revalidatePath()` purge once more two seconds later. Across isolates, other isolates re-read the shared tiers within `memoryTtl`; across colos, the zone purge by tag removes the Cache API copies. See [ADR 0017](../adr/0017-purge-consistency.md).
 
 ## Warming
 

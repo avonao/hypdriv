@@ -4,6 +4,7 @@ import { environmentChecks } from './checks/environment';
 import { hypdrivChecks } from './checks/hypdriv';
 import { nextjsChecks } from './checks/nextjs';
 import { opennextChecks } from './checks/opennext';
+import { openNextCacheChecks } from './checks/opennext-cache';
 import { purserChecks } from './checks/purser';
 import { securityChecks } from './checks/security';
 import { sizeChecks } from './checks/size';
@@ -22,6 +23,7 @@ export const allChecks: Check[] = [
   ...environmentChecks,
   ...nextjsChecks,
   ...onlyOn(['cloudflare'], opennextChecks),
+  ...onlyOn(['cloudflare'], openNextCacheChecks),
   ...onlyOn(['cloudflare'], wranglerChecks),
   ...onlyOn(['vercel'], vercelChecks),
   ...onlyOn(['cloudflare'], workersCompatChecks),

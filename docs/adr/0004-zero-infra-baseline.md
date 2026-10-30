@@ -15,3 +15,4 @@ Each capability defines a _baseline_ that needs nothing beyond the Worker (memor
 - Rate limiting is approximate per colo by default and exact with the `HypDrivLimiter` Durable Object or the Rate Limiting binding.
 - Tag purge is best-effort (TTL/SWR bounded) by default and exact with a tag index.
 - Live channels fall back to polling without Durable Objects.
+- Purges across isolates, colos and in-flight requests: see [ADR 0017](0017-purge-consistency.md) (short-lived memory tier, `Cache-Tag` on Cache API copies, purge tombstones).

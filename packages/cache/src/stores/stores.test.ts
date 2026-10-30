@@ -6,7 +6,7 @@ import type { CacheEntry, CacheMeta, CacheStore } from '../types';
 import { createCacheApiStore } from './cache-api';
 import { createKvStore, decodeKvValue, encodeKvValue } from './kv';
 import { createMemoryStore } from './memory';
-import { decodeMeta, entryFreshness, META_HEADER, readBody, storableHeaders } from './meta';
+import { cacheTagHeader, decodeMeta, entryFreshness, META_HEADER, readBody, storableHeaders } from './meta';
 import { selectStore } from './select';
 import { createTieredStore } from './tiered';
 
@@ -135,6 +135,19 @@ describe('memory store', () => {
     expect(small.size).toBe(0);
   });
 
+  it('caps how long a fronting memory tier serves an entry (purges in other isolates become visible)', async () => {
+    let now = NOW;
+    const store = createMemoryStore({ maxAgeSeconds: 10, now: () => now });
+    await store.set('a', entry('a'));
+    now = NOW + 9_000;
+    const hit = await store.get('a');
+    expect(hit).not.toBeNull();
+    // The entry keeps its own age: the shared tier copy stays valid, only this isolate's copy expires.
+    expect(hit!.meta.storedAt).toBe(NOW);
+    now = NOW + 10_001;
+    expect(await store.get('a')).toBeNull();
+  });
+
   it('handles null bodies and null-body statuses', async () => {
     const store = createMemoryStore({ now: () => NOW });
     await store.set('n', entry(null, { status: 204 }, { status: 204 }));
@@ -174,6 +187,36 @@ describe('cache-api store', () => {
     expect(hit?.response.headers.get('cache-control')).toBe('max-age=30');
     expect(hit?.response.headers.get('expires')).toBe('Thu, 01 Jan 2099 00:00:00 GMT');
     expect(hit?.response.headers.get(META_HEADER)).toBeNull();
+  });
+
+  it('stores the entry tags as Cache-Tag so zone purges by tag reach every colo', async () => {
+    const cache = fakeCache();
+    const store = createCacheApiStore({ cache, keyOrigin: 'https://keys.test' });
+    await store.set(
+      'k1',
+      entry(
+        'body',
+        { headers: { 'cache-tag': 'origin-tag' } },
+        {
+          tags: [
+            'route:app:/blog/[slug]',
+            'path:/blog/a b',
+            'has,comma',
+            'Route:App:/blog/[slug]',
+            'x'.repeat(2000),
+          ],
+        },
+      ),
+    );
+    const raw = cache.entries.get(cacheKeyUrl('k1', 'https://keys.test'))!;
+    expect(raw.headers.get('cache-tag')).toBe('route:app:/blog/[slug],path:/blog/ab,hascomma');
+    const hit = await store.get('k1');
+    // The index is internal: the stage decides which tags reach clients.
+    expect(hit?.response.headers.get('cache-tag')).toBeNull();
+    expect(cacheTagHeader([])).toBeNull();
+    expect(
+      cacheTagHeader(Array.from({ length: 2000 }, (_, i) => `tag-${i}-${'y'.repeat(20)}`))!.length,
+    ).toBeLessThanOrEqual(16 * 1024);
   });
 
   it('ignores foreign entries and resolves caches.default lazily', async () => {
@@ -307,6 +350,12 @@ describe('selectStore', () => {
     expect(selectStore('auto', caps({ kv: true }), { HYPDRIV_KV: kv }, config).name).toBe(
       'tiered(memory,kv)',
     );
+    // memoryTtl: 0 removes the memory tier in front of shared stores.
+    const noMemory = resolveConfig({ cache: { edge: { memoryTtl: 0 } } });
+    expect(selectStore('auto', caps({ cacheApi: true, kv: true }), { HYPDRIV_KV: kv }, noMemory).name).toBe(
+      'tiered(cache-api,kv)',
+    );
+    expect(config.cache.edge?.memoryTtl).toBe(10);
   });
 
   it('honours explicit kinds and degrades when the capability is missing', () => {

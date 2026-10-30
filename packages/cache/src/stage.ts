@@ -27,7 +27,7 @@ import {
   withHeaders,
 } from '@hypdriv/core';
 import { buildCacheKey } from './keys';
-import { cacheControlFor, effectiveTags, matchPolicyFor, resolvePolicies } from './policies';
+import { cacheControlFor, effectiveTags, matchPolicyFor, pathTag, resolvePolicies } from './policies';
 import { CACHE_DECISION_KEY, UPSTREAM_KEY, type UpstreamFetch } from './state';
 import { entryFreshness, isNullBodyStatus, lifetimeOf, readBody, storableHeaders } from './stores/meta';
 import type {
@@ -55,7 +55,12 @@ interface Shared {
   statusText: string;
   headers: Headers;
   meta: CacheMeta;
+  /** When the response was requested from upstream (compared with purge tombstones). */
+  fetchedAt: number;
 }
+
+/** Default window after a purge in which fetched responses are not kept (see `purgeGraceMs`). */
+export const DEFAULT_PURGE_GRACE_MS = 5000;
 
 interface Deferred<T> {
   readonly promise: Promise<T>;
@@ -110,6 +115,8 @@ interface Local {
   staleAge: number;
   leader: Deferred<Shared | null> | null;
   servedErrorStale: boolean;
+  /** When the lookup missed and the request went upstream. */
+  fetchedAt: number;
 }
 
 const LOCAL_KEY = stateKey<Local>('edge-cache.local');
@@ -276,6 +283,7 @@ class EdgeCacheImpl implements EdgeCache {
   private readonly now: () => number;
   private readonly log: Logger;
   private readonly coalesceTimeoutMs: number;
+  private readonly purgeGraceMs: number;
   private readonly resolvers: CacheDimensionResolvers;
   private readonly inflight = new Map<string, Deferred<Shared | null>>();
   private readonly revalidating = new SingleFlight<void>();
@@ -293,6 +301,7 @@ class EdgeCacheImpl implements EdgeCache {
     this.now = options.now ?? (() => Date.now());
     this.log = options.log ?? silentLogger;
     this.coalesceTimeoutMs = options.coalesceTimeoutMs ?? 10_000;
+    this.purgeGraceMs = Math.max(0, options.purgeGraceMs ?? DEFAULT_PURGE_GRACE_MS);
     this.resolvers = options.resolvers ?? {};
     this.learned =
       options.config && options.manifest
@@ -339,7 +348,7 @@ class EdgeCacheImpl implements EdgeCache {
       trailingSlash: ctx.config.site.trailingSlash ?? ctx.manifest.trailingSlash,
       ignoredQuery: edge.ignoredQuery,
     });
-    const tags = effectiveTags(policy, ctx.route, ctx.manifest.buildId);
+    const tags = effectiveTags(policy, ctx.route, ctx.manifest.buildId, ctx.url.pathname);
     const local: Local = {
       edge,
       policy,
@@ -351,6 +360,7 @@ class EdgeCacheImpl implements EdgeCache {
       staleAge: 0,
       leader: null,
       servedErrorStale: false,
+      fetchedAt: this.now(),
     };
     ctx.state.set(LOCAL_KEY, local);
 
@@ -615,7 +625,14 @@ class EdgeCacheImpl implements EdgeCache {
         ctx.log.debug('edge-cache: body exceeds maxBodySize, not stored', { key: meta.key.slice(0, 16) });
         return;
       }
-      const shared: Shared = { body: buffer?.byteLength ? buffer : null, status, statusText, headers, meta };
+      const shared: Shared = {
+        body: buffer?.byteLength ? buffer : null,
+        status,
+        statusText,
+        headers,
+        meta,
+        fetchedAt: local.fetchedAt,
+      };
       local.leader?.resolve(shared);
       await this.writeEntry(shared);
     } catch (err) {
@@ -635,7 +652,18 @@ class EdgeCacheImpl implements EdgeCache {
     });
     if (this.tagIndex) {
       const indexed = shared.meta.tags.filter((t) => !t.startsWith('build:'));
-      if (indexed.length) await this.tagIndex.add(shared.meta.key, indexed, lifetimeOf(shared.meta));
+      if (!indexed.length) return;
+      const result = await this.tagIndex.add(shared.meta.key, indexed, lifetimeOf(shared.meta), {
+        fetchedAt: shared.fetchedAt,
+      });
+      if (result?.stale) {
+        // Generated before a purge of one of its tags took effect: never serve it.
+        await this.store.delete(shared.meta.key).catch(() => undefined);
+        this.log.info('edge-cache: dropped an entry fetched before a purge', {
+          key: shared.meta.key.slice(0, 16),
+          tags: indexed.slice(0, 10),
+        });
+      }
     }
   }
 
@@ -654,6 +682,7 @@ class EdgeCacheImpl implements EdgeCache {
       const headers = new Headers(forwarded.headers);
       headers.set(REVALIDATE_HEADER, '1');
       const request = new Request(forwarded.url, { method: 'GET', headers });
+      const fetchedAt = this.now();
       const response = await upstream(request);
       const verdict = cacheability({ method: 'GET', policy: local.policy }, response, local.edge);
       if (!verdict.ok) {
@@ -689,6 +718,7 @@ class EdgeCacheImpl implements EdgeCache {
         statusText: response.statusText,
         headers: storableHeaders(clientHeaders),
         meta,
+        fetchedAt,
       });
       ctx.log.debug('edge-cache: revalidated', { key: local.key.slice(0, 16), status: 'REVALIDATED' });
     });
@@ -705,8 +735,22 @@ class EdgeCacheImpl implements EdgeCache {
   // -- purge -------------------------------------------------------------------------------------
 
   async purgeTags(tags: string[]): Promise<number> {
+    return (await this.purgeTagKeys(tags)).length;
+  }
+
+  /** Deletes the entries indexed under the tags and asks the zone purger to drop them; returns the keys. */
+  private async purgeTagKeys(tags: string[]): Promise<string[]> {
     const unique = [...new Set(tags.filter(Boolean))];
-    if (!unique.length) return 0;
+    if (!unique.length) return [];
+    // Tombstones first: a response already in flight (or one an upstream renders before it has applied
+    // the same revalidation) must not be stored once this purge returns.
+    if (this.tagIndex?.markPurged) {
+      try {
+        await this.tagIndex.markPurged(unique, this.now() + this.purgeGraceMs);
+      } catch (err) {
+        this.log.warn('edge-cache: tag index markPurged failed', { error: toError(err).message });
+      }
+    }
     let keys: string[] = [];
     if (this.tagIndex) {
       try {
@@ -715,9 +759,8 @@ class EdgeCacheImpl implements EdgeCache {
         this.log.warn('edge-cache: tag index lookup failed', { error: toError(err).message });
       }
     }
-    let deleted = 0;
     const results = await Promise.allSettled(keys.map((key) => this.store.delete(key)));
-    for (const r of results) if (r.status === 'fulfilled') deleted++;
+    const deleted = keys.filter((_, i) => results[i]!.status === 'fulfilled');
     if (this.tagIndex && keys.length) {
       try {
         await this.tagIndex.remove(keys);
@@ -739,6 +782,12 @@ class EdgeCacheImpl implements EdgeCache {
         this.log.warn('edge-cache: zone purge failed', { error: toError(err).message });
       }
     }
+    this.log.info('edge-cache: purged', {
+      tags: unique.slice(0, 20),
+      indexed: this.tagIndex ? keys.length : null,
+      deleted: deleted.length,
+      zone: Boolean(this.purger),
+    });
     return deleted;
   }
 
@@ -752,7 +801,7 @@ class EdgeCacheImpl implements EdgeCache {
         this.log.warn('edge-cache: purgeUrls skipped a relative URL without a known origin', { url: raw });
       }
     }
-    let deleted = 0;
+    const deleted = new Set<string>();
     const edge = context?.config.cache.edge;
     if (context && edge) {
       const policies = this.policiesFor(context.config, context.manifest);
@@ -771,7 +820,7 @@ class EdgeCacheImpl implements EdgeCache {
         });
         try {
           await this.store.delete(key);
-          deleted++;
+          deleted.add(key);
         } catch (err) {
           this.log.warn('edge-cache: delete failed', { key: key.slice(0, 16), error: toError(err).message });
         }
@@ -784,7 +833,11 @@ class EdgeCacheImpl implements EdgeCache {
         this.log.warn('edge-cache: zone purge failed', { error: toError(err).message });
       }
     }
-    return deleted;
+    // Every variant of each path (theme, locale, geo…) and the copies other colos hold: the `path:` tag
+    // is indexed with each entry and stored as `Cache-Tag` (zone purge by tag).
+    const byPath = [...new Set(absolute.map((u) => pathTag(u.pathname)).filter((t): t is string => !!t))];
+    if (byPath.length) for (const key of await this.purgeTagKeys(byPath)) deleted.add(key);
+    return deleted.size;
   }
 
   // -- helpers -----------------------------------------------------------------------------------

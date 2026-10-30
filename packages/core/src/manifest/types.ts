@@ -116,6 +116,15 @@ export interface HypManifest {
    * HTML that references another build's chunks or hashes.
    */
   fingerprint?: string;
+  /**
+   * Identifies Next.js's own ISR revalidation requests. OpenNext's revalidation queue re-requests stale
+   * pages through the Worker with `x-prerender-revalidate: <previewModeId>`; the Worker shell recognises
+   * them by this SHA-256 (hex) of the build's preview-mode id and sends them straight to Next.js — no edge
+   * cache, bot shield or rate limit in between — then drops the stale edge-cache copies of the page. Only
+   * the hash is stored; the id itself never leaves the build output. Not part of `fingerprint` (it changes
+   * on every build even when the output does not).
+   */
+  revalidation?: { tokenHash: string };
   deploymentId?: string;
   nextVersion: string;
   hypdrivVersion: string;

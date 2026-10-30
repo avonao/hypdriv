@@ -45,6 +45,7 @@ packages/cli         the `hypdriv` command
 packages/create-hypdriv  scaffolder
 packages/hypdriv     umbrella
 examples/            runnable Next 16 apps: basic, with-purser (Cloudflare); vercel, vercel-purser (Vercel); the create-hypdriv templates
+e2e/cloudflare       live suite: an app with every capability on + a runner that verifies it on a real Cloudflare account
 docs/                architecture, catalog, ADRs, guides
 skills/hypdriv       agent skill for adopting HypDriv in an application
 ```
@@ -64,6 +65,7 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 2. For runtime behaviour: `pnpm -F @hypdriv/example-basic build:worker && pnpm -F @hypdriv/example-basic preview`, then `pnpm -F @hypdriv/cli exec hypdriv audit all --url http://localhost:8787`.
 3. For Purser behaviour: `pnpm -F @hypdriv/example-with-purser audit:css`.
 4. For Vercel behaviour: `VERCEL=1 pnpm -F @hypdriv/example-vercel build`, `pnpm -F @hypdriv/example-vercel start`, then `hypdriv audit all --url http://localhost:3000`; `vercel build` in `examples/vercel` checks the Build Output API.
+5. For behaviour only production shows (colos, zone purges, Queues, cron, Analytics Engine, Early Hints, Turnstile): deploy `e2e/cloudflare` to a Cloudflare account and run `pnpm -F @hypdriv/e2e-cloudflare e2e` (see its README). Keep account-specific configuration in git-ignored `wrangler.*.local.jsonc` files.
 
 ## Dependency freshness
 

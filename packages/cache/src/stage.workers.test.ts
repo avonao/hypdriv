@@ -47,7 +47,9 @@ describe('edge-cache stage inside workerd', () => {
     expect(second.shortCircuitedBy).toBe('edge-cache');
     expect(second.response.headers.get('x-hypdriv-cache')).toBe('HIT');
     expect(second.response.headers.get('age')).toBe('0');
-    expect(second.response.headers.get('cache-tag')).toBe(`route:app:/blog/[slug],build:b-${slug}`);
+    expect(second.response.headers.get('cache-tag')).toBe(
+      `route:app:/blog/[slug],path:/blog/${slug},build:b-${slug}`,
+    );
     expect(await second.response.text()).toBe(`<p>${slug}</p>`);
     expect(renders).toBe(1);
 

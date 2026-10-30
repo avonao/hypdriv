@@ -337,8 +337,8 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
             matchers: context.outputs.middleware.config.matchers.map((m) => ({
               source: m.source,
               sourceRegex: m.sourceRegex,
-              ...(m.has ? { has: m.has } : {}),
-              ...(m.missing ? { missing: m.missing } : {}),
+              ...(m.has ? { has: redactPreviewModeId(m.has) } : {}),
+              ...(m.missing ? { missing: redactPreviewModeId(m.missing) } : {}),
             })),
           },
         }
@@ -355,6 +355,8 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
   };
 
   manifest.fingerprint = await buildFingerprint(manifest);
+  const revalidationToken = previewModeId(context, fs);
+  if (revalidationToken) manifest.revalidation = { tokenHash: await sha256Hex(revalidationToken) };
 
   // Attach inferred cache policy ids so runtimes/CLI can show them without recomputing.
   if (config.cache.edge) {
@@ -372,6 +374,42 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
   }
 
   return { manifest, failures, html };
+}
+
+/** Placeholder for the preview-mode id in `x-prerender-revalidate` matcher conditions. */
+export const PREVIEW_MODE_ID_PLACEHOLDER = '<preview-mode-id>';
+
+/**
+ * Next.js excludes its own revalidation requests from the proxy matcher with a `missing` condition that
+ * carries the preview-mode id. The manifest keeps the condition but never the id.
+ */
+function redactPreviewModeId<T extends { type: string; key?: string; value?: string }>(conditions: T[]): T[] {
+  return conditions.map((c) =>
+    c.key?.toLowerCase() === 'x-prerender-revalidate' && c.value
+      ? { ...c, value: PREVIEW_MODE_ID_PLACEHOLDER }
+      : c,
+  );
+}
+
+/**
+ * The build's preview-mode id: the token Next.js accepts in `x-prerender-revalidate` to regenerate a
+ * prerendered page (OpenNext's revalidation queue sends it). Taken from the prerender outputs'
+ * `bypassToken`, else from `prerender-manifest.json`; `null` when the build has no prerenders.
+ */
+export function previewModeId(context: OnBuildCompleteContext, fs: AdapterFs): string | null {
+  for (const p of context.outputs.prerenders ?? []) {
+    const token = p.config?.bypassToken;
+    if (typeof token === 'string' && token.length >= 16) return token;
+  }
+  const file = join(context.distDir, 'prerender-manifest.json');
+  try {
+    if (!fs.exists(file)) return null;
+    const parsed = JSON.parse(fs.readText(file)) as { preview?: { previewModeId?: unknown } };
+    const id = parsed.preview?.previewModeId;
+    return typeof id === 'string' && id.length >= 16 ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

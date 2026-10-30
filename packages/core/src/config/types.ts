@@ -199,7 +199,11 @@ export interface BotConfig {
   /** Validate `Sec-Fetch-*` headers on non-GET API requests (default true). */
   secFetchChecks?: boolean;
   /** Turnstile configuration for `challenge` policies. */
-  turnstile?: { siteKey: string; secretEnv?: string; action?: string };
+  /**
+   * Turnstile configuration for `challenge` policies. The site key is public: set it inline (`siteKey`) or per
+   * environment through a variable (`siteKeyEnv`, read at request time; one of the two is required).
+   */
+  turnstile?: { siteKey?: string; siteKeyEnv?: string; secretEnv?: string; action?: string };
   /** Tarpit delay in milliseconds (default 3000, max 10000). */
   tarpitMs?: number;
 }
@@ -336,6 +340,12 @@ export interface CacheConfig {
         /** Cache shell (PPR) HTML responses when inferred (default false). */
         inferredShell?: false | { ttl?: Duration; swr?: Duration };
         store?: CacheStoreKind;
+        /**
+         * Longest time an isolate's in-memory tier serves an entry before reading the shared tiers again
+         * (Cache API, KV) when it fronts them (default `'10s'`; `0` disables the memory tier). Purges run in
+         * one isolate, so this bounds how long other isolates can serve a purged copy.
+         */
+        memoryTtl?: Duration;
         /** Negative-cache TTL for 404/410 (default `'60s'`, `0` disables). */
         negativeTtl?: Duration;
         /** Query parameters removed from keys and from upstream requests (default: common tracking parameters). */
@@ -584,8 +594,15 @@ export interface ImagesConfig {
 export interface JobsConfig {
   /** Cron jobs: name → `{ cron, path }`. The Worker's `scheduled` handler dispatches by cron expression. */
   cron?: Record<string, { cron: string; path: string; timeout?: Duration; method?: 'GET' | 'POST' }>;
-  /** Queue consumers: queue name → `{ path }`. */
-  queues?: Record<string, { path: string; retry?: 'failed' | 'all' | 'none'; maxConcurrency?: number }>;
+  /**
+   * Queue consumers: queue name → `{ path }`. The key is the name `enqueue()` uses; `queues` lists the
+   * deployed Cloudflare queue names the consumer receives batches from when they differ per environment
+   * (`my-app-jobs-staging`, `my-app-jobs`), with `*` as a wildcard (`'*-jobs'`). Default: the key itself.
+   */
+  queues?: Record<
+    string,
+    { path: string; retry?: 'failed' | 'all' | 'none'; maxConcurrency?: number; queues?: string[] }
+  >;
   email?: { path: string };
   /** Base path for scaffolded job handlers (default `/api/jobs`). */
   basePath?: string;

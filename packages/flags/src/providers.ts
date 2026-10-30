@@ -154,7 +154,11 @@ export function kvProvider(
     async () => {
       try {
         const raw = await kv.get(key, 'json');
-        if (raw === null || raw === undefined) return lastGood ?? fallback;
+        // A missing key is a decision (overrides removed), not an outage: back to the config definitions.
+        if (raw === null || raw === undefined) {
+          lastGood = null;
+          return fallback;
+        }
         const parsed = parseFlagDefinitions(raw, (name, reason) =>
           options.log?.warn(`Ignoring flag "${name}" from KV ${key}: ${reason}`),
         );

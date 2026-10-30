@@ -10,6 +10,9 @@ export const VITAL_THRESHOLDS: Record<string, { good: number; poor: number; unit
   TTFB: { good: 800, poor: 1800, unit: 'ms' },
 };
 
+/** The metrics `analyticsEngineVitalsSink` writes (blob1). */
+export const VITAL_NAMES = Object.keys(VITAL_THRESHOLDS);
+
 export function rateVital(metric: string, value: number): 'good' | 'needs-improvement' | 'poor' | 'unknown' {
   const t = VITAL_THRESHOLDS[metric];
   if (!t) return 'unknown';
@@ -31,7 +34,11 @@ export function vitalsSql(
 ): string {
   if (!/^[A-Za-z0-9_]+$/.test(dataset))
     throw new CliError(`invalid Analytics Engine dataset name "${dataset}"`);
-  const where = [`timestamp > NOW() - INTERVAL '${Math.max(1, Math.floor(options.days))}' DAY`];
+  const where = [
+    `timestamp > NOW() - INTERVAL '${Math.max(1, Math.floor(options.days))}' DAY`,
+    // Spans exported with \`tracing.exporter: 'analytics-engine'\` can share the dataset; only vitals rows count.
+    `blob1 IN (${VITAL_NAMES.map((n) => `'${n}'`).join(', ')})`,
+  ];
   if (options.route)
     where.push(`(index1 = ${sqlString(options.route)} OR blob3 = ${sqlString(options.route)})`);
   return [

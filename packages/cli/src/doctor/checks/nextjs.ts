@@ -285,22 +285,30 @@ export const nextjsChecks: Check[] = [
         return pass(
           'Vercel assigns the deployment id (VERCEL_DEPLOYMENT_ID); enable Skew Protection in the project settings.',
         );
-      if (skew.deploymentId) return pass(`deploymentId "${skew.deploymentId}" from hypdriv.config.`);
-      if (ctx.project.nextConfig?.setsDeploymentId) return pass('next.config sets deploymentId.');
-      if (ctx.manifest?.deploymentId) return pass(`manifest deploymentId ${ctx.manifest.deploymentId}.`);
+      const sharedIdRisk =
+        "every build then shares one id: Next.js uses a constant BUILD_ID with deployment ids and OpenNext keys its incremental, regional and tag caches by the id, so other builds (and other apps on the same zone) read each other's cached pages";
+      if (skew.deploymentId)
+        return warn(`deploymentId "${skew.deploymentId}" is a constant in hypdriv.config; ${sharedIdRisk}.`, {
+          details: [
+            'Remove `performance.skewProtection.deploymentId`: HypDriv derives a per-build id (<commit>-<build stamp>, ADR 0016).',
+          ],
+        });
+      if (ctx.project.nextConfig?.setsDeploymentId)
+        return info(
+          'next.config sets deploymentId itself; make sure it is unique per build and per app (HypDriv derives <commit>-<build stamp> otherwise).',
+        );
       const env = ctx.io.env;
+      if (env.HYPDRIV_DEPLOYMENT_ID)
+        return info(
+          `HYPDRIV_DEPLOYMENT_ID is used verbatim ("${env.HYPDRIV_DEPLOYMENT_ID.slice(0, 64)}"); it must change with every build and differ between apps.`,
+        );
+      const manifestId = ctx.manifest?.deploymentId ? ` (last build: ${ctx.manifest.deploymentId})` : '';
       const fromEnv =
-        env.HYPDRIV_DEPLOYMENT_ID ??
-        env.WORKERS_CI_COMMIT_SHA ??
-        env.CF_PAGES_COMMIT_SHA ??
-        env.GITHUB_SHA ??
-        env.CI_COMMIT_SHA;
-      if (fromEnv) return pass('deploymentId will be derived from the CI commit SHA.');
+        env.WORKERS_CI_COMMIT_SHA ?? env.CF_PAGES_COMMIT_SHA ?? env.GITHUB_SHA ?? env.CI_COMMIT_SHA;
+      if (fromEnv) return pass(`deploymentId: the CI commit SHA plus a per-build stamp${manifestId}.`);
       if (existsSync(join(ctx.project.repoRoot, '.git')))
-        return pass('deploymentId will be derived from the git HEAD at build time.');
-      return warn(
-        'Skew protection is on but no deployment id can be derived (no git checkout, no CI SHA). Set HYPDRIV_DEPLOYMENT_ID in the build environment or `performance.skewProtection.deploymentId`.',
-      );
+        return pass(`deploymentId: the git HEAD plus a per-build stamp${manifestId}.`);
+      return pass(`deploymentId: a per-build stamp (no git checkout or CI SHA)${manifestId}.`);
     },
   },
   {

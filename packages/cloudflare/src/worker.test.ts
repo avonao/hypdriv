@@ -1,4 +1,10 @@
-import { emptyManifest, getCurrentContext, type HypManifest, routePatternToRegex } from '@hypdriv/core';
+import {
+  emptyManifest,
+  getCurrentContext,
+  type HypManifest,
+  routePatternToRegex,
+  sha256Hex,
+} from '@hypdriv/core';
 import { signing } from '@hypdriv/security';
 import { createFakeExecutionContext, createFakeKV } from '@hypdriv/testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -226,6 +232,130 @@ describe('createWorker hardening', () => {
     expect(forwarded.get('x-middleware-subrequest')).toBeNull();
     expect(forwarded.get('x-nonce')).not.toBe('attacker');
     expect(forwarded.get('x-hypdriv-flags')).toBeNull();
+  });
+});
+
+describe('createWorker ISR revalidation (OpenNext queue)', () => {
+  const TOKEN = '91a68bb5351b898134e48c088de025b9';
+  const setup = async () => {
+    let version = 1;
+    let revalidating = false;
+    const next = fakeNext((req) => {
+      const path = new URL(req.url).pathname;
+      revalidating = req.headers.get('x-prerender-revalidate') === TOKEN;
+      return new Response(
+        req.method === 'HEAD'
+          ? null
+          : `<!doctype html><html><head></head><body><h1>${path} v${version}</h1></body></html>`,
+        {
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            ...(revalidating ? { 'x-nextjs-cache': 'REVALIDATED' } : {}),
+          },
+        },
+      );
+    });
+    const worker = createWorker({
+      config: {
+        site: { name: 'shop' },
+        cache: { edge: { store: 'kv', policies: [{ id: 'home', match: '/', ttl: 3600 }] } },
+        security: { rateLimit: [{ id: 'all', match: '/**', limit: 3, window: '1m' }] },
+      },
+      next: next.loader,
+      manifest: async () => ({
+        default: { ...manifest, revalidation: { tokenHash: await sha256Hex(TOKEN) } },
+      }),
+      development: false,
+    });
+    const env = { HYPDRIV_KV: createFakeKV() };
+    const get = async (ip = '203.0.113.1') => {
+      const exec = createFakeExecutionContext();
+      const response = await worker.fetch(request('/', { headers: { 'cf-connecting-ip': ip } }), env, exec);
+      const body = await response.text();
+      // The KV tag index merges writes per second (KV allows one write per key per second).
+      await exec.flush();
+      return { response, body };
+    };
+    return {
+      next,
+      worker,
+      env,
+      get,
+      bump: () => {
+        version++;
+      },
+    };
+  };
+
+  it('sends verified revalidation requests straight to Next.js and drops the stale edge copies', async () => {
+    const t = await setup();
+    const first = await t.get();
+    expect(first.response.headers.get('x-hypdriv-cache')).toBe('MISS');
+    t.bump();
+    const second = await t.get();
+    expect(second.body).toContain('v1');
+    expect(second.response.headers.get('x-hypdriv-cache')).toBe('HIT');
+    await t.get();
+    // The rate limit (3/min) is exhausted for this client; revalidation must not be subject to it.
+    expect((await t.get()).response.status).toBe(429);
+    const calls = t.next.received.length;
+
+    // OpenNext's DOQueueHandler: HEAD, no browser headers, the build's preview-mode id.
+    const exec = createFakeExecutionContext();
+    const revalidation = await t.worker.fetch(
+      new Request('https://shop.example.com/', {
+        method: 'HEAD',
+        headers: { 'x-prerender-revalidate': TOKEN, 'x-isr': '1' },
+      }),
+      t.env,
+      exec,
+    );
+    await exec.flush();
+    expect(revalidation.status).toBe(200);
+    expect(revalidation.headers.get('x-nextjs-cache')).toBe('REVALIDATED');
+    expect(t.next.received.length).toBe(calls + 1);
+    const forwarded = t.next.received.at(-1)!;
+    expect(forwarded.method).toBe('HEAD');
+    expect(forwarded.headers.get('x-prerender-revalidate')).toBe(TOKEN);
+    // proxy.ts inside OpenNext sees the Worker's context and passes through.
+    expect(t.next.contexts.at(-1)?.runner).toBe('worker');
+
+    const after = await t.get('198.51.100.7');
+    expect(after.response.headers.get('x-hypdriv-cache')).toBe('MISS');
+    expect(after.body).toContain('v2');
+  });
+
+  it('runs requests with a wrong or oversized token through the Drivetrain', async () => {
+    const t = await setup();
+    await t.get();
+    for (const token of ['not-the-token', TOKEN.toUpperCase(), 'x'.repeat(300)]) {
+      const calls = t.next.received.length;
+      const exec = createFakeExecutionContext();
+      const response = await t.worker.fetch(
+        request('/', { headers: { 'x-prerender-revalidate': token } }),
+        t.env,
+        exec,
+      );
+      await response.text();
+      await exec.flush();
+      expect(response.headers.get('x-hypdriv-cache')).toBe('HIT');
+      expect(t.next.received.length).toBe(calls);
+    }
+  });
+
+  it('ignores the header when the manifest has no revalidation hash', async () => {
+    const next = fakeNext();
+    const worker = createWorker({
+      config: { site: { name: 'shop' } },
+      next: next.loader,
+      manifest: async () => ({ default: manifest }),
+      development: false,
+    });
+    const exec = createFakeExecutionContext();
+    await worker.fetch(request('/', { headers: { 'x-prerender-revalidate': TOKEN } }), {}, exec);
+    await exec.flush();
+    expect(next.received[0]!.headers.get('x-hypdriv-runner')).toBe('worker');
+    expect(next.received[0]!.headers.get('x-hypdriv-route')).toBe('app:/');
   });
 });
 

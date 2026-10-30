@@ -94,7 +94,12 @@ export interface ResolvedBots {
   allowUserAgents: Array<string | RegExp>;
   exempt: RoutePattern;
   secFetchChecks: boolean;
-  turnstile: null | { siteKey: string; secretEnv: string; action: string | null };
+  turnstile: null | {
+    siteKey: string | null;
+    siteKeyEnv: string | null;
+    secretEnv: string;
+    action: string | null;
+  };
   tarpitMs: number;
 }
 
@@ -174,6 +179,8 @@ export interface ResolvedCache {
     inferredStatic: { ttl: number; swr: number; staleIfError: number };
     inferredShell: null | { ttl: number; swr: number };
     store: import('./types').CacheStoreKind;
+    /** Seconds; `0` disables the memory tier in front of shared stores. */
+    memoryTtl: number;
     negativeTtl: number;
     ignoredQuery: string[];
     maxBodySize: number;
@@ -308,7 +315,10 @@ export interface ResolvedImages {
 
 export interface ResolvedJobs {
   cron: Record<string, { cron: string; path: string; timeoutMs: number; method: 'GET' | 'POST' }>;
-  queues: Record<string, { path: string; retry: 'failed' | 'all' | 'none'; maxConcurrency: number }>;
+  queues: Record<
+    string,
+    { path: string; retry: 'failed' | 'all' | 'none'; maxConcurrency: number; queues: string[] }
+  >;
   email: { path: string } | null;
   basePath: string;
 }

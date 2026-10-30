@@ -5,9 +5,11 @@ import {
   cacheControlFor,
   effectiveTags,
   inferPolicies,
+  MAX_PATH_TAG_LENGTH,
   matchPolicy,
   matchPolicyFor,
   nextPathnameToPattern,
+  pathTag,
   resolvePolicies,
   routePatternSpecificity,
 } from './policies';
@@ -195,5 +197,15 @@ describe('cacheControlFor / effectiveTags', () => {
     const route = makeRoute({ pathname: '/x' });
     expect(effectiveTags(policy, { route, params: {} }, 'b9')).toEqual(['a', 'route:app:/x', 'build:b9']);
     expect(effectiveTags(policy, null, 'b9')).toEqual(['a', 'route:app:/x', 'build:b9']);
+  });
+  it('tags every variant of a page with its normalised path', () => {
+    const config = resolveConfig({ cache: { edge: { policies: [{ match: '/**', ttl: 1 }] } } });
+    const policy = config.cache.edge!.policies[0]!;
+    expect(effectiveTags(policy, null, 'b9', '/blog/a/')).toEqual(['path:/blog/a', 'build:b9']);
+    expect(pathTag('/')).toBe('path:/');
+    expect(pathTag('')).toBe('path:/');
+    expect(pathTag('/blog/a')).toBe(pathTag('/blog/a/'));
+    expect(pathTag(`/${'x'.repeat(MAX_PATH_TAG_LENGTH)}`)).toBeNull();
+    expect(effectiveTags(policy, null, 'b9', `/${'x'.repeat(MAX_PATH_TAG_LENGTH)}`)).toEqual(['build:b9']);
   });
 });

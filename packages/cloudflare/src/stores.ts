@@ -70,10 +70,24 @@ function groupByShard(tags: string[]): Map<string, string[]> {
 /** Exact tag index backed by `HypDrivIndex`, sharded by tag hash. */
 export function createDoTagIndex(ns: DurableObjectNamespaceLike): TagIndex {
   return {
-    async add(key, tags, ttl) {
+    async add(key, tags, ttl, options = {}) {
+      const results = await Promise.all(
+        [...groupByShard(tags)].map(([shard, shardTags]) =>
+          callDurableObject<{ stale?: boolean } | null>(ns, shard, 'add', [
+            key,
+            shardTags,
+            ttl,
+            null,
+            options.fetchedAt ?? null,
+          ]),
+        ),
+      );
+      return { stale: results.some((r) => r?.stale === true) };
+    },
+    async markPurged(tags, until) {
       await Promise.all(
         [...groupByShard(tags)].map(([shard, shardTags]) =>
-          callDurableObject(ns, shard, 'add', [key, shardTags, ttl]),
+          callDurableObject(ns, shard, 'markPurged', [shardTags, until]),
         ),
       );
     },

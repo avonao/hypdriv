@@ -9,6 +9,7 @@ import {
   openNextProject,
   response,
   tempProject,
+  WRANGLER_JSONC,
 } from '../__tests__/helpers';
 import { runCommand } from '../main';
 import { allChecks } from './registry';
@@ -98,6 +99,27 @@ describe('hypdriv doctor', () => {
     expect(byId['vercel.config']).toMatchObject({ status: 'skip', platforms: ['vercel'] });
     expect(byId['deps.outdated']?.status).toBe('skip');
     expect(out.summary.total).toBe(allChecks.length);
+  });
+
+  it('maps per-environment queue consumers and flags orphaned queues and missing producers', async () => {
+    const p = openNextProject({
+      'hypdriv.config.ts': `export default {
+  jobs: { queues: { jobs: { path: '/api/jobs/work', queues: ['*-jobs'] }, mail: { path: '/api/jobs/mail' } } },
+  cloudflare: { bindings: { queues: { jobs: 'JOBS', mail: 'MAIL' } } },
+};
+`,
+      'wrangler.jsonc': WRANGLER_JSONC.replace(
+        '"services"',
+        '"queues": { "producers": [{ "binding": "JOBS", "queue": "shop-staging-jobs" }], "consumers": [{ "queue": "shop-staging-jobs" }, { "queue": "shop-jobs-dlq" }] },\n  "services"',
+      ),
+    });
+    const { byId } = await doctor(p.dir);
+    expect(byId['wrangler.queues']).toMatchObject({ status: 'warn' });
+    const details = (byId['wrangler.queues']?.details ?? []).join('\n');
+    expect(details).toContain('consumer queue "shop-jobs-dlq" maps to no jobs.queues entry');
+    expect(details).toContain('jobs.queues.mail has no queues.consumers entry');
+    expect(details).toContain('no queues.producers entry binds MAIL');
+    expect(details).not.toContain('jobs.queues.jobs has no');
   });
 
   it('passes the structural checks after init and syncs crons with --fix', async () => {

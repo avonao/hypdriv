@@ -122,4 +122,23 @@ describe('HypDrivIndex', () => {
     expect(await stub.clearTags(['blog'])).toBe(1);
     expect(await stub.stats()).toEqual({ associations: 0, tags: 0 });
   });
+
+  it('keeps purge tombstones so entries fetched before a purge are never indexed', async () => {
+    const stub = testEnv.HYPDRIV_INDEX.get(testEnv.HYPDRIV_INDEX.idFromName('shard:tombstones'));
+    const now = Date.now();
+    await stub.markPurged(['news'], now + 5000);
+    // Fetched before / inside the window: stale, nothing indexed.
+    expect(await stub.add('key-old', ['news', 'home'], 600, now, now - 1000)).toEqual({ stale: true });
+    expect(await stub.add('key-mid', ['news'], 600, now, now + 4000)).toEqual({ stale: true });
+    expect(await stub.keysFor(['news', 'home'], now)).toEqual([]);
+    // Fetched after the window, or for other tags: indexed.
+    expect(await stub.add('key-new', ['news'], 600, now, now + 6000)).toEqual({ stale: false });
+    expect(await stub.add('key-other', ['sports'], 600, now, now - 1000)).toEqual({ stale: false });
+    expect((await stub.keysFor(['news', 'sports'], now)).sort()).toEqual(['key-new', 'key-other']);
+    // Tombstones only move forward.
+    await stub.markPurged(['news'], now + 1000);
+    expect(await stub.add('key-again', ['news'], 600, now, now + 4500)).toEqual({ stale: true });
+    // Without fetchedAt (older clients), behaviour is unchanged.
+    expect(await stub.add('key-legacy', ['news'], 600, now)).toEqual({ stale: false });
+  });
 });

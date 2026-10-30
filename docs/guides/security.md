@@ -59,7 +59,18 @@ Stores: memory (per isolate), Cache API (per colo, approximate, zero config — 
 
 Verdicts: `human`, `verified` (Cloudflare verified bots or known search/social crawlers), `likely` (Bot Management score under the threshold, missing/odd headers), `definite` (headless/automation user agents, honeypot paths, blocked agents). Policies per verdict: `allow`, `log`, `challenge` (Turnstile page, then allow), `block` (403), `tarpit` (delay then 429). Defaults: verified → allow, likely → log, definite → block. Exempt patterns default to Next internals, HypDriv internals and `/api/webhooks/**`.
 
-`request.cf.botManagement` is used when your plan provides it; otherwise heuristics only. For `challenge` you need a Turnstile site key and `TURNSTILE_SECRET_KEY`.
+`request.cf.botManagement` is used when your plan provides it; otherwise heuristics only. For `challenge` you need a Turnstile site key and secret. Site keys usually differ per environment (and Cloudflare's always-pass test keys are handy in CI), so read both from the environment instead of hard-coding the key:
+
+```ts
+security: {
+  bots: {
+    likelyAutomated: 'challenge',
+    turnstile: { siteKeyEnv: 'TURNSTILE_SITE_KEY', secretEnv: 'TURNSTILE_SECRET_KEY', action: 'login' },
+  },
+},
+```
+
+`siteKeyEnv` defaults to `TURNSTILE_SITE_KEY` when no literal `siteKey` is configured. Switching keys is a secret change (`wrangler secret bulk`), not a redeploy. A passed challenge sets an `HttpOnly`, `Secure`, `SameSite=Lax` clearance cookie (`hyp_clearance`, 30 minutes by default); the challenge page's CSP allows `challenges.cloudflare.com`.
 
 ## Shield (WAF-lite)
 

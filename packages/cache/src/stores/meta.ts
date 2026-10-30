@@ -6,6 +6,31 @@ export const META_HEADER = 'x-hypdriv-meta';
 export const ORIGIN_CACHE_CONTROL_HEADER = 'x-hypdriv-origin-cache-control';
 export const ORIGIN_EXPIRES_HEADER = 'x-hypdriv-origin-expires';
 
+/** Cloudflare `Cache-Tag` limits: 1,024 bytes per tag, 16 KB for the header. */
+const MAX_CACHE_TAG_BYTES = 1024;
+const MAX_CACHE_TAG_HEADER_BYTES = 16 * 1024;
+
+/**
+ * A `Cache-Tag` header value for the given tags (Cloudflare's purge-by-tag index): printable ASCII
+ * without commas or whitespace, de-duplicated, each tag ≤ 1,024 bytes, the whole header ≤ 16 KB.
+ * `null` when no tag survives.
+ */
+export function cacheTagHeader(tags: Iterable<string>): string | null {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  let size = 0;
+  for (const raw of tags) {
+    if (typeof raw !== 'string') continue;
+    const tag = raw.replace(/[^\x21-\x7e]|,/g, '');
+    if (!tag || tag.length > MAX_CACHE_TAG_BYTES || seen.has(tag.toLowerCase())) continue;
+    if (size + tag.length + (out.length ? 1 : 0) > MAX_CACHE_TAG_HEADER_BYTES) break;
+    seen.add(tag.toLowerCase());
+    size += tag.length + (out.length ? 1 : 0);
+    out.push(tag);
+  }
+  return out.length ? out.join(',') : null;
+}
+
 /** Response headers that must never be persisted (per-response values re-added on every hit). */
 const VOLATILE_HEADERS = new Set([
   'set-cookie',

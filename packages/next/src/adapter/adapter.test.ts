@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertManifest, createRouteMatcher, resolveConfig } from '@hypdriv/core';
+import { assertManifest, createRouteMatcher, resolveConfig, sha256Hex } from '@hypdriv/core';
 import { describe, expect, it } from 'vitest';
 import { appRouteAssets, parseClientReferenceManifest } from './assets';
-import { buildFingerprint, buildManifest } from './build-manifest';
+import { buildFingerprint, buildManifest, previewModeId } from './build-manifest';
 import { classifyOutputs } from './classify';
 import { createNodeFs, rerootPaths } from './fs';
 import { extractAssets, extractInlineScripts, extractLinks, scanTags } from './html';
@@ -151,6 +151,30 @@ describe('buildManifest', () => {
     expect(manifest.proxy?.matchers[0]?.source).toBe('/((?!_next/static|_next/image|favicon.ico).*)');
     expect(Object.keys(html)).toContain('app:/');
     expect(Object.keys(html)).toContain('app:/blog/[slug]');
+  });
+
+  it('records only a hash of the preview-mode id for ISR revalidation requests', async () => {
+    const { manifest } = await buildManifest({ context, config, fs, hypdrivVersion: 't' });
+    const token = '91a68bb5351b898134e48c088de025b9';
+    expect(previewModeId(context, fs)).toBe(token);
+    expect(manifest.revalidation).toEqual({ tokenHash: await sha256Hex(token) });
+    expect(JSON.stringify(manifest)).not.toContain(token);
+    expect(manifest.proxy?.matchers[0]?.missing).toEqual([
+      { type: 'header', key: 'x-prerender-revalidate', value: '<preview-mode-id>' },
+    ]);
+    // Falls back to prerender-manifest.json when the outputs carry no bypass token.
+    const bare = {
+      ...context,
+      outputs: {
+        ...context.outputs,
+        prerenders: context.outputs.prerenders.map((p) => ({
+          ...p,
+          config: { ...p.config, bypassToken: undefined },
+        })),
+      },
+    } as OnBuildCompleteContext;
+    expect(previewModeId(bare, fs)).toBe(token);
+    expect(previewModeId({ ...bare, distDir: '/nonexistent' }, fs)).toBeNull();
   });
 
   it('fingerprints the build output so cache keys change whenever the output does', async () => {

@@ -17,3 +17,5 @@
 | [0013](0013-deploy-targets.md)         | One runtime, three deploy targets: Cloudflare Workers, Vercel and Node hosts    | accepted |
 | [0014](0014-scoped-build-artifacts.md) | Restore the classic prerender layout and ship the manifest with every function  | accepted |
 | [0015](0015-owner-audit-tokens.md)     | Owner audit tokens let HypDriv's own tooling through its bot shield              | accepted |
+| [0016](0016-deployment-ids-per-build.md) | Deployment ids are unique per build and per app                                 | accepted |
+| [0017](0017-purge-consistency.md)      | Edge-cache purges are consistent across isolates, colos and in-flight requests  | accepted |

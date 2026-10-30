@@ -27,10 +27,17 @@ export function selectStore(
   config: ResolvedConfig,
 ): CacheStore {
   const kv = caps.kv ? (env[config.cloudflare.bindings.kv] as KVNamespaceLike | undefined) : undefined;
+  // In front of shared tiers the memory tier is short-lived (`cache.edge.memoryTtl`): purges run in one
+  // isolate, and other isolates must not keep serving the purged copy from their memory.
+  const memoryTtl = config.cache.edge?.memoryTtl ?? 10;
   const tiered = () => {
-    const tiers: CacheStore[] = [createMemoryStore(caps.cacheApi ? MEMORY_TIER : MEMORY_ALONE)];
-    if (caps.cacheApi) tiers.push(createCacheApiStore());
-    if (kv) tiers.push(createKvStore(kv));
+    const shared: CacheStore[] = [];
+    if (caps.cacheApi) shared.push(createCacheApiStore());
+    if (kv) shared.push(createKvStore(kv));
+    const tiers: CacheStore[] = [];
+    if (!shared.length) tiers.push(createMemoryStore(MEMORY_ALONE));
+    else if (memoryTtl > 0) tiers.push(createMemoryStore({ ...MEMORY_TIER, maxAgeSeconds: memoryTtl }));
+    tiers.push(...shared);
     return createTieredStore(tiers);
   };
   switch (kind) {

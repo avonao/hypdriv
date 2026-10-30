@@ -179,7 +179,8 @@ function resolveBots(input: import('./types').SecurityConfig['bots']): ResolvedB
     secFetchChecks: b.secFetchChecks ?? true,
     turnstile: b.turnstile
       ? {
-          siteKey: b.turnstile.siteKey,
+          siteKey: b.turnstile.siteKey ?? null,
+          siteKeyEnv: b.turnstile.siteKeyEnv ?? (b.turnstile.siteKey ? null : 'TURNSTILE_SITE_KEY'),
           secretEnv: b.turnstile.secretEnv ?? 'TURNSTILE_SECRET_KEY',
           action: b.turnstile.action ?? null,
         }
@@ -323,6 +324,7 @@ function resolveCache(input: HypDrivConfig['cache']): ResolvedCache {
                   swr: parseDuration(edge.inferredShell.swr, 600),
                 },
           store: edge.store ?? 'auto',
+          memoryTtl: parseDuration(edge.memoryTtl, 10),
           negativeTtl: parseDuration(edge.negativeTtl, 60),
           ignoredQuery: arr(edge.ignoredQuery, DEFAULT_TRACKING_PARAMS),
           maxBodySize: parseSize(edge.maxBodySize, 5 * 1000 * 1000),
@@ -621,7 +623,12 @@ function resolveConfigShape(input: HypDrivConfig): ResolvedConfig {
       queues: Object.fromEntries(
         Object.entries(jobs.queues ?? {}).map(([name, q]) => [
           name,
-          { path: q.path, retry: q.retry ?? 'failed', maxConcurrency: q.maxConcurrency ?? 4 },
+          {
+            path: q.path,
+            retry: q.retry ?? 'failed',
+            maxConcurrency: q.maxConcurrency ?? 4,
+            queues: q.queues?.length ? [...q.queues] : [name],
+          },
         ]),
       ),
       email: jobs.email ? { path: jobs.email.path } : null,
