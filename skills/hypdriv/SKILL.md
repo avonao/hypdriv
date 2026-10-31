@@ -42,6 +42,10 @@ Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,svelt
 
 Never hand-edit `.hypdriv/` — it is build output.
 
+## Production on Cloudflare
+
+For a deployment that goes live, follow `docs/guides/production-cloudflare.md` in the HypDriv repository (https://github.com/avonao/hypdriv/blob/main/docs/guides/production-cloudflare.md) instead of improvising: it lists the rules that break production (populate the OpenNext R2 cache before the first request, `cache.edge.bypass` for middleware gates, `.ts` extensions inside `hypdriv.config.ts`, HTTPS at the zone, secrets) and the probes that prove each one.
+
 ## 3. Configure
 
 All configuration lives in `hypdriv.config.ts`. Read `docs/guides/configuration.md` in the HypDriv repository (https://github.com/avonao/hypdriv/blob/main/docs/guides/configuration.md) for every key. Typical edits:

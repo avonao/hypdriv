@@ -1,5 +1,7 @@
 # HypDriv on Cloudflare Workers
 
+> **Going to production?** [Production on Cloudflare](production-cloudflare.md) is the step-by-step implementation guide: codebase, OpenNext cache, Cloudflare resources, secrets, zone, build and deploy order, verification probes, a launch checklist and troubleshooting, including fleets of area Workers behind a router. This page is the reference for how HypDriv sits in the Worker.
+
 HypDriv runs inside the Worker that OpenNext generates. `hypdriv.worker.ts` becomes the Worker entry; it wraps `.open-next/worker.js`, runs the Drivetrain pipeline around it, answers HypDriv's internal routes and adds the `scheduled`, `queue`, `email` and `tail` handlers.
 
 ```ts
@@ -65,6 +67,8 @@ export default defineCloudflareConfig({
 ```
 
 Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone → Cache Purge) as secrets on custom domains: OpenNext's `BucketCachePurge` and HypDriv's edge cache both purge the zone by tag with them. On `*.workers.dev` the Cache API is a no-op, so the regional cache and HypDriv's Cache API tier only take effect on custom domains.
+
+**Populate the incremental cache before the first request.** `opennextjs-cloudflare populateCache remote --config <wrangler file>` (or `opennextjs-cloudflare deploy`, which runs it before `wrangler deploy`) writes the build's prerendered pages into the R2 bucket. Skip it and OpenNext renders every prerendered page per request: pages with a hash CSP then stream their flight data in a different chunking than the build measured, the hashes no longer match, and browsers block the inline scripts, so the page loads and never hydrates. `hypdriv doctor` fails (`opennext.cache`) for hash-CSP routes without an incremental cache. Several Workers of one platform can share one bucket: give each its own key prefix with the variable `NEXT_INC_CACHE_R2_PREFIX = "<worker>/"` (keys are `<prefix><buildId>/<hash>.cache`). Do not put a time-based lifecycle rule on the bucket: a site that is not redeployed would lose its current build's prerenders.
 
 **ISR revalidation through the Worker.** OpenNext's queue regenerates stale pages by requesting them through `WORKER_SELF_REFERENCE` with `x-prerender-revalidate: <previewModeId>`. The HypDriv Worker recognises these requests by a SHA-256 of the build's preview-mode id stored in the manifest (`manifest.revalidation`; the id itself never leaves the build output), sends them straight to Next.js — no edge cache, bot shield or rate limit in between — and, when Next.js answers `x-nextjs-cache: REVALIDATED`, purges the page's edge-cache copies by its `path:` tag. A request carrying the header with any other value runs through the Drivetrain like every other request.
 

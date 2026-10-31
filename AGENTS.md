@@ -76,6 +76,10 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 6. For Vite hosts: build the host example for each target (`HYPDRIV_TARGET=cloudflare|vercel|node`), `vite preview` / `hypdriv serve`, then `pnpm -F @hypdriv/e2e-hosts check --url … --framework <name> …` and `hypdriv audit all`; on real accounts deploy privately with `pnpm -F @hypdriv/e2e-hosts provision` (see its README).
 7. For behaviour only a Vercel deployment shows (Routing Middleware vs Functions, CDN tag purge, ISR, Global Config, Vercel Queues, Cron, WAF, BotID): `pnpm -F @hypdriv/e2e-vercel provision …`, deploy prebuilt from the repository root, then `pnpm -F @hypdriv/e2e-vercel e2e` (see its README). Never put an account token into a deployment's environment.
 
+## Putting HypDriv into a production Cloudflare setup
+
+`docs/guides/production-cloudflare.md` is the implementation guide for applications and platforms that go live on Cloudflare: install from a release bundle, the OpenNext production cache (populate the R2 cache before the first request), the policy, Cloudflare resources and secrets, fleets of area Workers behind a router, first-deploy probes, the launch checklist and troubleshooting. Follow it step by step and record the evidence its checklist asks for.
+
 ## Pitfalls the live runs found
 
 - Never `await response.body.cancel()` in code that can run inside Next.js: Next tees `fetch` bodies and the cancel never settles (`void res.body?.cancel().catch(() => undefined)`).
@@ -83,6 +87,8 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 - A prerender with explicit cache tags changes after `revalidateTag()`; it is `isr`, never hash-CSP `static` (ADR 0018).
 - Anything a runner answers before the pipeline (internal routes, static assets) must respect `forceHttps` itself — call `httpsUpgrade()` first.
 - Workers Static Assets answer before the Worker, so `forceHttps` never sees plain-HTTP asset requests: gated test zones carry a Redirect Rule for their hosts, and `hypdriv audit https` checks pages, internal routes and a hashed asset over `http://`.
+- The runners strip every client-supplied `x-hypdriv-*` header before the stages run. The one internal route that reads such a header, `POST /_hypdriv/purge` (`x-hypdriv-purge`), gets it from `info.purgeToken`, which each runner fills from the original request. A new header-authenticated internal route needs the same hand-over.
+- A raw Cloudflare tag purge clears only the Cache API tier; HypDriv's store is memory → Cache API → KV with backfill from lower tiers. Operator purges go through `hypdriv purge` (the Worker's own `purgeTags`), never the zone API alone.
 - Egress from CI and agent sandboxes can rotate client addresses per connection: verify IP-keyed rate limits over one keep-alive connection.
 - Test deployments are private: Vercel Authentication on all deployments + automation bypass; on Cloudflare a gated custom domain (`provision --gate`) with `workers.dev` off. Tooling passes gateways with `VERCEL_AUTOMATION_BYPASS_SECRET`, `CF_ACCESS_CLIENT_ID/_SECRET` or `HYPDRIV_ACCESS_HEADERS`.
 

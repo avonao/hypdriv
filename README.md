@@ -101,7 +101,7 @@ Next.js 16.0 → 16.4+ (App Router first, Pages Router supported) · React 19.2+
 ## Documentation
 
 - [Architecture](docs/architecture.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md)
-- Guides: [getting started](docs/guides/getting-started.md) · [configuration reference](docs/guides/configuration.md) · [Cloudflare](docs/guides/cloudflare.md) · [Vercel](docs/guides/vercel.md) · [caching](docs/guides/caching.md) · [security](docs/guides/security.md) · [observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [flags](docs/guides/flags.md) · [live channels](docs/guides/live.md) · [jobs](docs/guides/jobs.md) · [CLI](docs/guides/cli.md)
+- Guides: [production on Cloudflare](docs/guides/production-cloudflare.md) · [getting started](docs/guides/getting-started.md) · [configuration reference](docs/guides/configuration.md) · [Cloudflare](docs/guides/cloudflare.md) · [Vercel](docs/guides/vercel.md) · [caching](docs/guides/caching.md) · [security](docs/guides/security.md) · [observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [flags](docs/guides/flags.md) · [live channels](docs/guides/live.md) · [jobs](docs/guides/jobs.md) · [CLI](docs/guides/cli.md)
 - Examples: [`examples/basic`](examples/basic) and [`examples/with-purser`](examples/with-purser) on Cloudflare · [`examples/vercel`](examples/vercel) and [`examples/vercel-purser`](examples/vercel-purser) on Vercel
 - For coding agents: [`AGENTS.md`](AGENTS.md) and [`skills/hypdriv`](skills/hypdriv/SKILL.md)
 
