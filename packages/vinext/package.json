@@ -1,0 +1,105 @@
+{
+  "name": "@hypdriv/vinext",
+  "version": "0.1.0",
+  "description": "HypDriv for vinext (Cloudflare's Vite implementation of the Next.js API): the Drivetrain around every vinext request on Cloudflare Workers, Vercel and Node, the build manifest with CSP hashes of prerendered pages, static headers per platform, and revalidateTag purges that reach HypDriv's edge cache.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "virtual.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/vinext"
+  },
+  "keywords": [
+    "vinext",
+    "nextjs",
+    "vite",
+    "vite-plugin",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./runtime": {
+      "source": "./src/runtime.ts",
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./worker": {
+      "source": "./src/worker.ts",
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./proxy": {
+      "source": "./src/proxy.ts",
+      "types": "./dist/proxy.d.ts",
+      "default": "./dist/proxy.js"
+    },
+    "./cache": {
+      "source": "./src/cache.ts",
+      "types": "./dist/cache.d.ts",
+      "default": "./dist/cache.js"
+    },
+    "./virtual": {
+      "types": "./virtual.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/build": "workspace:*",
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/vite": "workspace:*"
+  },
+  "peerDependencies": {
+    "vinext": "^1.4.0",
+    "vite": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitejs/plugin-rsc": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-server-dom-webpack": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vinext": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

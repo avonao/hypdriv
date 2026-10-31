@@ -1,0 +1,5 @@
+# vinext, Nitro and Cloudflare build output
+.output/
+.cloudflare/
+.vinext/
+next-env.d.ts
