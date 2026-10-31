@@ -1,0 +1,31 @@
+{
+  "name": "@hypdriv/e2e-vercel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Live end-to-end suite for Vercel: a Next.js 16 app that exercises every HypDriv capability on a real Vercel project, and the runner that verifies it.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/e2e.ts",
+    "provision": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/provision.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/firewall": "^1.2.6",
+    "@vercel/queue": "^0.10.0",
+    "botid": "^1.5.12",
+    "hypdriv": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@hypdriv/security": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

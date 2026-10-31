@@ -8,7 +8,7 @@ A Next.js 16 app with every HypDriv capability switched on, each backed by the b
 | --- | --- |
 | Platform | `/_hypdriv/health` capabilities, http→https 308, compression and HTTP/3, immutable chunks and `public/_headers`, 404 with security headers |
 | Security | Security headers and hash CSP on static pages, per-request nonce (every script allowed by nonce or hash) on dynamic pages, CSP report intake, shield (scanner paths, traversal, methods, URL length), automation UA block, Turnstile challenge with the per-environment site key, Turnstile solved in Chromium (test keys), Durable Object and binding rate limits, CSRF, encrypted sessions |
-| Cache | Edge cache MISS→HIT, RSC payloads separated from HTML (Next 16 `_rsc` redirect), skew protection, time-based ISR through OpenNext's Durable Object queue and the Worker's pass-through, `revalidateTag()` a second after the first store (purge tombstones), `revalidatePath()`, per-country variants, R2 incremental cache objects |
+| Cache | Edge cache MISS→HIT, RSC payloads separated from HTML (Next 16 `_rsc` redirect), skew protection, time-based ISR through OpenNext's Durable Object queue and the Worker's pass-through, `revalidateTag()` a second after the first store (purge tombstones) with every script of the regenerated page allowed by its CSP, `revalidatePath()`, per-country variants, R2 incremental cache objects |
 | Performance | `Link` preloads, zone Early Hints, HTTP/2 **103** responses, `/cdn-cgi/image` resizing and `/_next/image` through the Images binding |
 | API | `defineRoute` validation, ETag/304, body limits; geo from `request.cf`; `hypFetch` |
 | Routing | Static redirect rule; redirects, feature flags and maintenance mode flipped through KV without a redeploy (and back) |

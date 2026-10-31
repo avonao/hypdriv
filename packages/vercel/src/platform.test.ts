@@ -311,8 +311,18 @@ describe('vercelPlatformOverrides capabilities', () => {
     expect(lines).toContain('cache: Vercel CDN (Vercel-CDN-Cache-Control, Vercel-Cache-Tag)');
     expect(lines).toContain('rate limiting: exact (Upstash Redis) + Vercel WAF (1 rule)');
     expect(lines.find((l) => l.startsWith('queues:'))).toContain('Vercel Queues (emails;');
-    expect(describeCapabilities(vercelPlatformOverrides(loadConfig({}), {}).capabilities)).toContain(
-      'rate limiting: per instance',
+    expect(lines).toContain('config store: Upstash Redis');
+    const bare = describeCapabilities(vercelPlatformOverrides(loadConfig({}), {}).capabilities);
+    expect(bare).toContain('rate limiting: per instance');
+    expect(bare).toContain('config store: none (hypdriv.config only)');
+    const withGlobalConfig = describeCapabilities(
+      vercelPlatformOverrides(loadConfig({}), {
+        ...REDIS,
+        GLOBAL_CONFIG: 'https://edge-config.vercel.com/ecfg_test?token=read-token',
+      }).capabilities,
+    );
+    expect(withGlobalConfig).toContain(
+      'config store: Global Config (read-only; flags, redirects, maintenance)',
     );
   });
 });

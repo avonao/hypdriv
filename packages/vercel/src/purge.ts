@@ -220,6 +220,24 @@ export function toPlatformPurger(purger: VercelPurger): Purger {
   };
 }
 
+/** The `path:<pathname>` tag form of `@hypdriv/cache` (what `revalidatePath()` / `purgeEdge()` pass). */
+const CACHE_PATH_TAG = 'path:';
+
+/**
+ * Adds the CDN form of every `path:<pathname>` tag (`hyp:path:<pathname>`, what the CDN stage and
+ * `withVercelCdn` put on responses), keeping the original: `revalidatePath()` called where no request URL is
+ * known (Route Handlers and Server Actions in Vercel Functions) purges by tag only, and must still reach
+ * every cached variant of the page.
+ */
+function withCdnPathTags(tags: string[]): string[] {
+  const out: string[] = [];
+  for (const tag of tags) {
+    out.push(tag);
+    if (tag.startsWith(CACHE_PATH_TAG)) out.push(pathTag(tag.slice(CACHE_PATH_TAG.length) || '/'));
+  }
+  return out;
+}
+
 /** Options of `vercelPurger`. */
 export interface VercelPurgerOptions {
   env: Record<string, unknown>;
@@ -229,9 +247,9 @@ export interface VercelPurgerOptions {
 }
 
 /**
- * Creates the purger HypDriv's `revalidateTag` / `purgeEdge` reach on Vercel. Tags are invalidated (not
- * deleted), so visitors keep getting the stale entry while Vercel revalidates it. URLs map to the
- * `hyp:path:<pathname>` tag the CDN stage puts on every cached response.
+ * Creates the purger HypDriv's `revalidateTag` / `revalidatePath` / `purgeEdge` reach on Vercel. Tags are
+ * invalidated (not deleted), so visitors keep getting the stale entry while Vercel revalidates it. URLs, and
+ * `path:<pathname>` tags, map to the `hyp:path:<pathname>` tag the CDN stage puts on every cached response.
  */
 export function vercelPurger(options: VercelPurgerOptions): VercelPurger {
   const shared: VercelPurgeOptions = {
@@ -241,7 +259,7 @@ export function vercelPurger(options: VercelPurgerOptions): VercelPurger {
     ...(options.log ? { log: options.log } : {}),
   };
   return {
-    purgeTags: (tags) => invalidateTags(tags, shared),
+    purgeTags: (tags) => invalidateTags(withCdnPathTags(tags), shared),
     purgeUrls(urls) {
       const tags: string[] = [];
       for (const raw of urls) {

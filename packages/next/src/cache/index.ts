@@ -1,5 +1,5 @@
 import { getEdgePurger, pathTag } from '@hypdriv/cache';
-import { getCurrentContext, readEnv } from '@hypdriv/core';
+import { getCurrentContext, platformWaitUntil, readEnv } from '@hypdriv/core';
 
 export { type EdgePurger, getEdgePurger, registerEdgePurger } from '@hypdriv/cache';
 
@@ -53,10 +53,18 @@ async function purgeTwice(options: { tags?: string[]; urls?: string[] }): Promis
   await purgeEdge(options);
 }
 
+/**
+ * Keeps the repeat purge alive after the response: the HypDriv request context, else the platform's
+ * `waitUntil` (Vercel Functions, where Route Handlers and Server Actions run outside the proxy's context).
+ */
 function schedule(task: Promise<unknown>): void {
+  const settled = task.catch(() => undefined);
   const ctx = getCurrentContext();
-  if (ctx) ctx.waitUntil(task);
-  else void task.catch(() => undefined);
+  if (ctx) {
+    ctx.waitUntil(settled);
+    return;
+  }
+  platformWaitUntil()?.(settled);
 }
 
 type NextCache = {

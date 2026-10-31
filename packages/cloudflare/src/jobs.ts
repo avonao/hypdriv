@@ -104,7 +104,9 @@ export async function enqueue(
   if (secret) request = await signing.signInternalRequest(request, secret);
   const run = async () => {
     const res = hasSelf ? await self!.fetch(request) : await fetch(request);
-    await res.body?.cancel();
+    // Released without waiting: under Next.js's patched fetch a body cancel does not settle until every
+    // teed branch is consumed, which would hold the function (or the caller) forever.
+    void res.body?.cancel().catch(() => undefined);
     if (!res.ok)
       throw new HypDrivError('E_UPSTREAM', `enqueue(): consumer route answered ${res.status}`, {
         queue: name,

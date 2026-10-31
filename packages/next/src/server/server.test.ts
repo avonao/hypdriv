@@ -282,6 +282,57 @@ describe('jobHandler()', () => {
     ).toBe(401);
   });
 
+  it('fills job and schedule of Vercel Cron calls from jobs.cron and honours the configured secret envs', async () => {
+    const { getRuntime, registerRuntime } = await import('@hypdriv/core');
+    const previous = getRuntime();
+    registerRuntime({
+      config: loadConfig({
+        jobs: { cron: { nightly: { cron: '17 7 * * *', path: '/api/cron/run' } } },
+        vercel: { cronSecretEnv: 'MY_CRON_SECRET' },
+        security: { internalAuth: { secretEnv: 'MY_INTERNAL_SECRET' } },
+      }),
+      env: {},
+      target: 'vercel',
+    });
+    // No HypDriv request context: a Vercel Function, where only the registered runtime exists and request
+    // headers come from next/headers.
+    setContextStore(null);
+    vi.doMock('next/headers', () => ({ headers: async () => new Headers() }));
+    try {
+      const handler = vi.fn(async () => ({ done: true }));
+      const route = jobHandler({}, handler);
+      const cronCall = new Request('https://app.example.com/api/cron/run', {
+        headers: { authorization: 'Bearer my-cron-secret-0123456789', 'user-agent': 'vercel-cron/1.0' },
+      });
+      const previousEnv = { cron: env.MY_CRON_SECRET, internal: env.MY_INTERNAL_SECRET };
+      env.MY_CRON_SECRET = 'my-cron-secret-0123456789';
+      env.MY_INTERNAL_SECRET = secret;
+      try {
+        const response = await route(cronCall);
+        expect(response.status).toBe(200);
+        expect(handler).toHaveBeenCalledWith(expect.objectContaining({ job: 'nightly', cron: '17 7 * * *' }));
+        // CRON_SECRET is not the configured env: the default name is ignored.
+        const legacy = new Request('https://app.example.com/api/cron/run', {
+          headers: { authorization: 'Bearer my-cron-secret-0123456789x' },
+        });
+        expect((await route(legacy)).status).toBe(401);
+        // Signed with the configured internal secret.
+        const signed = await signing.signInternalRequest(
+          new Request('https://app.example.com/api/cron/run', { method: 'POST' }),
+          secret,
+        );
+        expect((await route(signed)).status).toBe(200);
+      } finally {
+        env.MY_CRON_SECRET = previousEnv.cron;
+        env.MY_INTERNAL_SECRET = previousEnv.internal;
+      }
+    } finally {
+      vi.doUnmock('next/headers');
+      setContextStore({ getStore: () => als.getStore(), run: (ctx, fn) => als.run(ctx, fn) });
+      registerRuntime(previous ?? null);
+    }
+  });
+
   it('reports handler failures as JSON errors', async () => {
     const request = await signing.signInternalRequest(
       new Request('https://app.example.com/api/jobs/x', { method: 'POST' }),

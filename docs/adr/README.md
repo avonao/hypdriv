@@ -19,3 +19,4 @@
 | [0015](0015-owner-audit-tokens.md)     | Owner audit tokens let HypDriv's own tooling through its bot shield              | accepted |
 | [0016](0016-deployment-ids-per-build.md) | Deployment ids are unique per build and per app                                 | accepted |
 | [0017](0017-purge-consistency.md)      | Edge-cache purges are consistent across isolates, colos and in-flight requests  | accepted |
+| [0018](0018-tag-revalidated-prerenders.md) | Prerenders with explicit cache tags are classified `isr`                     | accepted |

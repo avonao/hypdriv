@@ -4,6 +4,7 @@ import {
   createContext,
   type DeployTarget,
   detectDeployTarget,
+  type GeoProperties,
   getCf,
   getCurrentContext,
   HEADER,
@@ -21,6 +22,7 @@ import {
   sanitizeInboundRequest,
 } from '@hypdriv/core';
 import { readManifestFile } from '../shared/manifest-file';
+import { geoFrom } from '../stages/geo';
 import {
   buildDefaultStages,
   type CreatePlatformInput,
@@ -169,7 +171,14 @@ export function createProxy(
     });
     const ip = clientIp(request.headers, platform.config.security.trustedProxies);
     // `/_hypdriv/*` (health, vitals, CSP reports, live polling fallback, dev endpoints) on every host.
-    const handled = await internal(request, { ip, waitUntil: (p) => event.waitUntil(p) });
+    // The visitor's country for vitals and reports: Cloudflare's `cf`, else the edge headers Vercel and other
+    // CDNs set (x-vercel-ip-country, cf-ipcountry).
+    const country = geoFrom(getCf(request) as GeoProperties | undefined, request.headers).country;
+    const handled = await internal(request, {
+      ip,
+      ...(country ? { country } : {}),
+      waitUntil: (p) => event.waitUntil(p),
+    });
     if (handled) return handled;
     const ctx = createContext({
       request,

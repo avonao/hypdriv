@@ -9,7 +9,8 @@ export async function GET() {
     retries: 1,
     onAttempt: (n) => void attempts.push(n),
   });
-  await res.body?.cancel();
+  // Not awaited: Next.js tees fetch bodies, and a cancel only settles once every branch is consumed.
+  void res.body?.cancel().catch(() => undefined);
   return Response.json(
     { status: res.status, attempts, ms: Date.now() - started },
     { headers: { 'cache-control': 'no-store' } },

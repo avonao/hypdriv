@@ -1,14 +1,16 @@
-import type { PathPattern } from '@hypdriv/core';
 import {
   CDN_CACHE_CONTROL,
   cdnCacheControl,
-  cdnExpressibility,
+  routeHeaderSkipReason,
   VERCEL_CACHE_TAG,
   VERCEL_CDN_CACHE_CONTROL,
   type VercelCdnOptions,
 } from './cdn';
+import { nextHeaderSource } from './route-source';
 import { MAX_TAGS_PER_RESPONSE, pathTag, sanitizeTags } from './tags';
 import { type ConfigInput, resolveInput } from './util';
+
+export { nextHeaderSource };
 
 /** A `has` / `missing` condition of a `next.config` `headers()` rule (Next's `RouteHas`). */
 export type NextRouteCondition =
@@ -29,68 +31,6 @@ export interface VercelCdnRouteHeaders {
   rules: NextHeaderRule[];
   /** Explicit policies that could not be expressed, with the reason. */
   skipped: Array<{ policy: string; reason: string }>;
-}
-
-const SPECIAL = new Set(['(', ')', '{', '}', '[', ']', '?', '+', '*', ':', '\\']);
-
-/**
- * Translates a HypDriv route pattern into a Next.js `source` (path-to-regexp): `:name`, `:name*`, `:name?`,
- * `/**` (any depth) and `*` (within a segment) are supported; regular expressions, `^…` patterns and query
- * patterns (`\?`) are not and yield `null`.
- */
-export function nextHeaderSource(pattern: PathPattern): string | null {
-  if (typeof pattern !== 'string' || !pattern.startsWith('/') || pattern.includes('\\?')) return null;
-  let out = '';
-  let generated = 0;
-  let i = 0;
-  while (i < pattern.length) {
-    const ch = pattern[i]!;
-    if (ch === '/' && pattern[i + 1] === '*' && pattern[i + 2] === '*') {
-      const after = pattern[i + 3];
-      if (after === '/') {
-        out += `/:hyp${generated++}*/`;
-        i += 4;
-        continue;
-      }
-      if (after === undefined) {
-        out += `/:hyp${generated++}*`;
-        i += 3;
-        continue;
-      }
-      return null;
-    }
-    if (ch === '*') {
-      if (pattern[i + 1] === '*') {
-        out += `:hyp${generated++}(.*)`;
-        i += 2;
-      } else {
-        out += `:hyp${generated++}([^/]*)`;
-        i += 1;
-      }
-      continue;
-    }
-    if (ch === ':' && /[A-Za-z_]/.test(pattern[i + 1] ?? '')) {
-      let j = i + 1;
-      while (j < pattern.length && /\w/.test(pattern[j]!)) j++;
-      const name = pattern.slice(i + 1, j);
-      const modifier = pattern[j];
-      const segmentStart = out.endsWith('/');
-      if (modifier === '*') {
-        out += segmentStart ? `:${name}*` : `:${name}(.*)`;
-        j++;
-      } else if (modifier === '?') {
-        out += segmentStart ? `:${name}?` : `:${name}([^/]*)`;
-        j++;
-      } else {
-        out += `:${name}`;
-      }
-      i = j;
-      continue;
-    }
-    out += SPECIAL.has(ch) ? `\\${ch}` : ch;
-    i += 1;
-  }
-  return out || '/';
 }
 
 /**
@@ -120,25 +60,9 @@ export function vercelCdnRouteHeaders(
   const skipped: VercelCdnRouteHeaders['skipped'] = [];
 
   for (const policy of edge.policies) {
-    if (policy.respectOrigin) {
-      skipped.push({ policy: policy.id, reason: 'respect-origin' });
-      continue;
-    }
-    if (policy.ttl < 1) {
-      skipped.push({ policy: policy.id, reason: 'zero-ttl' });
-      continue;
-    }
-    if (!policy.methods.includes('GET')) {
-      skipped.push({ policy: policy.id, reason: 'methods' });
-      continue;
-    }
-    const expressible = cdnExpressibility(policy, config);
-    if (!expressible.ok) {
-      skipped.push({ policy: policy.id, reason: expressible.reason });
-      continue;
-    }
-    if (expressible.vary.length) {
-      skipped.push({ policy: policy.id, reason: 'vary' });
+    const reason = routeHeaderSkipReason(policy, config);
+    if (reason) {
+      skipped.push({ policy: policy.id, reason });
       continue;
     }
     const patterns = Array.isArray(policy.match) ? policy.match : [policy.match];

@@ -44,3 +44,6 @@ pnpm-debug.log*
 !**/__fixtures__/**/.next/
 !**/__fixtures__/**/.open-next/
 !**/__fixtures__/**/.hypdriv/
+
+# Vercel CLI link and prebuilt output (vercel link / vercel build at the repository root)
+.vercel/

@@ -163,23 +163,39 @@ export function createHypFetch(defaults: HypFetchDefaults) {
       if (breaker && !breaker.allow())
         throw new HypDrivError('E_CIRCUIT_OPEN', `circuit open for ${origin}`, { origin });
       const controller = new AbortController();
-      const onAbort = () => controller.abort(base.signal.reason);
-      base.signal.addEventListener('abort', onAbort, { once: true });
+      // The deadline and the caller's abort settle the attempt themselves instead of relying on the fetch
+      // implementation to honour the signal: platform fetch wrappers (framework caches, observability
+      // instrumentation, service bindings) do not always forward it, and a timeout must still be a timeout.
+      let stop: (reason: unknown) => void = () => undefined;
+      const stopped = new Promise<never>((_, reject) => {
+        stop = reject;
+      });
+      const abort = (reason: unknown) => {
+        controller.abort(reason);
+        stop(reason);
+      };
+      const onAbort = () => abort(base.signal.reason ?? new Error('aborted'));
+      if (base.signal.aborted) onAbort();
+      else base.signal.addEventListener('abort', onAbort, { once: true });
       const timer = setTimeout(
-        () =>
-          controller.abort(
-            new HypDrivError('E_TIMEOUT', `fetch timed out after ${timeout}ms`, { url: base.url }),
-          ),
+        () => abort(new HypDrivError('E_TIMEOUT', `fetch timed out after ${timeout}ms`, { url: base.url })),
         timeout,
       );
+      let pending: Promise<Response> | null = null;
       try {
         const req = new Request(base, { signal: controller.signal });
         onAttempt?.(attempt, req);
-        const res = await doFetch(req);
+        pending = doFetch(req, { signal: controller.signal });
+        const res = await Promise.race([pending, stopped]);
         if (res.status >= 500 || res.status === 429) breaker?.failure();
         else breaker?.success();
         return res;
       } catch (err) {
+        // A response that arrives after the deadline is released, never leaked.
+        void pending?.then(
+          (late) => late.body?.cancel().catch(() => undefined),
+          () => undefined,
+        );
         breaker?.failure();
         throw err;
       } finally {
@@ -194,7 +210,9 @@ export function createHypFetch(defaults: HypFetchDefaults) {
         try {
           const res = await attemptOnce(attempt);
           if (attempt < maxRetries && retryStatuses.has(res.status)) {
-            await res.body?.cancel().catch(() => undefined);
+            // Never awaited: inside Next.js (patched fetch, teed bodies) a cancel only settles once every
+            // branch is consumed, i.e. never — the retry would hang.
+            void res.body?.cancel().catch(() => undefined);
             const retryAfter = Number(res.headers.get('retry-after'));
             await sleep(
               Number.isFinite(retryAfter) && retryAfter > 0

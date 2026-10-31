@@ -425,10 +425,18 @@ async function applyVercelCdnHeaders(
   }
   if (phase === PHASE.productionBuild) {
     if (rules.length) log.info(`hypdriv: ${rules.length} Vercel CDN header rule(s) from edge-cache policies`);
-    for (const { policy, reason } of skipped)
-      log.info(
-        `hypdriv: edge-cache policy "${policy}" is not a Vercel CDN route header (${reason}); wrap its Route Handlers with withVercelCdn() — pages follow their own Cache-Control`,
-      );
+    for (const { policy, reason } of skipped) {
+      // `respect-origin` is the normal case (the page's own Cache-Control drives the CDN, prerenders are
+      // cached natively); any other reason means pages matched by the policy are not CDN-cached on Vercel.
+      if (reason === 'respect-origin')
+        log.info(
+          `hypdriv: edge-cache policy "${policy}" follows the origin's Cache-Control on Vercel (respectOrigin); wrap its Route Handlers with withVercelCdn() to apply it there`,
+        );
+      else
+        log.warn(
+          `hypdriv: edge-cache policy "${policy}" has no Vercel route-header form (${reason}): pages it matches are not CDN-cached on Vercel; Route Handlers can apply it with withVercelCdn()`,
+        );
+    }
   }
 }
 

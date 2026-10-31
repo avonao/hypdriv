@@ -138,4 +138,45 @@ describe('createInstrumentation runtime registration', () => {
     );
     registerRuntime(null);
   });
+
+  it('registers the Vercel CDN purger in Vercel Functions, where the proxy registration is not visible', async () => {
+    const { getEdgePurger, registerEdgePurger } = await import('@hypdriv/cache');
+    const { registerRuntime } = await import('@hypdriv/core');
+    registerEdgePurger(null);
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), body: JSON.parse(String(init?.body ?? 'null')) });
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    try {
+      const vercel = createInstrumentation({
+        config: { observe: { errors: { sink: 'none' } } },
+        env: { VERCEL: '1', VERCEL_TOKEN: 'token', VERCEL_PROJECT_ID: 'prj_1', VERCEL_TEAM_ID: 'team_1' },
+      });
+      await vercel.register();
+      const purger = getEdgePurger();
+      expect(purger).toBeDefined();
+      await purger!.purgeUrls(['https://shop.example.com/api/products?page=2']);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.url).toContain('/v1/edge-cache/invalidate-by-tags');
+      expect(calls[0]!.url).toContain('projectIdOrName=prj_1');
+      expect(calls[0]!.body).toMatchObject({ tags: ['hyp:path:/api/products'] });
+
+      // An existing registration (createProxy in the same process) is kept.
+      const own = { purgeTags: vi.fn(), purgeUrls: vi.fn() };
+      registerEdgePurger(own);
+      await vercel.register();
+      expect(getEdgePurger()).toBe(own);
+
+      // Off Vercel nothing is registered.
+      registerEdgePurger(null);
+      await createInstrumentation({ config: { observe: { errors: { sink: 'none' } } }, env: {} }).register();
+      expect(getEdgePurger()).toBeUndefined();
+    } finally {
+      globalThis.fetch = realFetch;
+      registerEdgePurger(null);
+      registerRuntime(null);
+    }
+  });
 });

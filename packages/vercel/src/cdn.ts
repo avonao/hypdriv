@@ -19,6 +19,7 @@ import {
   type StateKey,
   stateKey,
 } from '@hypdriv/core';
+import { nextHeaderSource } from './route-source';
 import { MAX_TAGS_PER_RESPONSE, pathTag, routeTag, sanitizeTags } from './tags';
 import { type ConfigInput, readBuildManifest, resolveInput, warnOnce } from './util';
 
@@ -143,6 +144,24 @@ export function cdnExpressibility(
       return true;
     }),
   };
+}
+
+/**
+ * Why a policy cannot be expressed as static `next.config` route headers (`null` when it can):
+ * `respect-origin`, `zero-ttl`, `methods`, the `cdnExpressibility` reasons, or `vary` (a function's own `Vary`
+ * replaces route-level ones). Patterns are checked separately (`nextHeaderSource`).
+ */
+export function routeHeaderSkipReason(
+  policy: ResolvedEdgeCachePolicy,
+  config: ResolvedConfig,
+): string | null {
+  if (policy.respectOrigin) return 'respect-origin';
+  if (policy.ttl < 1) return 'zero-ttl';
+  if (!policy.methods.includes('GET')) return 'methods';
+  const expressible = cdnExpressibility(policy, config);
+  if (!expressible.ok) return expressible.reason;
+  if (expressible.vary.length) return 'vary';
+  return null;
 }
 
 /** Writes the CDN headers of a plan onto `headers`. */
@@ -314,7 +333,12 @@ function flagsCookiePending(ctx: HypContext): boolean {
 function record(ctx: HypContext, decision: CdnDecision, debugHeader: boolean): void {
   ctx.state.set(CDN_DECISION_KEY, decision);
   ctx.timings.mark('cache', decision.status);
-  if (debugHeader) ctx.responseHeaders.set(HEADER.cache, decision.status);
+  if (!debugHeader) return;
+  ctx.responseHeaders.set(HEADER.cache, decision.status);
+  // Explains a policy route that is not CDN-cached (audits tell configuration limits from breakage).
+  if (decision.status === 'BYPASS' && decision.policy)
+    ctx.responseHeaders.set(HEADER.cacheReason, decision.reason);
+  else ctx.responseHeaders.delete(HEADER.cacheReason);
 }
 
 /**
@@ -349,12 +373,40 @@ export function vercelCdnStage(configInput: ConfigInput, options: VercelCdnOptio
   if (!cdn || !edge) return null;
   const planner = createPlanner(config, options.downstream ?? cdn.downstream);
   const debugHeader = edge.debugHeader;
+  // Routing Middleware cannot make Vercel cache a function response: pages are CDN-cached by policy only
+  // through the static route headers `withHypDriv` emits (or natively, for prerendered/ISR output with
+  // `respectOrigin`). A page whose policy has no route-header form is therefore not cached, and must not be
+  // reported as such. Route Handlers can still apply such policies themselves with `withVercelCdn`.
+  const pageReasons = new Map<string, string>();
+  for (const policy of edge.policies) {
+    const reason = routeHeaderSkipReason(policy, config);
+    const patterns = Array.isArray(policy.match) ? policy.match : [policy.match];
+    const unexpressible = patterns.find((p) => nextHeaderSource(p) === null);
+    if (reason && reason !== 'respect-origin') pageReasons.set(policy.id, reason);
+    else if (!reason && unexpressible !== undefined)
+      pageReasons.set(policy.id, `pattern:${String(unexpressible)}`);
+  }
 
   return defineStage({
     name: 'edge-cache',
     runOnRsc: true,
     pre(ctx) {
-      const { decision, plan } = planner.plan(ctx);
+      let { decision, plan } = planner.plan(ctx);
+      const kind = ctx.route?.route.kind;
+      const pageReason =
+        decision.status === 'CDN' && decision.policy && (kind === 'app-page' || kind === 'page')
+          ? pageReasons.get(decision.policy.id)
+          : undefined;
+      if (pageReason) {
+        warnOnce(
+          ctx.log,
+          `vercel-cdn:page:${decision.policy!.id}:${pageReason}`,
+          `vercel-cdn: edge-cache policy "${decision.policy!.id}" has no route-header form (${pageReason}); its pages are not CDN-cached on Vercel (Route Handlers can use withVercelCdn)`,
+          { policy: decision.policy!.id, reason: pageReason },
+        );
+        decision = { status: 'BYPASS', reason: `route-header:${pageReason}`, policy: decision.policy! };
+        plan = undefined;
+      }
       if (plan && decision.cacheControl) {
         writeCdnHeaders(ctx.responseHeaders, decision.cacheControl, plan);
         if (plan.vary.length) appendListHeader(ctx.responseHeaders, 'vary', plan.vary);

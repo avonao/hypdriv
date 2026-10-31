@@ -184,6 +184,8 @@ export const HEADER = {
   route: 'x-hypdriv-route',
   cache: 'x-hypdriv-cache',
   cacheKey: 'x-hypdriv-cache-key',
+  /** Why the CDN plan is not `CDN` on Vercel (`route-header:vary`, `cookie:session`…), with `cache.edge.debugHeader`. */
+  cacheReason: 'x-hypdriv-cache-reason',
   cspMode: 'x-hypdriv-csp',
   internalSignature: 'x-hypdriv-signature',
   internalTimestamp: 'x-hypdriv-timestamp',

@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.hypdriv/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+*.secrets.local.json
+*.e2e.local.env
+e2e-report.json

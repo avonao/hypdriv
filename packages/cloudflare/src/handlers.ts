@@ -101,7 +101,8 @@ export async function dispatchScheduled(
           const res = await ctx.invoke(
             new Request(new URL(route, origin), { headers: { 'x-hypdriv-warm': '1', accept: 'text/html' } }),
           );
-          await res.body?.cancel();
+          // Released, not awaited: a cancel on a teed body only settles once every branch is consumed.
+          void res.body?.cancel().catch(() => undefined);
         } catch (err) {
           ctx.log.warn('warm failed', { route, error: (err as Error).message });
         }

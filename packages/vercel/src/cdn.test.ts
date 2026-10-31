@@ -157,6 +157,41 @@ describe('vercelCdnStage', () => {
     );
   });
 
+  it('reports pages whose policy has no route-header form as BYPASS (Route Handlers stay CDN)', async () => {
+    const geoManifest = makeManifest([
+      makeRoute({ pathname: '/geo', classification: 'dynamic' }),
+      makeRoute({ pathname: '/api/geo', kind: 'app-route', classification: 'route' }),
+    ]);
+    const config = configWith({
+      cache: {
+        edge: {
+          policies: [
+            {
+              id: 'geo',
+              match: ['/geo', '/api/geo'],
+              ttl: '10m',
+              vary: { geo: ['country'] },
+              respectOrigin: false,
+            },
+          ],
+        },
+      },
+    });
+    const page = await run('https://shop.example.com/geo', { config, manifest: geoManifest });
+    expect(page.decision).toMatchObject({ status: 'BYPASS', reason: 'route-header:vary' });
+    expect(page.response.headers.get('x-hypdriv-cache')).toBe('BYPASS');
+    expect(page.response.headers.get('x-hypdriv-cache-reason')).toBe('route-header:vary');
+    expect(page.response.headers.get('vercel-cdn-cache-control')).toBeNull();
+    expect(page.log.lines.filter((l) => l.message.includes('no route-header form'))).toHaveLength(1);
+    const handler = await run('https://shop.example.com/api/geo', { config, manifest: geoManifest });
+    expect(handler.decision).toMatchObject({ status: 'CDN' });
+    expect(handler.response.headers.get('x-hypdriv-cache-reason')).toBeNull();
+    expect(handler.response.headers.get('vary')).toContain('X-Vercel-IP-Country');
+    // Expressible page policies keep their CDN decision (the route headers carry them).
+    const products = await run('https://shop.example.com/products/9');
+    expect(products.decision).toMatchObject({ status: 'CDN' });
+  });
+
   it('leaves non-GET requests and unmatched paths dynamic', async () => {
     const post = await run('https://shop.example.com/products/1', { method: 'POST' });
     expect(post.decision).toEqual({ status: 'DYNAMIC', reason: 'method:POST' });

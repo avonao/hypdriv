@@ -663,7 +663,11 @@ export interface VercelConfig {
   redis?: false | { urlEnv?: string[]; tokenEnv?: string[]; prefix?: string };
   /** Vercel WAF rate-limit rules (`@vercel/firewall`) to enforce per HypDriv rate-limit policy id. */
   firewall?: { rateLimitRules?: Record<string, string> };
-  /** Vercel BotID verdicts in the bot stage (requires `botid` and `initBotId()` on the client). */
+  /**
+   * Vercel BotID: the default check level of `botIdGuard()` (`basic` is free on every plan; `deepAnalysis` is
+   * billed and enabled in the Firewall settings). Requires `botid` registered with `registerVercelSdk` and
+   * `initBotId()` on the client for the protected paths.
+   */
   botId?: false | { checkLevel?: 'basic' | 'deepAnalysis' };
   /** REST fallback for tag purges when `@vercel/functions` cannot purge (outside a Vercel function). */
   purge?: { tokenEnv?: string; teamIdEnv?: string; projectIdEnv?: string };

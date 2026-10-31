@@ -67,7 +67,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Tail handler          | Forwards tail events (exceptions, warn/error lines, CPU/memory/wall-time limits, cancellations) to log sinks | ✅                  | —                                | `cloudflare`         | ✅     |
 | ISR pass-through      | OpenNext's revalidation requests (`x-prerender-revalidate`, verified by hash) bypass the Drivetrain; regenerated pages purge their edge copies | ✅ | DO queue | `cloudflare`, `next` | ✅ |
 | OpenNext cache check  | `hypdriv doctor` verifies the incremental cache, queue, tag cache and purge overrides against bindings and Worker exports | ✅ | — | `cli` | ✅ |
-| Live e2e suite        | `e2e/cloudflare`: an app plus runner that verifies 40+ capabilities on a real account (provisioning script included) | — | account | `e2e` | ✅ |
+| Live e2e suites       | `e2e/cloudflare` (43 checks) and `e2e/vercel` (41 checks, Hobby plan): an app plus runner that verifies every capability on a real account, with provisioning scripts | — | account | `e2e` | ✅ |
 | Geo context           | Country, region, city, timezone, continent, ASN, colo exposed to the app                          | ✅                  | —                                | `cloudflare`, `next` | ✅     |
 | Locale negotiation    | `Accept-Language` + geo + cookie negotiation, proxy stage                                         | ✅                  | —                                | `next`               | ✅     |
 | Live channels         | Pub/sub with WebSocket hibernation and SSE, `useLive()` hook, server-component refresh on publish | polling transport   | `HypDrivChannel` DO              | `live`, `cloudflare` | ✅     |
@@ -83,20 +83,22 @@ Detected from `VERCEL=1`, `vercel.json` / `.vercel` or `platform: 'vercel'` ([AD
 
 | Capability | On Vercel | Baseline | Upgrade | Package | Status |
 | --- | --- | --- | --- | --- | --- |
-| Edge cache | Policies expressed as `Vercel-CDN-Cache-Control` + `Vercel-Cache-Tag`: `next.config` route headers for pages (`withHypDriv`), `withVercelCdn()` for Route Handlers, the `edge-cache` stage plans the decision (`x-hypdriv-cache: CDN`) | ✅ | `CDN-Cache-Control` for a downstream CDN | `vercel`, `next` | ✅ |
-| Tag purge | `revalidateTag()` / `purgeEdge()` purge Vercel's CDN (request-context API, REST with `VERCEL_TOKEN`), 16 tags per call, `Retry-After` aware | ✅ | — | `vercel`, `cache` | ✅ |
+| Edge cache | Policies expressed as `Vercel-CDN-Cache-Control` + `Vercel-Cache-Tag`: `next.config` route headers for pages (`withHypDriv`), `withVercelCdn()` for Route Handlers (with `Vary` for geo/language/device variants), the `edge-cache` stage plans the decision (`x-hypdriv-cache: CDN`; pages whose policy has no route-header form report `BYPASS` + `x-hypdriv-cache-reason`) | ✅ | `CDN-Cache-Control` for a downstream CDN | `vercel`, `next` | ✅ |
+| Tag purge | `revalidateTag()` / `revalidatePath()` / `purgeEdge()` purge Vercel's CDN from Routing Middleware and Vercel Functions (purger registered by `createInstrumentation`, repeat purge under `waitUntil`; `path:` tags map to the CDN's `hyp:path:` tags), request-context API or REST with `VERCEL_TOKEN`, 16 tags per call, `Retry-After` aware | ✅ | — | `vercel`, `cache`, `next` | ✅ |
 | Rate limiting | Same policies and headers | per instance | Upstash Redis (exact, global); Vercel WAF rules (`rate-limit-vercel`) | `vercel`, `security` | ✅ |
-| Bot shield | Heuristics, honeypots, `Sec-Fetch-*`, Turnstile | ✅ | BotID (`botIdGuard()`, `verifyBotId()`) | `vercel`, `security` | ✅ |
-| Flags, redirects, maintenance | KV-backed providers read Global Config | config / env | Global Config (read-only), Upstash Redis | `vercel`, `flags` | ✅ |
-| Cron | Vercel Cron (`GET` + `Authorization: Bearer $CRON_SECRET`) accepted by `jobHandler`; `hypdriv init` syncs `vercel.json#crons` | ✅ | — | `next`, `cli` | ✅ |
-| Queues | `enqueue()` → Vercel Queues; `queueConsumer()` with HypDriv's retry contract | signed consumer-route call | `@vercel/queue` | `vercel`, `cloudflare` | ✅ |
-| CSP | Hash for static routes, nonce for dynamic routes; declared `'unsafe-inline'` fallback for ISR / PPR shells (no `HTMLRewriter`) | ✅ | — | `security` | ✅ |
+| Bot shield | Heuristics, honeypots, `Sec-Fetch-*`, Turnstile (site key per deployment env) | ✅ | BotID (`botIdGuard()`, `verifyBotId()`, default level `vercel.botId.checkLevel`) | `vercel`, `security` | ✅ |
+| Flags, redirects, maintenance | KV-backed providers read Global Config (live within seconds; `config store` line in health) | config / env | Global Config (read-only), Upstash Redis | `vercel`, `flags` | ✅ |
+| Cron | Vercel Cron (`GET` + `Authorization: Bearer $CRON_SECRET` + `x-vercel-cron-schedule`) accepted by `jobHandler`, job name and schedule from `jobs.cron` by path, secret env names from config; `hypdriv init` syncs `vercel.json#crons` | ✅ | — | `next`, `cli` | ✅ |
+| Queues | `enqueue()` → Vercel Queues; `queueConsumer()` / `toQueueCallback()` with HypDriv's retry contract (redelivery with attempts, `retry: 'none'` acknowledges) | signed consumer-route call | `@vercel/queue` | `vercel`, `cloudflare` | ✅ |
+| CSP | Hash for static routes, nonce for dynamic routes; declared `'unsafe-inline'` fallback for ISR, tag-revalidated prerenders ([ADR 0018](adr/0018-tag-revalidated-prerenders.md)) and PPR shells (no `HTMLRewriter`) | ✅ | — | `security`, `next` | ✅ |
 | Geo | `x-vercel-ip-*` headers (country, region, city, coordinates, postal code, timezone) and the `x-vercel-id` region | ✅ | — | `next` | ✅ |
 | Build integration | Classic prerender layout restored for Vercel's builder, chaining with Vercel's adapter (`NEXT_ENABLE_ADAPTER=1`), manifest traced into every function | ✅ | — | `next` | ✅ |
-| Runtime registry | Config + platform env registered by `createInstrumentation()` for helpers outside a proxied request | ✅ | — | `core`, `next` | ✅ |
-| Tooling | `doctor`/`analyze`/`init --platform vercel`, Build Output API and function-size checks, `x-vercel-cache` in cache audits, Deployment Protection bypass | ✅ | — | `cli` | ✅ |
+| Runtime registry | Config, platform env and the Vercel CDN purger registered by `createInstrumentation()` for helpers outside a proxied request (`enqueue()`, `jobHandler`, `revalidatePath()`) | ✅ | — | `core`, `next` | ✅ |
+| Outbound fetch | `hypFetch` timeouts settle the attempt even when the platform fetch ignores the abort signal; body cancels are never awaited (Next.js tees fetch bodies) | ✅ | — | `core` | ✅ |
+| Observability | Request logs, spans (`tracing.exporter: 'console'`), Web Vitals (with the visitor's country) and CSP reports in the runtime logs / log drains | ✅ | OTLP | `observe`, `next` | ✅ |
+| Tooling | `doctor`/`analyze`/`init --platform vercel`, Build Output API and function-size checks, `x-vercel-cache` in cache audits (platform limits reported as warnings), Deployment Protection bypass, monorepo links at the repository root | ✅ | — | `cli` | ✅ |
 
-Not available on Vercel (documented fallbacks): HTML transforms and edge nonce injection (HTMLRewriter), Durable Object live channels (polling transport), 103 Early Hints (preload `Link` headers instead), Workers Analytics Engine sinks (logs / OTLP).
+Not available on Vercel (documented fallbacks): HTML transforms and edge nonce injection (HTMLRewriter), Durable Object live channels (polling transport), 103 Early Hints (preload `Link` headers instead), Workers Analytics Engine sinks (logs / OTLP), per-country CDN variants of pages (Route Handlers with `withVercelCdn` only), a dead-letter queue (`retry: 'none'` acknowledges), Skew Protection on Hobby (Pro feature).
 
 ## 6. Purser CSS
 

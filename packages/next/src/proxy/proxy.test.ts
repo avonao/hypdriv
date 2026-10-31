@@ -233,6 +233,58 @@ describe('internal routes on the proxy runner', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('passes the visitor country from edge headers to vitals beacons (Vercel)', async () => {
+    const { next } = markerNext();
+    const beacons: Array<{ pathname?: string; country?: string }> = [];
+    const proxy = createProxy({ observe: { vitals: { sink: 'log', sampleRate: 1 } } }, undefined, {
+      manifest,
+      env: {},
+      next,
+      development: false,
+      platform: {
+        vitalsSink: {
+          write(payload, ctx) {
+            beacons.push({ pathname: payload.pathname, ...(ctx.country ? { country: ctx.country } : {}) });
+          },
+        },
+      },
+    });
+    const res = await proxy(
+      new Request('https://shop.example.com/_hypdriv/vitals', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://shop.example.com',
+          'x-vercel-ip-country': 'US',
+        },
+        body: JSON.stringify({ name: 'LCP', value: 1200, rating: 'good', id: 'v1', pathname: '/x', ts: 1 }),
+      }),
+      event(),
+    );
+    expect(res.status).toBeLessThan(300);
+    expect(beacons).toEqual([{ pathname: '/x', country: 'US' }]);
+  });
+
+  it('reports the platform deployment id when Next.js has none (Vercel without Skew Protection)', async () => {
+    const { next } = markerNext();
+    const proxy = createProxy({ site: { name: 'shop' } }, undefined, {
+      manifest,
+      env: { VERCEL_DEPLOYMENT_ID: 'dpl_abc123' },
+      next,
+      development: false,
+    });
+    const health = await proxy(new Request('https://shop.example.com/_hypdriv/health'), event());
+    expect(await health.json()).toMatchObject({ deployment: 'dpl_abc123' });
+    const withOwnId = createProxy({ site: { name: 'shop' } }, undefined, {
+      manifest: { ...manifest, deploymentId: 'hyp-1' },
+      env: { VERCEL_DEPLOYMENT_ID: 'dpl_abc123' },
+      next,
+      development: false,
+    });
+    const own = await withOwnId(new Request('https://shop.example.com/_hypdriv/health'), event());
+    expect(await own.json()).toMatchObject({ deployment: 'hyp-1' });
+  });
+
   it('serves dev state with the proxy runner in development', async () => {
     const { next } = markerNext();
     const proxy = createProxy({}, undefined, {

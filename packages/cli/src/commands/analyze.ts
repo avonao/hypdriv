@@ -92,8 +92,10 @@ export const analyzeCommand = defineCommand({
         } else {
           const cmd = execCommand(project.packageManager, 'vercel', ['build']);
           ui.note(`$ ${cmd.command} ${cmd.args.join(' ')}`);
+          // In a monorepo the link (and `vercel build`) lives at the repository root.
+          const linkDir = project.vercel.linkDir ?? project.root;
           const result = await io.exec(cmd.command, cmd.args, {
-            cwd: project.root,
+            cwd: linkDir,
             timeoutMs: 20 * 60_000,
             env: { CI: '1' },
           });
@@ -101,9 +103,7 @@ export const analyzeCommand = defineCommand({
             const tail = `${result.stdout}\n${result.stderr}`.trim().split('\n').slice(-12).join('\n');
             throw new CliError(`vercel build failed (exit ${result.code}):\n${tail}`);
           }
-          outputDir = exists(join(project.root, '.vercel', 'output'))
-            ? join(project.root, '.vercel', 'output')
-            : null;
+          outputDir = exists(join(linkDir, '.vercel', 'output')) ? join(linkDir, '.vercel', 'output') : null;
         }
       } else if (!outputDir)
         notes.push('No .vercel/output and --no-build was given; run `vercel build` for the function report.');
@@ -154,8 +154,10 @@ export const analyzeCommand = defineCommand({
             WORKER_BUILD_DIR,
           ]);
           ui.note(`$ ${cmd.command} ${cmd.args.join(' ')}`);
+          // In a monorepo the link (and `vercel build`) lives at the repository root.
+          const linkDir = project.vercel.linkDir ?? project.root;
           const result = await io.exec(cmd.command, cmd.args, {
-            cwd: project.root,
+            cwd: linkDir,
             timeoutMs: 10 * 60_000,
             env: { CI: '1', WRANGLER_SEND_METRICS: 'false' },
           });

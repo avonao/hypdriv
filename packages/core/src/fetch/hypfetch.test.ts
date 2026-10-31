@@ -52,6 +52,60 @@ describe('hypFetch', () => {
     });
   });
 
+  it('enforces the timeout when the fetch implementation ignores the abort signal', async () => {
+    let late: Response | null = null;
+    let calls = 0;
+    // A wrapper that drops the signal (as some platform instrumentation does) and answers after 1 s.
+    const fetchImpl = ((input: Request) => {
+      calls++;
+      const url = input.url;
+      return new Promise<Response>((resolve) =>
+        setTimeout(() => {
+          late = new Response(new ReadableStream({ pull: () => undefined }), { headers: { 'x-url': url } });
+          resolve(late);
+        }, 1000),
+      );
+    }) as unknown as typeof fetch;
+    const hf = createHypFetch({ ...defaults, timeoutMs: 50, retries: 1 });
+    const started = Date.now();
+    await expect(hf('https://api.test/slow', { fetch: fetchImpl, dedupe: false })).rejects.toMatchObject({
+      code: 'E_TIMEOUT',
+    });
+    expect(Date.now() - started).toBeLessThan(800);
+    expect(calls).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    // The late response's body was cancelled, not leaked.
+    expect((late as Response | null)?.bodyUsed || (late as Response | null)?.body?.locked).toBe(true);
+  });
+
+  it('settles on the caller abort even when the fetch implementation ignores signals', async () => {
+    const fetchImpl = (() => new Promise<Response>(() => undefined)) as typeof fetch;
+    const hf = createHypFetch({ ...defaults, timeoutMs: 5000 });
+    const controller = new AbortController();
+    const pending = hf('https://api.test/hang', {
+      fetch: fetchImpl,
+      dedupe: false,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(new Error('caller gave up')), 20);
+    await expect(pending).rejects.toThrow('caller gave up');
+  });
+
+  it('retries without waiting for a body cancel that never settles (Next.js patched fetch)', async () => {
+    let calls = 0;
+    // A teed body (what Next.js's fetch returns) only finishes cancelling once every branch is consumed.
+    const stuckBody = () =>
+      new ReadableStream({ pull: () => undefined, cancel: () => new Promise<void>(() => undefined) });
+    const fetchImpl = (async () => {
+      calls++;
+      return calls < 2 ? new Response(stuckBody(), { status: 503 }) : new Response('ok');
+    }) as typeof fetch;
+    const hf = createHypFetch({ ...defaults, timeoutMs: 1000 });
+    const res = await hf('https://api.test/flaky', { fetch: fetchImpl, dedupe: false });
+    expect(await res.text()).toBe('ok');
+    expect(calls).toBe(2);
+  });
+
   it('dedupes concurrent GETs and gives each caller a readable body', async () => {
     let calls = 0;
     const fetchImpl = (async () => {

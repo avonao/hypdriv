@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import type { HypManifest } from '@hypdriv/core';
 import {
   detectPackageManager,
@@ -47,6 +47,12 @@ export interface VercelInfo {
   parseError: string | null;
   /** `.vercel/project.json` exists (`vercel link` / `vercel pull`). */
   linked: boolean;
+  /**
+   * The directory holding this app's `.vercel` link: the app root, or — in a monorepo, where `vercel link`,
+   * `vercel pull` and `vercel build` run at the repository root — the repository root when its
+   * `.vercel/project.json` names this app as the project's root directory. `null` when not linked.
+   */
+  linkDir: string | null;
   /** `.vercel/output` (Build Output API) exists. */
   outputDir: string | null;
   /** Installed `vercel` CLI package version. */
@@ -354,16 +360,35 @@ export function parseEnvKeys(text: string): string[] {
   return keys;
 }
 
-function readEnvFiles(root: string): EnvFileInfo[] {
+function readEnvFiles(root: string, vercelLinkDir: string | null): EnvFileInfo[] {
   const out: EnvFileInfo[] = [];
   for (const name of ENV_FILES) {
-    const text = readText(join(root, name));
-    if (text !== null) out.push({ file: name, keys: parseEnvKeys(text) });
+    // `vercel pull` writes `.vercel/.env.*.local` next to the link, which is the repository root in monorepos.
+    const base = name.startsWith('.vercel/') && vercelLinkDir ? vercelLinkDir : root;
+    const path = join(base, name);
+    const text = readText(path);
+    if (text !== null)
+      out.push({ file: base === root ? name : relative(root, path), keys: parseEnvKeys(text) });
   }
   return out;
 }
 
-function readVercel(root: string): VercelInfo {
+/** Where this app's `.vercel` link lives (see `VercelInfo.linkDir`). */
+export function vercelLinkDir(root: string, repoRoot: string): string | null {
+  if (exists(join(root, '.vercel', 'project.json'))) return root;
+  if (repoRoot === root) return null;
+  const text = readText(join(repoRoot, '.vercel', 'project.json'));
+  if (text === null) return null;
+  try {
+    const link = JSON.parse(text) as { settings?: { rootDirectory?: string | null } };
+    const dir = link.settings?.rootDirectory?.replace(/^\.?\/+|\/+$/g, '');
+    return dir && dir === relative(repoRoot, root).split(sep).join('/') ? repoRoot : null;
+  } catch {
+    return null;
+  }
+}
+
+function readVercel(root: string, linkDir: string | null): VercelInfo {
   const json = join(root, 'vercel.json');
   const ts = firstExisting(root, ['vercel.ts', 'vercel.mts']);
   const base: VercelInfo = {
@@ -371,8 +396,14 @@ function readVercel(root: string): VercelInfo {
     format: null,
     config: null,
     parseError: null,
-    linked: exists(join(root, '.vercel', 'project.json')),
-    outputDir: isDirectory(join(root, '.vercel', 'output')) ? join(root, '.vercel', 'output') : null,
+    linked: linkDir !== null,
+    linkDir,
+    // `vercel build` writes the Build Output next to the link; an app-local `.vercel/output` comes first.
+    outputDir:
+      [root, linkDir]
+        .filter((dir): dir is string => dir !== null)
+        .map((dir) => join(dir, '.vercel', 'output'))
+        .find((dir) => isDirectory(dir)) ?? null,
     cli: installedVersion(root, 'vercel'),
   };
   if (exists(json)) {
@@ -512,7 +543,8 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
   const nextConfigFile = firstExisting(root, NEXT_CONFIG_FILES);
   const purserVersion = installedVersion(root, '@avonao/purser');
   const wrangler = readWrangler(root, pkg);
-  const vercel = readVercel(root);
+  const linkDir = vercelLinkDir(root, repoRoot);
+  const vercel = readVercel(root, linkDir);
   const opennext = versionInfo(root, pkg, '@opennextjs/cloudflare');
   const next = versionInfo(root, pkg, 'next');
   const cloudflareConfigFile = firstExisting(root, [
@@ -540,7 +572,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     platform: platformDetection.platform,
     platformDetection,
     vercel,
-    envFiles: readEnvFiles(root),
+    envFiles: readEnvFiles(root, linkDir),
     tsconfigExcludesWorker: tsconfigExcludes(root, 'hypdriv.worker.ts'),
     inHypDrivMonorepo: detectHypDrivMonorepo(repoRoot),
     workspace: exists(join(repoRoot, 'pnpm-workspace.yaml')),

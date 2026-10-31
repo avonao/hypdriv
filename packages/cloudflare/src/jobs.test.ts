@@ -84,6 +84,27 @@ describe('enqueue', () => {
     expect(body.messages[0]!.body).toEqual({ id: 2 });
   });
 
+  it('does not wait on the consumer response body (a teed body never finishes cancelling)', async () => {
+    const platform = recordingQueue(() => false);
+    const stuck = new ReadableStream({
+      pull: () => undefined,
+      cancel: () => new Promise<void>(() => undefined),
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(stuck, { status: 200 })),
+    );
+    const result = await Promise.race([
+      enqueue(
+        'reports',
+        { id: 4 },
+        { config, env: { [queueEnvKey('reports')]: platform.queue, HYPDRIV_INTERNAL_SECRET: SECRET } },
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('hung'), 1000)),
+    ]);
+    expect(result).toEqual({ transport: 'inline', queue: 'reports' });
+  });
+
   it('reads config and env from the registered runtime outside a request context', async () => {
     const platform = recordingQueue();
     registerRuntime({ config, env: { [queueEnvKey('reports')]: platform.queue }, target: 'vercel' });

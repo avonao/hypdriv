@@ -175,6 +175,15 @@ describe('vercelPurger', () => {
     expect(fetch.calls[1]!.body).toEqual({ tags: ['hyp:path:/blog/hello', 'hyp:path:/about'] });
   });
 
+  it('also purges the CDN path tag for the path tags revalidatePath() sends without a request URL', async () => {
+    const fetch = scriptedFetch(() => new Response('{}'));
+    const purger = vercelPurger({ env: ENV, config: loadConfig({}), fetch });
+    expect(await purger.purgeTags(['route:app:/products/[id]', 'path:/products/42'])).toBe(3);
+    expect(fetch.calls[0]!.body).toEqual({
+      tags: ['route:app:/products/[id]', 'path:/products/42', 'hyp:path:/products/42'],
+    });
+  });
+
   it('fits the EdgePurger contract and adapts to the platform Purger slot', async () => {
     const fetch = scriptedFetch(() => new Response('{}'));
     const purger = vercelPurger({ env: ENV, config: loadConfig({}), fetch });

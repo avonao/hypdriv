@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [{ "path": "/api/jobs/tick", "schedule": "17 7 * * *" }],
+  "headers": [
+    {
+      "source": "/e2e-assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600" },
+        { "key": "X-E2E-Asset", "value": "1" }
+      ]
+    }
+  ],
+  "functions": {
+    "app/api/jobs/work/route.ts": {
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "hypdriv-e2e-jobs" }]
+    },
+    "app/api/jobs/once/route.ts": {
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "hypdriv-e2e-jobs-once" }]
+    }
+  }
+}

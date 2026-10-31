@@ -198,6 +198,7 @@ export function vercelPlatformOverrides(
   });
   const capabilities = detectCapabilities(augmented, config, { cf: false, waitUntil: true });
   const redisReady = resolveRedis(config, augmented) !== null;
+  const configStore = augmented[config.flags.kvBinding] ?? augmented[config.cloudflare.bindings.kv];
   const wafRules = Object.keys(config.vercel.firewall.rateLimitRules).length;
   const queueNames = [...new Set([...Object.keys(config.jobs.queues), ...Object.keys(config.vercel.queues)])];
   capabilities.services = {
@@ -205,6 +206,11 @@ export function vercelPlatformOverrides(
       ? 'Vercel CDN (Vercel-CDN-Cache-Control, Vercel-Cache-Tag)'
       : 'memory (per instance)',
     'tag purge': 'Vercel CDN tag purge (request context, REST with VERCEL_TOKEN)',
+    'config store': isReadOnlyKv(configStore)
+      ? 'Global Config (read-only; flags, redirects, maintenance)'
+      : isKvLike(configStore)
+        ? 'Upstash Redis'
+        : 'none (hypdriv.config only)',
     'rate limiting': [
       redisReady ? 'exact (Upstash Redis)' : 'per instance',
       ...(wafRules ? [`Vercel WAF (${wafRules} rule${wafRules === 1 ? '' : 's'})`] : []),

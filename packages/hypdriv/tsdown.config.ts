@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsdown';
+import { clientDirectivePlugin, quietClientDirective } from '../../scripts/tsdown-client-directive.mjs';
 
 export default defineConfig({
   entry: {
@@ -29,4 +30,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
+  // Client entries keep their 'use client' boundary (enforced, so rolldown's generic warning is noise).
+  plugins: [clientDirectivePlugin()],
+  inputOptions: { onLog: quietClientDirective },
 });

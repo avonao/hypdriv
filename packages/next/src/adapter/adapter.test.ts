@@ -119,6 +119,23 @@ describe('classification', () => {
     expect(byPath['/api/users/[id]']?.dynamic).toBe(true);
   });
 
+  it('classifies prerenders with explicit data cache tags as isr (revalidateTag regenerates them)', () => {
+    const outputs = structuredClone(context.outputs);
+    for (const p of outputs.prerenders) {
+      if (p.pathname !== '/pricing' || !p.fallback) continue;
+      p.fallback.initialHeaders = {
+        ...(p.fallback.initialHeaders ?? {}),
+        'x-next-cache-tags': '_N_T_/layout,_N_T_/pricing/page,_N_T_/pricing,plans, plans ,prices',
+      };
+    }
+    const tagged = Object.fromEntries(classifyOutputs(outputs).map((c) => [c.route.pathname, c.route]));
+    expect(tagged['/pricing']?.classification).toBe('isr');
+    expect(tagged['/pricing']?.prerender?.tags).toEqual(['plans', 'prices']);
+    // Implicit path tags alone keep a page static.
+    expect(tagged['/']?.classification).toBe('static');
+    expect(tagged['/']?.prerender?.tags).toBeUndefined();
+  });
+
   it('orders static before dynamic', () => {
     const idx = (p: string) => classified.findIndex((c) => c.route.pathname === p);
     expect(idx('/')).toBeLessThan(idx('/blog/[slug]'));

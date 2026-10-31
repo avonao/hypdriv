@@ -46,6 +46,8 @@ packages/create-hypdriv  scaffolder
 packages/hypdriv     umbrella
 examples/            runnable Next 16 apps: basic, with-purser (Cloudflare); vercel, vercel-purser (Vercel); the create-hypdriv templates
 e2e/cloudflare       live suite: an app with every capability on + a runner that verifies it on a real Cloudflare account
+e2e/vercel           live suite for Vercel (Hobby plan): app + runner (runtime-logs stream) + provisioning script
+scripts/             repo tooling (tsdown 'use client' boundary plugin, size/deps reports)
 docs/                architecture, catalog, ADRs, guides
 skills/hypdriv       agent skill for adopting HypDriv in an application
 ```
@@ -66,6 +68,13 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 3. For Purser behaviour: `pnpm -F @hypdriv/example-with-purser audit:css`.
 4. For Vercel behaviour: `VERCEL=1 pnpm -F @hypdriv/example-vercel build`, `pnpm -F @hypdriv/example-vercel start`, then `hypdriv audit all --url http://localhost:3000`; `vercel build` in `examples/vercel` checks the Build Output API.
 5. For behaviour only production shows (colos, zone purges, Queues, cron, Analytics Engine, Early Hints, Turnstile): deploy `e2e/cloudflare` to a Cloudflare account and run `pnpm -F @hypdriv/e2e-cloudflare e2e` (see its README). Keep account-specific configuration in git-ignored `wrangler.*.local.jsonc` files.
+6. For behaviour only a Vercel deployment shows (Routing Middleware vs Functions, CDN tag purge, ISR, Global Config, Vercel Queues, Cron, WAF, BotID): `pnpm -F @hypdriv/e2e-vercel provision …`, deploy prebuilt from the repository root, then `pnpm -F @hypdriv/e2e-vercel e2e` (see its README). Never put an account token into a deployment's environment.
+
+## Pitfalls the live runs found
+
+- Never `await response.body.cancel()` in code that can run inside Next.js: Next tees `fetch` bodies and the cancel never settles (`void res.body?.cancel().catch(() => undefined)`).
+- On Vercel, Routing Middleware and Functions are separate invocations: anything `createProxy` registers is invisible to Route Handlers and Server Actions unless `createInstrumentation().register()` registers it too.
+- A prerender with explicit cache tags changes after `revalidateTag()`; it is `isr`, never hash-CSP `static` (ADR 0018).
 
 ## Dependency freshness
 

@@ -1,3 +1,4 @@
+import { getEdgePurger, registerEdgePurger } from '@hypdriv/cache';
 import {
   detectCapabilities,
   detectDeployTarget,
@@ -63,8 +64,16 @@ export function createInstrumentation(options: InstrumentationOptions = {}): {
     const target = detectDeployTarget(env as Record<string, unknown>, resolved.platform);
     let runtimeEnv = env;
     if (target === 'vercel') {
-      const { vercelEnv } = await import('@hypdriv/vercel');
+      const { vercelEnv, vercelPurger } = await import('@hypdriv/vercel');
       runtimeEnv = vercelEnv(resolved, env as Record<string, unknown>) as HypDrivEnv;
+      // Vercel Functions run apart from Routing Middleware, so the purger `createProxy` registers is not
+      // visible here: register the same Vercel CDN purger for `revalidateTag()` / `revalidatePath()` /
+      // `purgeEdge()` called from Route Handlers and Server Actions (path and policy tags of CDN-cached
+      // responses are HypDriv's, Next's own revalidation does not know them).
+      if (!getEdgePurger())
+        registerEdgePurger(
+          vercelPurger({ env: runtimeEnv as Record<string, unknown>, config: resolved, log }),
+        );
     }
     registerRuntime({ config: resolved, env: runtimeEnv, target });
   };

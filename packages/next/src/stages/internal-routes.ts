@@ -77,6 +77,13 @@ export function internalRoutes(
   const livePath = platform.config.live.path;
   const noStore = { 'cache-control': 'no-store' };
 
+  // HypDriv's own deployment id (Cloudflare, skew protection) or the platform's (Vercel sets no Next.js
+  // deploymentId without Skew Protection, but every function knows VERCEL_DEPLOYMENT_ID).
+  const deploymentId =
+    platform.manifest.deploymentId ??
+    readEnv(platform.env as Record<string, unknown>, 'VERCEL_DEPLOYMENT_ID') ??
+    null;
+
   return async (request, info) => {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -90,7 +97,7 @@ export function internalRoutes(
           service: platform.config.site.name,
           hypdriv: HYPDRIV_VERSION,
           build: cacheVersion(platform.manifest),
-          deployment: platform.manifest.deploymentId ?? null,
+          deployment: deploymentId,
           next: platform.manifest.nextVersion,
           routes: platform.manifest.routes.length,
           capabilities: describeCapabilities(platform.capabilities),
@@ -121,7 +128,7 @@ export function internalRoutes(
             runner: platform.runner,
             development: platform.development,
             build: cacheVersion(platform.manifest),
-            deployment: platform.manifest.deploymentId ?? null,
+            deployment: deploymentId,
             nextBuildId: platform.manifest.buildId,
             next: platform.manifest.nextVersion,
             hypdriv: HYPDRIV_VERSION,

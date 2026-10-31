@@ -67,3 +67,23 @@ describe('revalidateTag / revalidatePath', () => {
     expect(await purgeEdge({ tags: ['a'], urls: ['https://x.test/a'] })).toEqual({ edge: true, zone: false });
   });
 });
+
+describe('scheduling outside a HypDriv request context', () => {
+  it('keeps the repeat purge alive with the platform waitUntil (Vercel Functions)', async () => {
+    const calls = fakePurger();
+    const pending: Array<Promise<unknown>> = [];
+    const slot = Symbol.for('@vercel/request-context');
+    (globalThis as Record<symbol, unknown>)[slot] = {
+      get: () => ({ waitUntil: (p: Promise<unknown>) => void pending.push(p) }),
+    };
+    try {
+      await revalidateTag('catalog');
+      expect(pending).toHaveLength(1);
+      await settle();
+      await pending[0];
+      expect(calls.tags).toEqual([['catalog'], ['catalog']]);
+    } finally {
+      delete (globalThis as Record<symbol, unknown>)[slot];
+    }
+  });
+});

@@ -189,6 +189,33 @@ describe('auditCache', () => {
     expect(noAge.findings.map((f) => f.message)).toContain('cached response without an Age header');
   });
 
+  it('reports a policy Vercel cannot apply to a page as a warning, not a broken cache', () => {
+    const limited = h({
+      'x-hypdriv-cache': 'BYPASS',
+      'x-hypdriv-cache-reason': 'route-header:vary',
+      'x-vercel-cache': 'MISS',
+      'cache-control': 'private, no-cache, no-store',
+    });
+    const result = auditCache({
+      path: '/geo',
+      hasPolicy: true,
+      first: { status: 200, headers: limited },
+      second: { status: 200, headers: limited },
+    });
+    expect(result.status).toBe('warn');
+    expect(result.findings.map((f) => f.message)).toContainEqual(
+      expect.stringContaining('policy not applicable on this platform (vary)'),
+    );
+    // A plain BYPASS without that reason is still a failure.
+    const broken = auditCache({
+      path: '/geo',
+      hasPolicy: true,
+      first: { status: 200, headers: h({ 'x-hypdriv-cache': 'BYPASS' }) },
+      second: { status: 200, headers: h({ 'x-hypdriv-cache': 'BYPASS' }) },
+    });
+    expect(broken.status).toBe('fail');
+  });
+
   it('checks Vary rsc, missing headers and Vercel CDN statuses', () => {
     const noVary = auditCache({
       path: '/',

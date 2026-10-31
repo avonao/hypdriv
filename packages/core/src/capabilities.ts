@@ -32,6 +32,7 @@ export type CapabilityLine =
   | 'cache'
   | 'tag purge'
   | 'rate limiting'
+  | 'config store'
   | 'live channels'
   | 'vitals/traces sink'
   | 'images'
@@ -94,6 +95,8 @@ export function describeCapabilities(c: Capabilities): string[] {
             ? 'approximate (Cache API)'
             : 'per isolate',
     ),
+    // Where flags, redirect rules and the maintenance switch are read at run time (no redeploy needed).
+    line('config store', c.kv ? 'Workers KV' : 'none (hypdriv.config only)'),
     line('live channels', c.channel ? 'Durable Object (SSE/WebSocket)' : 'polling fallback'),
     line('vitals/traces sink', c.analyticsEngine ? 'Analytics Engine' : 'logs'),
     line('images', c.images ? 'Images binding' : 'loader only'),

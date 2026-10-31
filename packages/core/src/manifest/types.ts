@@ -26,6 +26,11 @@ export interface HypRoutePrerender {
   /** Serves a partial fallback shell upgraded in the background (16.3+ ISR). */
   partialFallback?: boolean;
   renderingMode?: 'STATIC' | 'PARTIALLY_STATIC';
+  /**
+   * Data cache tags of the prerender besides Next's implicit path tags (`fetch`/`unstable_cache` tags):
+   * `revalidateTag()` regenerates the page, so its HTML can change between deploys (classified `isr`).
+   */
+  tags?: string[];
   /** Prerendered concrete paths for dynamic routes (first 200). */
   paths?: string[];
   pathCount?: number;

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupProjects, installed, openNextProject, tempProject } from './__tests__/helpers';
 import { analyzeNextConfig, detectPlatform, detectProject } from './project';
@@ -132,6 +133,39 @@ describe('platform detection', () => {
     expect(info.vercel.config?.regions).toEqual(['iad1']);
   });
 
+  it('finds a monorepo app linked at the repository root (vercel link / pull / build there)', () => {
+    const p = tempProject({
+      'pnpm-workspace.yaml': 'packages:\n  - apps/*\n',
+      'apps/web/package.json': JSON.stringify({ name: 'web', dependencies: { next: '16.4.3' } }),
+      'apps/web/vercel.json': JSON.stringify({ regions: ['iad1'] }),
+      '.vercel/project.json': JSON.stringify({
+        projectId: 'prj_1',
+        orgId: 'team_1',
+        settings: { rootDirectory: 'apps/web' },
+      }),
+      '.vercel/.env.production.local': 'HYPDRIV_SESSION_SECRET="x"\nCRON_SECRET="y"\n',
+      '.vercel/output/config.json': '{"version":3}',
+    });
+    const info = detectProject(join(p.dir, 'apps/web'), { env: {} });
+    expect(info.vercel.linked).toBe(true);
+    expect(info.vercel.linkDir).toBe(p.dir);
+    expect(info.vercel.outputDir).toBe(join(p.dir, '.vercel', 'output'));
+    expect(info.envFiles).toContainEqual({
+      file: join('..', '..', '.vercel', '.env.production.local'),
+      keys: ['HYPDRIV_SESSION_SECRET', 'CRON_SECRET'],
+    });
+    // A link for another app of the repository is not this app's.
+    p.write(
+      '.vercel/project.json',
+      JSON.stringify({ projectId: 'prj_2', orgId: 'team_1', settings: { rootDirectory: 'apps/docs' } }),
+    );
+    expect(detectProject(join(p.dir, 'apps/web'), { env: {} }).vercel).toMatchObject({
+      linked: false,
+      linkDir: null,
+      outputDir: null,
+    });
+  });
+
   it('weighs signals and honours --platform', () => {
     const base = {
       wranglerConfig: null,
@@ -147,6 +181,7 @@ describe('platform detection', () => {
       config: null,
       parseError: null,
       linked: false,
+      linkDir: null,
       outputDir: null,
       cli: null,
     } as const;

@@ -49,6 +49,11 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
   const cacheControl = input.second.headers.get('cache-control');
   const contentType = input.second.headers.get('content-type') ?? '';
   const isHtml = /text\/html/i.test(contentType);
+  // `x-hypdriv-cache-reason: route-header:<why>`: a configuration limit, not a broken cache.
+  const reason =
+    input.second.headers.get('x-hypdriv-cache-reason') ?? input.first.headers.get('x-hypdriv-cache-reason');
+  const platformLimit =
+    second === 'BYPASS' && reason?.startsWith('route-header:') ? reason.slice('route-header:'.length) : null;
 
   if (!first && !second) {
     findings.push({
@@ -70,6 +75,12 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
         level: 'info',
         message: `Vercel CDN headers present (${cdn}); hits show as x-vercel-cache on a deployment`,
       });
+  } else if (input.hasPolicy && platformLimit) {
+    // The policy cannot apply to this response on the platform (Vercel pages need a static route-header form).
+    findings.push({
+      level: 'warn',
+      message: `policy not applicable on this platform (${platformLimit}): the page is not CDN-cached; Route Handlers can apply it with withVercelCdn()`,
+    });
   } else if (input.hasPolicy) {
     const firstSetCookie = input.first.headers.has('set-cookie');
     if (first && !['MISS', 'HIT', 'STALE', 'REVALIDATED', 'PRERENDER', 'CDN'].includes(first))

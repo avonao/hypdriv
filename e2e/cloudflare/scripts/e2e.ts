@@ -235,6 +235,30 @@ function html(body: string, id: string): string | null {
   return m ? m[1]! : null;
 }
 
+/**
+ * Inline/external scripts of a document that its CSP would block: allowed are scripts carrying the policy's
+ * nonce, inline scripts whose hash is listed, and anything when the policy falls back to 'unsafe-inline'
+ * (no nonce or hash present, which is what browsers honour).
+ */
+function blockedScripts(body: string, csp: string): string[] {
+  const scriptSrc = /script-src([^;]*)/.exec(csp)?.[1] ?? '';
+  const nonce = /'nonce-([^']+)'/.exec(scriptSrc)?.[1];
+  const hashes = /'sha(256|384|512)-/.test(scriptSrc);
+  const unsafeInline = scriptSrc.includes("'unsafe-inline'") && !nonce && !hashes;
+  const blocked: string[] = [];
+  for (const m of body.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+    const [, attrs, content] = m as unknown as [string, string, string];
+    // Data blocks never execute; speculation rules are inline scripts like any other for CSP.
+    if (/type="application\/(?:ld\+)?json"/.test(attrs)) continue;
+    if (/\bsrc=/.test(attrs)) continue; // external: 'self'
+    if (unsafeInline) continue;
+    if (nonce && attrs.includes(`nonce="${nonce}"`)) continue;
+    if (scriptSrc.includes(`'sha256-${createHash('sha256').update(content).digest('base64')}'`)) continue;
+    blocked.push(content.slice(0, 50));
+  }
+  return blocked;
+}
+
 function cacheStatus(h: Headers): string {
   return h.get('x-hypdriv-cache') ?? '—';
 }
@@ -668,13 +692,21 @@ check({
     const after = await poll(
       'a fresh /tagged',
       async () => {
-        const s = html((await get('/tagged')).body, 'stamped');
-        return s && before && Date.parse(s) > Date.parse(before) ? s : null;
+        const r = await get('/tagged');
+        const s = html(r.body, 'stamped');
+        return s && before && Date.parse(s) > Date.parse(before) ? { s, r } : null;
       },
       60_000,
       2000,
     );
-    return `${before} → ${after}`;
+    // The regenerated HTML carries new inline RSC payload scripts: the CSP must still allow every one.
+    const csp = after.r.headers.get('content-security-policy') ?? '';
+    const blocked = blockedScripts(after.r.body, csp);
+    assert(
+      !blocked.length,
+      `${blocked.length} inline script(s) blocked after regeneration (${after.r.headers.get('x-hypdriv-csp')})`,
+    );
+    return `${before} → ${after.s} · CSP ${after.r.headers.get('x-hypdriv-csp')} allows every script of the regenerated page`;
   },
 });
 

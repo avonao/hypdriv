@@ -3,6 +3,7 @@ import {
   type FlagDefinition,
   type FlagValue,
   getCurrentContext,
+  getRuntime,
   HEADER,
   type HypContext,
   type HypDrivEnv,
@@ -204,11 +205,15 @@ export interface JobInput {
 }
 
 export interface JobHandlerOptions {
-  /** Environment variable holding the shared secret (default `HYPDRIV_INTERNAL_SECRET`). */
+  /**
+   * Environment variable holding the shared secret (default `security.internalAuth.secretEnv` from the
+   * registered config, else `HYPDRIV_INTERNAL_SECRET`).
+   */
   secretEnv?: string;
   /**
    * Environment variable holding the secret Vercel Cron sends as `Authorization: Bearer <secret>`
-   * (default `CRON_SECRET`). Requests carrying it are accepted as cron invocations.
+   * (default `vercel.cronSecretEnv` from the registered config, else `CRON_SECRET`). Requests carrying it are
+   * accepted as cron invocations.
    */
   cronSecretEnv?: string;
   /** Job name reported to the handler when the request does not name one (Vercel Cron calls). */
@@ -227,9 +232,13 @@ export function jobHandler(
   options: JobHandlerOptions,
   handler: (input: JobInput) => Promise<Response | unknown>,
 ): (request: Request) => Promise<Response> {
-  const secretEnv = options.secretEnv ?? 'HYPDRIV_INTERNAL_SECRET';
-  const cronSecretEnv = options.cronSecretEnv ?? 'CRON_SECRET';
   return async (request) => {
+    // The config of the request (proxy context) or the one `createInstrumentation().register()` registered
+    // for Vercel Functions, read per call because registration happens after module evaluation.
+    const config = getCurrentContext()?.config ?? getRuntime()?.config;
+    const secretEnv =
+      options.secretEnv ?? config?.security.internalAuth.secretEnv ?? 'HYPDRIV_INTERNAL_SECRET';
+    const cronSecretEnv = options.cronSecretEnv ?? config?.vercel.cronSecretEnv ?? 'CRON_SECRET';
     const context = await hyp();
     const readSecret = (name: string) => {
       const value = context.env[name] ?? processEnv()[name];
@@ -261,14 +270,21 @@ export function jobHandler(
       }
     }
     let payload: unknown = null;
+    const pathname = new URL(request.url).pathname;
+    // Vercel Cron names neither the job nor (outside `x-vercel-cron-schedule`) the schedule: the
+    // `jobs.cron` entry for this path supplies both.
+    const configured = viaVercelCron
+      ? Object.entries(config?.jobs.cron ?? {}).find(([, entry]) => entry.path === pathname)
+      : undefined;
     let job =
       request.headers.get('x-hypdriv-job') ??
       new URL(request.url).searchParams.get('job') ??
       options.job ??
-      new URL(request.url).pathname.split('/').filter(Boolean).pop() ??
+      configured?.[0] ??
+      pathname.split('/').filter(Boolean).pop() ??
       'default';
     let cron: string | undefined = viaVercelCron
-      ? (request.headers.get('x-vercel-cron-schedule') ?? undefined)
+      ? (request.headers.get('x-vercel-cron-schedule') ?? configured?.[1].cron ?? undefined)
       : undefined;
     let messages: JobInput['messages'];
     if (request.method !== 'GET' && request.headers.get('content-type')?.includes('application/json')) {
