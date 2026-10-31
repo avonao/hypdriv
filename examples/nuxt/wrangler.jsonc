@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // `nuxt build` (cloudflare-module preset, `deployConfig: true`) merges this file into
+  // `.output/server/wrangler.json` (adding `main` and the assets directory); `wrangler dev` / `wrangler deploy`
+  // from this directory pick that file up through `.wrangler/deploy/config.json`.
+  "name": "hypdriv-nuxt",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" },
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }
+  ]
+}
