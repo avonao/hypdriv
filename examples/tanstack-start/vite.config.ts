@@ -11,7 +11,15 @@ const target = process.env.HYPDRIV_TARGET ?? (process.env.VERCEL === '1' ? 'verc
 
 export default defineConfig({
   plugins: [
-    ...(target === 'cloudflare' ? [cloudflare({ viteEnvironment: { name: 'ssr' } })] : []),
+    // WRANGLER_CONFIG points at an account-specific, git-ignored wrangler.<name>.local.jsonc.
+    ...(target === 'cloudflare'
+      ? [
+          cloudflare({
+            viteEnvironment: { name: 'ssr' },
+            ...(process.env.WRANGLER_CONFIG ? { configPath: process.env.WRANGLER_CONFIG } : {}),
+          }),
+        ]
+      : []),
     tanstackStart(
       // withHypDriv() marks Start's prerender requests (so the pipeline stays out of the static HTML) and writes
       // prerendered pages as `about.html`, the path Start's router and the platforms serve without a redirect.
