@@ -243,9 +243,7 @@ describe('hypdriv(adapter)', () => {
     expect(manifest.csp['page:/']!.scriptHashes).toContain("'sha256-FROMKITMETA='");
     expect(manifest.csp['page:/']!.scriptHashes.length).toBe(2);
     // Early Hints use root-relative URLs although SvelteKit wrote relative ones.
-    expect(manifest.earlyHints['page:/']).toContain(
-      '</_app/immutable/entry/start.A.js>; rel=modulepreload',
-    );
+    expect(manifest.earlyHints['page:/']).toContain('</_app/immutable/entry/start.A.js>; rel=modulepreload');
     expect(manifest.earlyHints['page:/ssr']?.join(',')).toContain('/_app/immutable/nodes/3.js');
     expect(existsSync(join(root, '.hypdriv', 'report.md'))).toBe(true);
 
