@@ -192,3 +192,151 @@ describe('hypdriv init (Astro)', () => {
     expect(p.read('astro.config.mjs')).toContain('integrations: [hypdriv()]');
   });
 });
+
+describe('config editors for framework wiring', () => {
+  it('wraps a call argument and a property value', async () => {
+    const { wrapCallArgument, wrapPropertyValue } = await import('./config-edit');
+    const start = `import { tanstackStart } from '@tanstack/react-start/plugin/vite';\nexport default defineConfig({ plugins: [tanstackStart({ prerender: { enabled: true } }), viteReact()] });\n`;
+    const wrapped = wrapCallArgument(start, {
+      callee: 'tanstackStart',
+      wrapper: 'withHypDriv',
+      importLine: "import { withHypDriv } from '@hypdriv/tanstack-start/vite';",
+      importFrom: '@hypdriv/tanstack-start/vite',
+    });
+    expect(wrapped.content).toContain(
+      'tanstackStart(withHypDriv({ prerender: { enabled: true } })), viteReact()',
+    );
+    expect(wrapped.content).toContain("import { withHypDriv } from '@hypdriv/tanstack-start/vite';");
+    expect(
+      wrapCallArgument(wrapped.content, {
+        callee: 'tanstackStart',
+        wrapper: 'withHypDriv',
+        importLine: '',
+        importFrom: 'x',
+      }).changed,
+    ).toBe(false);
+    expect(
+      wrapCallArgument('x(tanstackStart())', {
+        callee: 'tanstackStart',
+        wrapper: 'withHypDriv',
+        importLine: 'import w from "w";',
+        importFrom: 'w',
+      }).content,
+    ).toContain('tanstackStart(withHypDriv())');
+    const kit = `import adapter from '@sveltejs/adapter-node';\nexport default defineConfig({ plugins: [sveltekit({ adapter: adapter({ out: 'build' }), csp: { mode: 'auto' } })] });\n`;
+    const k = wrapPropertyValue(kit, {
+      property: 'adapter',
+      within: 'sveltekit',
+      wrapper: 'hypdriv',
+      importLine: "import { hypdriv } from '@hypdriv/sveltekit';",
+      importFrom: '@hypdriv/sveltekit',
+    });
+    expect(k.content).toContain("adapter: hypdriv(adapter({ out: 'build' })), csp:");
+    expect(k.content).toContain("import { hypdriv } from '@hypdriv/sveltekit';");
+  });
+
+  it('inserts before an anchor element', () => {
+    const r = addToConfigArray('export default defineConfig({ plugins: [vinext(), tail()] });', {
+      property: 'plugins',
+      element: 'cloudflare()',
+      before: /tail\s*\(/,
+    });
+    expect(r.content).toContain('plugins: [vinext(), cloudflare(), tail()]');
+  });
+});
+
+describe('hypdriv init for framework hosts', () => {
+  async function init(files: Record<string, string>, platform: string) {
+    const p = tempProject(files);
+    const io = memoryIO(p.dir);
+    expect(await runCommand('init', ['--platform', platform, '--skip-doctor', '--json'], io)).toBe(0);
+    return {
+      p,
+      out: JSON.parse(io.out) as { plan: Array<{ path: string; action: string }>; notes: string[] },
+    };
+  }
+
+  it('React Router: plugin before reactRouter(), preset, root middleware, server entry, Worker', async () => {
+    const { p } = await init(
+      {
+        'package.json': JSON.stringify({ name: 'rr', devDependencies: { '@react-router/dev': '^8.5.1' } }),
+        ...installed('@react-router/dev', '8.5.1'),
+        'vite.config.ts':
+          "import { reactRouter } from '@react-router/dev/vite';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [reactRouter()] });\n",
+        'react-router.config.ts':
+          "import type { Config } from '@react-router/dev/config';\nexport default { ssr: true } satisfies Config;\n",
+        'app/root.tsx':
+          "import { Outlet } from 'react-router';\nexport default function App() { return <Outlet />; }\n",
+      },
+      'cloudflare',
+    );
+    expect(p.read('vite.config.ts')).toMatch(
+      /plugins: \[cloudflare\(\{ viteEnvironment: \{ name: 'ssr' \} \}\), hypdriv\(\), reactRouter\(\)\]/,
+    );
+    expect(p.read('react-router.config.ts')).toContain('presets: [hypdrivPreset()]');
+    expect(p.read('app/root.tsx')).toContain('export const middleware = [hypdrivMiddleware()];');
+    expect(p.read('app/entry.server.tsx')).toContain('@hypdriv/react-router/entry.server');
+    expect(p.read('workers/app.ts')).toContain('reactRouterWorker');
+    expect(parseJsonc(p.read('wrangler.jsonc'))).toMatchObject({ main: 'workers/app.ts' });
+  });
+
+  it('TanStack Start: withHypDriv(), hypdriv() last, nitro before it, start.ts', async () => {
+    const { p, out } = await init(
+      {
+        'package.json': JSON.stringify({ name: 'ts', dependencies: { '@tanstack/react-start': '^1.169.4' } }),
+        ...installed('@tanstack/react-start', '1.169.4'),
+        'vite.config.ts':
+          "import { tanstackStart } from '@tanstack/react-start/plugin/vite';\nimport viteReact from '@vitejs/plugin-react';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [tanstackStart(), viteReact()] });\n",
+      },
+      'vercel',
+    );
+    const vite = p.read('vite.config.ts');
+    expect(vite).toContain('tanstackStart(withHypDriv()), viteReact(), nitro(), hypdriv()');
+    expect(p.read('src/start.ts')).toContain('hypdrivRequestMiddleware');
+    expect(out.notes.join('\n')).toContain('hypdrivSsr');
+  });
+
+  it('SvelteKit, Nuxt and vinext register where their config expects it', async () => {
+    const kit = await init(
+      {
+        'package.json': JSON.stringify({ name: 'kit', devDependencies: { '@sveltejs/kit': '^3.1.1' } }),
+        ...installed('@sveltejs/kit', '3.1.1'),
+        'vite.config.ts':
+          "import adapter from '@sveltejs/adapter-node';\nimport { sveltekit } from '@sveltejs/kit/vite';\nexport default defineConfig({ plugins: [sveltekit({ adapter: adapter() })] });\n",
+      },
+      'node',
+    );
+    expect(kit.p.read('vite.config.ts')).toContain('adapter: hypdriv(adapter())');
+    expect(kit.p.read('src/hooks.server.ts')).toContain('export const handle = hypdriv();');
+    expect(kit.p.read('server.js')).toContain('@hypdriv/sveltekit/node');
+    expect(JSON.parse(kit.p.read('package.json')).scripts.start).toBe('node server.js');
+
+    const nuxt = await init(
+      {
+        'package.json': JSON.stringify({ name: 'nx', dependencies: { nuxt: '^4.6.3' } }),
+        ...installed('nuxt', '4.6.3'),
+        'nuxt.config.ts': "export default defineNuxtConfig({ modules: ['@nuxt/image'] });\n",
+      },
+      'cloudflare',
+    );
+    expect(nuxt.p.read('nuxt.config.ts')).toContain("modules: ['@nuxt/image', '@hypdriv/nuxt']");
+    expect(parseJsonc(nuxt.p.read('wrangler.jsonc'))).toMatchObject({
+      assets: { html_handling: 'drop-trailing-slash' },
+    });
+    expect(nuxt.out.notes.join('\n')).toContain('cloudflare-module');
+
+    const vinext = await init(
+      {
+        'package.json': JSON.stringify({ name: 'vx', dependencies: { vinext: '^1.4.0' } }),
+        ...installed('vinext', '1.4.0'),
+        'vite.config.ts':
+          "import vinext from 'vinext';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [vinext()] });\n",
+      },
+      'cloudflare',
+    );
+    expect(vinext.p.read('vite.config.ts')).toMatch(
+      /plugins: \[vinext\(\), cloudflare\(\{ viteEnvironment: \{ name: 'rsc', childEnvironments: \['ssr'\] \} \}\), hypdriv\(\)\]/,
+    );
+    expect(vinext.p.read('worker/index.ts')).toContain('createVinextWorker');
+  });
+});

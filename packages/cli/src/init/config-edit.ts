@@ -89,6 +89,8 @@ export function addToConfigArray(
     importFrom?: string;
     /** Insert as the first element (default) or the last. */
     position?: 'first' | 'last';
+    /** Insert right before the first element matching this (e.g. `/reactRouter\s*\(/`); falls back to `position`. */
+    before?: RegExp;
     present?: RegExp;
   },
 ): ConfigEditResult {
@@ -112,7 +114,11 @@ export function addToConfigArray(
     if (!present.test(inner)) {
       const multiline = /^\s*\n/.test(inner);
       const empty = inner.trim() === '';
-      if (empty) out = `${source.slice(0, open + 1)}${options.element}${source.slice(close)}`;
+      const anchor = options.before ? options.before.exec(inner) : null;
+      if (anchor) {
+        const at = open + 1 + anchor.index;
+        out = `${source.slice(0, at)}${options.element},${multiline ? `\n${indentAt(source, at)}` : ' '}${source.slice(at)}`;
+      } else if (empty) out = `${source.slice(0, open + 1)}${options.element}${source.slice(close)}`;
       else if (options.position === 'last') {
         const trimmed = inner.replace(/\s*$/, '');
         const comma = trimmed.endsWith(',') ? '' : ',';
@@ -143,4 +149,94 @@ export function addToConfigArray(
     content: out,
     reason: changed ? `register ${callee} in ${options.property}` : `${callee} already registered`,
   };
+}
+
+/** Index just past the expression that starts at `start` (stops at a top-level `,`, `)`, `]` or `}`). */
+function expressionEnd(source: string, start: number): number {
+  for (let i = start; i < source.length; i++) {
+    const c = source[i]!;
+    if (c === '(' || c === '[' || c === '{') {
+      const close = matchClose(source, i);
+      if (close === -1) return -1;
+      i = close;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < source.length && source[j] !== c) {
+        if (source[j] === '\\') j++;
+        j++;
+      }
+      i = j;
+      continue;
+    }
+    if (c === ',' || c === ')' || c === ']' || c === '}') return i;
+  }
+  return source.length;
+}
+
+/**
+ * Wraps the first argument of the first `callee(...)` call: `tanstackStart({ … })` → `tanstackStart(withHypDriv({ … }))`
+ * (`tanstackStart()` → `tanstackStart(withHypDriv())`). Unchanged when the argument is already wrapped.
+ */
+export function wrapCallArgument(
+  source: string,
+  options: { callee: string; wrapper: string; importLine: string; importFrom: string },
+): ConfigEditResult {
+  const call = new RegExp(`(^|[^\\w$.])${options.callee.replace(/[.$]/g, '\\$&')}\\s*\\(`).exec(source);
+  if (!call) return { changed: false, content: source, reason: `no ${options.callee}() call found` };
+  const open = call.index + call[0].length - 1;
+  const close = matchClose(source, open);
+  if (close === -1) return { changed: false, content: source, reason: `could not parse ${options.callee}()` };
+  const inner = source.slice(open + 1, close);
+  if (new RegExp(`^\\s*${options.wrapper}\\s*\\(`).test(inner))
+    return { changed: false, content: source, reason: `${options.callee}() options already wrapped` };
+  let out: string;
+  if (!inner.trim()) out = `${source.slice(0, open + 1)}${options.wrapper}()${source.slice(close)}`;
+  else {
+    const argStart = open + 1 + (inner.length - inner.trimStart().length);
+    const argEnd = expressionEnd(source, argStart);
+    if (argEnd === -1)
+      return { changed: false, content: source, reason: `could not parse ${options.callee}()` };
+    const arg = source.slice(argStart, argEnd).replace(/\s+$/, '');
+    out = `${source.slice(0, argStart)}${options.wrapper}(${arg})${source.slice(argStart + arg.length)}`;
+  }
+  const imports = out
+    .split(/\n/)
+    .filter((l) => /^\s*import\b/.test(l))
+    .join('\n');
+  if (!new RegExp(`\\b${options.wrapper}\\b`).test(imports))
+    out = insertImport(out, options.importLine, 'esm');
+  return { changed: true, content: out, reason: `wrap ${options.callee}() options in ${options.wrapper}()` };
+}
+
+/**
+ * Wraps the value of `property` inside the first `within(...)` call (or anywhere when `within` is omitted):
+ * `sveltekit({ adapter: adapter() })` → `sveltekit({ adapter: hypdriv(adapter()) })`.
+ */
+export function wrapPropertyValue(
+  source: string,
+  options: { property: string; wrapper: string; within?: string; importLine: string; importFrom: string },
+): ConfigEditResult {
+  let from = 0;
+  let to = source.length;
+  if (options.within) {
+    const call = new RegExp(`(^|[^\\w$.])${options.within}\\s*\\(`).exec(source);
+    if (!call) return { changed: false, content: source, reason: `no ${options.within}() call found` };
+    from = call.index + call[0].length - 1;
+    to = matchClose(source, from);
+    if (to === -1) return { changed: false, content: source, reason: `could not parse ${options.within}()` };
+  }
+  const prop = new RegExp(`(^|[\\s,{])${options.property}\\s*:\\s*`).exec(source.slice(from, to));
+  if (!prop) return { changed: false, content: source, reason: `no ${options.property} option found` };
+  const valueStart = from + prop.index + prop[0].length;
+  if (new RegExp(`^${options.wrapper}\\s*\\(`).test(source.slice(valueStart)))
+    return { changed: false, content: source, reason: `${options.property} already wrapped` };
+  const valueEnd = expressionEnd(source, valueStart);
+  if (valueEnd === -1)
+    return { changed: false, content: source, reason: `could not parse ${options.property}` };
+  const value = source.slice(valueStart, valueEnd).replace(/\s+$/, '');
+  let out = `${source.slice(0, valueStart)}${options.wrapper}(${value})${source.slice(valueStart + value.length)}`;
+  if (!importsModule(out, options.importFrom)) out = insertImport(out, options.importLine, 'esm');
+  return { changed: true, content: out, reason: `wrap ${options.property} in ${options.wrapper}()` };
 }

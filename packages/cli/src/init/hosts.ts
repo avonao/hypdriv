@@ -5,7 +5,8 @@ import type { LoadedConfig } from '../context';
 import { FRAMEWORK_LABEL, type ProjectInfo } from '../project';
 import { defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
-import { addToConfigArray } from './config-edit';
+import { addToConfigArray, wrapCallArgument, wrapPropertyValue } from './config-edit';
+import { insertImport } from './next-config';
 import { editPackageJson } from './package-json';
 import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, planVercel } from './plan';
 import { addRootKey, editWranglerJsonc, rootValueText } from './wrangler';
@@ -135,11 +136,18 @@ export default defineConfig({
 `;
 }
 
+const CONFIG_EXT_ORDER = ['ts', 'mts', 'js', 'mjs', 'cts', 'cjs'];
+const extOf = (file: string) => file.slice(file.lastIndexOf('.') + 1);
+
 export interface ConfigEntry {
   element: string;
   importLine: string;
   from: string;
   position?: 'first' | 'last';
+  /** Insert right before the first element matching this. */
+  before?: RegExp;
+  /** Whether the element is already there (default: its callee is called in the array). */
+  present?: RegExp;
   property?: string;
 }
 
@@ -153,7 +161,11 @@ export function registerInConfig(
   entries: ConfigEntry[],
   o: { file: RegExp; fallback: { path: string; content: string }; property?: string },
 ): void {
-  const candidates = [ctx.project.framework.configFile, ...(ctx.extraConfigFiles ?? [])].filter(
+  const inRoot = readdirSync(ctx.project.root)
+    .filter((f) => o.file.test(f) && /\.(?:[cm]?[jt]s)$/.test(f))
+    .sort((a, b) => CONFIG_EXT_ORDER.indexOf(extOf(a)) - CONFIG_EXT_ORDER.indexOf(extOf(b)))
+    .map((f) => join(ctx.project.root, f));
+  const candidates = [ctx.project.framework.configFile, ...(ctx.extraConfigFiles ?? []), ...inRoot].filter(
     (f): f is string => Boolean(f) && o.file.test(f as string),
   );
   const file = candidates[0];
@@ -173,9 +185,10 @@ export function registerInConfig(
     const r = addToConfigArray(content, {
       property,
       element: e.element,
-      importLine: e.importLine,
-      importFrom: e.from,
+      ...(e.importLine ? { importLine: e.importLine, importFrom: e.from } : {}),
       position: e.position ?? 'last',
+      ...(e.before ? { before: e.before } : {}),
+      ...(e.present ? { present: e.present } : {}),
     });
     if (!r.changed && /no exported config|could not parse/.test(r.reason)) {
       ctx.items.push({
@@ -470,10 +483,535 @@ export const ASTRO_SPEC: HostSpec = {
   }),
 };
 
+/** Applies a text edit to a project file as one plan item (create when absent with `fallback`, manual on failure). */
+export function planFileEdit(
+  ctx: HostContext,
+  path: string,
+  edit: (source: string) => { changed: boolean; content: string; reason: string },
+  o: { fallback?: string; hint: string; done?: RegExp },
+): void {
+  const file = join(ctx.project.root, path);
+  if (!existsSync(file)) {
+    if (o.fallback !== undefined)
+      ctx.items.push({ path, action: 'create', reason: 'HypDriv wiring', content: o.fallback });
+    else ctx.items.push({ path, action: 'manual', reason: 'file not found', hint: o.hint });
+    return;
+  }
+  const source = ctx.read(file);
+  if (o.done?.test(source)) {
+    ctx.items.push({ path, action: 'skip', reason: 'already wired' });
+    return;
+  }
+  const r = edit(source);
+  if (r.changed) ctx.items.push({ path, action: 'modify', reason: r.reason, content: r.content });
+  else if (/already/.test(r.reason)) ctx.items.push({ path, action: 'skip', reason: r.reason });
+  else ctx.items.push({ path, action: 'manual', reason: r.reason, hint: o.hint });
+}
+
+/** Creates a file when absent; a file without `uses` gets a manual step with the template as the hint. */
+export function planNewFile(
+  ctx: HostContext,
+  path: string,
+  content: string,
+  o: { uses: RegExp; reason: string; existing?: string },
+): void {
+  const file = join(ctx.project.root, path);
+  if (!existsSync(file)) {
+    ctx.items.push({ path, action: 'create', reason: o.reason, content });
+    return;
+  }
+  if (o.uses.test(ctx.read(file))) ctx.items.push({ path, action: 'skip', reason: 'already wired' });
+  else
+    ctx.items.push({
+      path,
+      action: 'manual',
+      reason: o.existing ?? `${path} exists; wire HypDriv in`,
+      hint: content,
+    });
+}
+
+const DO_EXPORTS =
+  "export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects';";
+const cloudflarePlugin = (environment: string, extra = ''): ConfigEntry => ({
+  element: `cloudflare({ viteEnvironment: { name: '${environment}'${extra} } })`,
+  importLine: "import { cloudflare } from '@cloudflare/vite-plugin';",
+  from: '@cloudflare/vite-plugin',
+  position: 'first',
+});
+const wranglerJson = (o: Record<string, unknown>) => `${JSON.stringify(o, null, 2)}\n`;
+
+export const REACT_ROUTER_SPEC: HostSpec = {
+  framework: 'react-router',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/react-router', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/react-router', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare'
+      ? { devDependencies: ['@cloudflare/vite-plugin', 'wrangler', '@cloudflare/workers-types'] }
+      : {},
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [
+        ...(ctx.platform === 'cloudflare' ? [cloudflarePlugin('ssr')] : []),
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/react-router';",
+          from: '@hypdriv/react-router',
+          before: /reactRouter\s*\(/,
+        },
+      ],
+      {
+        file: /vite\.config\./,
+        property: 'plugins',
+        fallback: {
+          path: 'vite.config.ts',
+          content: `${ctx.platform === 'cloudflare' ? "import { cloudflare } from '@cloudflare/vite-plugin';\n" : ''}import { hypdriv } from '@hypdriv/react-router';\nimport { reactRouter } from '@react-router/dev/vite';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({\n  plugins: [${ctx.platform === 'cloudflare' ? "cloudflare({ viteEnvironment: { name: 'ssr' } }), " : ''}hypdriv(), reactRouter()],\n});\n`,
+        },
+      },
+    );
+    const rrConfig = ['react-router.config.ts', 'react-router.config.js'].find((f) =>
+      existsSync(join(ctx.project.root, f)),
+    );
+    planFileEdit(
+      ctx,
+      rrConfig ?? 'react-router.config.ts',
+      (source) =>
+        addToConfigArray(source, {
+          property: 'presets',
+          element: 'hypdrivPreset()',
+          importLine: "import { hypdrivPreset } from '@hypdriv/react-router';",
+          importFrom: '@hypdriv/react-router',
+          position: 'last',
+        }),
+      {
+        fallback: `import { hypdrivPreset } from '@hypdriv/react-router';\nimport type { Config } from '@react-router/dev/config';\n\nexport default {\n  ssr: true,\n  presets: [hypdrivPreset()],\n} satisfies Config;\n`,
+        hint: "presets: [hypdrivPreset()] // import { hypdrivPreset } from '@hypdriv/react-router'",
+      },
+    );
+    const root = ['app/root.tsx', 'app/root.jsx', 'app/root.ts'].find((f) =>
+      existsSync(join(ctx.project.root, f)),
+    );
+    planFileEdit(
+      ctx,
+      root ?? 'app/root.tsx',
+      (source) => {
+        if (/export\s+(?:const|let|function)\s+middleware\b/.test(source))
+          return {
+            changed: false,
+            content: source,
+            reason: 'root route exports its own middleware; add hypdrivMiddleware() first',
+          };
+        const withImport = insertImport(
+          source,
+          "import { hypdrivMiddleware } from '@hypdriv/react-router/server';",
+          'esm',
+        );
+        return {
+          changed: true,
+          content: `${withImport.replace(/\s*$/, '')}\n\n// HypDriv's request stages around every route (security headers, CSP nonce, rate limiting, bot shield).\nexport const middleware = [hypdrivMiddleware()];\n`,
+          reason: 'export the HypDriv root middleware',
+        };
+      },
+      {
+        done: /hypdrivMiddleware/,
+        hint: "import { hypdrivMiddleware } from '@hypdriv/react-router/server';\nexport const middleware = [hypdrivMiddleware(), /* your middleware */];",
+      },
+    );
+    planNewFile(
+      ctx,
+      'app/entry.server.tsx',
+      "// React Router's server entry with HypDriv's CSP nonce on every script ServerRouter and React render.\nexport { default, streamTimeout } from '@hypdriv/react-router/entry.server';\n",
+      {
+        uses: /@hypdriv\/react-router/,
+        reason: "server entry that hands HypDriv's nonce to ServerRouter",
+        existing:
+          "app/entry.server.tsx exists; pass the request nonce to ServerRouter (or re-export HypDriv's entry)",
+      },
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      const main = configured ?? 'workers/app.ts';
+      planWorkerEntry(
+        ctx,
+        main,
+        `/// <reference types="@hypdriv/vite/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport { reactRouterWorker } from '@hypdriv/react-router/cloudflare';\n\n${DO_EXPORTS}\n\n// HypDriv's Worker shell around React Router: prerendered pages and public files from the assets binding, the\n// rest from React Router; scheduled/queue/email dispatch HypDriv's jobs.\nexport default reactRouterWorker({ config });\n`,
+        /reactRouterWorker|createWorker/,
+      );
+      const assets = {
+        binding: 'ASSETS',
+        html_handling: 'drop-trailing-slash',
+        not_found_handling: 'none',
+        run_worker_first: ['/*', '!/assets/*'],
+      };
+      planHostWrangler(ctx, {
+        main: configured ? null : main,
+        durableObjects: true,
+        assets: JSON.stringify(assets),
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main,
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            assets,
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "On Vercel HypDriv writes the Build Output itself (static files, header routes, one traced function per server bundle, Routing Middleware for prerendered pages); @vercel/react-router's vercelPreset() is optional (route `config`).",
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'hypdriv-react-router-serve ./build/server/index.js' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '4173' : '3000'}`,
+  }),
+};
+
+export const TANSTACK_START_SPEC: HostSpec = {
+  framework: 'tanstack-start',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/tanstack-start', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/tanstack-start', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare'
+      ? { devDependencies: ['@cloudflare/vite-plugin', 'wrangler', '@cloudflare/workers-types'] }
+      : { dependencies: ['nitro'] },
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [
+        ...(ctx.platform === 'cloudflare' ? [cloudflarePlugin('ssr')] : []),
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/tanstack-start/vite';",
+          from: '@hypdriv/tanstack-start/vite',
+        },
+        ...(ctx.platform !== 'cloudflare'
+          ? [
+              {
+                element: 'nitro()',
+                importLine: "import { nitro } from 'nitro/vite';",
+                from: 'nitro/vite',
+                before: /hypdriv\s*\(/,
+              },
+            ]
+          : []),
+      ],
+      {
+        file: /vite\.config\./,
+        property: 'plugins',
+        fallback: { path: 'vite.config.ts', content: '' },
+      },
+    );
+    const vite = ctx.items.find((i) => /vite\.config\./.test(i.path) && i.action !== 'manual');
+    const viteFile = ctx.project.framework.configFile;
+    if (vite && viteFile) {
+      const source = vite.content ?? ctx.read(viteFile);
+      const r = wrapCallArgument(source, {
+        callee: 'tanstackStart',
+        wrapper: 'withHypDriv',
+        importLine: "import { withHypDriv } from '@hypdriv/tanstack-start/vite';",
+        importFrom: '@hypdriv/tanstack-start/vite',
+      });
+      if (r.changed) {
+        vite.reason = vite.action === 'modify' ? `${vite.reason}; ${r.reason}` : r.reason;
+        vite.action = 'modify';
+        vite.content = r.content;
+      } else if (!/already wrapped/.test(r.reason))
+        ctx.notes.push(
+          `vite.config: ${r.reason}; pass Start's options through withHypDriv() so prerendering stays outside the pipeline.`,
+        );
+    }
+    planNewFile(
+      ctx,
+      'src/start.ts',
+      "import { hypdrivRequestMiddleware } from '@hypdriv/tanstack-start';\nimport { createStart } from '@tanstack/react-start';\n\n// HypDriv first (it wraps SSR documents, server routes, server functions, 404s), then Start's CSRF protection.\nconst requestMiddleware = hypdrivRequestMiddleware();\n\nexport const startInstance = createStart(() => ({ requestMiddleware }));\n",
+      {
+        uses: /hypdriv/i,
+        reason: "global request middleware (HypDriv, then Start's CSRF)",
+        existing: 'src/start.ts exists; put hypdrivRequestMiddleware() first in requestMiddleware',
+      },
+    );
+    ctx.notes.push(
+      "For Start's own tags to carry the request nonce, pass `ssr: hypdrivSsr()` to createRouter() in src/router.tsx (import { hypdrivSsr } from '@hypdriv/tanstack-start'); without it the pipeline injects the nonce while streaming.",
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform !== 'cloudflare') return;
+    const configured = ctx.project.wrangler.config?.main ?? null;
+    const main = configured ?? 'src/worker.ts';
+    planWorkerEntry(
+      ctx,
+      main,
+      `/// <reference types="@hypdriv/vite/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport { createStartWorker } from '@hypdriv/tanstack-start/cloudflare';\n\n${DO_EXPORTS}\n\nexport default createStartWorker({ config, manifest: () => import('virtual:hypdriv/manifest') });\n`,
+      /createStartWorker|createWorker/,
+    );
+    planHostWrangler(ctx, {
+      main: configured ? null : main,
+      durableObjects: true,
+      template: () =>
+        wranglerJson({
+          $schema: 'node_modules/wrangler/config-schema.json',
+          name: ctx.name,
+          main,
+          compatibility_date: defaultCompatibilityDate(ctx.now),
+          compatibility_flags: ['nodejs_compat'],
+          observability: { enabled: true },
+          durable_objects: { bindings: HYPDRIV_DO },
+          migrations: HYPDRIV_MIGRATION,
+        }),
+    });
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node .output/server/index.mjs' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '4173' : '3000'}`,
+  }),
+};
+
+export const SVELTEKIT_SPEC: HostSpec = {
+  framework: 'sveltekit',
+  packages: () => ['@hypdriv/sveltekit', '@hypdriv/core'],
+  install: (platform) => ({
+    devDependencies: [
+      platform === 'cloudflare'
+        ? '@sveltejs/adapter-cloudflare'
+        : platform === 'vercel'
+          ? '@sveltejs/adapter-vercel'
+          : '@sveltejs/adapter-node',
+      ...(platform === 'cloudflare' ? ['wrangler'] : []),
+    ],
+  }),
+  register(ctx) {
+    const viteFile =
+      ctx.project.framework.configFile && /vite\.config\./.test(ctx.project.framework.configFile)
+        ? rel(ctx.project.root, ctx.project.framework.configFile)
+        : 'vite.config.ts';
+    planFileEdit(
+      ctx,
+      viteFile,
+      (source) =>
+        wrapPropertyValue(source, {
+          property: 'adapter',
+          within: 'sveltekit',
+          wrapper: 'hypdriv',
+          importLine: "import { hypdriv } from '@hypdriv/sveltekit';",
+          importFrom: '@hypdriv/sveltekit',
+        }),
+      {
+        done: /@hypdriv\/sveltekit/,
+        hint: "import { hypdriv } from '@hypdriv/sveltekit';\nplugins: [sveltekit({ adapter: hypdriv(adapter()) })]",
+      },
+    );
+    planNewFile(
+      ctx,
+      'src/hooks.server.ts',
+      "import { hypdriv } from '@hypdriv/sveltekit/hooks';\n\n// HypDriv owns the full response (security headers, CSP, rate limiting, bot shield, `/_hypdriv/*`). With hooks of\n// your own: export const handle = sequence(hypdriv(), yourHandle) (import { sequence } from '@sveltejs/kit/hooks').\nexport const handle = hypdriv();\n",
+      {
+        uses: /@hypdriv\/sveltekit\/hooks/,
+        reason: 'the HypDriv handle hook',
+        existing:
+          'src/hooks.server.ts exists; export const handle = sequence(hypdriv(), …) with hypdriv() first',
+      },
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      const assets = {
+        binding: 'ASSETS',
+        directory: '.svelte-kit/cloudflare',
+        run_worker_first: ['/*', '!/_app/immutable/*'],
+      };
+      planHostWrangler(ctx, {
+        main: ctx.project.wrangler.config?.main ? null : '.svelte-kit/cloudflare/_worker.js',
+        durableObjects: true,
+        assets: JSON.stringify(assets),
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main: '.svelte-kit/cloudflare/_worker.js',
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            assets,
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+    } else if (ctx.platform === 'node')
+      planNewFile(
+        ctx,
+        'server.js',
+        "// adapter-node's build behind the HypDriv pipeline (static files and prerendered pages included).\nimport { serve } from '@hypdriv/sveltekit/node';\n\nawait serve({ dir: 'build' });\n",
+        { uses: /@hypdriv\/sveltekit\/node/, reason: "Node server around adapter-node's handler" },
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node server.js' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+};
+
+export const NUXT_SPEC: HostSpec = {
+  framework: 'nuxt',
+  packages: () => ['@hypdriv/nuxt', '@hypdriv/core'],
+  install: (platform) => (platform === 'cloudflare' ? { devDependencies: ['wrangler'] } : {}),
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [
+        {
+          element: "'@hypdriv/nuxt'",
+          importLine: '',
+          from: '',
+          position: 'last',
+          present: /['"]@hypdriv\/nuxt['"]/,
+        },
+      ],
+      {
+        file: /nuxt\.config\./,
+        property: 'modules',
+        fallback: {
+          path: 'nuxt.config.ts',
+          content: "export default defineNuxtConfig({\n  modules: ['@hypdriv/nuxt'],\n});\n",
+        },
+      },
+    );
+    if (ctx.platform === 'cloudflare') {
+      const source = ctx.project.framework.configFile ? ctx.read(ctx.project.framework.configFile) : '';
+      if (!/cloudflare-module/.test(source))
+        ctx.notes.push(
+          "Build Nuxt for Workers with Nitro's `cloudflare-module` preset and `cloudflare: { deployConfig: true }` (nitro in nuxt.config): HypDriv's module then puts its Worker shell around Nitro.",
+        );
+    }
+  },
+  platform(ctx) {
+    if (ctx.platform !== 'cloudflare') return;
+    planHostWrangler(ctx, {
+      main: null,
+      durableObjects: true,
+      assets: JSON.stringify({ html_handling: 'drop-trailing-slash' }),
+      template: () =>
+        wranglerJson({
+          $schema: 'node_modules/wrangler/config-schema.json',
+          name: ctx.name,
+          compatibility_date: defaultCompatibilityDate(ctx.now),
+          compatibility_flags: ['nodejs_compat'],
+          assets: { html_handling: 'drop-trailing-slash' },
+          observability: { enabled: true },
+          durable_objects: { bindings: HYPDRIV_DO },
+          migrations: HYPDRIV_MIGRATION,
+        }),
+    });
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node .output/server/index.mjs' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+};
+
+export const VINEXT_SPEC: HostSpec = {
+  framework: 'vinext',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/vinext', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/vinext', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare'
+      ? { devDependencies: ['@cloudflare/vite-plugin', 'wrangler', '@cloudflare/workers-types'] }
+      : platform === 'vercel'
+        ? { dependencies: ['nitro'] }
+        : {},
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [
+        // hypdriv() goes last, the platform plugin right before it (after vinext()).
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/vinext';",
+          from: '@hypdriv/vinext',
+        },
+        ...(ctx.platform === 'cloudflare'
+          ? [{ ...cloudflarePlugin('rsc', ", childEnvironments: ['ssr']"), before: /hypdriv\s*\(/ }]
+          : []),
+        ...(ctx.platform === 'vercel'
+          ? [
+              {
+                element: "nitro({ preset: 'vercel' })",
+                importLine: "import { nitro } from 'nitro/vite';",
+                from: 'nitro/vite',
+                before: /hypdriv\s*\(/,
+              },
+            ]
+          : []),
+      ],
+      { file: /vite\.config\./, property: 'plugins', fallback: { path: 'vite.config.ts', content: '' } },
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform !== 'cloudflare') return;
+    const configured = ctx.project.wrangler.config?.main ?? null;
+    const main = configured ?? 'worker/index.ts';
+    planWorkerEntry(
+      ctx,
+      main,
+      `/// <reference types="@hypdriv/vinext/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport manifest from 'virtual:hypdriv/manifest';\nimport { createVinextWorker } from '@hypdriv/vinext/worker';\nimport handler from 'vinext/server/fetch-handler';\n\n${DO_EXPORTS}\nexport * from 'vinext/server/fetch-handler';\n\nexport default createVinextWorker({ config, manifest, app: handler });\n`,
+      /createVinextWorker|createWorker/,
+    );
+    const assets = {
+      binding: 'ASSETS',
+      html_handling: 'none',
+      not_found_handling: 'none',
+      run_worker_first: ['/*', '!/_next/static/*'],
+    };
+    planHostWrangler(ctx, {
+      main: configured ? null : main,
+      durableObjects: true,
+      assets: JSON.stringify(assets),
+      template: () =>
+        wranglerJson({
+          $schema: 'node_modules/wrangler/config-schema.json',
+          name: ctx.name,
+          main,
+          compatibility_date: defaultCompatibilityDate(ctx.now),
+          compatibility_flags: ['nodejs_compat'],
+          assets,
+          observability: { enabled: true },
+          durable_objects: { bindings: HYPDRIV_DO },
+          migrations: HYPDRIV_MIGRATION,
+        }),
+    });
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'vinext start' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '4173' : '3000'}`,
+  }),
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
   astro: ASTRO_SPEC,
+  'react-router': REACT_ROUTER_SPEC,
+  'tanstack-start': TANSTACK_START_SPEC,
+  sveltekit: SVELTEKIT_SPEC,
+  nuxt: NUXT_SPEC,
+  vinext: VINEXT_SPEC,
 };
 
 /** The init plan for a Vite host. */
