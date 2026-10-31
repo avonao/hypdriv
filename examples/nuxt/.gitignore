@@ -1,0 +1,7 @@
+.nuxt
+.output
+.data
+.vercel
+.wrangler
+.hypdriv
+node_modules/.cache

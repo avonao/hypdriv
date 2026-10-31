@@ -1,0 +1,31 @@
+{
+  "name": "@hypdriv/example-nuxt",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare nuxt build",
+    "build:vercel": "HYPDRIV_TARGET=vercel nuxt build",
+    "build:node": "HYPDRIV_TARGET=node nuxt build",
+    "start": "node .output/server/index.mjs",
+    "preview:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare nuxt build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/nuxt": "workspace:*",
+    "nuxt": "catalog:",
+    "vue": "catalog:",
+    "vue-router": "catalog:"
+  },
+  "devDependencies": {
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}
