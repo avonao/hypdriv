@@ -1,8 +1,8 @@
 import { cspHash, loadConfig } from '@hypdriv/core';
 import { buildThemeScript } from '@hypdriv/purser';
+import { componentSpeculationRules, speculationScript } from '@hypdriv/runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { componentSpeculationRules, speculationScript } from '../shared/speculation';
 import { HypDrivMeta, Speculation, ThemeScript } from './components';
 
 const theme = { axes: { mode: { classes: { light: null, dark: 'dark' }, default: 'light' } } };

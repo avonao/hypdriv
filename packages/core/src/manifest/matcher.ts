@@ -8,8 +8,9 @@ export interface RouteMatcher {
 }
 
 /**
- * Converts a Next.js route pattern (`/blog/[slug]`, `/docs/[...path]`, `/shop/[[...slug]]`,
- * `/(group)/about`, `/@slot/page`) into a regular expression with named groups.
+ * Converts a route pattern in HypDriv's canonical (Next.js) syntax — `/blog/[slug]`, `/docs/[...path]`,
+ * `/shop/[[...slug]]`, `/[[lang]]/about` (optional segment), `/(group)/about`, `/@slot/page` — into a regular
+ * expression with named groups. Other frameworks' patterns are converted to this syntax at build time.
  */
 /** Removes route groups `(name)` and parallel slots `@name` from a Next.js route pattern. */
 export function cleanRoutePathname(pathname: string): string {
@@ -29,6 +30,9 @@ export function routePatternToRegex(pathname: string): string {
       if (m) return `(?:/(?<${safeName(m[1]!)}>.+?))?`;
       m = /^\[\.\.\.([^\]]+)\]$/.exec(seg);
       if (m) return `/(?<${safeName(m[1]!)}>.+?)`;
+      // Optional single segment (SvelteKit `[[lang]]`, React Router `:lang?`).
+      m = /^\[\[([^\].]+)\]\]$/.exec(seg);
+      if (m) return `(?:/(?<${safeName(m[1]!)}>[^/]+?))?`;
       m = /^\[([^\]]+)\]$/.exec(seg);
       if (m) return `/(?<${safeName(m[1]!)}>[^/]+?)`;
       return seg === '' ? '' : `/${seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
@@ -102,6 +106,7 @@ function specificity(pathname: string): number {
   for (const seg of segments) {
     if (seg.startsWith('[[...')) score += 1;
     else if (seg.startsWith('[...')) score += 2;
+    else if (seg.startsWith('[[')) score += 3;
     else if (seg.startsWith('[')) score += 5;
     else score += 10;
   }
@@ -119,6 +124,8 @@ export function routeId(kind: HypRoute['kind'], pathname: string): string {
           ? 'page'
           : kind === 'page-api'
             ? 'api'
-            : 'static';
+            : kind === 'endpoint'
+              ? 'endpoint'
+              : 'static';
   return `${prefix}:${pathname}`;
 }

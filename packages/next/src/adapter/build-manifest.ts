@@ -1,66 +1,28 @@
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import {
-  type BudgetResult,
-  cspHash,
-  evaluateBudgets,
-  type HypManifest,
-  type HypRoute,
-  type Logger,
-  MANIFEST_VERSION,
-  matchesAny,
-  type PurserManifest,
-  type ResolvedConfig,
-  sha256Hex,
-  silentLogger,
-} from '@hypdriv/core';
-import { linkEntriesForRoute, linkHeaderValues } from '../shared/hints';
-import { componentSpeculationRules, speculationScriptHash } from '../shared/speculation';
-import {
-  appRouteAssets,
-  assetFilePath,
-  mergeWithHtml,
-  pagesRouteAssets,
-  type RouteAssetSources,
-} from './assets';
+  assembleManifest,
+  type BuildManifestResult,
+  buildFingerprint,
+  type ManifestRouteInput,
+  type PurserVerifier,
+  type PurserVerifierInput,
+  type PurserVerifierResult,
+  type SecretsScanner,
+} from '@hypdriv/build';
+import type { Logger, ResolvedConfig } from '@hypdriv/core';
+import { appRouteAssets, assetFilePath, pagesRouteAssets, type RouteAssetSources } from './assets';
 import { classifyOutputs, staticFileRoutes } from './classify';
 import type { AdapterFs } from './fs';
-import { extractInlineScripts, extractInlineStyles, extractLinks } from './html';
 import type { OnBuildCompleteContext } from './types';
 
-export interface PurserVerifierInput {
-  /** Prerendered HTML by route id (primary documents only). */
-  html: Record<string, string>;
-  /**
-   * Every prerendered document by pathname, with the route's RSC payload text appended (atoms that only
-   * appear in client-side navigations are referenced there). Built from the adapter outputs, so it follows
-   * Next's on-disk layout (`.next/server/route-cache/...` in 16.4) without guessing paths.
-   */
-  documents: Record<string, string>;
-  config: ResolvedConfig;
-  projectDir: string;
-  /** Next's dist directory (`.next`), for collecting every prerendered document and RSC payload. */
-  distDir: string;
-  /** Emitted client CSS files (public paths) across all routes. */
-  cssAssets: string[];
-  /** Reads an emitted asset by public path (null when missing). */
-  readAsset: (publicPath: string) => string | null;
-  log: Logger;
-}
-
-export interface PurserVerifierResult {
-  manifest: PurserManifest | null;
-  ok: boolean;
-  warnings: string[];
-  /** Problems that fail the build (missing atoms with `verify: 'error'`, missing stylesheet). */
-  errors?: string[];
-}
-
-export type PurserVerifier = (input: PurserVerifierInput) => Promise<PurserVerifierResult>;
-
-export type SecretsScanner = (input: { dirs: string[]; config: ResolvedConfig; log: Logger }) => Promise<{
-  findings: Array<{ id: string; file: string; line: number; severity: 'error' | 'warn'; snippet: string }>;
-  ok: boolean;
-}>;
+export type {
+  BuildManifestResult,
+  PurserVerifier,
+  PurserVerifierInput,
+  PurserVerifierResult,
+  SecretsScanner,
+};
+export { buildFingerprint };
 
 export interface BuildManifestInput {
   context: OnBuildCompleteContext;
@@ -71,17 +33,11 @@ export interface BuildManifestInput {
   /** Purser verification hook (injected by the adapter when the bridge is available). */
   purser?: PurserVerifier;
   secrets?: SecretsScanner;
+  /** The bundler that built the app (`turbopack` / `webpack`), recorded in `manifest.framework`. */
+  bundler?: string;
   /** Limits the number of concrete prerendered HTML files read per dynamic route (default 25). */
   maxConcretePerRoute?: number;
   now?: () => Date;
-}
-
-export interface BuildManifestResult {
-  manifest: HypManifest;
-  /** Build must fail (budgets with failOn error, Purser verify errors, secrets). */
-  failures: string[];
-  /** Prerendered HTML by route id (static/isr/shell), useful to callers. */
-  html: Record<string, string>;
 }
 
 function readHtml(fs: AdapterFs, file: string | undefined, max = 2 * 1024 * 1024): string | null {
@@ -137,84 +93,37 @@ export function collectDocuments(
 /** Derives the HypDriv manifest from a Next.js `onBuildComplete` context and the build directory. */
 export async function buildManifest(input: BuildManifestInput): Promise<BuildManifestResult> {
   const { context, config, fs } = input;
-  const log = input.log ?? silentLogger;
   const basePath = context.config.basePath ?? '';
-  const trailingSlash = context.config.trailingSlash ?? false;
   const warnings: string[] = [];
-  const failures: string[] = [];
   const classified = classifyOutputs(context.outputs, context.routing.rsc?.suffix ?? '.rsc');
   const statics = staticFileRoutes(context.outputs);
-  const html: Record<string, string> = {};
-  const earlyHints: HypManifest['earlyHints'] = {};
-  const csp: HypManifest['csp'] = {};
-  const graph: Record<string, string[]> = {};
-  const clientWeights: Record<string, { js: number; css: number }> = {};
-  const sizeCache = new Map<string, number>();
-  const sizeOf = (publicPath: string): number => {
-    const file = assetFilePath(context.distDir, publicPath, basePath);
-    if (!file) return 0;
-    const hit = sizeCache.get(file);
-    if (hit !== undefined) return hit;
-    let n = 0;
-    try {
-      n = fs.exists(file) ? fs.gzipSize(file) : 0;
-    } catch {
-      n = 0;
-    }
-    sizeCache.set(file, n);
-    return n;
-  };
+  const maxConcrete = input.maxConcretePerRoute ?? 25;
 
-  const routes: HypRoute[] = [];
+  const routes: ManifestRouteInput[] = [];
   for (const item of classified) {
     const { route, primaryPrerender, concretePrerenders, output } = item;
     const sources: RouteAssetSources =
       route.kind === 'app-page' || route.kind === 'app-route'
         ? appRouteAssets(context.distDir, output.sourcePage, fs, basePath)
         : pagesRouteAssets(context.distDir, output.sourcePage, fs, basePath);
-
+    const isPage = route.kind === 'app-page' || route.kind === 'page';
     // Prerendered HTML: the primary output, or the first concrete path for dynamic routes.
     const htmlFile =
       primaryPrerender?.fallback?.filePath ??
       concretePrerenders.find((c) => c.fallback?.filePath)?.fallback?.filePath;
-    const doc = route.kind === 'app-page' || route.kind === 'page' ? readHtml(fs, htmlFile) : null;
-    const merged = mergeWithHtml(sources, doc);
-    route.assets = { js: merged.js, css: merged.css, fonts: merged.fonts };
-
-    if (doc) {
-      html[route.id] = doc;
-      // Speculation graph: links from the primary document plus a few concrete ones.
-      const links = new Set(extractLinks(doc, { basePath }));
-      const extra = concretePrerenders.slice(0, input.maxConcretePerRoute ?? 25);
-      for (const c of extra) {
+    const document = isPage ? readHtml(fs, htmlFile) : null;
+    const concrete: Array<{ pathname: string; html: string }> = [];
+    if (document) {
+      for (const c of concretePrerenders.slice(0, maxConcrete)) {
         const d = readHtml(fs, c.fallback?.filePath);
-        if (!d) continue;
-        for (const l of extractLinks(d, { basePath })) links.add(l);
-        if (route.classification === 'static' && c.fallback?.filePath) {
-          // Hash every concrete static page too; store under the concrete pathname.
-          csp[`${route.id}#${c.pathname}`] = await hashesFor(d);
-        }
+        if (d && c.fallback?.filePath) concrete.push({ pathname: c.pathname, html: d });
       }
-      graph[route.pathname] = [...links].filter((l) => l !== route.pathname);
-      if (route.classification === 'static') csp[route.id] = await hashesFor(doc);
-    }
-
-    if (config.performance.earlyHints) {
-      const entries = linkEntriesForRoute(route, config.performance.earlyHints, { main: merged.main });
-      if (entries.length) earlyHints[route.id] = linkHeaderValues(entries);
-    }
-
-    if (route.kind === 'app-page' || route.kind === 'page') {
-      clientWeights[route.id] = {
-        js: route.assets.js.reduce((n, f) => n + sizeOf(f), 0),
-        css: route.assets.css.reduce((n, f) => n + sizeOf(f), 0),
-      };
     }
     if (route.runtime === 'edge')
       warnings.push(
         `${route.pathname} uses the deprecated Edge runtime; OpenNext Cloudflare does not support it. Remove \`export const runtime = 'edge'\`.`,
       );
-    routes.push(route);
+    routes.push({ route, sources, document, concrete });
   }
 
   // Deprecated middleware file name check.
@@ -231,106 +140,24 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
       );
   }
 
-  // Purser verification.
-  let purser: PurserManifest | undefined;
-  if (config.purser && input.purser) {
-    try {
-      const cssAssets = [...new Set(routes.flatMap((r) => r.assets.css))].sort();
-      const readAsset = (publicPath: string): string | null => {
-        const file = assetFilePath(context.distDir, publicPath, basePath);
-        if (!file || !fs.exists(file)) return null;
-        try {
-          return fs.readText(file);
-        } catch {
-          return null;
-        }
-      };
-      const documents = collectDocuments(context, fs);
-      const result = await input.purser({
-        html,
-        documents,
-        config,
-        projectDir: context.projectDir,
-        distDir: context.distDir,
-        cssAssets,
-        readAsset,
-        log,
-      });
-      if (result.manifest) purser = result.manifest;
-      warnings.push(...result.warnings);
-      if (result.errors?.length) failures.push(...result.errors.map((e) => `Purser: ${e}`));
-      if (!result.ok && !result.errors?.length)
-        failures.push(
-          'Purser verification failed: prerendered HTML references atoms missing from the stylesheet (see warnings).',
-        );
-      // The theme fallback script is inlined by the root layout; allow it on hash-mode (static) routes.
-      if (purser?.themeScriptHash) {
-        for (const entry of Object.values(csp))
-          if (!entry.scriptHashes.includes(purser.themeScriptHash))
-            entry.scriptHashes.push(purser.themeScriptHash);
-      }
-    } catch (err) {
-      warnings.push(`Purser verification skipped: ${(err as Error).message}`);
-    }
-  }
-
-  // Secrets scan over client assets.
-  if (config.security.secretsScan && input.secrets) {
-    try {
-      const dirs = [join(context.distDir, 'static'), join(context.projectDir, 'public')].filter((d) =>
-        fs.exists(d),
-      );
-      const result = await input.secrets({ dirs, config, log });
-      for (const f of result.findings) {
-        const line = `secret pattern ${f.id} in ${relative(context.projectDir, f.file)}:${f.line} (${f.snippet})`;
-        if (f.severity === 'error') failures.push(line);
-        else warnings.push(line);
-      }
-      if (!result.ok && config.security.secretsScan.failOnFinding)
-        failures.push('Secrets scan found credential-like strings in client assets.');
-    } catch (err) {
-      warnings.push(`Secrets scan skipped: ${(err as Error).message}`);
-    }
-  }
-
-  // Budgets (client side; worker budgets are evaluated by `hypdriv analyze`).
-  // Next's internal error boundaries (`/_global-error`, Pages' `/_error`) are not navigable routes.
-  const budgetInput = routes
-    .filter((r) => (r.kind === 'app-page' || r.kind === 'page') && !INTERNAL_PAGES.has(r.pathname))
-    .map((r) => ({
-      id: r.id,
-      pathname: r.pathname,
-      js: clientWeights[r.id]?.js ?? 0,
-      css: clientWeights[r.id]?.css ?? 0,
-    }));
-  const allJs = new Set<string>();
-  for (const r of routes) for (const f of r.assets.js) allJs.add(f);
-  const totalJs = [...allJs].reduce((n, f) => n + sizeOf(f), 0);
-  const budgets: BudgetResult[] = evaluateBudgets(config.budgets, { routes: budgetInput, totalJs });
-  const overBudget = budgets.filter((b) => b.status === 'error');
-  if (overBudget.length && config.budgets.failOn === 'error')
-    failures.push(`${overBudget.length} budget(s) exceeded: ${overBudget.map((b) => b.id).join(', ')}`);
-
-  // Route-independent inline scripts HypDriv components render without a nonce (allowed by hash everywhere).
-  const inlineScriptHashes: string[] = [];
-  const spec = config.performance.speculation;
-  if (spec && spec.inject !== 'off') {
-    const rules = componentSpeculationRules(spec, basePath);
-    if (rules) inlineScriptHashes.push(await speculationScriptHash(rules));
-  }
-  if (purser?.themeScriptHash) inlineScriptHashes.push(purser.themeScriptHash);
-
-  const manifest: HypManifest = {
-    version: MANIFEST_VERSION,
+  return assembleManifest({
+    config,
+    framework: {
+      name: 'next',
+      version: context.nextVersion,
+      ...(input.bundler ? { bundler: input.bundler } : {}),
+    },
     buildId: context.buildId,
     ...(context.config.deploymentId ? { deploymentId: context.config.deploymentId } : {}),
-    nextVersion: context.nextVersion,
-    hypdrivVersion: input.hypdrivVersion,
-    generatedAt: (input.now?.() ?? new Date()).toISOString(),
     basePath,
-    trailingSlash,
+    trailingSlash: context.config.trailingSlash ?? false,
     cacheComponents: context.config.cacheComponents === true,
-    routes: [...routes, ...statics.routes],
+    routes,
+    staticFiles: {
+      count: statics.count,
+      immutablePrefixes: statics.immutablePrefixes,
+      routes: statics.routes,
+    },
     ...(context.outputs.middleware?.config.matchers
       ? {
           proxy: {
@@ -343,37 +170,22 @@ export async function buildManifest(input: BuildManifestInput): Promise<BuildMan
           },
         }
       : {}),
-    staticFiles: { count: statics.count, immutablePrefixes: statics.immutablePrefixes },
-    earlyHints,
-    csp,
-    ...(inlineScriptHashes.length ? { inlineScriptHashes: [...new Set(inlineScriptHashes)] } : {}),
-    speculation: { graph, excluded: config.performance.speculation?.exclude ?? [] },
-    ...(purser ? { purser } : {}),
-    weights: { client: clientWeights },
-    budgets,
+    projectDir: context.projectDir,
+    distDir: context.distDir,
+    clientDirs: [join(context.distDir, 'static'), join(context.projectDir, 'public')],
+    assetFile: (publicPath) => assetFilePath(context.distDir, publicPath, basePath),
+    fs,
+    // Purser checks every prerendered document and RSC payload the outputs point at.
+    ...(config.purser && input.purser ? { documents: collectDocuments(context, fs) } : {}),
+    ...(input.purser ? { purser: input.purser } : {}),
+    ...(input.secrets ? { secrets: input.secrets } : {}),
+    hypdrivVersion: input.hypdrivVersion,
+    ...(input.log ? { log: input.log } : {}),
+    ...(input.now ? { now: input.now } : {}),
     warnings,
-  };
-
-  manifest.fingerprint = await buildFingerprint(manifest);
-  const revalidationToken = previewModeId(context, fs);
-  if (revalidationToken) manifest.revalidation = { tokenHash: await sha256Hex(revalidationToken) };
-
-  // Attach inferred cache policy ids so runtimes/CLI can show them without recomputing.
-  if (config.cache.edge) {
-    for (const route of manifest.routes) {
-      const explicit = config.cache.edge.policies.find((p) => matchesAny(p.match, route.pathname));
-      if (explicit) route.cachePolicyId = explicit.id;
-      else if (
-        config.cache.edge.infer &&
-        (route.classification === 'static' || route.classification === 'isr')
-      )
-        route.cachePolicyId = `inferred:${route.id}`;
-      else if (config.cache.edge.infer && route.classification === 'shell' && config.cache.edge.inferredShell)
-        route.cachePolicyId = `inferred:${route.id}`;
-    }
-  }
-
-  return { manifest, failures, html };
+    revalidationToken: previewModeId(context, fs),
+    internalPages: INTERNAL_PAGES,
+  });
 }
 
 /** Placeholder for the preview-mode id in `x-prerender-revalidate` matcher conditions. */
@@ -410,44 +222,4 @@ export function previewModeId(context: OnBuildCompleteContext, fs: AdapterFs): s
   } catch {
     return null;
   }
-}
-
-/**
- * Content fingerprint of the build output (see `HypManifest.fingerprint`): Next's build id and deployment id,
- * every route's client assets (content-hashed names), CSP hashes of prerendered HTML, HypDriv's inline-script
- * hashes and the Purser stylesheet. Canonical JSON, SHA-256, 16 hex characters.
- */
-export async function buildFingerprint(
-  manifest: Pick<
-    HypManifest,
-    'buildId' | 'deploymentId' | 'routes' | 'csp' | 'inlineScriptHashes' | 'purser'
-  >,
-): Promise<string> {
-  const routes = [...manifest.routes]
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((r) => [r.id, r.classification, [...r.assets.js].sort(), [...r.assets.css].sort()]);
-  const csp = Object.keys(manifest.csp)
-    .sort()
-    .map((id) => [
-      id,
-      [...(manifest.csp[id]?.scriptHashes ?? [])].sort(),
-      [...(manifest.csp[id]?.styleHashes ?? [])].sort(),
-    ]);
-  const canonical = JSON.stringify({
-    b: manifest.buildId,
-    d: manifest.deploymentId ?? null,
-    r: routes,
-    c: csp,
-    s: [...(manifest.inlineScriptHashes ?? [])].sort(),
-    p: manifest.purser?.asset ?? null,
-  });
-  return (await sha256Hex(canonical)).slice(0, 16);
-}
-
-async function hashesFor(doc: string): Promise<{ scriptHashes: string[]; styleHashes: string[] }> {
-  const scripts = extractInlineScripts(doc);
-  const styles = extractInlineStyles(doc);
-  const scriptHashes = [...new Set(await Promise.all(scripts.map((s) => cspHash(s))))];
-  const styleHashes = [...new Set(await Promise.all(styles.map((s) => cspHash(s))))];
-  return { scriptHashes, styleHashes };
 }

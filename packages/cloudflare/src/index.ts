@@ -11,8 +11,8 @@
  */
 
 export { type Capabilities, describeCapabilities, detectCapabilities, type HypDrivEnv } from '@hypdriv/core';
+export { edgeStages, htmlTransformsStage, priorityHintsStage } from '@hypdriv/runtime';
 export { getHypContext, installContextStore, runWithHypContext } from './context';
-export { edgeStages, htmlTransformsStage, priorityHintsStage } from './edge-stages';
 export { cloudflareGeo } from './geo';
 export {
   type DispatchContext,
@@ -36,6 +36,7 @@ export {
   type DoLock,
 } from './stores';
 export {
+  type AppWorkerModule,
   type CreateWorkerOptions,
   createWorker,
   type ExecutionContextLike,

@@ -17,7 +17,7 @@ import {
   type RequestErrorEvent,
   type Tracer,
 } from '@hypdriv/observe';
-import { createConfiguredTracer } from '../shared/tracer';
+import { createConfiguredTracer } from '@hypdriv/runtime';
 
 export interface InstrumentationOptions {
   config?: HypDrivConfig | ResolvedConfig;

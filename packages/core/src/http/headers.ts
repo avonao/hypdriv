@@ -50,6 +50,14 @@ export function withHeaders(
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+/** Returns the response without the named headers (unchanged when none is present). */
+export function withoutHeaders(response: Response, names: string[]): Response {
+  if (!names.some((n) => response.headers.has(n))) return response;
+  const headers = new Headers(response.headers);
+  for (const n of names) headers.delete(n);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 /** Adds values to a comma-separated list header (`Vary`, `Cache-Tag`) without duplicates. */
 export function appendListHeader(headers: Headers, name: string, values: string | string[]): void {
   const incoming = (Array.isArray(values) ? values : [values])

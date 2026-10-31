@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { assertManifest, type HypManifest } from '@hypdriv/core';
+import { assertManifest, frameworkLabel, type HypManifest, manifestFramework } from '@hypdriv/core';
 import { manifestPath } from '@hypdriv/core/node';
 import { CliError, createContext } from '../context';
 import { bytes } from '../ui';
@@ -173,7 +173,8 @@ export const manifestCommand = defineCommand({
       for (const r of m.routes ?? []) counts[r.classification] = (counts[r.classification] ?? 0) + 1;
       const summary = {
         buildId: m.buildId,
-        nextVersion: m.nextVersion,
+        nextVersion: m.nextVersion ?? null,
+        framework: manifestFramework(m),
         hypdrivVersion: m.hypdrivVersion,
         generatedAt: m.generatedAt,
         cacheComponents: m.cacheComponents,
@@ -190,7 +191,7 @@ export const manifestCommand = defineCommand({
       else {
         ui.heading(`Manifest ${ui.color.dim(file)}`);
         ui.kv([
-          ['build', `${summary.buildId} · Next ${summary.nextVersion} · HypDriv ${summary.hypdrivVersion}`],
+          ['build', `${summary.buildId} · ${frameworkLabel(m)} · HypDriv ${summary.hypdrivVersion}`],
           ['generated', summary.generatedAt],
           [
             'routes',

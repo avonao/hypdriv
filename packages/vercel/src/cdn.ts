@@ -252,6 +252,12 @@ export function cdnVerdict(
 export interface VercelCdnOptions {
   /** Also emit `CDN-Cache-Control` for CDNs in front of Vercel (default `config.vercel.cdn.downstream`). */
   downstream?: boolean;
+  /**
+   * The stage runs inside the Vercel Function that renders the response (a framework hook, `createHandler`),
+   * not in Routing Middleware: Vercel's CDN follows the headers it sets, so every policy applies to pages as
+   * well, `vary` included (per-variant entries through `Vary`). Default `false` (`proxy.ts`).
+   */
+  responseOwner?: boolean;
 }
 
 /** Shared planning state of one stage / handler wrapper instance. */
@@ -378,7 +384,7 @@ export function vercelCdnStage(configInput: ConfigInput, options: VercelCdnOptio
   // `respectOrigin`). A page whose policy has no route-header form is therefore not cached, and must not be
   // reported as such. Route Handlers can still apply such policies themselves with `withVercelCdn`.
   const pageReasons = new Map<string, string>();
-  for (const policy of edge.policies) {
+  for (const policy of options.responseOwner ? [] : edge.policies) {
     const reason = routeHeaderSkipReason(policy, config);
     const patterns = Array.isArray(policy.match) ? policy.match : [policy.match];
     const unexpressible = patterns.find((p) => nextHeaderSource(p) === null);

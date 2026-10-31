@@ -1,0 +1,84 @@
+{
+  "name": "@hypdriv/vite",
+  "version": "0.1.0",
+  "description": "HypDriv for Vite: the build plugin (route manifest, CSP hashes, static headers for Cloudflare, Vercel and Node) and the integration toolkit behind HypDriv's React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext support.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "dist",
+    "virtual.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/vite"
+  },
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "source": "./src/worker.ts",
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./node": {
+      "source": "./src/node/index.ts",
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./vercel-middleware": {
+      "source": "./src/vercel-middleware.ts",
+      "types": "./dist/vercel-middleware.d.ts",
+      "default": "./dist/vercel-middleware.js"
+    },
+    "./virtual": {
+      "types": "./virtual.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/build": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/security": "workspace:*"
+  },
+  "peerDependencies": {
+    "vite": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

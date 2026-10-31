@@ -1,38 +1,14 @@
-import { type EdgePurger, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
-import {
-  clientIp,
-  createContext,
-  type DeployTarget,
-  detectDeployTarget,
-  type GeoProperties,
-  getCf,
-  getCurrentContext,
-  HEADER,
-  type HypDrivConfig,
-  type HypDrivEnv,
-  type HypManifest,
-  isResolvedConfig,
-  loadConfig,
-  nodeEnvironment,
-  type ResolvedConfig,
-  registerRuntime,
-  runPipeline,
-  runWithContext,
-  type Stage,
-  sanitizeInboundRequest,
+import type {
+  DeployTarget,
+  HypDrivConfig,
+  HypDrivEnv,
+  HypManifest,
+  ResolvedConfig,
+  Stage,
 } from '@hypdriv/core';
-import { readManifestFile } from '../shared/manifest-file';
-import { geoFrom } from '../stages/geo';
-import {
-  buildDefaultStages,
-  type CreatePlatformInput,
-  createPlatform,
-  httpsUpgrade,
-  internalRoutes,
-  type Platform,
-} from '../stages/index';
+import { type CreatePlatformInput, createProxyHandler, type Platform } from '@hypdriv/runtime';
 
-export { buildDefaultStages, createPlatform, type Platform, stages } from '../stages/index';
+export { buildDefaultStages, createPlatform, type Platform, stages } from '@hypdriv/runtime';
 
 /** Minimal structural types so this module does not import `next/server` at runtime. */
 export interface NextRequestLike extends Request {
@@ -76,23 +52,6 @@ export const matcher = {
   ],
 };
 
-/** Purser's watcher writes its latest result here during `next dev` (statically scoped path). */
-async function readDevState(): Promise<Record<string, unknown>> {
-  try {
-    const proc = (globalThis as { process?: { cwd?: () => string } }).process;
-    if (typeof proc?.cwd !== 'function') return {};
-    const { readFile } = await import('node:fs/promises');
-    const { join } = await import('node:path');
-    return {
-      purser: JSON.parse(
-        await readFile(join(proc.cwd(), '.hypdriv', 'dev', 'purser.json'), 'utf8'),
-      ) as unknown,
-    };
-  } catch {
-    return {};
-  }
-}
-
 async function defaultNext(request: Request): Promise<Response> {
   const mod = (await import('next/server')) as {
     NextResponse: { next(init?: { request?: { headers?: Headers } }): Response };
@@ -108,123 +67,6 @@ export function createProxy(
   config: HypDrivConfig | ResolvedConfig,
   stageList?: StageList,
   options: CreateProxyOptions = {},
-) {
-  const resolved: ResolvedConfig = isResolvedConfig(config) ? config : loadConfig(config);
-  let ready: Promise<{
-    platform: Platform;
-    stages: Stage[];
-    internal: ReturnType<typeof internalRoutes>;
-  }> | null = null;
-
-  const init = async () => {
-    const manifest =
-      options.manifest === undefined ? await readManifestFile(Number.POSITIVE_INFINITY) : options.manifest;
-    let env: HypDrivEnv =
-      options.env ?? (globalThis as { process?: { env?: HypDrivEnv } }).process?.env ?? {};
-    const development =
-      options.development ?? nodeEnvironment(env as Record<string, unknown>) === 'development';
-    const target = options.target ?? detectDeployTarget(env as Record<string, unknown>, resolved.platform);
-    let overrides: CreatePlatformInput['overrides'] | undefined = options.platform;
-    let adapt: ((defaults: Stage[]) => Stage[]) | null = null;
-    let purger: EdgePurger | null = null;
-    if (target === 'vercel') {
-      const vercel = await import('@hypdriv/vercel');
-      env = vercel.vercelEnv(resolved, env as Record<string, unknown>) as HypDrivEnv;
-      const { edgePurger, ...platformOverrides } = vercel.vercelPlatformOverrides(
-        resolved,
-        env as Record<string, unknown>,
-      );
-      overrides = { ...platformOverrides, ...(options.platform ?? {}) };
-      purger = edgePurger;
-      adapt = vercel.vercelStages(resolved);
-    }
-    const platform = createPlatform({
-      config: resolved,
-      manifest,
-      env,
-      runner: 'proxy',
-      development,
-      ...(overrides ? { overrides } : {}),
-    });
-    const defaults = adapt ? adapt(buildDefaultStages(platform)) : buildDefaultStages(platform);
-    const list = typeof stageList === 'function' ? stageList(defaults, platform) : (stageList ?? defaults);
-    registerRuntime({ config: platform.config, env, target });
-    // `revalidateTag()` / `purgeEdge()` purge what actually caches responses: Vercel's CDN, or the edge cache.
-    if (purger) registerEdgePurger(purger);
-    else if (platform.edgeCache) registerEdgePurger(platform.edgeCache);
-    const internal = internalRoutes(platform, {
-      devEndpoints: platform.development,
-      devState: options.devState ?? readDevState,
-    });
-    return { platform, stages: list, internal };
-  };
-
-  return async function proxy(incoming: NextRequestLike, event: NextFetchEventLike): Promise<Response> {
-    const passThrough = options.next ?? defaultNext;
-    // Inside the HypDriv Worker (OpenNext runs proxy.ts in the same isolate) the stages already ran around
-    // this request; the Worker's context is visible here through AsyncLocalStorage and cannot be spoofed.
-    if (getCurrentContext()?.runner === 'worker') return passThrough(incoming);
-    ready ??= init();
-    const { platform, stages: list, internal } = await ready;
-    const request = sanitizeInboundRequest(incoming, {
-      nonceHeader: platform.config.security.csp?.nonceHeader ?? HEADER.nonce,
-      middlewareHeaders: false,
-    });
-    // `forceHttps` also covers the internal routes answered below, before the redirects stage runs.
-    const upgrade = httpsUpgrade(platform.config, request, { development: platform.development });
-    if (upgrade) return upgrade;
-    const ip = clientIp(request.headers, platform.config.security.trustedProxies);
-    // `/_hypdriv/*` (health, vitals, CSP reports, live polling fallback, dev endpoints) on every host.
-    // The visitor's country for vitals and reports: Cloudflare's `cf`, else the edge headers Vercel and other
-    // CDNs set (x-vercel-ip-country, cf-ipcountry).
-    const country = geoFrom(getCf(request) as GeoProperties | undefined, request.headers).country;
-    const handled = await internal(request, {
-      ip,
-      ...(country ? { country } : {}),
-      waitUntil: (p) => event.waitUntil(p),
-    });
-    if (handled) return handled;
-    const ctx = createContext({
-      request,
-      config: platform.config,
-      manifest: platform.manifest,
-      env: platform.env,
-      cf: getCf(request),
-      runner: 'proxy',
-      development: platform.development,
-      waitUntil: (p) => event.waitUntil(p),
-      ip,
-      log: platform.log,
-    });
-    ctx.route = platform.matcher.match(ctx.url.pathname);
-    ctx.requestHeaders.set(HEADER.runner, 'proxy');
-    if (ctx.route) ctx.requestHeaders.set(HEADER.route, ctx.route.route.id);
-    ctx.requestHeaders.set('x-hypdriv-pathname', ctx.url.pathname);
-    // The edge cache revalidates in the background and recovers from upstream errors through this key.
-    ctx.state.set(UPSTREAM_KEY, passThrough);
-    try {
-      const { response } = await runWithContext(ctx, () =>
-        runPipeline({
-          stages: list,
-          ctx,
-          skipEdgeOnly: true,
-          next: (forwarded) => ctx.state.get(UPSTREAM_KEY)!(forwarded),
-          onStageError: (error, stage) => {
-            platform.log.error('stage failed', { stage: stage.name, error: error.message });
-            return 'continue';
-          },
-        }),
-      );
-      return response;
-    } catch (err) {
-      platform.log.error('request failed', {
-        requestId: ctx.id,
-        path: ctx.url.pathname,
-        error: (err as Error).message,
-      });
-      const stale = platform.edgeCache?.recover(ctx);
-      if (stale) return stale;
-      throw err;
-    }
-  };
+): (request: NextRequestLike, event: NextFetchEventLike) => Promise<Response> {
+  return createProxyHandler(config, stageList, { ...options, next: options.next ?? defaultNext });
 }

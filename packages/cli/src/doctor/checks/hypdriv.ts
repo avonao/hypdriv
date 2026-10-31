@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { frameworkLabel } from '@hypdriv/core';
 import { editPackageJson, ensureHeadersRule } from '../../init/package-json';
 import { addTsconfigExclude } from '../../init/tsconfig';
 import { devVarsExampleTemplate, envExampleTemplate, HEADERS_RULE, scriptsTemplate } from '../../templates';
@@ -104,13 +105,11 @@ export const hypdrivChecks: Check[] = [
       const m = ctx.project.manifest;
       if (!m)
         return warn(
-          'No .hypdriv/manifest.json; run `next build` (with withHypDriv) so routes, CSP hashes and weights are known.',
+          'No .hypdriv/manifest.json; run the production build (`next build` with withHypDriv, or `vite build` with the HypDriv plugin) so routes, CSP hashes and weights are known.',
         );
       if (m.error) return fail(`.hypdriv/manifest.json is invalid: ${m.error}`);
       const d = m.data!;
-      return pass(
-        `build ${d.buildId} · ${d.routes.length} routes · Next ${d.nextVersion} · ${d.generatedAt}`,
-      );
+      return pass(`build ${d.buildId} · ${d.routes.length} routes · ${frameworkLabel(d)} · ${d.generatedAt}`);
     },
   },
   {

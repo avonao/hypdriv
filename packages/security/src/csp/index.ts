@@ -12,6 +12,12 @@ export {
   withoutSource,
 } from './directives';
 export {
+  injectNonceIntoHtml,
+  injectNonceStream,
+  type NonceInjectionOptions,
+  NonceInjector,
+} from './inject';
+export {
   type CspReport,
   cspReportHandler,
   extractCspReports,

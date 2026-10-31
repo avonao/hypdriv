@@ -1,14 +1,8 @@
 import { join } from 'node:path';
+import { mergeWithHtml, type RouteAssetSources } from '@hypdriv/build';
 import type { AdapterFs } from './fs';
-import { extractAssets } from './html';
 
-export interface RouteAssetSources {
-  js: string[];
-  css: string[];
-  fonts: string[];
-  /** Entry chunks that bootstrap the route (preload candidates). */
-  main: string[];
-}
+export { mergeWithHtml, type RouteAssetSources };
 
 function uniq<T>(items: Iterable<T>): T[] {
   return [...new Set(items)];
@@ -152,51 +146,6 @@ export function pagesRouteAssets(
     fonts: fonts.map((f) => toPublicAssetPath(f, basePath)),
     main: js.map((f) => toPublicAssetPath(f, basePath)),
   };
-}
-
-/** Merges manifest-derived assets with what the prerendered HTML actually references (HTML wins for order). */
-/** Asset identity without Next's `?dpl=<deploymentId>` skew-protection query (and the hash fragment). */
-function assetIdentity(href: string): string {
-  const [path, query] = href.split('#')[0]!.split('?');
-  if (!query) return path!;
-  const kept = query.split('&').filter((pair) => !pair.startsWith('dpl='));
-  return kept.length ? `${path}?${kept.join('&')}` : path!;
-}
-
-/** De-duplicates assets that differ only by `?dpl=`; the first spelling wins (HTML spellings come first). */
-function uniqAssets(list: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const href of list) {
-    const id = assetIdentity(href);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(href);
-  }
-  return out;
-}
-
-export function mergeWithHtml(sources: RouteAssetSources, html: string | null): RouteAssetSources {
-  if (!html) return sources;
-  const fromHtml = extractAssets(html);
-  const js = uniqAssets([
-    ...fromHtml.scripts,
-    ...fromHtml.modulePreloads,
-    ...fromHtml.preloads.filter((p) => p.as === 'script').map((p) => p.href),
-    ...sources.js,
-  ]);
-  const css = uniqAssets([
-    ...fromHtml.stylesheets,
-    ...fromHtml.preloads.filter((p) => p.as === 'style').map((p) => p.href),
-    ...sources.css,
-  ]);
-  const fonts = uniqAssets([...fromHtml.fonts.map((f) => f.href), ...sources.fonts]);
-  // Preloads must use the exact URL the document requests (including `?dpl=`), or the browser fetches twice.
-  const spelling = new Map(js.map((href) => [assetIdentity(href), href]));
-  const main = sources.main.length
-    ? uniqAssets(sources.main.map((href) => spelling.get(assetIdentity(href)) ?? href))
-    : js.slice(0, 4);
-  return { js, css, fonts, main };
 }
 
 /** Resolves a public `/_next/static/...` path to its file under distDir (null when not local). */

@@ -170,6 +170,9 @@ catalogs:
     '@changesets/cli':
       specifier: ^3.0.3
       version: 3.0.3
+    '@cloudflare/vite-plugin':
+      specifier: ^1.66.0
+      version: 1.66.0
     '@cloudflare/vitest-plugin':
       specifier: ^1.4.11
       version: 1.4.11
@@ -212,6 +215,9 @@ catalogs:
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
+    vite:
+      specifier: ^8.3.5
+      version: 8.3.5
     vitest:
       specifier: ^4.1.12
       version: 4.1.12
@@ -451,6 +457,40 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  examples/vite:
+    dependencies:
+      '@hypdriv/cloudflare':
+        specifier: workspace:*
+        version: link:../../packages/cloudflare
+      '@hypdriv/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@hypdriv/vite':
+        specifier: workspace:*
+        version: link:../../packages/vite
+    devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: 'catalog:'
+        version: 1.66.0(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))(workerd@1.20261023.1)(wrangler@4.156.0(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6))
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 5.20261030.1
+      '@hypdriv/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.156.0(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6)
+
   examples/with-purser:
     dependencies:
       '@opennextjs/cloudflare':
@@ -490,6 +530,34 @@ importers:
       wrangler:
         specifier: 'catalog:'
         version: 4.156.0(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6)
+
+  packages/build:
+    dependencies:
+      '@hypdriv/core':
+        specifier: workspace:*
+        version: link:../core
+      '@hypdriv/purser':
+        specifier: workspace:*
+        version: link:../purser
+      '@hypdriv/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@hypdriv/security':
+        specifier: workspace:*
+        version: link:../security
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.4(publint@0.3.25)(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))
 
   packages/cache:
     dependencies:
@@ -561,15 +629,15 @@ importers:
       '@hypdriv/live':
         specifier: workspace:*
         version: link:../live
-      '@hypdriv/next':
-        specifier: workspace:*
-        version: link:../next
       '@hypdriv/observe':
         specifier: workspace:*
         version: link:../observe
       '@hypdriv/purser':
         specifier: workspace:*
         version: link:../purser
+      '@hypdriv/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@hypdriv/security':
         specifier: workspace:*
         version: link:../security
@@ -846,6 +914,9 @@ importers:
 
   packages/next:
     dependencies:
+      '@hypdriv/build':
+        specifier: workspace:*
+        version: link:../build
       '@hypdriv/cache':
         specifier: workspace:*
         version: link:../cache
@@ -870,6 +941,9 @@ importers:
       '@hypdriv/purser':
         specifier: workspace:*
         version: link:../purser
+      '@hypdriv/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@hypdriv/security':
         specifier: workspace:*
         version: link:../security
@@ -933,6 +1007,49 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.4(publint@0.3.25)(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))
+
+  packages/runtime:
+    dependencies:
+      '@hypdriv/cache':
+        specifier: workspace:*
+        version: link:../cache
+      '@hypdriv/core':
+        specifier: workspace:*
+        version: link:../core
+      '@hypdriv/flags':
+        specifier: workspace:*
+        version: link:../flags
+      '@hypdriv/live':
+        specifier: workspace:*
+        version: link:../live
+      '@hypdriv/observe':
+        specifier: workspace:*
+        version: link:../observe
+      '@hypdriv/purser':
+        specifier: workspace:*
+        version: link:../purser
+      '@hypdriv/security':
+        specifier: workspace:*
+        version: link:../security
+      '@hypdriv/vercel':
+        specifier: workspace:*
+        version: link:../vercel
+    devDependencies:
+      '@hypdriv/testing':
+        specifier: workspace:*
+        version: link:../testing
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -1023,6 +1140,40 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))
+
+  packages/vite:
+    dependencies:
+      '@hypdriv/build':
+        specifier: workspace:*
+        version: link:../build
+      '@hypdriv/cloudflare':
+        specifier: workspace:*
+        version: link:../cloudflare
+      '@hypdriv/core':
+        specifier: workspace:*
+        version: link:../core
+      '@hypdriv/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@hypdriv/security':
+        specifier: workspace:*
+        version: link:../security
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.4(publint@0.3.25)(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1)
       vitest:
         specifier: 'catalog:'
         version: 4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))
@@ -1440,6 +1591,12 @@ packages:
     peerDependenciesMeta:
       workerd:
         optional: true
+
+  '@cloudflare/vite-plugin@1.66.0':
+    resolution: {integrity: sha512-hlXPbS6SWXHCJVztghkg+iW7dQNrx/wuy00SOLB6V2Ho78agt7RZdzb3iQuksl4XcFrp7cr/4WX4myBTiqitNw==}
+    peerDependencies:
+      vite: ^6.1.0 || ^7.0.0 || ^8.0.0
+      wrangler: ^4.154.0
 
   '@cloudflare/vitest-plugin@1.4.11':
     resolution: {integrity: sha512-ZBte0LzR9eWQL17wb5gJpNrIWma0UlcfnU0aBgF8fVuKN8/uZpqEKRvuLE/mBZTTAvR5pCl18DG872NGlUwyvg==}
@@ -3005,6 +3162,10 @@ packages:
     resolution: {integrity: sha512-OqbOk5oEQeAZ8WXWydlu9HJjz9WVdEIvamMCcXmuqUYjTknH/sqsWvhQ3vgwKFRR1HpjvNBKQ37nbJgYzGqGcg==}
     engines: {node: '>=6'}
 
+  miniflare@5.20261023.1-beta:
+    resolution: {integrity: sha512-hgm1AJhwC6W+iaRhvMnfs7bPOsxjKa8LXTFR2WVPA5qA9KhpyBd2LddmT+9M9tm65VZ8YWkwQGvB+cKbqJoKeA==}
+    engines: {node: '>=22.0.0'}
+
   miniflare@5.20261023.3-beta:
     resolution: {integrity: sha512-thdXzlktu5GE1o/BlmMAPeJ0Cu6Tu5LpMbRlyfRrpVvMRrhd6p52TMqcITCZZLVzt1UO92VGBkLDhLOpryUAyQ==}
     engines: {node: '>=22.0.0'}
@@ -3627,6 +3788,18 @@ packages:
 
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -4458,6 +4631,20 @@ snapshots:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20261023.1
+
+  '@cloudflare/vite-plugin@1.66.0(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1))(workerd@1.20261023.1)(wrangler@4.156.0(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6))':
+    dependencies:
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261023.1)
+      miniflare: 5.20261023.1-beta(@types/node@26.6.6)
+      unenv: 2.0.0-rc.24
+      vite: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1)
+      wrangler: 4.156.0(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6)
+      ws: 8.22.0
+    transitivePeerDependencies:
+      - '@types/node'
+      - bufferutil
+      - utf-8-validate
+      - workerd
 
   '@cloudflare/vitest-plugin@1.4.11(@cloudflare/workers-types@5.20261030.1)(@types/node@26.6.6)(vitest@4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(terser@5.36.0)(yaml@2.9.1)))':
     dependencies:
@@ -5809,6 +5996,19 @@ snapshots:
 
   mimic-fn@2.1.0: {}
 
+  miniflare@5.20261023.1-beta(@types/node@26.6.6):
+    dependencies:
+      '@cspotcode/source-map-support': 0.8.1
+      sharp: 0.35.5(@types/node@26.6.6)
+      undici: 7.30.1
+      workerd: 1.20261023.1
+      ws: 8.21.0
+      youch: 4.1.0-beta.10
+    transitivePeerDependencies:
+      - '@types/node'
+      - bufferutil
+      - utf-8-validate
+
   miniflare@5.20261023.3-beta(@types/node@26.6.6):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
@@ -6397,6 +6597,8 @@ snapshots:
       signal-exit: 4.1.0
 
   ws@8.21.0: {}
+
+  ws@8.22.0: {}
 
   xdg-app-paths@5.5.1:
     dependencies:

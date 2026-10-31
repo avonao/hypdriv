@@ -64,7 +64,14 @@ export class StateBag {
   }
 }
 
-export type Runner = 'worker' | 'proxy' | 'node' | 'test';
+/**
+ * Who runs the pipeline:
+ * - `worker`: the Cloudflare Worker shell around the application (owns the full response);
+ * - `proxy`: Next.js `proxy.ts` (sees a pass-through marker, not the rendered body);
+ * - `host`: a framework hook or HypDriv-served app (`createHandler`) that owns the full response on any platform;
+ * - `node`, `test`: plain Node helpers and tests.
+ */
+export type Runner = 'worker' | 'proxy' | 'host' | 'node' | 'test';
 
 export interface HypContext {
   readonly request: Request;

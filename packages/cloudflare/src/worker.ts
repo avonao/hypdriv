@@ -23,9 +23,14 @@ import {
   type Stage,
   sanitizeInboundRequest,
 } from '@hypdriv/core';
-import { buildDefaultStages, createPlatform, httpsUpgrade, type Platform } from '@hypdriv/next/stages';
+import {
+  buildDefaultStages,
+  createPlatform,
+  edgeStages,
+  httpsUpgrade,
+  type Platform,
+} from '@hypdriv/runtime';
 import { runWithHypContext } from './context';
-import { edgeStages } from './edge-stages';
 import { cloudflareGeo } from './geo';
 import {
   type DispatchContext,
@@ -42,9 +47,13 @@ import { internalRoutes } from './internal-routes';
 import { isRevalidationRequest, revalidatedTags, wasRevalidated } from './revalidation';
 import { createDoCounterStore, createDoTagIndex } from './stores';
 
+/** A Workers module whose default export handles `fetch` (OpenNext's worker, a framework's worker entry). */
 export interface NextWorkerModule {
   default: { fetch(request: Request, env: unknown, ctx: ExecutionContextLike): Promise<Response> | Response };
 }
+
+/** Alias of `NextWorkerModule` for non-Next applications. */
+export type AppWorkerModule = NextWorkerModule;
 
 export interface ExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
@@ -54,7 +63,12 @@ export interface ExecutionContextLike {
 export interface CreateWorkerOptions {
   config: HypDrivConfig | ResolvedConfig;
   /** Lazily imports OpenNext's worker (`() => import('./.open-next/worker.js')`). */
-  next: () => Promise<NextWorkerModule>;
+  next?: () => Promise<NextWorkerModule>;
+  /**
+   * Lazily imports any other application worker whose default export has `fetch` (a framework's Cloudflare
+   * entry, a Vite app's Worker). Exactly one of `next` and `app` is required.
+   */
+  app?: () => Promise<AppWorkerModule | AppWorkerModule['default']>;
   /**
    * The build manifest. Defaults to importing `./.hypdriv/manifest.js` relative to the project; pass
    * `() => import('./.hypdriv/manifest.js')` explicitly when your bundler needs a static import.
@@ -124,8 +138,14 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
   let runtimeEnv: HypDrivEnv | null = null;
   let nextPromise: Promise<NextWorkerModule> | null = null;
 
+  const load = options.next ?? options.app;
+  if (!load) throw new TypeError('createWorker: pass `next` (OpenNext) or `app` (any Workers fetch handler)');
   const loadNext = () => {
-    nextPromise ??= options.next();
+    nextPromise ??= Promise.resolve(load()).then((mod) =>
+      mod && typeof mod === 'object' && 'default' in mod
+        ? (mod as NextWorkerModule)
+        : { default: mod as NextWorkerModule['default'] },
+    );
     return nextPromise;
   };
 

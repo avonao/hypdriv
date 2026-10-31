@@ -1,0 +1,63 @@
+{
+  "name": "@hypdriv/runtime",
+  "version": "0.1.0",
+  "description": "HypDriv's framework-neutral runtime: the Drivetrain stages, the platform assembly and a request handler that wraps any Web fetch handler on Cloudflare Workers, Vercel and Node.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/runtime"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "vercel",
+    "edge",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/cache": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/flags": "workspace:*",
+    "@hypdriv/live": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/security": "workspace:*",
+    "@hypdriv/vercel": "workspace:*"
+  },
+  "devDependencies": {
+    "@hypdriv/testing": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

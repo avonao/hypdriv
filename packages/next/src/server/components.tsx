@@ -1,7 +1,7 @@
 import { HYPDRIV_VERSION, type HypDrivConfig, loadConfig } from '@hypdriv/core';
 import { buildThemeScript } from '@hypdriv/purser';
+import { componentSpeculationRules, speculationScript } from '@hypdriv/runtime';
 import type { ReactElement } from 'react';
-import { componentSpeculationRules, speculationScript } from '../shared/speculation';
 
 /** Next.js inlines the configured `basePath` into server bundles under this name. */
 function nextBasePath(): string {

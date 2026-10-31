@@ -97,6 +97,9 @@ function inferredDurations(
   route: HypRoute,
   edge: NonNullable<ResolvedConfig['cache']['edge']>,
 ): { ttl: number; swr: number; staleIfError: number } | null {
+  // A fallback document served for every unmatched path (a single-page app's shell) is not per-URL content: an
+  // inferred policy would also capture whatever else answers under the pattern (the Worker's own API routes).
+  if (route.fallback) return null;
   switch (route.classification) {
     case 'static':
       return { ...edge.inferredStatic };

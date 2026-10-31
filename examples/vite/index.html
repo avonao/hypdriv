@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HypDriv × Vite</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 42rem; line-height: 1.5; }
+      nav a { margin-right: 1rem; }
+    </style>
+    <script>
+      // Inline classic script: allowed by its build-time hash (static) or the request nonce (Worker).
+      document.documentElement.dataset.boot = String(Date.now());
+    </script>
+  </head>
+  <body>
+    <nav><a href="/">Home</a><a href="/about">About</a><a href="/account">Account</a></nav>
+    <main id="app"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

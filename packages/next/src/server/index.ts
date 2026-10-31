@@ -3,19 +3,21 @@ import {
   type FlagDefinition,
   type FlagValue,
   getCurrentContext,
-  getRuntime,
   HEADER,
   type HypContext,
   type HypDrivEnv,
-  HypDrivError,
   type Logger,
   parseCookies,
-  timingSafeEqual,
 } from '@hypdriv/core';
 import { decodeFlagsHeader, encodeFlagsHeader, publicFlags } from '@hypdriv/flags';
 import { decodeThemeHeader, resolveTheme } from '@hypdriv/purser';
-import { signing } from '@hypdriv/security';
-import { decodeGeoHeader, type GeoInfo } from '../stages/geo';
+import {
+  createJobHandler,
+  decodeGeoHeader,
+  type GeoInfo,
+  type JobHandlerOptions,
+  type JobInput,
+} from '@hypdriv/runtime';
 
 export { defineRoute, type ServerActionContext, safeAction } from './actions';
 export { HypDrivMeta, Speculation, ThemeScript } from './components';
@@ -31,7 +33,7 @@ export interface HypServerContext {
   theme: Record<string, string> | null;
   cspMode: string | null;
   speculation: 'edge' | 'component' | null;
-  runner: 'worker' | 'proxy' | 'node' | 'test' | null;
+  runner: 'worker' | 'proxy' | 'host' | 'node' | 'test' | null;
   /** The incoming request headers (read-only). */
   headers: Headers;
   cookies: Record<string, string>;
@@ -193,35 +195,7 @@ export function defer(task: () => Promise<unknown>): void {
   });
 }
 
-export interface JobInput {
-  request: Request;
-  /** Job name from the payload (cron jobs) or queue name. */
-  job: string;
-  payload: unknown;
-  /** Cron expression when triggered by a schedule. */
-  cron?: string;
-  /** Queue message metadata when triggered by a queue batch. */
-  messages?: Array<{ id: string; timestamp: string; body: unknown; attempts: number }>;
-}
-
-export interface JobHandlerOptions {
-  /**
-   * Environment variable holding the shared secret (default `security.internalAuth.secretEnv` from the
-   * registered config, else `HYPDRIV_INTERNAL_SECRET`).
-   */
-  secretEnv?: string;
-  /**
-   * Environment variable holding the secret Vercel Cron sends as `Authorization: Bearer <secret>`
-   * (default `vercel.cronSecretEnv` from the registered config, else `CRON_SECRET`). Requests carrying it are
-   * accepted as cron invocations.
-   */
-  cronSecretEnv?: string;
-  /** Job name reported to the handler when the request does not name one (Vercel Cron calls). */
-  job?: string;
-  /** Accept requests without a signature in development (default true). */
-  allowUnsignedInDevelopment?: boolean;
-  ttlSeconds?: number;
-}
+export type { JobHandlerOptions, JobInput } from '@hypdriv/runtime';
 
 /**
  * Wraps a Route Handler so it only accepts signed internal requests from the Worker's `scheduled`,
@@ -232,88 +206,7 @@ export function jobHandler(
   options: JobHandlerOptions,
   handler: (input: JobInput) => Promise<Response | unknown>,
 ): (request: Request) => Promise<Response> {
-  return async (request) => {
-    // The config of the request (proxy context) or the one `createInstrumentation().register()` registered
-    // for Vercel Functions, read per call because registration happens after module evaluation.
-    const config = getCurrentContext()?.config ?? getRuntime()?.config;
-    const secretEnv =
-      options.secretEnv ?? config?.security.internalAuth.secretEnv ?? 'HYPDRIV_INTERNAL_SECRET';
-    const cronSecretEnv = options.cronSecretEnv ?? config?.vercel.cronSecretEnv ?? 'CRON_SECRET';
-    const context = await hyp();
-    const readSecret = (name: string) => {
-      const value = context.env[name] ?? processEnv()[name];
-      return typeof value === 'string' && value ? value : undefined;
-    };
-    const secret = readSecret(secretEnv);
-    const cronSecret = readSecret(cronSecretEnv);
-    const development = processEnv().NODE_ENV === 'development';
-    // Vercel Cron: GET with `Authorization: Bearer $CRON_SECRET` (compared in constant time).
-    const authorization = request.headers.get('authorization');
-    const viaVercelCron =
-      !!cronSecret && !!authorization && timingSafeEqual(authorization, `Bearer ${cronSecret}`);
-    if (!viaVercelCron) {
-      if (!secret) {
-        if (!(development && options.allowUnsignedInDevelopment !== false)) {
-          return Response.json(
-            {
-              error: 'internal_secret_missing',
-              hint: `set ${secretEnv} (or ${cronSecretEnv} for Vercel Cron)`,
-            },
-            { status: 503 },
-          );
-        }
-      } else {
-        const ok = await signing.verifyInternalRequest(request.clone() as Request, secret, {
-          ttlSeconds: options.ttlSeconds ?? 300,
-        });
-        if (!ok) return Response.json({ error: 'unauthorized' }, { status: 401 });
-      }
-    }
-    let payload: unknown = null;
-    const pathname = new URL(request.url).pathname;
-    // Vercel Cron names neither the job nor (outside `x-vercel-cron-schedule`) the schedule: the
-    // `jobs.cron` entry for this path supplies both.
-    const configured = viaVercelCron
-      ? Object.entries(config?.jobs.cron ?? {}).find(([, entry]) => entry.path === pathname)
-      : undefined;
-    let job =
-      request.headers.get('x-hypdriv-job') ??
-      new URL(request.url).searchParams.get('job') ??
-      options.job ??
-      configured?.[0] ??
-      pathname.split('/').filter(Boolean).pop() ??
-      'default';
-    let cron: string | undefined = viaVercelCron
-      ? (request.headers.get('x-vercel-cron-schedule') ?? configured?.[1].cron ?? undefined)
-      : undefined;
-    let messages: JobInput['messages'];
-    if (request.method !== 'GET' && request.headers.get('content-type')?.includes('application/json')) {
-      try {
-        const body = (await request.json()) as Record<string, unknown>;
-        payload = body.payload ?? body;
-        if (typeof body.job === 'string') job = body.job;
-        if (typeof body.cron === 'string') cron = body.cron;
-        if (Array.isArray(body.messages)) messages = body.messages as JobInput['messages'];
-      } catch {
-        return Response.json({ error: 'invalid_json' }, { status: 400 });
-      }
-    }
-    try {
-      const result = await handler({
-        request,
-        job,
-        payload,
-        ...(cron ? { cron } : {}),
-        ...(messages ? { messages } : {}),
-      });
-      if (result instanceof Response) return result;
-      return Response.json({ ok: true, job, result: result ?? null });
-    } catch (err) {
-      const e = err instanceof HypDrivError ? err : new HypDrivError('E_INTERNAL', (err as Error).message);
-      context.log.error('job failed', { job, error: e.message });
-      return Response.json({ ok: false, job, error: e.code, message: e.message }, { status: e.status });
-    }
-  };
+  return createJobHandler({ context: () => hyp() }, options, handler);
 }
 
 /**

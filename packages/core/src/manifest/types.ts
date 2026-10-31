@@ -5,7 +5,36 @@
 
 export const MANIFEST_VERSION = 1 as const;
 
-export type RouteKind = 'app-page' | 'app-route' | 'page' | 'page-api' | 'static-file';
+/**
+ * - `app-page` / `app-route`: Next.js App Router page / Route Handler
+ * - `page` / `page-api`: a Next.js Pages Router page / API route, or a page of any other framework
+ * - `endpoint`: a server route of a non-Next framework (Astro endpoint, SvelteKit `+server`, React Router
+ *   resource route, TanStack Start server route, Nuxt server handler)
+ * - `static-file`: a file served as is
+ */
+export type RouteKind = 'app-page' | 'app-route' | 'page' | 'page-api' | 'endpoint' | 'static-file';
+
+/** Frameworks HypDriv builds manifests for. */
+export type FrameworkName =
+  | 'next'
+  | 'vite'
+  | 'react-router'
+  | 'tanstack-start'
+  | 'astro'
+  | 'sveltekit'
+  | 'nuxt'
+  | 'vinext';
+
+/** The framework (and bundler) that produced a build. */
+export interface ManifestFramework {
+  name: FrameworkName;
+  version: string;
+  /** `turbopack` / `webpack` (Next.js) or `vite`. */
+  bundler?: string;
+  bundlerVersion?: string;
+  /** Deployment adapter or preset the framework built for (`cloudflare`, `vercel`, `node`…), when known. */
+  adapter?: string;
+}
 /**
  * - `static`: prerendered, never revalidates (immutable until the next deploy)
  * - `isr`: prerendered, revalidates in the background (content may change between deploys)
@@ -57,6 +86,11 @@ export interface HypRoute {
   ensureStatic?: 'navigation' | 'prefetch' | 'shell';
   /** Source file relative to the project (e.g. `app/blog/[slug]/page.tsx`). */
   sourcePage?: string;
+  /**
+   * The route answers every otherwise unmatched path with one shared document (a single-page app's shell). It is
+   * never edge-cached by inference: other handlers may answer under the same pattern.
+   */
+  fallback?: boolean;
   /** Route segment config picked up from the build (`revalidate`, `dynamic`, `maxDuration`). */
   segment?: { maxDuration?: number; preferredRegion?: string | string[] };
 }
@@ -131,7 +165,10 @@ export interface HypManifest {
    */
   revalidation?: { tokenHash: string };
   deploymentId?: string;
-  nextVersion: string;
+  /** The Next.js version (Next.js builds only). */
+  nextVersion?: string;
+  /** The framework that produced the build. Manifests without it come from Next.js builds. */
+  framework?: ManifestFramework;
   hypdrivVersion: string;
   generatedAt: string;
   basePath: string;
@@ -166,7 +203,6 @@ export function emptyManifest(partial: Partial<HypManifest> = {}): HypManifest {
   return {
     version: MANIFEST_VERSION,
     buildId: 'development',
-    nextVersion: 'unknown',
     hypdrivVersion: 'unknown',
     generatedAt: new Date(0).toISOString(),
     basePath: '',
@@ -193,6 +229,39 @@ export function assertManifest(value: unknown): asserts value is HypManifest {
     );
   if (!Array.isArray(m.routes)) throw new TypeError('manifest.routes must be an array');
   if (typeof m.buildId !== 'string') throw new TypeError('manifest.buildId must be a string');
+}
+
+const FRAMEWORK_LABELS: Record<FrameworkName, string> = {
+  next: 'Next.js',
+  vite: 'Vite',
+  'react-router': 'React Router',
+  'tanstack-start': 'TanStack Start',
+  astro: 'Astro',
+  sveltekit: 'SvelteKit',
+  nuxt: 'Nuxt',
+  vinext: 'vinext',
+};
+
+/** The framework of a manifest (`{ name: 'next' }` for manifests written by the Next.js adapter). */
+export function manifestFramework(
+  manifest: Pick<HypManifest, 'framework' | 'nextVersion'>,
+): ManifestFramework | null {
+  if (manifest.framework) return manifest.framework;
+  if (manifest.nextVersion && manifest.nextVersion !== 'unknown')
+    return { name: 'next', version: manifest.nextVersion };
+  return null;
+}
+
+/** Human-readable framework label: `Next.js 16.4.3`, `Astro 7.4.4 (Vite 8.3.5)`, or `unknown framework`. */
+export function frameworkLabel(manifest: Pick<HypManifest, 'framework' | 'nextVersion'>): string {
+  const f = manifestFramework(manifest);
+  if (!f) return 'unknown framework';
+  const name = FRAMEWORK_LABELS[f.name] ?? f.name;
+  const bundler =
+    f.bundler === 'vite' && f.name !== 'vite'
+      ? ` (Vite${f.bundlerVersion ? ` ${f.bundlerVersion}` : ''})`
+      : '';
+  return `${name} ${f.version}${bundler}`;
 }
 
 /** The build identity edge-cache keys are scoped to: the content fingerprint, else the build id. */

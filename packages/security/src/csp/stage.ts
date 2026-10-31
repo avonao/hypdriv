@@ -13,10 +13,12 @@ import {
   type StateKey,
   stateKey,
   withHeaders,
+  withoutHeaders,
 } from '@hypdriv/core';
 import { CSP_EXTRA_HASHES_KEY, CSP_MODE_KEY, type CspMode, NONCE_KEY } from '../keys';
 import { buildCspDirectives } from './build';
 import { mergeDirectives, serializeCsp, withoutSource } from './directives';
+import { injectNonceStream } from './inject';
 
 /** Structural subset of Workers' `HTMLRewriter` (kept local: this package never imports workers-types). */
 export interface HtmlRewriterElementLike {
@@ -44,6 +46,12 @@ export interface CspStageOptions {
   edgeNonceInjection?: 'auto' | 'always' | 'never';
   /** Override the `HTMLRewriter` implementation (tests, custom runtimes). Default `globalThis.HTMLRewriter`. */
   htmlRewriter?: HtmlRewriterConstructor | null;
+  /**
+   * The runner owns the response body (a framework hook or HypDriv-served HTML rather than `proxy.ts`): without
+   * `HTMLRewriter`, nonces are injected with the portable streaming tokenizer (`injectNonceStream`) instead of
+   * degrading cached HTML to the `'unsafe-inline'` fallback. Default `false`.
+   */
+  portableInjection?: boolean;
 }
 
 /** Decision made in `pre`, consumed in `post`. */
@@ -85,8 +93,12 @@ export function injectNonce(
       if (!el.getAttribute('nonce')) el.setAttribute('nonce', nonce);
     },
   };
-  let rewriter = new Rewriter().on('script', handler);
-  if (options.styles) rewriter = rewriter.on('style', handler).on('link[rel="stylesheet"]', handler);
+  // `modulepreload` / script preloads are fetched under `script-src` with the link's own nonce.
+  let rewriter = new Rewriter()
+    .on('script', handler)
+    .on('link[rel~="modulepreload"]', handler)
+    .on('link[rel~="preload"][as="script"]', handler);
+  if (options.styles) rewriter = rewriter.on('style', handler).on('link[rel~="stylesheet"]', handler);
   return rewriter.transform(response);
 }
 
@@ -172,7 +184,7 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
       else mode = classification === 'static' && hashes && !rsc ? 'hash' : 'nonce';
 
       const rewriter = resolveRewriter(options);
-      const canInject = injection !== 'never' && rewriter !== null;
+      const canInject = injection !== 'never' && (rewriter !== null || options.portableInjection === true);
       let inject = false;
       if (mode === 'nonce') {
         const cachedHtml = classification === 'isr' || classification === 'shell';
@@ -210,6 +222,16 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
         ctx.timings.mark('csp', 'off');
         return withHeaders(response, headers);
       }
+      // A policy carrying `x-hypdriv-csp` is HypDriv's own static rule (Cloudflare `_headers` applied to a static
+      // asset the Worker fetched): the request's policy replaces it rather than counting as the application's.
+      if (response.headers.has(HEADER.cspMode)) {
+        response = withoutHeaders(response, [
+          'content-security-policy',
+          'content-security-policy-report-only',
+          'reporting-endpoints',
+          HEADER.cspMode,
+        ]);
+      }
       const reportTo = decision.effective.reportTo;
       if (reportTo && decision.effective.reportingEndpoints)
         headers['reporting-endpoints'] = `hypdriv="${absolutize(reportTo, ctx.url.origin)}"`;
@@ -231,10 +253,13 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
 
       let out = response;
       if (decision.mode === 'nonce' && decision.nonce && decision.inject) {
-        out = injectNonce(out, decision.nonce, {
-          styles: !decision.effective.unsafeInlineStyles,
-          htmlRewriter: resolveRewriter(options),
-        });
+        const styles = !decision.effective.unsafeInlineStyles;
+        const rewriter = resolveRewriter(options);
+        out = rewriter
+          ? injectNonce(out, decision.nonce, { styles, htmlRewriter: rewriter })
+          : options.portableInjection
+            ? injectNonceStream(out, decision.nonce, { styles })
+            : out;
       }
       if (enforced) headers['content-security-policy'] = enforced;
       if (reportOnly) headers['content-security-policy-report-only'] = reportOnly;

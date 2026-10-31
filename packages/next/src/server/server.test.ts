@@ -8,9 +8,9 @@ import {
   setContextStore,
 } from '@hypdriv/core';
 import { decodeFlagsHeader } from '@hypdriv/flags';
+import { encodeGeoHeader, type GeoInfo } from '@hypdriv/runtime';
 import { signing } from '@hypdriv/security';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { encodeGeoHeader, type GeoInfo } from '../stages/geo';
 import { defer, devtoolsMeta, flag, geo, hyp, jobHandler, nonce, setCloudflareContextLoader } from './index';
 
 const als = new AsyncLocalStorage<HypContext>();

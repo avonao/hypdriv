@@ -1,0 +1,63 @@
+{
+  "name": "@hypdriv/build",
+  "version": "0.1.0",
+  "description": "HypDriv's framework-neutral build engine: route manifest, CSP hashes, Early Hints, speculation graph, Purser verification, secrets scan and budgets for Next.js and Vite builds.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/build"
+  },
+  "keywords": [
+    "build",
+    "csp",
+    "manifest",
+    "vite",
+    "nextjs",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./html": {
+      "source": "./src/html.ts",
+      "types": "./dist/html.d.ts",
+      "default": "./dist/html.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/purser": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

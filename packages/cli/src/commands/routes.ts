@@ -1,4 +1,4 @@
-import type { HypManifest, HypRoute } from '@hypdriv/core';
+import { frameworkLabel, type HypManifest, type HypRoute, manifestFramework } from '@hypdriv/core';
 import { cspModeFor } from '../audit/paths';
 import { createContext } from '../context';
 import { bytes } from '../ui';
@@ -72,7 +72,8 @@ export const routesCommand = defineCommand({
     if (args.json) {
       ctx.ui.printJson({
         buildId: manifest.buildId,
-        nextVersion: manifest.nextVersion,
+        nextVersion: manifest.nextVersion ?? null,
+        framework: manifestFramework(manifest),
         cacheComponents: manifest.cacheComponents,
         routes: rows.map((r) => ({
           ...r,
@@ -108,7 +109,7 @@ export const routesCommand = defineCommand({
     }
     const { ui } = ctx;
     ui.heading(
-      `Routes — build ${manifest.buildId} · Next ${manifest.nextVersion} · ${rows.length} routes${manifest.cacheComponents ? ' · Cache Components on' : ''}`,
+      `Routes — build ${manifest.buildId} · ${frameworkLabel(manifest)} · ${rows.length} routes${manifest.cacheComponents ? ' · Cache Components on' : ''}`,
     );
     const columns: Array<string | { header: string; align?: 'left' | 'right' }> = [
       'route',

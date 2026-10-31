@@ -83,6 +83,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hypdriv/build": "workspace:*",
     "@hypdriv/cache": "workspace:*",
     "@hypdriv/core": "workspace:*",
     "@hypdriv/devtools": "workspace:*",
@@ -91,6 +92,7 @@
     "@hypdriv/live": "workspace:*",
     "@hypdriv/observe": "workspace:*",
     "@hypdriv/purser": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
     "@hypdriv/security": "workspace:*",
     "@hypdriv/vercel": "workspace:*"
   },

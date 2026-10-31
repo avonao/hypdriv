@@ -14,6 +14,6 @@
 
 export type { HypDrivConfig, HypManifest, ResolvedConfig } from '@hypdriv/core';
 export { defineConfig } from '@hypdriv/core';
+export { buildDefaultStages, createPlatform, type Platform, stages } from '@hypdriv/runtime';
 export { PHASE, type WithHypDrivOptions, withHypDriv } from './config/index';
 export { createProxy, matcher } from './proxy/index';
-export { buildDefaultStages, createPlatform, type Platform, stages } from './stages/index';

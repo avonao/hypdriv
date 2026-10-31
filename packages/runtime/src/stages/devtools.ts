@@ -58,6 +58,8 @@ export function devtoolsStage(config: ResolvedConfig): Stage | null {
       mark('build', ctx.manifest.buildId);
       mark('deployment', ctx.manifest.deploymentId);
       mark('next', ctx.manifest.nextVersion !== 'unknown' ? ctx.manifest.nextVersion : undefined);
+      const framework = ctx.manifest.framework;
+      if (framework && framework.name !== 'next') mark('framework', `${framework.name}@${framework.version}`);
       mark('version', HYPDRIV_VERSION);
       return response;
     },

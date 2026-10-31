@@ -13,6 +13,31 @@ export function setContextStore(store: ContextStore | null): void {
   (globalThis as Record<symbol, unknown>)[KEY] = store ?? undefined;
 }
 
+/** The installed context store, if any. */
+export function getContextStore(): ContextStore | undefined {
+  return (globalThis as Record<symbol, unknown>)[KEY] as ContextStore | undefined;
+}
+
+/** Structural `AsyncLocalStorage` (Node, workerd with `nodejs_compat`, Bun, Deno). */
+export interface AsyncLocalStorageLike<T> {
+  getStore(): T | undefined;
+  run<R>(store: T, fn: () => R): R;
+}
+
+/**
+ * Installs an `AsyncLocalStorage`-backed context store once per isolate and returns the installed store.
+ * The first installation wins, so the Worker shell, framework hooks and server helpers that share an
+ * isolate always read the same storage (two storages would hide each other's contexts).
+ */
+export function installAsyncContext(create: () => AsyncLocalStorageLike<HypContext>): ContextStore {
+  const existing = getContextStore();
+  if (existing) return existing;
+  const als = create();
+  const store: ContextStore = { getStore: () => als.getStore(), run: (ctx, fn) => als.run(ctx, fn) };
+  setContextStore(store);
+  return store;
+}
+
 /** Returns the request context of the current async flow, when a store is installed. */
 export function getCurrentContext(): HypContext | undefined {
   const store = (globalThis as Record<symbol, unknown>)[KEY] as ContextStore | undefined;

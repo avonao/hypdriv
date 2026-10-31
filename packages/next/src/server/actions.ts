@@ -1,6 +1,6 @@
 import { clientIp, HEADER } from '@hypdriv/core';
+import { decodeGeoHeader } from '@hypdriv/runtime';
 import { defineRoute as baseDefineRoute, safeAction as baseSafeAction } from '@hypdriv/security';
-import { decodeGeoHeader } from '../stages/geo';
 
 type BaseSafeAction = typeof baseSafeAction;
 type BaseDefineRoute = typeof baseDefineRoute;

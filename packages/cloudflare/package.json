@@ -57,9 +57,9 @@
     "@hypdriv/core": "workspace:*",
     "@hypdriv/flags": "workspace:*",
     "@hypdriv/live": "workspace:*",
-    "@hypdriv/next": "workspace:*",
     "@hypdriv/observe": "workspace:*",
     "@hypdriv/purser": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
     "@hypdriv/security": "workspace:*"
   },
   "peerDependencies": {
