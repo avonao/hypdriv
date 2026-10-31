@@ -1,5 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   mergeVercelRoutes,
   type StaticDocument,
@@ -26,6 +28,25 @@ export function vercelNodeRuntime(version: string = process.versions.node): stri
 export const VERCEL_NODE_MAJORS = [22, 24, 26] as const;
 
 /**
+ * The middleware runtime module, resolved from this package rather than the application: framework apps depend on
+ * their integration (`@hypdriv/astro`, `@hypdriv/vinext`…), not necessarily on `@hypdriv/vite` itself.
+ */
+function vercelMiddlewareModule(): string {
+  const specifier = '@hypdriv/vite/vercel-middleware';
+  try {
+    const resolved = import.meta.resolve?.(specifier);
+    if (resolved?.startsWith('file:')) return fileURLToPath(resolved);
+  } catch {
+    // fall through
+  }
+  try {
+    return createRequire(import.meta.url).resolve(specifier);
+  } catch {
+    return specifier;
+  }
+}
+
+/**
  * Bundles HypDriv's Routing Middleware (config + final manifest + runtime) into one ESM file for a Build Output
  * API Node.js function.
  */
@@ -45,7 +66,7 @@ export async function buildVercelMiddleware(input: {
     entry,
     [
       `import config from ${JSON.stringify(VIRTUAL_CONFIG)};`,
-      `import { createVercelMiddleware } from '@hypdriv/vite/vercel-middleware';`,
+      `import { createVercelMiddleware } from ${JSON.stringify(vercelMiddlewareModule())};`,
       `const manifest = JSON.parse(${JSON.stringify(JSON.stringify(input.manifest))});`,
       'export default createVercelMiddleware({ config, manifest });',
       '',
