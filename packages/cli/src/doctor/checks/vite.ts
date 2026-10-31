@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { manifestFramework } from '@hypdriv/core';
 import { FRAMEWORK_LABEL, type ProjectFramework } from '../../project';
 import { rel } from '../../util/fs';
@@ -40,6 +40,21 @@ function builtHeaders(root: string): string[] {
     '.svelte-kit/cloudflare/_headers',
   ];
   return candidates.map((c) => join(root, c)).filter((f) => existsSync(f));
+}
+
+/** The Worker entry a framework build generated with its own wrangler config (`.output/server/wrangler.json`). */
+function generatedWorkerEntry(root: string): string | null {
+  for (const config of ['.output/server/wrangler.json', 'dist/server/wrangler.json']) {
+    const file = join(root, config);
+    if (!existsSync(file)) continue;
+    try {
+      const main = (JSON.parse(readFileSync(file, 'utf8')) as { main?: string }).main;
+      if (main) return join(file, '..', main);
+    } catch {
+      // unreadable: fall through
+    }
+  }
+  return null;
 }
 
 export const viteChecks: Check[] = [
@@ -161,12 +176,24 @@ export const viteChecks: Check[] = [
         HYPDRIV_DO_CLASSES.includes(d.class_name ?? ''),
       );
       if (!bound.length) return skip('no HypDriv Durable Object bindings (optional upgrades).');
-      if (!cfg.main)
-        return warn('Durable Objects are bound but the Worker has no `main` that could export them.');
-      const entry = join(ctx.root, cfg.main);
+      let main = cfg.main;
+      if (!main) {
+        // Frameworks whose build generates the Worker and its config (Nuxt/Nitro `cloudflare-module`).
+        const generated = generatedWorkerEntry(ctx.root);
+        if (generated) main = rel(ctx.root, generated);
+        else if (ctx.project.framework.name === 'nuxt')
+          return info(
+            "The Worker entry is generated at build time (@hypdriv/nuxt with Nitro's cloudflare-module preset); build once to check its exports.",
+          );
+        else return warn('Durable Objects are bound but the Worker has no `main` that could export them.');
+      }
+      // `main` is relative to the wrangler config (which may live in a subdirectory, e.g. vinext's `cloudflare/`).
+      const configDir =
+        cfg.main && ctx.project.wrangler.configFile ? dirname(ctx.project.wrangler.configFile) : ctx.root;
+      const entry = join(configDir, main);
       if (!existsSync(entry))
         return info(
-          `main ${cfg.main} is generated at build time; make sure it exports ${bound.map((b) => b.class_name).join(', ')}.`,
+          `main ${main} is generated at build time; make sure it exports ${bound.map((b) => b.class_name).join(', ')}.`,
         );
       const source = readFileSync(entry, 'utf8');
       const missing = bound.filter(
@@ -174,9 +201,9 @@ export const viteChecks: Check[] = [
       );
       if (missing.length)
         return fail(
-          `${cfg.main} does not export ${missing.map((m) => m.class_name).join(', ')}; add \`export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects'\`.`,
+          `${main} does not export ${missing.map((m) => m.class_name).join(', ')}; add \`export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects'\`.`,
         );
-      return pass(`${bound.length} HypDriv Durable Object(s) bound and exported from ${cfg.main}.`);
+      return pass(`${bound.length} HypDriv Durable Object(s) bound and exported from ${main}.`);
     },
   },
   {

@@ -403,6 +403,14 @@ function readWrangler(root: string, pkg: PackageInfo | null): WranglerInfo {
     ['wrangler.json', 'json'],
     ['wrangler.toml', 'toml'],
   ];
+  // A Vite config can point the Cloudflare plugin elsewhere (`cloudflare({ configPath: './cloudflare/wrangler.jsonc' })`).
+  for (const viteConfig of ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs']) {
+    const source = readText(join(root, viteConfig));
+    const m = source
+      ? /configPath\s*:\s*(?:[^,'"`]*\?\?\s*)?['"]([^'"]+\.(jsonc|json|toml))['"]/.exec(source)
+      : null;
+    if (m) candidates.push([m[1]!, m[2] as WranglerFormat]);
+  }
   for (const [name, format] of candidates) {
     const file = join(root, name);
     if (!exists(file)) continue;
@@ -572,6 +580,11 @@ export function detectPlatform(input: PlatformInputs, forced?: DeployPlatform | 
   }
   if (input.workerFile) {
     signals.cloudflare.push(name(input.workerFile));
+    cf += 2;
+  }
+  const allDeps = { ...(input.pkg?.dependencies ?? {}), ...(input.pkg?.devDependencies ?? {}) };
+  if (allDeps['@cloudflare/vite-plugin']) {
+    signals.cloudflare.push('@cloudflare/vite-plugin');
     cf += 2;
   }
   const deps = { ...(input.pkg?.dependencies ?? {}), ...(input.pkg?.devDependencies ?? {}) };
