@@ -53,3 +53,7 @@ pnpm-debug.log*
 
 # Local wrangler configurations for your own accounts (wrangler.<name>.local.jsonc)
 wrangler.*.local.json*
+
+# Local secrets of private test deployments (e2e/*/provision)
+*.secrets.local.json
+*.local.env

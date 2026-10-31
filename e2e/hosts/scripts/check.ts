@@ -157,9 +157,7 @@ interface ScriptTag {
 
 function scripts(html: string): ScriptTag[] {
   const out: ScriptTag[] = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
+  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
     const attrs = m[1] ?? '';
     const attr = (name: string) =>
       new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
