@@ -609,6 +609,21 @@ describe('cspStage on runners that own the body', () => {
     const body = await response.text();
     expect(body).toContain(`<script nonce="${nonce}">x()</script>`);
     expect(body).toContain(`<link rel="modulepreload" href="/a.js" nonce="${nonce}">`);
+    // Per-request nonces: no shared caching when the application sent no policy of its own.
+    expect(response.headers.get('cache-control')).toBe('private, no-cache');
+  });
+
+  it("keeps the application's own Cache-Control on nonce documents", async () => {
+    const ctx = makeCtx({ route: isrRoute, manifest, url: 'https://app.test/blog' });
+    const { response } = await runStage(
+      cspStage(ctx.config, { htmlRewriter: null, portableInjection: true }),
+      ctx,
+      () =>
+        new Response('<html><script>x()</script></html>', {
+          headers: { 'content-type': 'text/html', 'cache-control': 'private, no-store' },
+        }),
+    );
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('without portable injection, cached HTML degrades to the unsafe-inline fallback (proxy runners)', async () => {

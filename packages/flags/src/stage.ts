@@ -3,6 +3,7 @@ import {
   defineStage,
   FLAGS_COOKIE_PENDING_KEY,
   type FlagValue,
+  type GeoProperties,
   type HypContext,
   parseCookies,
   type ResolvedConfig,
@@ -104,7 +105,7 @@ export function flagsStage(
         url: ctx.url,
         headers: ctx.request.headers,
         cookies,
-        geo: ctx.cf,
+        geo: geoForFlags(ctx.cf, ctx.request.headers),
         device: detectDevice(ctx.request.headers),
         ...(options.now ? { now: options.now() } : {}),
         ...(overridesAllowed ? { overrides: parseQueryOverrides(ctx.url, definitions) } : {}),
@@ -136,4 +137,22 @@ export function flagsStage(
       return response;
     },
   });
+}
+
+/**
+ * Geo for rule evaluation: Cloudflare's `request.cf`, else the platform's geo headers (Vercel `x-vercel-ip-*`,
+ * Cloudflare `cf-ipcountry` behind a proxy) — country and continent rules must match on every platform.
+ */
+export function geoForFlags(cf: GeoProperties | undefined, headers: Headers): GeoProperties | undefined {
+  if (cf?.country) return cf;
+  const country = headers.get('x-vercel-ip-country') ?? headers.get('cf-ipcountry');
+  if (!country || country === 'XX' || country === 'T1') return cf;
+  const continent = headers.get('x-vercel-ip-continent') ?? headers.get('cf-ipcontinent');
+  const region = headers.get('x-vercel-ip-country-region');
+  return {
+    ...(cf ?? {}),
+    country,
+    ...(continent ? { continent } : {}),
+    ...(region ? { region, regionCode: region } : {}),
+  };
 }

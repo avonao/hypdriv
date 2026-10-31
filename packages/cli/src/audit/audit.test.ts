@@ -667,3 +667,17 @@ describe('cache audit on Vite hosts', () => {
     expect(cdn.status).toBe('pass');
   });
 });
+
+describe('audits of API endpoints', () => {
+  it('does not require a CSP on JSON responses or endpoint routes', () => {
+    const json = new Headers({ ...STRONG, 'content-type': 'application/json' });
+    json.delete('content-security-policy');
+    expect(gradeHeaders(json, { https: true, document: false }).missing).not.toContain(
+      'Content-Security-Policy',
+    );
+    expect(gradeHeaders(json, { https: true }).missing).toContain('Content-Security-Policy');
+    expect(
+      cspModeFor({ kind: 'endpoint', classification: 'route' } as Parameters<typeof cspModeFor>[0], null),
+    ).toBe('none');
+  });
+});

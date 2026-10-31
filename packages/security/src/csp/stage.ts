@@ -263,6 +263,10 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
       }
       if (enforced) headers['content-security-policy'] = enforced;
       if (reportOnly) headers['content-security-policy-report-only'] = reportOnly;
+      // A document carrying a per-request nonce must not be stored by shared caches: when the application sent no
+      // caching policy (framework SSR responses often have none), say so explicitly.
+      if (decision.mode === 'nonce' && !out.headers.has('cache-control') && out.headers.has('content-type'))
+        headers['cache-control'] = 'private, no-cache';
       const mode = effectiveMode(decision);
       headers[HEADER.cspMode] = mode;
       ctx.state.set(CSP_MODE_KEY, mode);

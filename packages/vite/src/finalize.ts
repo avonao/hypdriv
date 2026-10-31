@@ -156,7 +156,9 @@ export async function finalizeManifest(input: FinalizeInput): Promise<FinalizeRe
       preliminary[index]!.dynamic ? paths : [],
     );
     const primaryPath = paths.includes(route.pathname) ? route.pathname : paths[0];
-    if (servedStatically && route.kind === 'page' && !route.dynamic && primaryPath === route.pathname)
+    // A fully prerendered route (static, every path a file) is the static layer's; a dynamic route with some
+    // prerendered paths still renders the others at request time.
+    if (servedStatically && route.kind === 'page' && route.classification === 'static' && paths.length)
       route.servedStatically = true;
     const primary = primaryPath ? docsByPath.get(primaryPath) : undefined;
     const document = primary ? readHtml(primary.file) : null;

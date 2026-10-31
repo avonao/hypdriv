@@ -52,4 +52,5 @@ export {
   FLAGS_KEY,
   type FlagsStageOptions,
   flagsStage,
+  geoForFlags,
 } from './stage';

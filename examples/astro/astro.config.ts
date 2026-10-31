@@ -14,10 +14,14 @@ const adapter =
     ? vercel()
     : target === 'node'
       ? node({ mode: 'standalone', staticHeaders: true })
-      : cloudflare();
+      : // WRANGLER_CONFIG points at an account-specific, git-ignored wrangler.<name>.local.jsonc.
+        cloudflare(process.env.WRANGLER_CONFIG ? { configPath: process.env.WRANGLER_CONFIG } : {});
 
 export default defineConfig({
   output: 'server',
   adapter,
   integrations: [hypdriv()],
+  // Stylesheets as content-hashed files under /_astro/ (immutable caching from HypDriv's static rules) instead of
+  // inline <style> blocks.
+  build: { inlineStylesheets: 'never' },
 });

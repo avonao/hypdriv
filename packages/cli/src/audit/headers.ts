@@ -31,7 +31,13 @@ const REQUIRED: Array<{ name: string; label: string; points: number }> = [
  * Grades response headers the way securityheaders.com does: the six core headers earn points, an
  * A+ requires all of them with an enforced CSP and no deductions, and leaky or weak values deduct.
  */
-export function gradeHeaders(headers: HeaderMap, options: { https?: boolean } = {}): HeaderGrade {
+export function gradeHeaders(
+  headers: HeaderMap,
+  options: {
+    https?: boolean /** false for non-HTML responses (APIs): no CSP required. */;
+    document?: boolean;
+  } = {},
+): HeaderGrade {
   const present: string[] = [];
   const missing: string[] = [];
   const deductions: HeaderGrade['deductions'] = [];
@@ -45,6 +51,11 @@ export function gradeHeaders(headers: HeaderMap, options: { https?: boolean } = 
   for (const req of REQUIRED) {
     // Browsers ignore HSTS on plain http (local previews), so it is not applicable there.
     if (req.name === 'strict-transport-security' && options.https === false) {
+      score += req.points;
+      continue;
+    }
+    // A CSP governs documents; JSON and other non-HTML responses do not need one.
+    if (req.name === 'content-security-policy' && options.document === false && !get(headers, req.name)) {
       score += req.points;
       continue;
     }

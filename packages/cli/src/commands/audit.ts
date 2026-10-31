@@ -88,7 +88,8 @@ export function auditHeadersPages(
         grade: null,
         level: 'fail',
       };
-    const grade = gradeHeaders(page.headers, { https });
+    const type = page.headers.get('content-type');
+    const grade = gradeHeaders(page.headers, { https, document: !type || /html/i.test(type) });
     return {
       path,
       status: page.status,

@@ -44,7 +44,9 @@ export function choosePaths(
     return out;
   }
   const pages = manifest.routes.filter(
-    (r) => (isPageRoute(r) || (options.includeRoutes && r.kind === 'app-route')) && !HIDDEN.has(r.pathname),
+    (r) =>
+      (isPageRoute(r) || (options.includeRoutes && (r.kind === 'app-route' || r.kind === 'endpoint'))) &&
+      !HIDDEN.has(r.pathname),
   );
   const cached = pages.filter((r) => r.classification === 'static' || r.classification === 'isr');
   const rest = pages.filter((r) => !cached.includes(r));
@@ -83,7 +85,13 @@ export function findRoute(manifest: HypManifest, path: string): HypRoute | null 
 /** Expected CSP mode for a route per ADR 0006. */
 export function cspModeFor(route: HypRoute | null, manifest: HypManifest | null): 'hash' | 'nonce' | 'none' {
   if (!route) return 'nonce';
-  if (route.kind === 'app-route' || route.kind === 'page-api' || route.kind === 'static-file') return 'none';
+  if (
+    route.kind === 'app-route' ||
+    route.kind === 'page-api' ||
+    route.kind === 'endpoint' ||
+    route.kind === 'static-file'
+  )
+    return 'none';
   if (route.classification === 'static' && manifest?.csp[route.id]) return 'hash';
   return 'nonce';
 }

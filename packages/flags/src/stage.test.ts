@@ -50,6 +50,18 @@ async function run(
 }
 
 describe('flagsStage', () => {
+  it('matches country rules from platform geo headers when there is no request.cf (Vercel, Node)', async () => {
+    const vercel = await run({ headers: { 'x-vercel-ip-country': 'US', 'x-vercel-ip-continent': 'NA' } });
+    expect(vercel.ctx.state.get(FLAGS_KEY)!.region).toBe('us');
+    const proxied = await run({ headers: { 'cf-ipcountry': 'US' } });
+    expect(proxied.ctx.state.get(FLAGS_KEY)!.region).toBe('us');
+    const unknown = await run({ headers: { 'cf-ipcountry': 'XX' } });
+    expect(unknown.ctx.state.get(FLAGS_KEY)!.region).toBe('global');
+    // request.cf wins over headers.
+    const cf = await run({ cf: { country: 'DE' }, headers: { 'x-vercel-ip-country': 'US' } });
+    expect(cf.ctx.state.get(FLAGS_KEY)!.region).toBe('global');
+  });
+
   it('evaluates, stores state and forwards the encoded header to Next.js', async () => {
     const { ctx, forwarded } = await run({ cf: { country: 'US' } });
     const values = ctx.state.get(FLAGS_KEY)!;
