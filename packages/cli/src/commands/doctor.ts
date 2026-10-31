@@ -85,7 +85,7 @@ export function printDoctorSummary(ui: Ui, run: DoctorRun, options: { compact?: 
 export const doctorCommand = defineCommand({
   name: 'doctor',
   summary:
-    'Run 40+ checks on environment, Next.js, OpenNext, wrangler, Workers compatibility, HypDriv setup, size, security, Purser and dependencies',
+    'Run 100+ checks on the environment, the framework host, OpenNext, wrangler, Workers compatibility, HypDriv setup, size, security, Purser and dependencies',
   usage: 'hypdriv doctor [--fix] [--ci] [--only <ids>] [--category <name>]',
   options: {
     fix: {

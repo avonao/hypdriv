@@ -1,18 +1,18 @@
 # Live Vercel test — 2026-10-31
 
-HypDriv tested on a real Vercel team on the **Hobby** (free) plan, US-first: every function and the Routing Middleware run in `iad1` (requests reached it through the Cleveland edge, `x-vercel-id: cle1::iad1::…`). Everything created for the test is named `avonao-hypdriv-dev*`; Vercel has no resource tags, so every deployment carries the `tag=hypdriv-dev` deployment meta. The team token was used only from the operator's shell and by the suite's runner; the deployments hold project secrets and a Global Config **read** token, never the account token.
+HypDriv tested on a real Vercel team on the **Hobby** (free) plan, US-first: every function and the Routing Middleware run in `iad1` (requests reached it through the Cleveland edge, `x-vercel-id: cle1::iad1::…`). Everything created for the test is named `hypdriv-dev*`; Vercel has no resource tags, so every deployment carries the `tag=hypdriv-dev` deployment meta. The team token was used only from the operator's shell and by the suite's runner; the deployments hold project secrets and a Global Config **read** token, never the account token.
 
-**Every test deployment is private.** Vercel Authentication covers all deployments of the three projects (`ssoProtection: all` — production and `<project>.vercel.app` included, available on Hobby); the runner and `hypdriv audit` get through with each project's Protection Bypass for Automation secret. Anonymous requests get Vercel's login redirect (`302`). The first part of the run used custom domains under `avonao.dev`; they were removed with their DNS records once it was clear the suite runs just as well on `<project>.vercel.app` behind the bypass.
+**Every test deployment is private.** Vercel Authentication covers all deployments of the three projects (`ssoProtection: all` — production and `<project>.vercel.app` included, available on Hobby); the runner and `hypdriv audit` get through with each project's Protection Bypass for Automation secret. Anonymous requests get Vercel's login redirect (`302`). The first part of the run used custom domains under the test zone; they were removed with their DNS records once it was clear the suite runs just as well on `<project>.vercel.app` behind the bypass.
 
 ## What ran
 
 | Project | URL (private) | Contents |
 | --- | --- | --- |
-| `avonao-hypdriv-dev-vercel` | `avonao-hypdriv-dev-vercel.vercel.app` | `examples/vercel` (Cache Components, PPR, route-header CDN policies, `withVercelCdn`, Vercel Queues, cron) |
-| `avonao-hypdriv-dev-vercel-purser` | `avonao-hypdriv-dev-vercel-purser.vercel.app` | `examples/vercel-purser` |
-| `avonao-hypdriv-dev-vercel-e2e` | `avonao-hypdriv-dev-vercel-e2e.vercel.app` | `e2e/vercel` (every capability that applies on Vercel) |
+| `hypdriv-dev-vercel` | `hypdriv-dev-vercel.vercel.app` | `examples/vercel` (Cache Components, PPR, route-header CDN policies, `withVercelCdn`, Vercel Queues, cron) |
+| `hypdriv-dev-vercel-purser` | `hypdriv-dev-vercel-purser.vercel.app` | `examples/vercel-purser` |
+| `hypdriv-dev-vercel-e2e` | `hypdriv-dev-vercel-e2e.vercel.app` | `e2e/vercel` (every capability that applies on Vercel) |
 
-Projects are monorepo projects (root directory = the app), deployed prebuilt from the repository root (`vercel pull` → `vercel build --prod` → `vercel deploy --prebuilt --prod`), Node.js 26, Fluid compute. Resources: Global Config store `avonao-hypdriv-dev-vercel-e2e` with the read token `avonao-hypdriv-dev-vercel-e2e-read` (connection string in the project's `GLOBAL_CONFIG`); WAF custom rule `avonao-hypdriv-dev-vercel-e2e-waf` (`@vercel/firewall` rate-limit id `hypdriv-e2e-waf`, fixed window 5 / 60 s per key — Hobby allows one); Vercel Queues topics `hypdriv-e2e-jobs` and `hypdriv-e2e-jobs-once` (project-scoped); Vercel Cron `/api/jobs/tick` at `17 7 * * *` (Hobby: daily); the Cloudflare Turnstile widget `avonao-hypdriv-dev`; an automation bypass per project. Provisioning is scripted and private by default: `pnpm -F @hypdriv/e2e-vercel provision --prefix …`.
+Projects are monorepo projects (root directory = the app), deployed prebuilt from the repository root (`vercel pull` → `vercel build --prod` → `vercel deploy --prebuilt --prod`), Node.js 26, Fluid compute. Resources: Global Config store `hypdriv-dev-vercel-e2e` with the read token `hypdriv-dev-vercel-e2e-read` (connection string in the project's `GLOBAL_CONFIG`); WAF custom rule `hypdriv-dev-vercel-e2e-waf` (`@vercel/firewall` rate-limit id `hypdriv-e2e-waf`, fixed window 5 / 60 s per key — Hobby allows one); Vercel Queues topics `hypdriv-e2e-jobs` and `hypdriv-e2e-jobs-once` (project-scoped); Vercel Cron `/api/jobs/tick` at `17 7 * * *` (Hobby: daily); the Cloudflare Turnstile widget `hypdriv-dev`; an automation bypass per project. Provisioning is scripted and private by default: `pnpm -F @hypdriv/e2e-vercel provision --prefix …`.
 
 ## Results
 

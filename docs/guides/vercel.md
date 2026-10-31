@@ -1,5 +1,7 @@
 # HypDriv on Vercel
 
+> **Preview install.** The 0.1.0 packages are distributed as release-bundle tarballs and source, not through a package registry. Where this page shows `npm create hypdriv@latest` or `pnpm add hypdriv`, scaffold with `--no-install` and run the bundle's `install.sh <app root>` (or install the tarballs of the packages you use). See [Install a Preview build](../../README.md#install-a-preview-build).
+
 On Vercel, HypDriv runs where Vercel runs your code: the Drivetrain stages in **Routing Middleware** (`proxy.ts`), server helpers in **Vercel Functions**, and the build integration in `next build` (`withHypDriv` and the chained adapter). There is no Worker entry and no extra infrastructure: platform services — the Vercel CDN, Upstash Redis, Global Config, the Vercel WAF, BotID, Vercel Queues — are upgrades HypDriv detects from the environment, exactly like bindings on Cloudflare.
 
 Vercel is detected automatically (`VERCEL=1` during builds and in functions, a `vercel.json` / `.vercel` directory locally); set `platform: 'vercel'` in `hypdriv.config.ts` to make it explicit. US-first: the examples deploy to `iad1`; add an EU region (`fra1`, `cdg1`) only where EU operations require it.

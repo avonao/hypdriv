@@ -4,15 +4,16 @@ HypDriv ships security features (CSP generation, security headers, rate limiting
 
 ## Supported versions
 
-| Version                           | Supported                                              |
-| --------------------------------- | ------------------------------------------------------ |
-| latest minor of the current major | yes                                                    |
-| previous major                    | security fixes for 6 months after the next major ships |
-| older                             | no                                                     |
+| Version                              | Supported                                              |
+| ------------------------------------ | ------------------------------------------------------ |
+| 0.1.x (Preview)                      | yes, security fixes land on the latest Preview version |
+| latest minor of the current major    | yes (from 1.0)                                         |
+| previous major                       | security fixes for 6 months after the next major ships (from 2.0) |
+| older                                | no                                                     |
 
 ## Reporting a vulnerability
 
-Please **do not** open a public issue. Email **security@hypdriv.dev** (or use GitHub's private vulnerability reporting on the repository) with:
+Please **do not** open a public issue. Report the vulnerability privately through GitHub's private vulnerability reporting (the **Report a vulnerability** button on the repository's *Security* tab) with:
 
 - the affected package(s) and version(s),
 - a description of the issue and its impact,

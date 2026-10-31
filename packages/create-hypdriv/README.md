@@ -2,6 +2,8 @@
 
 Scaffold a production-ready application with [HypDriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt or vinext — on **Cloudflare Workers**, **Vercel** or **Node**.
 
+> **Preview install.** The 0.1.0 packages are not on a package registry. Run the scaffolder from a release bundle or a source build with `--no-install` (`node dist/index.js my-app --no-install`), then run the bundle's `install.sh my-app`. The commands below show the registry form that applies once the packages are published.
+
 ```sh
 npm create hypdriv@latest my-app
 pnpm create hypdriv my-app --platform vercel

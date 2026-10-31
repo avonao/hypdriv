@@ -4,4 +4,4 @@ HypDriv follows the [Contributor Covenant](https://www.contributor-covenant.org/
 
 In short: be respectful, assume good faith, keep discussions technical and constructive, and welcome newcomers. Harassment, personal attacks, and discriminatory language are not tolerated anywhere in the project's spaces (issues, pull requests, discussions, chat).
 
-Reports can be sent to **conduct@hypdriv.dev**. They are handled confidentially by the maintainers.
+Report violations privately to the maintainers through the repository's *Security* tab (**Report a vulnerability**, choose *Code of conduct* in the title) or by contacting a maintainer listed on the organization page. Reports are handled confidentially.

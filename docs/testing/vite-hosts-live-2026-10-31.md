@@ -1,10 +1,10 @@
 # Live test of the Vite hosts — 2026-10-31
 
-HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4 and vinext — each deployed from its example app to **Cloudflare Workers** (account "avonao") and **Vercel** (Hobby team), US-first: requests reached Cloudflare through IAD/CMH and Vercel functions run in `iad1`. Every resource is named `avonao-hypdriv-dev-<framework>`; Workers carry the `hypdriv-dev` tag, Vercel deployments the `tag=hypdriv-dev` meta. Account tokens were used from the operator's shell only and never reached a deployment.
+HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4 and vinext — each deployed from its example app to **Cloudflare Workers** (a Cloudflare account) and **Vercel** (Hobby team), US-first: requests reached Cloudflare through IAD/CMH and Vercel functions run in `iad1`. Every resource is named `hypdriv-dev-<framework>`; Workers carry the `hypdriv-dev` tag, Vercel deployments the `tag=hypdriv-dev` meta. Account tokens were used from the operator's shell only and never reached a deployment.
 
 **Every deployment is private.**
 
-- **Cloudflare:** custom domains `avonao-hypdriv-dev-<framework>.avonao.dev` with `workers.dev` and preview URLs off, provisioned by `pnpm -F @hypdriv/e2e-hosts provision cloudflare`. The zone keeps two rules for all private HypDriv hosts (the Free plan allows five custom rules): a WAF custom rule that blocks HTTPS requests without the gate header or cookie, and a Redirect Rule that sends plain HTTP to https before anything answers. Anonymous requests get `403` over HTTPS and `308 → https` over HTTP.
+- **Cloudflare:** custom domains `hypdriv-dev-<framework>.example-zone.dev` with `workers.dev` and preview URLs off, provisioned by `pnpm -F @hypdriv/e2e-hosts provision cloudflare`. The zone keeps two rules for all private HypDriv hosts (the Free plan allows five custom rules): a WAF custom rule that blocks HTTPS requests without the gate header or cookie, and a Redirect Rule that sends plain HTTP to https before anything answers. Anonymous requests get `403` over HTTPS and `308 → https` over HTTP.
 - **Vercel:** `ssoProtection: all` on every project, plus an automation bypass per project for tooling (`provision vercel`). Anonymous requests get Vercel's login redirect (`302`).
 
 ## What ran

@@ -1,16 +1,16 @@
 # Live Cloudflare test — 2026-10-30
 
-HypDriv tested on a real Cloudflare account (Free-plan zone, US-first: R2 `enam`, requests served from IAD/CMH). Everything created for the test is named `avonao-hypdriv-dev*`; the three Workers carry the `hypdriv-dev` tag (script settings) and every deployed version the `hypdriv-dev` version tag. Credentials stayed out of the repository: a scoped token (Zone → Cache Purge) was created for the Workers' `CACHE_PURGE_API_TOKEN`; the account token was used only from the operator's shell.
+HypDriv tested on a real Cloudflare account (Free-plan zone, US-first: R2 `enam`, requests served from IAD/CMH). Everything created for the test is named `hypdriv-dev*`; the three Workers carry the `hypdriv-dev` tag (script settings) and every deployed version the `hypdriv-dev` version tag. Credentials stayed out of the repository: a scoped token (Zone → Cache Purge) was created for the Workers' `CACHE_PURGE_API_TOKEN`; the account token was used only from the operator's shell.
 
 ## What ran
 
 | Worker | Custom domain | Contents |
 | --- | --- | --- |
-| `avonao-hypdriv-dev-basic` | `avonao-hypdriv-dev-basic.avonao.dev` | `examples/basic` (Cache Components, PPR, KV, Durable Objects, Analytics Engine, Rate Limiting binding, Images, cron); tail producer for the suite |
-| `avonao-hypdriv-dev-purser` | `avonao-hypdriv-dev-purser.avonao.dev` | `examples/with-purser` |
-| `avonao-hypdriv-dev-e2e` | `avonao-hypdriv-dev-e2e.avonao.dev` | `e2e/cloudflare` (every capability on, queues + DLQ, cron every minute) |
+| `hypdriv-dev-basic` | `hypdriv-dev-basic.example-zone.dev` | `examples/basic` (Cache Components, PPR, KV, Durable Objects, Analytics Engine, Rate Limiting binding, Images, cron); tail producer for the suite |
+| `hypdriv-dev-purser` | `hypdriv-dev-purser.example-zone.dev` | `examples/with-purser` |
+| `hypdriv-dev-e2e` | `hypdriv-dev-e2e.example-zone.dev` | `e2e/cloudflare` (every capability on, queues + DLQ, cron every minute) |
 
-Resources: KV namespaces `avonao-hypdriv-dev-{basic,purser,e2e}-kv`; R2 buckets `avonao-hypdriv-dev-{basic,purser,e2e}-cache` (`enam`); queues `avonao-hypdriv-dev-e2e-jobs` and `…-jobs-dlq`; Turnstile widget `avonao-hypdriv-dev` (managed, `avonao.dev`); Analytics Engine datasets `avonao_hypdriv_dev_{basic,purser,e2e}`; Rate Limiting namespaces 74010–74012; zone settings Early Hints and Image Resizing switched on (both were off; they only affect proxied hostnames, and the zone's other records are DNS-only). DNS records for the custom domains are managed by Workers (read-only), so they carry no tags; the zone plan has no DNS tags either.
+Resources: KV namespaces `hypdriv-dev-{basic,purser,e2e}-kv`; R2 buckets `hypdriv-dev-{basic,purser,e2e}-cache` (`enam`); queues `hypdriv-dev-e2e-jobs` and `…-jobs-dlq`; Turnstile widget `hypdriv-dev` (managed, the test zone); Analytics Engine datasets `hypdriv_dev_{basic,purser,e2e}`; Rate Limiting namespaces 74010–74012; zone settings Early Hints and Image Resizing switched on (both were off; they only affect proxied hostnames, and the zone's other records are DNS-only). DNS records for the custom domains are managed by Workers (read-only), so they carry no tags; the zone plan has no DNS tags either.
 
 All three Workers deploy with OpenNext's full cache setup (R2 incremental cache behind the regional Cache API cache, Durable Object queue, sharded Durable Object tag cache, Durable Object cache purge) next to HypDriv's Durable Objects.
 

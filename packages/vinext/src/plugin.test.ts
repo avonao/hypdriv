@@ -110,7 +110,10 @@ describe('Vercel static pages', () => {
 
 const page = (body: string) => `export default function Page() { return ${body}; }\n`;
 
-describe('a real vinext build', () => {
+// vinext itself requires Node 22+ (it uses `fs.promises.glob`), matching this package's `engines`.
+const nodeMajor = Number(process.versions.node.split('.')[0]);
+
+describe.skipIf(nodeMajor < 22)('a real vinext build', () => {
   it('finalises the manifest after vinext’s prerender, patches it into the server and serves through the hook', async () => {
     mkdirSync(buildsDir, { recursive: true });
     const root = mkdtempSync(join(buildsDir, 'node-'));

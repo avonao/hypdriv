@@ -50,7 +50,7 @@ On Cloudflare the pipeline runs in the Worker shell, before OpenNext executes th
 List the cookies, headers and query parameters the middleware reads in `cache.edge.bypass`. It applies to every policy, inferred ones included; a request carrying any of them reads nothing from the cache and stores nothing in it:
 
 ```ts
-cache: { edge: { bypass: { cookies: ['tv_gate'], headers: ['x-preview'], query: ['preview'] } } }
+cache: { edge: { bypass: { cookies: ['site_gate'], headers: ['x-preview'], query: ['preview'] } } }
 ```
 
 `hypdriv doctor` (`cache.middleware`) warns when the build has a middleware, the edge cache has policies and nothing is listed. A site whose middleware decides on more than a few cookies can turn the HTML cache off (`cache.edge.infer: false`, no policies) and keep OpenNext's incremental cache, which sits behind the middleware.

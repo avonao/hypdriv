@@ -17,6 +17,8 @@ The JSON report names the framework it detected (Next.js-only checks are skipped
 
 ## 2. Install and wire (new projects)
 
+Preview packages are release-bundle tarballs, not registry packages: scaffold with `--no-install` and run the bundle's `install.sh <app root>`; the commands below show the registry form.
+
 ```sh
 npm create hypdriv@latest my-app -- --pm pnpm                    # Cloudflare Workers (OpenNext)
 npm create hypdriv@latest my-app -- --pm pnpm --platform vercel  # Vercel

@@ -15,7 +15,8 @@ jobs:
   release:
     name: Version or publish
     runs-on: ubuntu-latest
-    if: github.repository == 'avonao/hypdriv'
+    # Publishing is enabled per repository: set the repository variable NPM_PUBLISH to 'true' once packages are released to a registry.
+    if: github.repository == 'avonao/hypdriv' && vars.NPM_PUBLISH == 'true'
     steps:
       - uses: actions/checkout@v5
         with:

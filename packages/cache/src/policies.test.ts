@@ -87,20 +87,20 @@ describe('inferPolicies / resolvePolicies', () => {
 
   it('gives every inferred policy the shared cache.edge.bypass (a gate cookie must skip the cache)', () => {
     const config = resolveConfig({
-      cache: { edge: { bypass: { cookies: ['tv_gate'], headers: ['X-Gate'] } } },
+      cache: { edge: { bypass: { cookies: ['site_gate'], headers: ['X-Gate'] } } },
     });
     const inferred = inferPolicies(config, manifest);
     expect(inferred.length).toBeGreaterThan(0);
     for (const p of inferred) {
-      expect(p.bypass.cookies).toEqual(['tv_gate']);
+      expect(p.bypass.cookies).toEqual(['site_gate']);
       expect(p.bypass.headers).toEqual(['x-gate']);
     }
     const blog = inferred.find((p) => p.id === 'inferred:app:/blog')!;
     const withCookie = makeCtx(
-      new Request('https://example.com/blog', { headers: { cookie: 'a=1; tv_gate=signed' } }),
+      new Request('https://example.com/blog', { headers: { cookie: 'a=1; site_gate=signed' } }),
       { config, manifest },
     );
-    expect(bypassReason(blog, withCookie)).toBe('cookie:tv_gate');
+    expect(bypassReason(blog, withCookie)).toBe('cookie:site_gate');
     const anonymous = makeCtx('https://example.com/blog', { config, manifest });
     expect(bypassReason(blog, anonymous)).toBeNull();
   });

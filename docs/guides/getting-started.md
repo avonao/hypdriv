@@ -1,5 +1,7 @@
 # Getting started
 
+> **Preview install.** The 0.1.0 packages are distributed as release-bundle tarballs and source, not through a package registry. Where this page shows `npm create hypdriv@latest` or `pnpm add hypdriv`, scaffold with `--no-install` and run the bundle's `install.sh <app root>` (or install the tarballs of the packages you use). See [Install a Preview build](../../README.md#install-a-preview-build).
+
 ## New project
 
 ```sh

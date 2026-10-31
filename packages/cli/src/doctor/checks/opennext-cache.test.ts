@@ -213,10 +213,10 @@ describe('evaluateEdgeCacheMiddleware', () => {
   it('passes once the gate cookie is listed', () => {
     const r = evaluateEdgeCacheMiddleware({
       manifest: withMiddleware,
-      edge: edgeOf({ edge: { bypass: { cookies: ['tv_gate'] } } }),
+      edge: edgeOf({ edge: { bypass: { cookies: ['site_gate'] } } }),
     });
     expect(r.status).toBe('pass');
-    expect(r.message).toContain('cookies tv_gate');
+    expect(r.message).toContain('cookies site_gate');
   });
 
   it('passes without middleware, with the edge cache off, or with no policies', () => {
