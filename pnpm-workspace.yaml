@@ -42,6 +42,11 @@ catalog:
   "@sveltejs/adapter-vercel": ^7.0.2
   "@sveltejs/adapter-node": ^6.0.1
   svelte: ^5.57.3
+  # TanStack Start (React). @tanstack/react-start pins @tanstack/react-router exactly: keep them in step.
+  "@tanstack/react-start": ^1.169.4
+  "@tanstack/react-router": 1.170.46
+  "@tanstack/router-generator": ^1.167.46
+  nitro: 3.0.261029-rc
   # Small, standards-based deps
   "@standard-schema/spec": ^1.1.0
   web-vitals: ^6.2.3
@@ -59,6 +64,7 @@ minimumReleaseAgeExclude:
   - "@sveltejs/adapter-vercel@7.0.2"
   - "@sveltejs/adapter-node@6.0.1"
   - svelte@5.57.3
+  - nitro@3.0.261029-rc
 
 # Dependencies that are allowed to run install scripts.
 allowBuilds:

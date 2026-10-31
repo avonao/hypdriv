@@ -1,0 +1,41 @@
+{
+  "name": "@hypdriv/example-tanstack-start",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare vite build",
+    "build:vercel": "HYPDRIV_TARGET=vercel vite build",
+    "build:node": "HYPDRIV_TARGET=node vite build",
+    "preview": "vite preview",
+    "start": "node .output/server/index.mjs",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare vite build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/tanstack-start": "workspace:*",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@hypdriv/vite": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "nitro": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

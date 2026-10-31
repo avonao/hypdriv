@@ -1,0 +1,103 @@
+{
+  "name": "@hypdriv/tanstack-start",
+  "version": "0.1.0",
+  "description": "HypDriv for TanStack Start: the Drivetrain as global request middleware (security headers, CSP nonces through the router's ssr.nonce, rate limiting, bot shield, flags, /_hypdriv/*), the route manifest with CSP hashes of prerendered pages, and static headers for Cloudflare Workers, Vercel and Node.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/tanstack-start"
+  },
+  "keywords": [
+    "tanstack",
+    "tanstack-start",
+    "vite",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "nitro",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "workerd": "./dist/index.js",
+      "edge-light": "./dist/index.js",
+      "worker": "./dist/index.js",
+      "deno": "./dist/index.js",
+      "browser": "./dist/client.js",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "workerd": "./dist/server.js",
+      "edge-light": "./dist/server.js",
+      "worker": "./dist/server.js",
+      "deno": "./dist/server.js",
+      "browser": "./dist/server-client.js",
+      "default": "./dist/server.js"
+    },
+    "./server-entry": {
+      "source": "./src/server-entry.ts",
+      "types": "./dist/server-entry.d.ts",
+      "default": "./dist/server-entry.js"
+    },
+    "./cloudflare": {
+      "source": "./src/cloudflare.ts",
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
+    "./vite": {
+      "source": "./src/vite/index.ts",
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/build": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/vite": "workspace:*",
+    "@tanstack/router-generator": "catalog:"
+  },
+  "peerDependencies": {
+    "@tanstack/react-start": ">=1.169.0 <2",
+    "vite": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "@types/node": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
