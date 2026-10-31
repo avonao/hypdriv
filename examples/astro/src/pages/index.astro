@@ -1,0 +1,23 @@
+---
+import RequestFacts from '../components/RequestFacts.astro';
+import Layout from '../layouts/Layout.astro';
+
+// Prerendered at build time: served by the platform with HypDriv's static headers (hash CSP from the build).
+export const prerender = true;
+---
+
+<Layout title="HypDriv × Astro">
+  <h1>HypDriv × Astro</h1>
+  <p>
+    This page is prerendered. Its Content-Security-Policy lists the hashes of its inline scripts and styles, computed
+    at build time. The facts below come from a server island rendered per request behind the HypDriv pipeline.
+  </p>
+  <RequestFacts server:defer>
+    <p slot="fallback">Loading request facts…</p>
+  </RequestFacts>
+  <p id="status">Scripts did not run.</p>
+  <script>
+    const status = document.querySelector('#status');
+    if (status) status.textContent = 'Scripts ran under the page policy.';
+  </script>
+</Layout>

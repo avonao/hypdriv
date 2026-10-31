@@ -1,0 +1,28 @@
+---
+// Rendered per request (a server island inside a prerendered page, or inline in an on-demand page).
+import { flag, hyp } from '@hypdriv/astro/server';
+
+const ctx = hyp();
+const newHero = flag('newHero', false);
+---
+
+<dl class="facts">
+  <dt>Request id</dt>
+  <dd data-fact="request-id">{ctx?.requestId ?? 'none'}</dd>
+  <dt>Runner</dt>
+  <dd data-fact="runner">{ctx?.runner ?? 'none'}</dd>
+  <dt>CSP nonce</dt>
+  <dd data-fact="nonce">{ctx?.nonce ?? 'none'}</dd>
+  <dt>Country</dt>
+  <dd data-fact="country">{ctx?.country ?? 'unknown'}</dd>
+  <dt>Flag <code>newHero</code></dt>
+  <dd data-fact="flag">{String(newHero)}</dd>
+</dl>
+
+<style>
+  .facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.25rem 1rem;
+  }
+</style>

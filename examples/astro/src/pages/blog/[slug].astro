@@ -1,0 +1,20 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// A dynamic route prerendered for every post: each document gets its own hash CSP.
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [
+    { params: { slug: 'hello' }, props: { title: 'Hello, HypDriv' } },
+    { params: { slug: 'edge' }, props: { title: 'Security at the edge' } },
+  ];
+}
+
+const { title } = Astro.props;
+---
+
+<Layout title={title}>
+  <h1>{title}</h1>
+  <p>Prerendered from <code>src/pages/blog/[slug].astro</code>.</p>
+</Layout>
