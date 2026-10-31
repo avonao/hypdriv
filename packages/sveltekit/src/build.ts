@@ -45,6 +45,8 @@ export interface PreparedBuild {
   /** Server files the final manifest was patched into before the adapter ran. */
   patched: string[];
   immutablePrefixes: string[];
+  /** Pathnames of the prerendered documents (served by the platform's static layer). */
+  documents: string[];
 }
 
 /** A HypDriv logger that prints through SvelteKit's builder log. */
@@ -150,7 +152,7 @@ export async function prepareBuild(input: {
   // Every SvelteKit adapter caches `/_app/immutable/*` itself (adapter-cloudflare's `_headers`, adapter-vercel's
   // route, adapter-node's file table): a second rule would join values on Cloudflare (`…, immutable, no-cache`).
   const rules = rulesFor({ config, manifest, documents: result.documents, immutablePrefixes: [] });
-  return { manifest, rules, patched, immutablePrefixes };
+  return { manifest, rules, patched, immutablePrefixes, documents: result.documents.map((d) => d.pathname) };
 }
 
 const CODE_FILE = /\.(?:m?js|cjs)$/;

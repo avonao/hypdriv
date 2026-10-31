@@ -4,9 +4,11 @@ import type { StaticHeaderRule } from '@hypdriv/build';
 import type { HypManifest, Logger, ManifestFramework, ResolvedConfig } from '@hypdriv/core';
 import { silentLogger } from '@hypdriv/core';
 import {
+  addVercelMiddleware,
   type DiscoveredRoute,
   finalizeManifest,
   htmlPathname,
+  type LoadedHypConfig,
   normalizePathname,
   type PrerenderedDocument,
   patchRuntimeManifest,
@@ -254,6 +256,12 @@ export interface FinalizeAstroInput {
   targets: AstroTarget[];
   /** `@astrojs/node` serves `dist/_headers.json` (its `staticHeaders` option is on). */
   nodeStaticHeaders?: boolean;
+  /**
+   * The loaded HypDriv config, for HypDriv's Routing Middleware on Vercel: prerendered pages, which the CDN serves
+   * without Astro's function, get the request stages too. Omit (or set `vercelMiddleware: false`) to skip it.
+   */
+  loaded?: LoadedHypConfig;
+  vercelMiddleware?: boolean;
   log?: Logger;
 }
 
@@ -337,6 +345,18 @@ export async function finalizeAstroBuild(input: FinalizeAstroInput): Promise<Fin
         writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
       written.push(file);
       log.info(`hypdriv: Vercel header routes written, manifest copied into ${functions} function(s)`);
+      if (input.loaded)
+        await addVercelMiddleware({
+          root: input.root,
+          outputDir,
+          config: input.loaded,
+          manifest: result.manifest,
+          paths:
+            input.vercelMiddleware === false
+              ? []
+              : documents.map((d) => (d.pathname === '/' ? basePath || '/' : `${basePath}${d.pathname}`)),
+          log,
+        });
     } else log.warn('hypdriv: .vercel/output/config.json not found; Vercel header routes were not written');
     serverDirs.push(join(outputDir, 'functions'), join(outputDir, '_functions'));
   }

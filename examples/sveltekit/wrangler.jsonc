@@ -6,7 +6,13 @@
   "main": ".svelte-kit/cloudflare/_worker.js",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
+  // The Worker runs first for everything except content-hashed assets, so prerendered pages get the request stages
+  // (rate limiting, bot shield, geo, flags) too; without it they carry HypDriv's `_headers` rules only.
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".svelte-kit/cloudflare",
+    "run_worker_first": ["/*", "!/_app/immutable/*"]
+  },
   "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [

@@ -665,6 +665,22 @@ describe('cache audit on Vite hosts', () => {
       },
     });
     expect(cdn.status).toBe('pass');
+    const before = auditCache({
+      path: '/',
+      hasPolicy: false,
+      servedStatically: true,
+      rscVary: false,
+      first: {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html', 'cache-control': 'public' }),
+      },
+      second: {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html', 'cache-control': 'public' }),
+      },
+    });
+    expect(before.status).toBe('pass');
+    expect(before.findings[0]!.message).toContain('run_worker_first');
   });
 });
 

@@ -29,6 +29,13 @@ export interface HypDrivAstroOptions {
    * Default true when an adapter is configured.
    */
   internalRoutes?: boolean;
+  vercel?: {
+    /**
+     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Astro's function
+     * (rate limiting, bot shield, maintenance, redirects, geo; default true).
+     */
+    middleware?: boolean;
+  };
 }
 
 /** The platform an Astro adapter deploys to. */
@@ -192,6 +199,8 @@ export function hypdriv(options: HypDrivAstroOptions = {}): AstroIntegration {
           trailingSlash: astroConfig.trailingSlash,
           targets,
           nodeStaticHeaders,
+          loaded,
+          ...(options.vercel?.middleware === false ? { vercelMiddleware: false } : {}),
           log: astroLogger(logger),
         });
         host?.api.setManifest(result.manifest);

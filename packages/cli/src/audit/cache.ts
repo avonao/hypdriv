@@ -62,7 +62,15 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
   const platformLimit =
     second === 'BYPASS' && reason?.startsWith('route-header:') ? reason.slice('route-header:'.length) : null;
 
-  if (!first && !second) {
+  if (!first && !second && input.servedStatically) {
+    // Prerendered files the platform serves before HypDriv runs (Workers Static Assets without
+    // run_worker_first, a CDN): they carry HypDriv's static header rules but no request stages.
+    findings.push({
+      level: 'info',
+      message:
+        "prerendered document served by the platform's static layer before HypDriv (static header rules only; on Cloudflare set assets.run_worker_first to run the request stages)",
+    });
+  } else if (!first && !second) {
     findings.push({
       level: 'fail',
       message:

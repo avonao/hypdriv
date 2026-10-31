@@ -1,7 +1,13 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { type HypDrivConfig, loadConfig, type ManifestFramework } from '@hypdriv/core';
-import { type HostPluginApi, hostPlugin, patchRuntimeManifest, writeCloudflareStatic } from '@hypdriv/vite';
+import {
+  addVercelMiddleware,
+  type HostPluginApi,
+  hostPlugin,
+  patchRuntimeManifest,
+  writeCloudflareStatic,
+} from '@hypdriv/vite';
 import type { Adapter, AdapterViteConfig, Builder } from '@sveltejs/kit';
 import { VERSION } from '@sveltejs/kit';
 import { type Plugin, version as viteVersion } from 'vite';
@@ -40,6 +46,14 @@ export interface HypDrivSvelteKitOptions {
   node?: {
     /** adapter-node's `out` option (default `build`). */
     out?: string;
+  };
+  vercel?: {
+    /**
+     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without SvelteKit's
+     * function (rate limiting, bot shield, maintenance, redirects, geo; default true). On-demand routes run the
+     * pipeline in the function's `handle` either way.
+     */
+    middleware?: boolean;
   };
 }
 
@@ -230,6 +244,14 @@ export function hypdriv(adapter: Adapter, options: HypDrivSvelteKitOptions = {})
         const output = join(root, '.vercel', 'output');
         const { routes } = writeVercelHeaders(output, prepared.rules);
         log.info(`hypdriv: ${routes} header route(s) → .vercel/output/config.json`);
+        await addVercelMiddleware({
+          root,
+          outputDir: output,
+          config: loaded,
+          manifest: prepared.manifest,
+          paths: options.vercel?.middleware === false ? [] : prepared.documents,
+          log,
+        });
         outputs.push(join(output, 'functions'));
       } else if (platform === 'node') {
         const out = resolve(root, options.node?.out ?? 'build');

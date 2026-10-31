@@ -47,7 +47,14 @@ export {
   writeCloudflareStatic,
   writeVercelStatic,
 } from './targets';
-export { buildVercelMiddleware, vercelNodeRuntime, writeVercelOutput } from './vercel-output';
+export {
+  addVercelMiddleware,
+  buildVercelMiddleware,
+  VERCEL_MIDDLEWARE_PATH,
+  vercelMiddlewareSource,
+  vercelNodeRuntime,
+  writeVercelOutput,
+} from './vercel-output';
 export {
   assetsForEntries,
   entriesForSources,

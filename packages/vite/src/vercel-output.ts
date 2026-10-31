@@ -1,9 +1,10 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
   mergeVercelRoutes,
   type StaticDocument,
   type StaticHeaderRule,
+  VERCEL_ROUTE_MARKER,
   type VercelRoute,
 } from '@hypdriv/build';
 import type { HypManifest, Logger } from '@hypdriv/core';
@@ -129,26 +130,6 @@ export async function writeVercelOutput(input: {
   });
 
   const routes: VercelRoute[] = mergeVercelRoutes([], input.rules);
-  if (input.middleware) {
-    const funcDir = join(out, 'functions', '_hypdriv', 'middleware.func');
-    await buildVercelMiddleware({
-      root: input.root,
-      funcDir,
-      config: input.config,
-      manifest: input.manifest,
-    });
-    const immutable = input.manifest.staticFiles.immutablePrefixes.map((p) => p.replace(/^\/|\/$/g, ''));
-    const exclude = immutable.length
-      ? `(?!${immutable.map((p) => `${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`).join('|')})`
-      : '';
-    routes.push({
-      src: `^/${exclude}.*$`,
-      middlewarePath: '_hypdriv/middleware',
-      middlewareRawSrc: [`/${exclude ? `(${exclude}.*)` : '(.*)'}`],
-      continue: true,
-      override: true,
-    });
-  }
   routes.push({ handle: 'filesystem' });
   // The SPA shell answers unknown extensionless paths, never `/api/*` (Vercel Functions or a 404).
   if (input.spa && existsSync(join(staticDir, 'index.html')))
@@ -177,6 +158,97 @@ export async function writeVercelOutput(input: {
       2,
     )}\n`,
   );
+  if (input.middleware)
+    await addVercelMiddleware({
+      root: input.root,
+      outputDir: out,
+      config: input.config,
+      manifest: input.manifest,
+    });
   input.log.info(`hypdriv: Vercel Build Output written → ${relative(input.root, out)}`);
   return out;
+}
+
+/** The middleware path of HypDriv's Routing Middleware in a Build Output. */
+export const VERCEL_MIDDLEWARE_PATH = '_hypdriv/middleware';
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The `src` regex (and raw sources) of HypDriv's Routing Middleware: every path except content-hashed assets, or —
+ * for frameworks whose own function runs the pipeline for on-demand routes — only the prerendered documents the
+ * CDN serves without application code (`/about`, `/about/`, `/about.html`), so no request runs the stages twice.
+ */
+export function vercelMiddlewareSource(input: { immutablePrefixes: string[]; paths?: string[] }): {
+  src: string;
+  raw: string[];
+} {
+  if (input.paths) {
+    const unique = [...new Set(input.paths.map((p) => (p.length > 1 ? p.replace(/\/+$/, '') : p)))].sort();
+    const alternatives = unique.map((p) =>
+      p === '/' ? '/(?:index\\.html)?' : `${escapeRegex(p)}(?:/|\\.html)?`,
+    );
+    return { src: `^(?:${alternatives.join('|')})$`, raw: unique };
+  }
+  const immutable = input.immutablePrefixes.map((p) => p.replace(/^\/|\/$/g, '')).filter(Boolean);
+  const exclude = immutable.length ? `(?!${immutable.map((p) => `${escapeRegex(p)}/`).join('|')})` : '';
+  return { src: `^/${exclude}.*$`, raw: [`/${exclude ? `(${exclude}.*)` : '(.*)'}`] };
+}
+
+/**
+ * Adds HypDriv's Routing Middleware to a Build Output (`.vercel/output`): bundles it as a Node.js function and
+ * inserts its route right after HypDriv's header routes (before the framework's rewrites and `handle: filesystem`),
+ * replacing one from a previous run. Plain Vite apps run it for every path except content-hashed assets; framework
+ * integrations pass `paths` (their prerendered documents), so static pages get the request stages — rate limiting,
+ * bot shield, maintenance, redirects, geo — while the framework's function keeps running them for everything else.
+ * An empty `paths` list removes the middleware.
+ */
+export async function addVercelMiddleware(input: {
+  root: string;
+  outputDir: string;
+  config: LoadedHypConfig;
+  manifest: HypManifest;
+  paths?: string[];
+  log?: Pick<Logger, 'info'>;
+}): Promise<{ paths: number | 'all' } | null> {
+  const file = join(input.outputDir, 'config.json');
+  const config = (existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { version: 3 }) as {
+    routes?: VercelRoute[];
+    [key: string]: unknown;
+  };
+  const routes = (config.routes ?? []).filter((r) => r.middlewarePath !== VERCEL_MIDDLEWARE_PATH);
+  const funcDir = join(input.outputDir, 'functions', '_hypdriv', 'middleware.func');
+  if (input.paths && !input.paths.length) {
+    rmSync(funcDir, { recursive: true, force: true });
+    config.routes = routes;
+    writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+    return null;
+  }
+  await buildVercelMiddleware({ root: input.root, funcDir, config: input.config, manifest: input.manifest });
+  const { src, raw } = vercelMiddlewareSource({
+    immutablePrefixes: input.manifest.staticFiles.immutablePrefixes,
+    ...(input.paths ? { paths: input.paths } : {}),
+  });
+  const route: VercelRoute = {
+    src,
+    middlewarePath: VERCEL_MIDDLEWARE_PATH,
+    middlewareRawSrc: raw,
+    continue: true,
+    override: true,
+  };
+  let lastHeader = -1;
+  routes.forEach((r, i) => {
+    if (r.headers?.[VERCEL_ROUTE_MARKER] !== undefined) lastHeader = i;
+  });
+  const fs = routes.findIndex((r) => r.handle !== undefined);
+  const at = lastHeader >= 0 ? lastHeader + 1 : fs >= 0 ? fs : routes.length;
+  routes.splice(at, 0, route);
+  config.routes = routes;
+  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+  input.log?.info(
+    `hypdriv: Routing Middleware → ${input.paths ? `${raw.length} prerendered document(s)` : 'every path except hashed assets'}`,
+  );
+  return { paths: input.paths ? raw.length : 'all' };
 }

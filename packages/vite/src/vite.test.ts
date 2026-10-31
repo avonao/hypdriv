@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mergeVercelRoutes, renderCloudflareHeaders, staticHeaderRules } from '@hypdriv/build';
@@ -9,7 +9,7 @@ import { manifestModuleCode, patchRuntimeManifest, replaceRuntimeManifest, toMod
 import { htmlPathname } from './plugin';
 import { fromColonPath, fromSvelteKitId, fromTanStackPath, fromVueRouterPath, toHypRoute } from './routes';
 import { rulesFor } from './targets';
-import { vercelNodeRuntime } from './vercel-output';
+import { addVercelMiddleware, vercelMiddlewareSource, vercelNodeRuntime } from './vercel-output';
 import { assetsForEntries } from './vite-manifest';
 
 describe('route pattern converters', () => {
@@ -231,4 +231,59 @@ describe('vercelNodeRuntime', () => {
     expect(vercelNodeRuntime('27.0.0')).toBe('nodejs26.x');
     expect(vercelNodeRuntime('20.19.0')).toBe('nodejs22.x');
   });
+});
+
+describe('Vercel Routing Middleware', () => {
+  it('matches every path but hashed assets, or only the prerendered documents', () => {
+    const all = new RegExp(vercelMiddlewareSource({ immutablePrefixes: ['/assets/'] }).src);
+    expect(all.test('/about')).toBe(true);
+    expect(all.test('/assets/app-1.js')).toBe(false);
+    const docs = vercelMiddlewareSource({
+      immutablePrefixes: ['/_app/immutable/'],
+      paths: ['/', '/blog/a.b', '/about/'],
+    });
+    expect(docs.raw).toEqual(['/', '/about', '/blog/a.b']);
+    const re = new RegExp(docs.src);
+    for (const ok of ['/', '/index.html', '/about', '/about/', '/about.html', '/blog/a.b'])
+      expect(re.test(ok)).toBe(true);
+    for (const no of ['/ssr', '/blog/aXb', '/about/x', '/api/hello']) expect(re.test(no)).toBe(false);
+  });
+
+  it("inserts the route after HypDriv's header routes and before the framework's rewrites, once", async () => {
+    const out = mkdtempSync(join(tmpdir(), 'hypdriv-vc-'));
+    writeFileSync(
+      join(out, 'config.json'),
+      JSON.stringify({
+        version: 3,
+        routes: [
+          { src: '^/(?:.*)$', headers: { 'x-hypdriv-static': '1' }, continue: true },
+          { src: '^/about/?$', dest: '/about.html' },
+          { handle: 'filesystem' },
+        ],
+      }),
+    );
+    // A project that depends on @hypdriv/vite (the bundle resolves the runtime from the app's dependencies).
+    const root = join(__dirname, '..', '..', '..', 'examples', 'vite');
+    const input = {
+      root,
+      outputDir: out,
+      config: { resolved: loadConfig({}), raw: {}, file: null },
+      manifest: emptyManifest(),
+      paths: ['/about'],
+    };
+    await addVercelMiddleware(input);
+    await addVercelMiddleware(input);
+    const routes = JSON.parse(readFileSync(join(out, 'config.json'), 'utf8')).routes as Array<
+      Record<string, unknown>
+    >;
+    expect(routes.map((r) => r.middlewarePath ?? r.dest ?? r.handle ?? 'headers')).toEqual([
+      'headers',
+      '_hypdriv/middleware',
+      '/about.html',
+      'filesystem',
+    ]);
+    expect(existsSync(join(out, 'functions/_hypdriv/middleware.func/index.mjs'))).toBe(true);
+    await addVercelMiddleware({ ...input, paths: [] });
+    expect(existsSync(join(out, 'functions/_hypdriv/middleware.func'))).toBe(false);
+  }, 60_000);
 });
