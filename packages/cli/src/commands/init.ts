@@ -2,7 +2,7 @@ import { createContext } from '../context';
 import { allChecks } from '../doctor/registry';
 import { runDoctor } from '../doctor/run';
 import { applyInitPlan, buildInitPlan, type PlanItem } from '../init/plan';
-import { cliInvocation } from '../project';
+import { cliInvocation, FRAMEWORK_LABEL } from '../project';
 import { cliVersion } from '../version';
 import { buildCheckContext, printDoctorSummary } from './doctor';
 import { defineCommand } from './types';
@@ -17,7 +17,7 @@ const ACTION_LABEL: Record<PlanItem['action'], string> = {
 export const initCommand = defineCommand({
   name: 'init',
   summary:
-    'Detect the project and write/update the HypDriv files (config, worker entry, next.config, wrangler, proxy, headers, scripts)',
+    'Detect the project and write/update the HypDriv files (config, framework registration, worker entry, wrangler, proxy, headers, scripts)',
   usage: 'hypdriv init [--platform cloudflare|vercel|node] [--purser] [--no-proxy] [--yes] [--dry-run]',
   options: {
     purser: { type: 'boolean', description: 'Scaffold the Purser CSS section of hypdriv.config.ts' },
@@ -54,8 +54,20 @@ export const initCommand = defineCommand({
         'platform',
         `${plan.platform}${project.platformDetection.explicit ? ' (--platform)' : ` (detected: ${project.platform}${signals.cloudflare.length || signals.vercel.length ? `; ${[...signals.cloudflare, ...signals.vercel].join(', ')}` : ''})`}`,
       ],
-      ['next', project.next.installed ?? 'not installed'],
-      ['@opennextjs/cloudflare', project.opennext.installed ?? 'not installed'],
+      [
+        'framework',
+        `${FRAMEWORK_LABEL[project.framework.name]}${project.framework.version ? ` ${project.framework.version}` : ''}`,
+      ],
+      ...(project.framework.name === 'next' || project.framework.name === 'unknown'
+        ? ([['@opennextjs/cloudflare', project.opennext.installed ?? 'not installed']] as Array<
+            [string, string]
+          >)
+        : ([
+            [
+              'integration',
+              project.framework.integrationInstalled ?? `${project.framework.integration} (not installed)`,
+            ],
+          ] as Array<[string, string]>)),
       ['wrangler', project.wrangler.installed ?? 'not installed'],
       ['wrangler config', project.wrangler.configFile ? `${project.wrangler.format}` : 'none'],
       ['package manager', project.packageManager],

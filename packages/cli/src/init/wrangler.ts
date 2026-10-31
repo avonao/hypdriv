@@ -135,6 +135,27 @@ function valueEnd(source: string, start: number): number {
 }
 
 /**
+ * Adds a root-level key with the given JSON value text when the document has none (comments and formatting are
+ * kept). Returns null when the key exists.
+ */
+export function addRootKey(source: string, key: string, valueText: string, afterKey?: string): string | null {
+  if (findRootKey(source, key)) return null;
+  return insertRootLine(
+    source,
+    `"${key}": ${valueText}`,
+    afterKey && findRootKey(source, afterKey) ? afterKey : undefined,
+  );
+}
+
+/** The raw text of a root-level key's value, or null. */
+export function rootValueText(source: string, key: string): string | null {
+  const m = findRootKey(source, key);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  return source.slice(start, valueEnd(source, start)).trim();
+}
+
+/**
  * Applies targeted string edits to a `wrangler.jsonc`/`wrangler.json` document so comments and
  * formatting survive: sets `main`, enables observability and merges cron triggers.
  */

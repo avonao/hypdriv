@@ -4,6 +4,8 @@ export interface PackageJsonEditOptions {
   scripts: Record<string, string>;
   /** Dependency to add when neither it nor any `@hypdriv/*` package is declared. */
   dependency?: { name: string; range: string };
+  /** Dependencies to add each when not declared yet (`dev` → devDependencies). */
+  dependencies?: Array<{ name: string; range: string; dev?: boolean }>;
 }
 
 export interface PackageJsonEditResult {
@@ -44,6 +46,18 @@ export function editPackageJson(source: string, options: PackageJsonEditOptions)
       pkg.dependencies = sorted;
       changes.push(`dependency "${options.dependency.name}": "${options.dependency.range}"`);
     }
+  }
+  for (const dep of options.dependencies ?? []) {
+    const field = dep.dev ? 'devDependencies' : 'dependencies';
+    const current = (pkg[field] && typeof pkg[field] === 'object' ? pkg[field] : {}) as Record<
+      string,
+      string
+    >;
+    const other = (pkg[dep.dev ? 'dependencies' : 'devDependencies'] ?? {}) as Record<string, string>;
+    if (dep.name in current || dep.name in other) continue;
+    current[dep.name] = dep.range;
+    pkg[field] = Object.fromEntries(Object.entries(current).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    changes.push(`${dep.dev ? 'devDependency' : 'dependency'} "${dep.name}": "${dep.range}"`);
   }
   if (!changes.length) return { content: source, changes };
   const indent = detectIndent(source);

@@ -19,6 +19,7 @@ import {
 } from '../templates';
 import { rel, writeText } from '../util/fs';
 import { upsertVercelCrons, type VercelCron } from '../vercel-config';
+import { buildHostPlan } from './hosts';
 import { wrapNextConfig } from './next-config';
 import { editPackageJson, ensureHeadersRule } from './package-json';
 import { addTsconfigExclude } from './tsconfig';
@@ -77,6 +78,9 @@ export function buildInitPlan(
   options: InitOptions,
 ): InitPlan {
   const platform = initPlatform(project, options.platform);
+  // Vite hosts (ADR 0019) have their own plan: registration in the framework config, no Next.js files.
+  if (project.framework.name !== 'next' && project.framework.name !== 'unknown')
+    return buildHostPlan(project, loaded, { ...options, platform });
   const items: PlanItem[] = [];
   const notes: string[] = [];
   const nextSteps: string[] = [];
@@ -426,7 +430,7 @@ function planCloudflare(
     });
 }
 
-function planVercel(
+export function planVercel(
   project: ProjectInfo,
   items: PlanItem[],
   notes: string[],
