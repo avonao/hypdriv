@@ -1,0 +1,44 @@
+{
+  "name": "@hypdriv/example-react-router",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare react-router build",
+    "build:vercel": "HYPDRIV_TARGET=vercel react-router build",
+    "build:node": "HYPDRIV_TARGET=node react-router build",
+    "preview": "vite preview",
+    "start": "hypdriv-react-router-serve ./build/server/index.js",
+    "start:react-router-serve": "react-router-serve ./build/server/index.js",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare react-router build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "react-router typegen && tsc"
+  },
+  "dependencies": {
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/react-router": "workspace:*",
+    "@react-router/node": "catalog:",
+    "@react-router/serve": "catalog:",
+    "isbot": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@hypdriv/vite": "workspace:*",
+    "@react-router/dev": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vercel/react-router": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

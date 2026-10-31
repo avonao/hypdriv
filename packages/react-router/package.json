@@ -1,0 +1,105 @@
+{
+  "name": "@hypdriv/react-router",
+  "version": "0.1.0",
+  "description": "HypDriv for React Router (framework mode): the Drivetrain around every request on Cloudflare Workers, Vercel and Node — root middleware, Worker entry, Node server, Vercel Build Output, CSP nonces through ServerRouter and build-time manifests with hash CSP for prerendered pages.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22"
+  },
+  "files": [
+    "dist",
+    "virtual.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/react-router"
+  },
+  "keywords": [
+    "react-router",
+    "remix",
+    "vite",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "bin": {
+    "hypdriv-react-router-serve": "./dist/serve.js"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./entry.server": {
+      "source": "./src/entry-server.ts",
+      "types": "./dist/entry-server.d.ts",
+      "default": "./dist/entry-server.js"
+    },
+    "./cloudflare": {
+      "source": "./src/cloudflare.ts",
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
+    "./node": {
+      "source": "./src/node.ts",
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./virtual": {
+      "types": "./virtual.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/build": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/vite": "workspace:*",
+    "@vercel/nft": "catalog:",
+    "isbot": "catalog:"
+  },
+  "peerDependencies": {
+    "@react-router/dev": ">=8.0.0",
+    "react": ">=19.2.7",
+    "react-dom": ">=19.2.7",
+    "react-router": ">=8.0.0",
+    "vite": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@react-router/dev": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
