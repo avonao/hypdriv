@@ -22,6 +22,7 @@ export * from './html';
 export { renderReport } from './report';
 export {
   CLOUDFLARE_HEADERS_LIMITS,
+  cloudflareHeaderNamesByPath,
   mergeVercelRoutes,
   renderCloudflareHeaders,
   type StaticDocument,

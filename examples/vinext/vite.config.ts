@@ -24,7 +24,8 @@ export default defineConfig({
     ...(target === 'cloudflare'
       ? [
           cloudflare({
-            configPath: './cloudflare/wrangler.jsonc',
+            // WRANGLER_CONFIG points at an account-specific, git-ignored wrangler.<name>.local.jsonc.
+            configPath: process.env.WRANGLER_CONFIG ?? './cloudflare/wrangler.jsonc',
             viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
           }),
         ]

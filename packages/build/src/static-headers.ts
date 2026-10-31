@@ -180,6 +180,17 @@ export function renderCloudflareHeaders(
 ): { content: string; dropped: string[] } {
   const kept: StaticHeaderRule[] = [];
   const dropped: string[] = [];
+  // Cloudflare joins the values of every matching rule that sets a header (`…, immutable, public, …`): a header the
+  // framework's or the user's own rule sets for the same path stays theirs.
+  const theirs = cloudflareHeaderNamesByPath(stripBlock(existing, CF_START, CF_END));
+  rules = rules
+    .map((rule) => {
+      const own = theirs.get(rule.path);
+      if (!own) return rule;
+      const set = Object.fromEntries(Object.entries(rule.set).filter(([k]) => !own.has(k.toLowerCase())));
+      return { ...rule, set };
+    })
+    .filter((rule) => Object.keys(rule.set).length || rule.unset?.length);
   const existingRules = existing
     .split('\n')
     .filter((line) => line.length && !/^\s/.test(line) && !line.startsWith('#')).length;
@@ -203,6 +214,26 @@ export function renderCloudflareHeaders(
   block.push(CF_END);
   const rest = stripBlock(existing, CF_START, CF_END).trim();
   return { content: `${block.join('\n')}\n${rest ? `\n${rest}\n` : ''}`, dropped };
+}
+
+/** Header names each path rule of a `_headers` file sets (lowercase), ignoring `! name` detaches. */
+export function cloudflareHeaderNamesByPath(text: string): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  let current: Set<string> | null = null;
+  for (const raw of text.split(/\r?\n/)) {
+    if (!raw.trim() || raw.trimStart().startsWith('#')) continue;
+    if (!/^\s/.test(raw)) {
+      const path = raw.trim();
+      current = out.get(path) ?? new Set<string>();
+      out.set(path, current);
+      continue;
+    }
+    const line = raw.trim();
+    if (!current || line.startsWith('!')) continue;
+    const colon = line.indexOf(':');
+    if (colon > 0) current.add(line.slice(0, colon).trim().toLowerCase());
+  }
+  return out;
 }
 
 function stripBlock(text: string, start: string, end: string): string {
