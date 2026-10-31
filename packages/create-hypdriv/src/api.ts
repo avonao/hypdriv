@@ -14,6 +14,8 @@ export {
   workerName,
 } from './scaffold';
 export {
+  FRAMEWORKS,
+  type Framework,
   type Platform,
   parseCatalog,
   syncTemplates,
@@ -24,4 +26,6 @@ export {
   transformPackageJson,
   transformReadme,
   transformTsconfig,
+  VITE_HOSTS,
+  type ViteHost,
 } from './templates';

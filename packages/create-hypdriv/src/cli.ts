@@ -13,7 +13,7 @@ import {
   toPackageName,
   validateName,
 } from './scaffold';
-import type { Platform } from './templates';
+import { FRAMEWORKS, type Framework, type Platform } from './templates';
 
 declare const __HYPDRIV_VERSION__: string;
 const VERSION = typeof __HYPDRIV_VERSION__ === 'string' ? __HYPDRIV_VERSION__ : '0.0.0';
@@ -34,15 +34,18 @@ export interface CliIO {
 
 const HELP = `create-hypdriv ${VERSION}
 
-Scaffold a Next.js 16 app with HypDriv on Cloudflare Workers (OpenNext) or Vercel.
+Scaffold an app with HypDriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
+(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel or Node.
 
 Usage
   npm create hypdriv@latest [directory] -- [options]
   pnpm create hypdriv [directory] [options]
 
 Options
-  --platform <cloudflare|vercel>  Deploy target (default: cloudflare)
-  --purser                        Style the app with Purser CSS (zero-override atomic CSS, flashless themes)
+  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext
+  --platform <cloudflare|vercel|node>
+                                  Deploy target (default: cloudflare; node for Vite frameworks only)
+  --purser                        Style the app with Purser CSS (Next.js; zero-override atomic CSS, flashless themes)
   --pm <pnpm|npm|yarn|bun>        Package manager (default: the one running create-hypdriv)
   --name <package-name>           package.json name (default: from the directory)
   --no-install                    Skip installing dependencies
@@ -101,6 +104,7 @@ const parse = (argv: string[]) =>
     allowPositionals: true,
     strict: true,
     options: {
+      framework: { type: 'string' },
       platform: { type: 'string' },
       purser: { type: 'boolean' },
       pm: { type: 'string' },
@@ -144,17 +148,36 @@ export async function main(io: CliIO): Promise<number> {
     directory = (await ask('Project directory: [hypdriv-app] ')).trim() || 'hypdriv-app';
   directory ??= 'hypdriv-app';
 
+  const frameworkArg = values.framework?.toLowerCase();
+  if (frameworkArg && !FRAMEWORKS.includes(frameworkArg as Framework)) {
+    io.stderr.write(
+      `create-hypdriv: --framework must be one of ${FRAMEWORKS.join(', ')} (got "${values.framework}")\n`,
+    );
+    return 2;
+  }
+  const framework: Framework =
+    (frameworkArg as Framework | undefined) ??
+    (prompt ? await askChoice(ask, 'Framework', FRAMEWORKS, 'next') : 'next');
+  const platforms =
+    framework === 'next' ? (['cloudflare', 'vercel'] as const) : (['cloudflare', 'vercel', 'node'] as const);
   const platformArg = values.platform?.toLowerCase();
-  if (platformArg && platformArg !== 'cloudflare' && platformArg !== 'vercel') {
-    io.stderr.write(`create-hypdriv: --platform must be cloudflare or vercel (got "${values.platform}")\n`);
+  if (platformArg && !(platforms as readonly string[]).includes(platformArg)) {
+    io.stderr.write(
+      `create-hypdriv: --platform must be ${platforms.join(', ')} for ${framework} (got "${values.platform}")\n`,
+    );
     return 2;
   }
   const platform: Platform =
     (platformArg as Platform | undefined) ??
-    (prompt
-      ? await askChoice(ask, 'Deploy to', ['cloudflare', 'vercel'] as const, 'cloudflare')
-      : 'cloudflare');
-  const purser = values.purser ?? (prompt ? await askYesNo(ask, 'Use Purser CSS?', false) : false);
+    (prompt ? await askChoice(ask, 'Deploy to', platforms, 'cloudflare') : 'cloudflare');
+  if (values.purser && framework !== 'next') {
+    io.stderr.write('create-hypdriv: --purser is available for Next.js apps only\n');
+    return 2;
+  }
+  const purser =
+    framework === 'next'
+      ? (values.purser ?? (prompt ? await askYesNo(ask, 'Use Purser CSS?', false) : false))
+      : false;
 
   const pmArg = values.pm?.toLowerCase();
   if (pmArg && !['pnpm', 'npm', 'yarn', 'bun'].includes(pmArg)) {
@@ -184,6 +207,7 @@ export async function main(io: CliIO): Promise<number> {
       name,
       platform,
       purser,
+      framework,
       packageManager,
       templatesDir: io.templatesDir ?? defaultTemplatesDir(),
     });
@@ -217,17 +241,36 @@ export async function main(io: CliIO): Promise<number> {
     }
   }
 
+  const hostSteps =
+    platform === 'cloudflare'
+      ? [
+          `${runScript(packageManager, 'build:cloudflare')}   # the Worker (HypDriv shell) + static assets`,
+          `${runScript(packageManager, 'deploy:cloudflare')}`,
+        ]
+      : platform === 'vercel'
+        ? [
+            `${runScript(packageManager, 'build:vercel')}       # Build Output API (.vercel/output)`,
+            'vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)',
+          ]
+        : [
+            `${runScript(packageManager, 'build:node')}`,
+            `${runScript(packageManager, 'start')}              # Node server behind the HypDriv pipeline`,
+          ];
   const steps = [
     relative(io.cwd, result.root) ? `cd ${relative(io.cwd, result.root)}` : null,
     installed ? null : `${packageManager} install`,
     runScript(packageManager, 'dev'),
-    platform === 'cloudflare'
-      ? `${runScript(packageManager, 'preview')}   # OpenNext build + wrangler dev (the Worker)`
-      : `${runScript(packageManager, 'build')}     # next build (withHypDriv emits Vercel CDN headers)`,
-    `${runScript(packageManager, 'hypdriv:doctor')}`,
-    platform === 'cloudflare'
-      ? `${runScript(packageManager, 'deploy')}`
-      : 'vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)',
+    ...(framework === 'next'
+      ? [
+          platform === 'cloudflare'
+            ? `${runScript(packageManager, 'preview')}   # OpenNext build + wrangler dev (the Worker)`
+            : `${runScript(packageManager, 'build')}     # next build (withHypDriv emits Vercel CDN headers)`,
+          `${runScript(packageManager, 'hypdriv:doctor')}`,
+          platform === 'cloudflare'
+            ? `${runScript(packageManager, 'deploy')}`
+            : 'vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)',
+        ]
+      : [...hostSteps, `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`]),
   ].filter((s): s is string => s !== null);
 
   if (json)
@@ -238,6 +281,7 @@ export async function main(io: CliIO): Promise<number> {
           root: result.root,
           name: result.name,
           template: result.template,
+          framework,
           platform,
           purser,
           packageManager,

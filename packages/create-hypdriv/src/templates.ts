@@ -10,11 +10,28 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 
-/** Deploy targets the scaffolder supports. */
-export type Platform = 'cloudflare' | 'vercel';
+/** Deploy targets the scaffolder supports (Node: Vite hosts only). */
+export type Platform = 'cloudflare' | 'vercel' | 'node';
 
-/** Template ids: one per platform, with or without Purser CSS. */
-export type TemplateId = 'cloudflare' | 'cloudflare-purser' | 'vercel' | 'vercel-purser';
+/** Frameworks the scaffolder supports: Next.js and the Vite hosts (ADR 0019). */
+export type Framework = 'next' | ViteHost;
+export type ViteHost = 'vite' | 'react-router' | 'tanstack-start' | 'astro' | 'sveltekit' | 'nuxt' | 'vinext';
+export const VITE_HOSTS: readonly ViteHost[] = [
+  'vite',
+  'react-router',
+  'tanstack-start',
+  'astro',
+  'sveltekit',
+  'nuxt',
+  'vinext',
+];
+export const FRAMEWORKS: readonly Framework[] = ['next', ...VITE_HOSTS];
+
+/**
+ * Template ids: Next.js has one per platform, with or without Purser CSS; every Vite host has one app that builds
+ * for Cloudflare, Vercel and Node.
+ */
+export type TemplateId = 'cloudflare' | 'cloudflare-purser' | 'vercel' | 'vercel-purser' | ViteHost;
 
 /** Each template is a runnable example app of the repository, built and audited in CI. */
 export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
@@ -22,9 +39,22 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   'cloudflare-purser': 'examples/with-purser',
   vercel: 'examples/vercel',
   'vercel-purser': 'examples/vercel-purser',
+  vite: 'examples/vite',
+  'react-router': 'examples/react-router',
+  'tanstack-start': 'examples/tanstack-start',
+  astro: 'examples/astro',
+  sveltekit: 'examples/sveltekit',
+  nuxt: 'examples/nuxt',
+  vinext: 'examples/vinext',
 };
 
-export function templateFor(platform: Platform, purser: boolean): TemplateId {
+export function templateFor(platform: Platform, purser: boolean, framework: Framework = 'next'): TemplateId {
+  if (framework !== 'next') {
+    if (purser) throw new Error(`Purser CSS templates exist for Next.js only (not ${framework})`);
+    return framework;
+  }
+  if (platform === 'node')
+    throw new Error('Next.js templates target Cloudflare or Vercel (use --platform cloudflare|vercel)');
   return purser ? `${platform}-purser` : platform;
 }
 
@@ -48,6 +78,19 @@ const EXCLUDED = new Set([
   'next-env.d.ts',
   'cloudflare-env.d.ts',
   '.turbo',
+  // Vite hosts: build output and generated types
+  'dist',
+  'build',
+  '.svelte-kit',
+  '.output',
+  '.nuxt',
+  '.data',
+  '.astro',
+  '.react-router',
+  '.tanstack',
+  '.vinext',
+  // Monorepo-only configuration (extends the repository's root config)
+  'biome.json',
 ]);
 
 export function excluded(rel: string): boolean {
@@ -203,7 +246,10 @@ export function syncTemplates(options: SyncOptions): Record<TemplateId, string[]
       if (posix === 'package.json')
         writeFileSync(to, transformPackageJson(readFileSync(from, 'utf8'), { catalog, workspace }));
       else if (posix === 'tsconfig.json') writeFileSync(to, transformTsconfig(readFileSync(from, 'utf8')));
-      else if (/\.(ts|tsx|jsonc?|md|example|toml)$/.test(posix) || posix === '.gitignore') {
+      else if (
+        /\.(ts|tsx|jsonc?|md|example|toml|astro|svelte|vue|html|js|mjs)$/.test(posix) ||
+        posix === '.gitignore'
+      ) {
         let text = readFileSync(from, 'utf8');
         if (posix === 'hypdriv.config.ts') text = transformHypdrivConfig(text);
         if (posix === 'README.md') text = transformReadme(text, id);

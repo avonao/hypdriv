@@ -58,6 +58,19 @@ describe('template sync', () => {
     expect(manifest.templates.vercel).toContain('vercel.json');
     expect(manifest.templates.vercel).not.toContain('wrangler.jsonc');
     expect(manifest.templates['vercel-purser']).toContain('lib/tokens.ts');
+    // One template per Vite host, without build output or monorepo-only files.
+    for (const host of ['vite', 'react-router', 'tanstack-start', 'astro', 'sveltekit', 'nuxt', 'vinext']) {
+      const files = manifest.templates[host]!;
+      expect(files).toContain('hypdriv.config.ts');
+      expect(files).toContain('.dev.vars.example');
+      expect(files).toContain('.env.example');
+      expect(
+        files.some((f) => /^(dist|build|\.svelte-kit|\.output|\.nuxt|\.astro|\.react-router)\//.test(f)),
+      ).toBe(false);
+      expect(files).not.toContain('biome.json');
+    }
+    expect(manifest.templates.vinext).toContain('cloudflare/wrangler.jsonc');
+    expect(manifest.templates.sveltekit).toContain('src/hooks.server.ts');
     for (const files of Object.values(manifest.templates))
       expect(files.filter((f) => /\.local\.|^\.dev\.vars\./.test(f) && f !== '.dev.vars.example')).toEqual(
         [],
@@ -311,7 +324,7 @@ describe('cli', () => {
   });
 
   it('asks on a TTY when options are missing', async () => {
-    const answers = ['my-app', 'v', 'y'];
+    const answers = ['my-app', '', 'v', 'y'];
     const t = io([], { interactive: true, ask: async () => answers.shift() ?? '' });
     expect(await main({ ...t.value, run: () => 0 })).toBe(0);
     expect(t.out.join('')).toContain('Created my-app (vercel-purser)');
@@ -328,7 +341,37 @@ describe('cli', () => {
     expect(await main(t.value)).toBe(1);
     const help = io(['--help']);
     expect(await main(help.value)).toBe(0);
-    expect(help.out.join('')).toContain('--platform <cloudflare|vercel>');
+    expect(help.out.join('')).toContain('--platform <cloudflare|vercel|node>');
+    expect(help.out.join('')).toContain('--framework <name>');
+    expect(await main(io(['x', '--framework', 'remix']).value)).toBe(2);
+    expect(await main(io(['x', '--platform', 'node']).value)).toBe(2);
+    expect(await main(io(['x', '--framework', 'astro', '--purser']).value)).toBe(2);
+  });
+
+  it('scaffolds a Vite framework app for any platform', async () => {
+    const t = io(['shop', '--framework', 'sveltekit', '--platform', 'node', '--no-git', '--json'], {
+      run: () => 0,
+    });
+    expect(await main(t.value)).toBe(0);
+    const out = JSON.parse(t.out.join('')) as {
+      template: string;
+      framework: string;
+      next: string[];
+      secretsFile: string;
+    };
+    expect(out).toMatchObject({ template: 'sveltekit', framework: 'sveltekit', secretsFile: '.env.local' });
+    expect(out.next.join('\n')).toContain('build:node');
+    const root = join(t.cwd, 'shop');
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+      name: string;
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.name).toBe('shop');
+    expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+    expect(readFileSync(join(root, '.env.local'), 'utf8')).toMatch(/^HYPDRIV_INTERNAL_SECRET=\S{20,}$/m);
+    expect(readFileSync(join(root, 'hypdriv.config.ts'), 'utf8')).toContain("name: 'shop'");
+    expect(existsSync(join(root, 'biome.json'))).toBe(false);
   });
 
   it('reports a failed install without failing the scaffold', async () => {

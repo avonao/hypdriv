@@ -1,23 +1,25 @@
 # create-hypdriv
 
-Scaffold a production-ready Next.js 16 application with [HypDriv](https://github.com/avonao/hypdriv) on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser).
+Scaffold a production-ready application with [HypDriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt or vinext — on **Cloudflare Workers**, **Vercel** or **Node**.
 
 ```sh
 npm create hypdriv@latest my-app
 pnpm create hypdriv my-app --platform vercel
 yarn create hypdriv my-app --purser
-bun create hypdriv my-app --platform cloudflare --purser
+pnpm create hypdriv my-site --framework astro --platform cloudflare
+pnpm create hypdriv my-shop --framework sveltekit --platform node
 ```
 
-Without options on a terminal, it asks for the directory, the platform and whether to use Purser. In CI pass the options (or `--yes` for the defaults).
+Without options on a terminal, it asks for the directory, the framework, the platform and (for Next.js) whether to use Purser. In CI pass the options (or `--yes` for the defaults).
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `[directory]` | `hypdriv-app` | Target directory; must be empty or missing. |
-| `--platform <cloudflare\|vercel>` | `cloudflare` | Deploy target. |
-| `--purser` | off | Purser CSS: zero-override atomic CSS, the unstyled-atom build guard, flashless themes. |
+| `--framework <name>` | `next` | `next`, `vite`, `react-router`, `tanstack-start`, `astro`, `sveltekit`, `nuxt` or `vinext`. |
+| `--platform <cloudflare\|vercel\|node>` | `cloudflare` | Deploy target (`node` for Vite frameworks). |
+| `--purser` | off | Next.js: Purser CSS — zero-override atomic CSS, the unstyled-atom build guard, flashless themes. |
 | `--pm <pnpm\|npm\|yarn\|bun>` | the package manager running it | Used to install and in the printed commands. |
 | `--name <package-name>` | from the directory | `package.json` name; Workers names are derived from it. |
 | `--no-install` | — | Skip installing dependencies. |
@@ -35,6 +37,15 @@ Every template is one of the repository's example apps, built and audited end to
 | `cloudflare-purser` | `examples/with-purser` | The above plus Purser CSS, edge-pinned themes and the zero-override audit |
 | `vercel` | `examples/vercel` | HypDriv stages in `proxy.ts`, Vercel CDN cache headers by policy, tag purge on Vercel's CDN, Vercel Cron, Vercel Queues, Upstash Redis counters, region `iad1` |
 | `vercel-purser` | `examples/vercel-purser` | The Vercel setup with Purser CSS and hashed theme script |
+| `vite` | `examples/vite` | Single-page Vite app: `assetsWorker()` on Cloudflare, Build Output with HypDriv's Routing Middleware and an `api/` function on Vercel, `hypdriv serve` on Node |
+| `react-router` | `examples/react-router` | React Router 8 framework mode: preset, root middleware, nonce-aware server entry, prerendered pages, `reactRouterWorker()` |
+| `tanstack-start` | `examples/tanstack-start` | TanStack Start with `withHypDriv()`, global request middleware (CSRF kept), router nonces, Nitro for Vercel and Node |
+| `astro` | `examples/astro` | Astro 7 integration: prerendered pages with a server island, on-demand pages, endpoints, `src/fetch.ts` |
+| `sveltekit` | `examples/sveltekit` | SvelteKit 3: adapter wrapper, `handle` hook, one CSP merged with `kit.csp`, form actions, Node server |
+| `nuxt` | `examples/nuxt` | Nuxt 4 module: Nitro plugin, `useHyp()`, route-rule prerendering, Worker entry around Nitro |
+| `vinext` | `examples/vinext` | The Next.js App Router API on Vite: request hook in every runtime, `createVinextWorker()`, cache purge bridge |
+
+Vite framework templates build for every platform (`build:cloudflare`, `build:vercel`, `build:node`); `--platform` picks the local secrets file (`.dev.vars` for Workers, `.env.local` otherwise) and the printed next steps.
 
 The scaffolder also:
 

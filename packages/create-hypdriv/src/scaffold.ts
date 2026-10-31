@@ -1,7 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { NAME, NAME_UNDERSCORED, type Platform, type TemplateId, templateFor } from './templates';
+import {
+  type Framework,
+  NAME,
+  NAME_UNDERSCORED,
+  type Platform,
+  type TemplateId,
+  templateFor,
+} from './templates';
 
 export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
 
@@ -10,6 +17,8 @@ export interface ScaffoldOptions {
   directory: string;
   platform: Platform;
   purser: boolean;
+  /** Next.js (default) or a Vite host. */
+  framework?: Framework;
   packageManager: PackageManager;
   /** Directory holding the synced templates (`<package>/templates`). */
   templatesDir: string;
@@ -119,7 +128,7 @@ export function fillSecrets(
 }
 
 function pnpmWorkspaceYaml(platform: Platform): string {
-  const builds = platform === 'cloudflare' ? ['esbuild', 'sharp', 'workerd'] : ['sharp'];
+  const builds = platform === 'cloudflare' ? ['esbuild', 'sharp', 'workerd'] : ['esbuild', 'sharp'];
   return [
     '# Dependencies allowed to run install scripts (pnpm ≥ 10).',
     'onlyBuiltDependencies:',
@@ -138,7 +147,7 @@ export function scaffold(options: ScaffoldOptions): ScaffoldResult {
   const invalid = validateName(name);
   if (invalid) throw new Error(`${invalid} ("${name}")`);
   if (!isUsableDirectory(root)) throw new Error(`${root} is not empty; choose a new directory`);
-  const template = templateFor(options.platform, options.purser);
+  const template = templateFor(options.platform, options.purser, options.framework ?? 'next');
   const source = join(options.templatesDir, template);
   if (!existsSync(source)) throw new Error(`template ${template} is missing from ${options.templatesDir}`);
   const secret = options.secret ?? defaultSecret;
@@ -153,7 +162,7 @@ export function scaffold(options: ScaffoldOptions): ScaffoldResult {
     let content = readFileSync(join(source, rel), 'utf8');
     content = content.split(NAME_UNDERSCORED).join(worker.replace(/-/g, '_'));
     // Worker, service-binding and bucket names follow the Workers naming rules, not npm's.
-    if (target === 'wrangler.jsonc')
+    if (target === 'wrangler.jsonc' || target.endsWith('/wrangler.jsonc'))
       content = content
         .split(NAME)
         .join(worker)
