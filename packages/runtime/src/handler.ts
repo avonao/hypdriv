@@ -187,8 +187,11 @@ async function workersContext(): Promise<{
 } | null> {
   if (!isWorkerd()) return null;
   try {
-    const specifier = 'cloudflare:workers';
-    const mod = (await import(/* @vite-ignore */ specifier)) as {
+    // The specifier is only known at run time, so no bundler (Rolldown's const inlining, Vercel's file tracer,
+    // a Node target's resolver) turns it into a static import of a module that exists only in workerd.
+    const name = (globalThis as { __hypdrivWorkersModule?: string }).__hypdrivWorkersModule ?? 'workers';
+    const specifier = `cloudflare:${name}`;
+    const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ specifier)) as {
       env?: HypDrivEnv;
       waitUntil?: (p: Promise<unknown>) => void;
     };

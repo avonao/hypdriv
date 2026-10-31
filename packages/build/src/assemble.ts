@@ -213,7 +213,11 @@ export async function assembleManifest(input: AssembleManifestInput): Promise<Bu
     }
 
     if (config.performance.earlyHints) {
-      const entries = linkEntriesForRoute(route, config.performance.earlyHints, { main: merged.main });
+      const entries = linkEntriesForRoute(route, config.performance.earlyHints, {
+        main: merged.main,
+        // Vite builds emit ES modules: `modulepreload` instead of a second, classic-mode fetch.
+        moduleScripts: input.framework.name !== 'next',
+      });
       if (entries.length) earlyHints[route.id] = linkHeaderValues(entries);
     }
 

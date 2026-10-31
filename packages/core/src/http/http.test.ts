@@ -192,3 +192,39 @@ describe('sanitizeInboundRequest', () => {
     expect(sanitizeInboundRequest(request)).toBe(request);
   });
 });
+describe('withRequestHeaders', () => {
+  /** A srvx-style lazy request: passes `instanceof Request` but cannot be the input of `new Request()`. */
+  function lookAlike(inner: Request): Request {
+    const fake = Object.create(Request.prototype) as Request & { _request?: Request };
+    for (const key of ['url', 'method', 'headers', 'body', 'signal', 'redirect'] as const)
+      Object.defineProperty(fake, key, { get: () => inner[key] });
+    return fake;
+  }
+
+  it('copies native requests with new headers', async () => {
+    const { withRequestHeaders } = await import('./headers');
+    const copy = withRequestHeaders(
+      new Request('https://x.test/a', { headers: { a: '1' } }),
+      new Headers({ b: '2' }),
+    );
+    expect(copy.headers.get('b')).toBe('2');
+    expect(copy.headers.has('a')).toBe(false);
+  });
+
+  it('unwraps or rebuilds look-alike requests, body included', async () => {
+    const { withRequestHeaders } = await import('./headers');
+    const inner = new Request('https://x.test/form', { method: 'POST', body: 'x=1' });
+    const wrapped = Object.assign(lookAlike(inner), { _request: inner });
+    expect(() => new Request(wrapped, { headers: new Headers() })).toThrow(TypeError);
+    const unwrapped = withRequestHeaders(wrapped, new Headers({ c: '3' }));
+    expect(unwrapped.headers.get('c')).toBe('3');
+    expect(await unwrapped.text()).toBe('x=1');
+    const rebuilt = withRequestHeaders(
+      lookAlike(new Request('https://x.test/form', { method: 'POST', body: 'y=2' })),
+      new Headers({ d: '4' }),
+    );
+    expect(rebuilt.method).toBe('POST');
+    expect(rebuilt.url).toBe('https://x.test/form');
+    expect(await rebuilt.text()).toBe('y=2');
+  });
+});

@@ -9,7 +9,7 @@ import {
   type ResolvedConfig,
   type Stage,
 } from '@hypdriv/core';
-import { linkEntriesForRoute } from '../shared/hints';
+import { hasModuleScripts, linkEntriesForRoute } from '../shared/hints';
 
 /**
  * Emits `Link: rel=preload|preconnect` headers per route so Cloudflare can send 103 Early Hints on
@@ -29,7 +29,7 @@ export function earlyHintsStage(config: ResolvedConfig): Stage | null {
     const precomputed = ctx.manifest.earlyHints[route.id];
     const entries = precomputed?.length
       ? precomputed.flatMap((v) => parseLink(v))
-      : linkEntriesForRoute(route, eh);
+      : linkEntriesForRoute(route, eh, { moduleScripts: hasModuleScripts(ctx.manifest) });
     cache.set(route.id, entries);
     return entries;
   };

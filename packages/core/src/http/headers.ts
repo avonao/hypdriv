@@ -293,5 +293,32 @@ export function sanitizeInboundRequest(
   if (!remove.length) return request;
   const headers = new Headers(request.headers);
   for (const name of remove) headers.delete(name);
-  return new Request(request, { headers });
+  return withRequestHeaders(request, headers);
+}
+
+/**
+ * A copy of `request` with other headers. Node servers built on srvx (Nitro's Node presets, `@vitejs/plugin-rsc`'s
+ * dev server) hand frameworks a lazy `Request` look-alike that undici rejects as the input of
+ * `new Request(input, init)`; the copy then unwraps srvx's native request (`_request`, sharing its body) or is
+ * rebuilt from the request's parts.
+ */
+export function withRequestHeaders(request: Request, headers: Headers): Request {
+  try {
+    return new Request(request, { headers });
+  } catch (error) {
+    const inner = (request as Request & { _request?: unknown })._request;
+    if (inner instanceof Request && inner !== request) return withRequestHeaders(inner, headers);
+    if (!(error instanceof TypeError)) throw error;
+    const init: RequestInit & { duplex?: 'half' } = {
+      method: request.method,
+      headers,
+      redirect: request.redirect,
+      ...(request.signal ? { signal: request.signal } : {}),
+    };
+    if (request.method !== 'GET' && request.method !== 'HEAD' && request.body) {
+      init.body = request.body;
+      init.duplex = 'half';
+    }
+    return new Request(request.url, init);
+  }
 }

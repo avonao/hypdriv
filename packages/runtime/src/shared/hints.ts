@@ -6,6 +6,20 @@ export interface HintOptions {
   main?: string[];
   /** Already-present preconnect hosts (avoid duplicates). */
   existingPreconnects?: string[];
+  /**
+   * Scripts are ES modules (every Vite build): hint them as `modulepreload`, which the module loader reuses; a
+   * `preload; as=script` would be fetched a second time in module mode. Default false (Next.js chunks).
+   */
+  moduleScripts?: boolean;
+}
+
+/** Whether a manifest's scripts are ES modules: everything but Next.js builds. */
+export function hasModuleScripts(manifest: {
+  framework?: { name: string } | null;
+  nextVersion?: string;
+}): boolean {
+  if (manifest.framework) return manifest.framework.name !== 'next';
+  return false;
 }
 
 /** Computes the Early Hints `Link` entries for a route from its assets and the configured policy. */
@@ -43,7 +57,12 @@ export function linkEntriesForRoute(
           ? options.main
           : route.assets.js.slice(0, 4)
         : route.assets.js;
-    for (const js of scripts) add({ href: js, rel: 'preload', as: 'script' });
+    for (const js of scripts)
+      add(
+        options.moduleScripts
+          ? { href: js, rel: 'modulepreload' }
+          : { href: js, rel: 'preload', as: 'script' },
+      );
   }
   return entries;
 }

@@ -66,7 +66,7 @@ import { redirectsStage } from './redirects';
 import { skewStage } from './skew';
 import { speculationStage } from './speculation';
 
-export { type HintOptions, linkEntriesForRoute, linkHeaderValues } from '../shared/hints';
+export { type HintOptions, hasModuleScripts, linkEntriesForRoute, linkHeaderValues } from '../shared/hints';
 export {
   buildSpeculationRules,
   componentSpeculationRules,

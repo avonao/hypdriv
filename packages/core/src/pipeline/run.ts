@@ -1,4 +1,4 @@
-import { isRscRequest, mergeHeaders } from '../http/headers';
+import { isRscRequest, mergeHeaders, withRequestHeaders } from '../http/headers';
 import { isInternalPath } from '../http/url';
 import { toError } from '../util/errors';
 import type { HypContext } from './context';
@@ -125,7 +125,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
 /** Creates the request Next.js receives: original request with `ctx.requestHeaders` applied. */
 export function buildForwardedRequest(ctx: HypContext): Request {
   if (headersEqual(ctx.request.headers, ctx.requestHeaders)) return ctx.request;
-  return new Request(ctx.request, { headers: ctx.requestHeaders });
+  return withRequestHeaders(ctx.request, ctx.requestHeaders);
 }
 
 function hasEntries(headers: Headers): boolean {

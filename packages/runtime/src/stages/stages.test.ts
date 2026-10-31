@@ -353,6 +353,26 @@ describe('early hints', () => {
     expect(link).toContain('as=style');
     expect(link).toContain('as=font');
     expect(link).toContain('b.js');
+    expect(link).toMatch(/b\.js>; rel=preload; as=script/);
+  });
+  it('hints the ES modules of Vite builds as modulepreload', async () => {
+    const config = resolveConfig({ performance: { earlyHints: { scripts: true } } });
+    const m2 = { ...manifest, earlyHints: {}, framework: { name: 'astro' as const, version: '7.4.4' } };
+    const ctx = createContext({
+      request: new Request('https://x.test/'),
+      config,
+      manifest: m2,
+      runner: 'test',
+    });
+    ctx.route = createRouteMatcher(m2).match('/');
+    const r = await runPipeline({
+      stages: [earlyHintsStage(config)!],
+      ctx,
+      next: async () => htmlResponse(),
+    });
+    const link = r.response.headers.get('link') ?? '';
+    expect(link).toMatch(/b\.js>; rel=modulepreload/);
+    expect(link).not.toContain('as=script');
   });
 });
 
