@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { staticHeaderRules } from '@hypdriv/build';
 import { emptyManifest, type HypDrivConfig, type ManifestFramework } from '@hypdriv/core';
 import {
+  addVercelMiddleware,
   type DiscoveredRoute,
   finalizeManifest,
   hostPlugin,
@@ -53,6 +54,11 @@ export interface HypDrivStartPluginOptions {
    * registers them, and which prerendering needs anyway).
    */
   start?: StartOptionsLike;
+  /**
+   * Run HypDriv's Routing Middleware on Vercel for prerendered pages, which the CDN serves without Start's function
+   * (rate limiting, bot shield, maintenance, redirects, geo; default true).
+   */
+  vercelMiddleware?: boolean;
 }
 
 const RESOLVED_START = `\0${VIRTUAL_START}`;
@@ -267,6 +273,19 @@ export function hypdriv(options: HypDrivStartPluginOptions = {}): Plugin[] {
         log.info(
           `hypdriv: Vercel Build Output header routes written (${mapped} prerendered page(s) at clean URLs)`,
         );
+        // Prerendered pages are served by Vercel's CDN without Start's function: HypDriv's Routing Middleware runs
+        // the request stages for them (the function keeps running them for everything else).
+        await addVercelMiddleware({
+          root,
+          outputDir,
+          config: loaded,
+          manifest: result.manifest,
+          paths:
+            options.vercelMiddleware === false
+              ? []
+              : documents.filter((d) => d.file.startsWith(join(outputDir, 'static'))).map((d) => d.pathname),
+          log,
+        });
       } else
         log.warn(
           `hypdriv: no Vercel Build Output at ${outputDir}; build with Nitro's \`vercel\` preset (VERCEL=1 sets it)`,

@@ -211,6 +211,11 @@ export async function addVercelMiddleware(input: {
   config: LoadedHypConfig;
   manifest: HypManifest;
   paths?: string[];
+  /**
+   * Request conditions the CDN-served pages answer under (Build Output `missing`): requests that carry one of these
+   * headers go to the framework's function, which runs the pipeline itself — e.g. RSC payload requests (`rsc`).
+   */
+  missingHeaders?: string[];
   log?: Pick<Logger, 'info'>;
 }): Promise<{ paths: number | 'all' } | null> {
   const file = join(input.outputDir, 'config.json');
@@ -233,6 +238,11 @@ export async function addVercelMiddleware(input: {
   });
   const route: VercelRoute = {
     src,
+    // Prerendered files only answer GET and HEAD; other methods reach the framework's function.
+    ...(input.paths ? { methods: ['GET', 'HEAD'] } : {}),
+    ...(input.missingHeaders?.length
+      ? { missing: input.missingHeaders.map((key) => ({ type: 'header', key })) }
+      : {}),
     middlewarePath: VERCEL_MIDDLEWARE_PATH,
     middlewareRawSrc: raw,
     continue: true,

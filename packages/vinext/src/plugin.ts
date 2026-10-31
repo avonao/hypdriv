@@ -5,6 +5,7 @@ import { buildFingerprint, renderReport, type StaticDocument } from '@hypdriv/bu
 import type { HypDrivConfig, HypManifest, ManifestFramework } from '@hypdriv/core';
 import { writeManifest } from '@hypdriv/core/node';
 import {
+  addVercelMiddleware,
   type DiscoveredRoute,
   finalizeManifest,
   hostPlugin,
@@ -54,6 +55,11 @@ export interface HypDrivVinextOptions {
   hook?: boolean;
   /** Vercel: serve vinext's prerendered static pages from the CDN (default true). */
   vercelStaticPages?: boolean;
+  /**
+   * Run HypDriv's Routing Middleware on Vercel for the prerendered pages its CDN serves without vinext's function
+   * (rate limiting, bot shield, maintenance, redirects, geo; default true).
+   */
+  vercelMiddleware?: boolean;
 }
 
 /** vinext's generated App Router request handler module. */
@@ -358,6 +364,17 @@ export function hypdriv(options: HypDrivVinextOptions = {}): Plugin[] {
       );
       const copied = writeVercelStaticPages({ outputDir, pages: servedPages });
       writeVercelStatic({ outputDir, rules, manifestJson: JSON.stringify(manifest), log });
+      // The CDN serves those pages without vinext's function: HypDriv's Routing Middleware runs the request stages
+      // for them. RSC payloads, Server Actions and other methods go to the function, which runs them itself.
+      await addVercelMiddleware({
+        root,
+        outputDir,
+        config: loaded,
+        manifest,
+        paths: options.vercelMiddleware === false ? [] : copied.map((p) => p.pathname),
+        missingHeaders: ['rsc', 'next-action'],
+        log,
+      });
       if (copied.length)
         log.info(
           `hypdriv: ${copied.length} prerendered page(s) served from Vercel's CDN: ${copied.map((p) => p.pathname).join(', ')}`,

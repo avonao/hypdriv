@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
-import type { HypDrivConfig, Logger } from '@hypdriv/core';
+import type { HypDrivConfig, HypManifest, Logger } from '@hypdriv/core';
 import {
+  addVercelMiddleware,
   configModuleCode,
   developmentManifest,
   type FinalizeResult,
@@ -53,6 +54,13 @@ export interface ModuleOptions {
    * Cloudflare's `_headers` / Vercel's Build Output `config.json` (default true).
    */
   staticHeaders?: boolean;
+  vercel?: {
+    /**
+     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Nitro's function
+     * (rate limiting, bot shield, maintenance, redirects, geo; default true).
+     */
+    middleware?: boolean;
+  };
   cloudflare?: {
     /**
      * Build the `cloudflare-module` Worker with HypDriv's entry: the HypDriv Worker shell (`createWorker`) around
@@ -286,6 +294,15 @@ export default defineNuxtModule<ModuleOptions>({
           staticHeaders: options.staticHeaders !== false,
           log,
         });
+        if (target() === 'vercel' && options.staticHeaders !== false)
+          await addVercelMiddleware({
+            root: rootDir,
+            outputDir: nitro.options.output.dir,
+            config: loaded,
+            manifest: result.manifest as HypManifest,
+            paths: options.vercel?.middleware === false ? [] : result.documents.map((d) => d.pathname),
+            log,
+          });
         if (!out.embedded.length)
           log.warn(
             'hypdriv: no server file embeds the runtime manifest; the HypDriv Nitro plugin is not part of this build',
