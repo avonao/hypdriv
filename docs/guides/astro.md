@@ -162,7 +162,7 @@ export default defineConfig({
 
 ## Limitations
 
-- Static responses carry static headers only: on Vercel, Node standalone and Cloudflare without the Worker shell, prerendered pages and assets are served without application code, so rate limits, the bot shield, maintenance mode and per-request ids apply to on-demand routes only. Use the Worker shell on Cloudflare for the full pipeline everywhere.
+- Prerendered pages get the request stages on Cloudflare through the Worker shell and on Vercel through HypDriv's Routing Middleware, which the build scopes to exactly those pages (`hypdriv({ vercel: { middleware: false } })` turns it off). On Node standalone and Cloudflare without the shell they carry static headers only, so rate limits, the bot shield, maintenance mode and per-request ids apply to on-demand routes only.
 - Unmatched URLs answered by a prerendered `404.astro` bypass middleware; add the `src/fetch.ts` wrapper (Node, Cloudflare adapter entry) or use the Worker shell. On Vercel they never reach the function; the catch-all route serves `404.html` with its static policy.
 - With `trailingSlash: 'always'` Astro redirects `/_hypdriv/health` to `/_hypdriv/health/` before middleware; request the trailing-slash form or use the `src/fetch.ts` wrapper.
 - `<ClientRouter />` (view transitions) keeps the first document's policy while it swaps pages, and inline scripts of later pages carry nonces that policy does not list. Astro's own CSP does not support `<ClientRouter />` either; use full navigations on pages that rely on inline scripts.

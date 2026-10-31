@@ -5,6 +5,9 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The Worker runs first for everything except content-hashed assets: prerendered pages (served from the assets
+  // binding by createStartWorker) get the request stages too — rate limiting, bot shield, geo, flags.
+  "assets": { "binding": "ASSETS", "run_worker_first": ["/*", "!/assets/*"] },
   "observability": { "enabled": true },
   // `jobs.cron` in hypdriv.config.ts: the shell's scheduled handler dispatches matching jobs.
   "triggers": { "crons": ["0 * * * *"] },

@@ -10,7 +10,7 @@ Requirements: `@tanstack/react-start` 1.169 or later, Vite 8, Node.js 22.12 or l
 | --- | --- | --- | --- |
 | SSR page, server route, server function, 404, Start's redirects | Worker shell (`createStartWorker`) with `HTMLRewriter`; the request middleware passes through | request middleware in the Vercel Function | request middleware (or the server entry) in the Node server |
 | `/_hypdriv/*` | Worker shell | request middleware | request middleware |
-| Prerendered page | Workers Static Assets with its `_headers` rule (hash CSP, security headers, Early Hints) | Vercel CDN with its Build Output header route (hash CSP …), served at its clean URL | rendered per request by Start (nonce CSP) — see *Node and prerendered pages* |
+| Prerendered page | the Worker shell (with `assets.run_worker_first`), served as built from the assets binding with its hash CSP; without it Workers Static Assets with its `_headers` rule | Vercel CDN with its Build Output header route (hash CSP …) at its clean URL, behind HypDriv's Routing Middleware (request stages) | rendered per request by Start (nonce CSP) — see *Node and prerendered pages* |
 | Hashed assets (`/assets/*`) | Static Assets, `_headers`: immutable caching + security headers | CDN, header route | Nitro, `routeRules`: immutable caching + security headers |
 | Other public files (`robots.txt`) | Static Assets, `_headers` base rule | CDN, header route | Nitro (no HypDriv headers) |
 | Start's prerender requests (`vite build`) | Start only, no pipeline | Start only | Start only |
@@ -149,6 +149,8 @@ export default createStartWorker({ config, manifest: () => import('virtual:hypdr
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The Worker runs first for everything except content-hashed assets: prerendered pages get the request stages.
+  "assets": { "binding": "ASSETS", "run_worker_first": ["/*", "!/assets/*"] },
   "triggers": { "crons": ["0 * * * *"] },
   "durable_objects": {
     "bindings": [
@@ -161,7 +163,7 @@ export default createStartWorker({ config, manifest: () => import('virtual:hypdr
 }
 ```
 
-`createStartWorker()` is `createWorker({ app })` from `@hypdriv/cloudflare` with Start's server entry as the application: the shell runs the full pipeline with `HTMLRewriter`, answers `/_hypdriv/*`, uses the Durable Objects for exact rate limits and the tag index when their bindings exist, and handles `scheduled`, `queue`, `email` and `tail`. Workers' `env` and `ctx` reach Start as `context.cloudflare` (they never land in Start's request options); `import { env, waitUntil } from 'cloudflare:workers'` works anywhere as well. The request middleware sees the shell's context and passes through, still forwarding the nonce. Start's prerender requests (the build runs the Worker in workerd to prerender) go to Start directly. To compose it yourself:
+`createStartWorker()` is `createWorker({ app })` from `@hypdriv/cloudflare` with Start's server entry as the application: the shell runs the full pipeline with `HTMLRewriter`, answers `/_hypdriv/*`, uses the Durable Objects for exact rate limits and the tag index when their bindings exist, and handles `scheduled`, `queue`, `email` and `tail`. Workers' `env` and `ctx` reach Start as `context.cloudflare` (they never land in Start's request options); `import { env, waitUntil } from 'cloudflare:workers'` works anywhere as well. The request middleware sees the shell's context and passes through, still forwarding the nonce. GET and HEAD requests are answered from the assets binding first (`assets: false` turns that off), so with `run_worker_first` prerendered pages and public files keep being served as built — prerendered pages with their build-time hash CSP — while they get rate limiting, the bot shield, geo and flags. Start's prerender requests (the build runs the Worker in workerd to prerender) go to Start directly. To compose it yourself:
 
 ```ts
 import { createWorker } from '@hypdriv/cloudflare';

@@ -94,7 +94,7 @@ Use `node-server` and start `node .output/server/index.mjs`. Every request excep
 | | Cloudflare (`cloudflare-module`) | Vercel | Node |
 |---|---|---|---|
 | Rendered pages, API routes, Nuxt error pages | HypDriv Worker shell around Nitro (`runner: worker`) | Nitro hook in the function (`runner: host`) | Nitro hook (`runner: host`) |
-| Prerendered pages | Workers Static Assets + `_headers` (or the shell with `run_worker_first`) | Vercel CDN + `config.json` header routes | Nitro hook |
+| Prerendered pages | the shell with `run_worker_first`, served from the assets binding (without it: Workers Static Assets + `_headers`) | Vercel CDN + `config.json` header routes + HypDriv's Routing Middleware | Nitro hook |
 | `/_nuxt/*` build assets | Workers Static Assets (Nitro's immutable caching) | Vercel CDN | Nitro, without the pipeline |
 | `scheduled` / `queue` / `email` | HypDriv jobs + Nitro hooks | Vercel Cron → `jobHandler` routes | — |
 | `nuxt dev` | Nitro hook (`runner: host`, development mode) | | |
@@ -151,7 +151,7 @@ export default defineEventHandler((event) => handle(event.req));
 - Nuxt 5 (Nitro 3, h3 2) is not supported yet; the module refuses to load on Nitro 3.
 - Nitro 2 buffers responses on Cloudflare (`localFetch`): streaming SSR and event streams arrive in one piece there. Node and Vercel stream.
 - WebSocket upgrades (`nitro.experimental.websocket`) go to Nitro directly on Cloudflare, without the pipeline.
-- Prerendered pages served by Workers Static Assets or the Vercel CDN get their static headers only: rate limits, the bot shield, redirects and geo do not run for them. On Cloudflare, route them through the Worker with `assets.run_worker_first` when they need the full pipeline.
+- Prerendered pages get the request stages on both edge platforms: on Cloudflare route them through the Worker with `assets.run_worker_first` (the example uses `["/*", "!/_nuxt/*"]`; the Worker entry serves them from the assets binding with their build-time hash CSP), on Vercel HypDriv's Routing Middleware runs for exactly those pages (`hypdriv: { vercel: { middleware: false } }` turns it off). Without either they carry their static headers only.
 - Cloudflare's `_headers` holds at most 100 rules; documents beyond that are reported at build time and still get their CSP from the Worker when it serves them.
 - The pipeline asks Nitro for identity-encoded responses (it may rewrite the body); compression is the CDN's or the reverse proxy's job.
 - Facts rendered into a page that Nitro caches (`useHyp()` in a `swr` route) are those of the request that filled the cache.

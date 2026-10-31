@@ -43,6 +43,12 @@ export interface StartWorkerOptions extends Omit<CreateWorkerOptions, 'next' | '
    * Start directly, outside the shell, so static documents carry no per-request state.
    */
   prerenderToken?: string;
+  /**
+   * The static-assets binding answered first for GET/HEAD requests, so prerendered pages and public files keep being
+   * served as built when the Worker runs first (`assets.run_worker_first`, which gives them the request stages).
+   * `false` sends everything to Start. Default `ASSETS`.
+   */
+  assets?: string | false;
 }
 
 /**
@@ -52,26 +58,49 @@ export interface StartWorkerOptions extends Omit<CreateWorkerOptions, 'next' | '
 export function startApp(
   entry: () => Promise<StartServerEntry | { default: StartServerEntry }> = () =>
     import('@tanstack/react-start/server-entry') as Promise<{ default: StartServerEntry }>,
+  assets: string | false = 'ASSETS',
 ): () => Promise<AppWorkerModule['default']> {
   return async () => {
     const loaded = await entry();
     const start = 'default' in loaded ? loaded.default : loaded;
     return {
-      fetch: (request: Request, env: unknown, ctx: ExecutionContextLike) =>
-        start.fetch(request, { context: { cloudflare: { env, ctx } } }),
+      async fetch(request: Request, env: unknown, ctx: ExecutionContextLike) {
+        const binding =
+          assets === false
+            ? undefined
+            : ((env as Record<string, unknown> | undefined)?.[assets] as AssetsBinding | undefined);
+        if (
+          binding &&
+          typeof binding.fetch === 'function' &&
+          (request.method === 'GET' || request.method === 'HEAD')
+        ) {
+          const asset = await binding.fetch(request);
+          if (asset.status !== 404) return asset;
+          void asset.body?.cancel().catch(() => undefined);
+        }
+        return start.fetch(request, { context: { cloudflare: { env, ctx } } });
+      },
     };
   };
 }
 
+interface AssetsBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
 /**
- * Creates the Worker entry for a TanStack Start app: `createWorker()` with Start as the application. Pages that
- * reach the Worker are rendered per request (Workers Static Assets serve the prerendered ones first), so the shell
- * reads the manifest through `renderedManifest()`.
+ * Creates the Worker entry for a TanStack Start app: `createWorker()` with Start as the application. GET/HEAD
+ * requests are answered from the assets binding first, so with `assets.run_worker_first` prerendered pages get the
+ * request stages and are still served as built (hash CSP from the build manifest); everything else is rendered by
+ * Start per request. With `assets: false` every page that reaches the Worker is rendered, and the shell reads the
+ * manifest through `renderedManifest()`.
  */
 export function createStartWorker(options: StartWorkerOptions): HypDrivWorker {
-  const { entry, manifest, prerenderToken: token = prerenderToken, ...rest } = options;
-  const rendered = renderedManifestLoader(manifest);
-  const load = startApp(entry);
+  const { entry, manifest, prerenderToken: token = prerenderToken, assets = 'ASSETS', ...rest } = options;
+  // With the assets binding answered first, prerendered pages reach the client as built: the build manifest (hash
+  // CSP for them) is the right one. Without it, every page that reaches the Worker is rendered per request.
+  const rendered = assets === false ? renderedManifestLoader(manifest) : manifest;
+  const load = startApp(entry, assets);
   let app: Promise<AppWorkerModule['default']> | null = null;
   const worker = createWorker({
     ...rest,
