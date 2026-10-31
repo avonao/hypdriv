@@ -100,7 +100,8 @@ export interface CacheKeyInput {
   flags?: Record<string, FlagValue>;
   locale?: string;
   device?: string;
-  trailingSlash: boolean | null;
+  /** Kept for callers; the key preserves the trailing slash as requested whatever this says. */
+  trailingSlash?: boolean | null;
   ignoredQuery: string[];
 }
 

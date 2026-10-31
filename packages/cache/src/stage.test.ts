@@ -219,6 +219,58 @@ describe('edge-cache stage: miss, hit, stale', () => {
     expect(other.decision.status).toBe('MISS');
   });
 
+  it('keeps /legal and /legal/ apart: a redirect for one never answers the other', async () => {
+    const h = harness({
+      config: {
+        site: { trailingSlash: true },
+        cache: { edge: { policies: [{ match: '/**', ttl: 60 }] } },
+      },
+    });
+    const next = (request: Request) =>
+      new URL(request.url).pathname === '/legal'
+        ? new Response(null, { status: 308, headers: { location: '/legal/' } })
+        : new Response('legal page', { headers: { 'content-type': 'text/html' } });
+    // Empty cache, slashless first: the redirect is stored under its own key...
+    const redirect = await h.request('https://x.test/legal', {}, { next });
+    expect(redirect.response.status).toBe(308);
+    await redirect.flush();
+    // ...and the page is a MISS of its own, not the redirect again.
+    const page = await h.request('https://x.test/legal/', {}, { next });
+    expect(page.decision.status).toBe('MISS');
+    expect(page.response.status).toBe(200);
+    expect(await text(page.response)).toBe('legal page');
+    await page.flush();
+    const hit = await h.request('https://x.test/legal/', {}, { next });
+    expect(hit.decision.status).toBe('HIT');
+    expect(hit.response.status).toBe(200);
+    const redirectHit = await h.request('https://x.test/legal', {}, { next });
+    expect(redirectHit.decision.status).toBe('HIT');
+    expect(redirectHit.response.status).toBe(308);
+    expect(redirectHit.response.headers.get('location')).toBe('/legal/');
+  });
+
+  it('never stores a redirect to the URL that was requested', async () => {
+    const h = harness({ config: { cache: { edge: { policies: [{ match: '/**', ttl: 60 }] } } } });
+    const loop = await h.request(
+      'https://x.test/legal/',
+      {},
+      { next: () => new Response(null, { status: 308, headers: { location: '/legal/' } }) },
+    );
+    expect(loop.decision.reason).toBe('uncacheable:self-redirect');
+    const absolute = await h.request(
+      'https://x.test/a',
+      {},
+      { next: () => new Response(null, { status: 301, headers: { location: 'https://x.test/a#top' } }) },
+    );
+    expect(absolute.decision.reason).toBe('uncacheable:self-redirect');
+    const other = await h.request(
+      'https://x.test/b',
+      {},
+      { next: () => new Response(null, { status: 301, headers: { location: '/b/' } }) },
+    );
+    expect(other.decision.reason).toBe('store');
+  });
+
   it('serves HEAD requests from cache without a body and never stores HEAD misses', async () => {
     const h = harness();
     const headMiss = await h.request(
@@ -801,6 +853,17 @@ describe('edge-cache purge', () => {
       expect(
         (await h.request('https://x.test/docs', { headers: { 'accept-language': lang } })).decision.status,
       ).toBe('MISS');
+  });
+
+  it('purgeUrls clears both trailing-slash forms of a page', async () => {
+    const h = harness({ config: { cache: { edge: { policies: [{ match: '/**', ttl: 60 }] } } } });
+    await (await h.request('https://x.test/guide')).flush();
+    await (await h.request('https://x.test/guide/')).flush();
+    expect((await h.request('https://x.test/guide')).decision.status).toBe('HIT');
+    expect((await h.request('https://x.test/guide/')).decision.status).toBe('HIT');
+    await h.edgeCache.purgeUrls(['https://x.test/guide']);
+    expect((await h.request('https://x.test/guide')).decision.status).toBe('MISS');
+    expect((await h.request('https://x.test/guide/')).decision.status).toBe('MISS');
   });
 
   it('purgeUrls works without any request when config and manifest are given', async () => {

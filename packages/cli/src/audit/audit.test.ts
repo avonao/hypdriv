@@ -260,6 +260,16 @@ describe('path selection', () => {
     const root = choosePaths(manifest, { paths: ['/'] })[0]!;
     expect(cspModeFor(root.route, manifest)).toBe('hash');
   });
+
+  it('audits the trailing-slash form of pages when the app uses trailingSlash, and keeps explicit paths as given', async () => {
+    const manifest = { ...(await fixtureManifest()), trailingSlash: true };
+    const paths = choosePaths(manifest).map((p) => p.path);
+    expect(paths).toContain('/blog/');
+    expect(paths).toContain('/blog/hello-world/');
+    expect(paths).toContain('/');
+    expect(paths.filter((p) => p.length > 1 && !p.endsWith('/'))).toEqual([]);
+    expect(choosePaths(manifest, { paths: ['/x', '/y/'] }).map((p) => p.path)).toEqual(['/x', '/y/']);
+  });
 });
 
 describe('hypdriv audit (injected fetch)', () => {

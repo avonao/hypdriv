@@ -212,10 +212,18 @@ export const wranglerChecks: Check[] = [
       const cfg = ctx.project.wrangler.config;
       if (!cfg) return skip('no wrangler config.');
       const self = cfg.services.find((s) => s.binding === 'WORKER_SELF_REFERENCE');
-      if (!self)
+      if (!self) {
+        // Nothing revalidates without ISR routes or revalidation calls, so nothing needs the binding.
+        const isr = ctx.manifest?.routes.filter((r) => r.classification === 'isr').length ?? null;
+        const sources = ctx.project.sources;
+        if (isr === 0 && sources.filesScanned > 0 && sources.revalidation.length === 0)
+          return info(
+            'No WORKER_SELF_REFERENCE service binding; not needed here (no ISR routes and no revalidateTag / revalidatePath / "use cache" in the sources). Add it before using them.',
+          );
         return warn(
           'No WORKER_SELF_REFERENCE service binding; OpenNext uses it for ISR revalidation and queue dispatch (`"services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "<worker name>" }]`).',
         );
+      }
       if (cfg.name && self.service !== cfg.name)
         return warn(
           `WORKER_SELF_REFERENCE points at "${self.service}" but the Worker is named "${cfg.name}".`,

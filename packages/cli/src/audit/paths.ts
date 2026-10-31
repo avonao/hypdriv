@@ -29,8 +29,18 @@ export function choosePaths(
   const limit = options.limit ?? 20;
   const out: AuditPath[] = [];
   const seen = new Set<string>();
+  const explicit = Boolean(options.paths?.length);
+  // Next with `trailingSlash: true` answers the slashless form with a redirect: audit the pages, not the redirects.
+  const slashed = !explicit && manifest?.trailingSlash === true;
   const push = (path: string, route: HypRoute | null) => {
-    const normalized = path.startsWith('/') ? path : `/${path}`;
+    let normalized = path.startsWith('/') ? path : `/${path}`;
+    if (
+      slashed &&
+      normalized.length > 1 &&
+      !normalized.endsWith('/') &&
+      !/\.[A-Za-z0-9]{1,8}$/.test(normalized)
+    )
+      normalized = `${normalized}/`;
     if (seen.has(normalized)) return;
     seen.add(normalized);
     out.push({ path: normalized, route });

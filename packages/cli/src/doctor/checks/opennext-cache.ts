@@ -181,6 +181,12 @@ export interface OpenNextCacheInput {
   workerSource: string | null;
   workerFile: string | null;
   manifest: HypManifest | null;
+  /**
+   * Whether the application calls Next's invalidation or tagging APIs (`revalidateTag`, `revalidatePath`,
+   * `'use cache'`, fetch tags…). `null` when the sources were not scanned. Without any, a missing tag cache or
+   * queue changes nothing, so the doctor stays quiet about them.
+   */
+  usesRevalidation?: boolean | null;
 }
 
 /** Evaluates the OpenNext cache setup against the wrangler bindings and the Worker entry's exports. */
@@ -217,11 +223,12 @@ export function evaluateOpenNextCache(input: OpenNextCacheInput): CheckResult {
     advice.push(
       'No incrementalCache: prerendered pages and the data cache are not persisted between isolates (use r2IncrementalCache, ideally inside withRegionalCache).',
     );
-  if (!setup.queue)
+  const usesRevalidation = input.usesRevalidation ?? null;
+  if (!setup.queue && (isr === null || isr > 0))
     advice.push(
       `No queue: time-based ISR revalidation never runs on Cloudflare (OpenNext's default queue is a no-op)${isr ? `; ${isr} ISR route(s) in the manifest stay stale forever` : ''}. Use doQueue.`,
     );
-  if (!setup.tagCache)
+  if (!setup.tagCache && usesRevalidation !== false)
     advice.push(
       "No tagCache: revalidateTag()/revalidatePath() and 'use cache' tags have no effect on Cloudflare (OpenNext's default tag cache is a no-op). Use doShardedTagCache.",
     );
@@ -330,6 +337,8 @@ export const openNextCacheChecks: Check[] = [
         workerSource: workerFile ? readText(workerFile) : null,
         workerFile: workerFile ? rel(ctx.root, workerFile) : null,
         manifest: ctx.manifest,
+        usesRevalidation:
+          ctx.project.sources.filesScanned > 0 ? ctx.project.sources.revalidation.length > 0 : null,
       });
     },
   },

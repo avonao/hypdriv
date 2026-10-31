@@ -108,6 +108,10 @@ export const initCommand = defineCommand({
           'pass',
           `Wrote ${applied.written.length} file(s)${applied.backups.length ? `, backups: ${applied.backups.join(', ')}` : ''}.`,
         );
+      if (applied.backups.length)
+        ui.note(
+          'Review the changes with `git diff`, then delete the *.hypdriv.bak backups (or git-ignore them).',
+        );
       else ui.status('pass', 'Nothing to write; the project is already set up.');
     }
     if (plan.notes.length) {

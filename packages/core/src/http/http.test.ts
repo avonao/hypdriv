@@ -122,6 +122,13 @@ describe('url', () => {
     expect(normalizeTrailingSlash('/a.txt', true)).toBe('/a.txt');
     expect(normalizeTrailingSlash('/', true)).toBe('/');
   });
+  it('preserves the trailing slash on request, still cleaning the rest of the URL', () => {
+    expect(normalizeUrl('https://x.test/a/', { trailingSlash: 'preserve' }).pathname).toBe('/a/');
+    expect(normalizeUrl('https://x.test/a', { trailingSlash: 'preserve' }).pathname).toBe('/a');
+    expect(normalizeUrl('https://X.test//a//b/', { trailingSlash: 'preserve' }).href).toBe(
+      'https://x.test/a/b/',
+    );
+  });
   it('detects tracking params', () => {
     expect(isTrackingParam('utm_whatever')).toBe(true);
     expect(isTrackingParam('gclid')).toBe(true);

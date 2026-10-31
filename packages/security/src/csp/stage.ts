@@ -5,13 +5,16 @@ import {
   firstMatch,
   HEADER,
   type HypContext,
+  type HypManifest,
   isHtmlLike,
   isRscRequest,
   type ResolvedConfig,
   type ResolvedCsp,
   type Stage,
   type StateKey,
+  safeDecodePath,
   stateKey,
+  stripBasePath,
   withHeaders,
   withoutHeaders,
 } from '@hypdriv/core';
@@ -147,6 +150,48 @@ export function policyHeadersFor(
   return { enforced: policy };
 }
 
+/** Route ids that have per-path entries (`<route id>#<pathname>`), per manifest `csp` object. */
+const concretePathRoutes = new WeakMap<object, Set<string>>();
+
+function routesWithConcretePaths(csp: HypManifest['csp']): Set<string> {
+  let ids = concretePathRoutes.get(csp);
+  if (!ids) {
+    ids = new Set();
+    for (const key of Object.keys(csp)) {
+      const at = key.indexOf('#');
+      if (at > 0) ids.add(key.slice(0, at));
+    }
+    concretePathRoutes.set(csp, ids);
+  }
+  return ids;
+}
+
+/**
+ * The hashes of the prerendered document a request is for. The build hashes every concrete page of a dynamic
+ * route under `<route id>#<pathname>` (`generateStaticParams`), plus one route-level entry for the first page. A
+ * route-level entry says nothing about the other pages: their inline scripts (Next's flight data above all)
+ * differ. So the concrete entry wins; a route that has concrete entries and none for this path (a page the build
+ * did not hash, a runtime-rendered `not-found`) gets no hashes, which means a nonce, not a wrong hash.
+ */
+export function cspHashesFor(
+  manifest: HypManifest,
+  route: { id: string },
+  pathname: string,
+): { scriptHashes: string[]; styleHashes: string[] } | undefined {
+  const csp = manifest.csp;
+  if (routesWithConcretePaths(csp).has(route.id)) {
+    const stripped = stripBasePath(pathname, manifest.basePath);
+    const bare = stripped.length > 1 ? stripped.replace(/\/+$/, '') || '/' : stripped;
+    const decoded = safeDecodePath(bare);
+    for (const candidate of new Set([stripped, bare, ...(decoded ? [decoded] : [])])) {
+      const hit = csp[`${route.id}#${candidate}`];
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  return csp[route.id];
+}
+
 /**
  * The `csp` stage (ADR 0006). `pre` picks the mode (route override → config → `auto`), generates the
  * nonce and forwards it to Next.js through the request headers; `post` emits the response policy,
@@ -175,7 +220,7 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
         return;
       }
       const route = ctx.route?.route;
-      const hashes = route ? ctx.manifest.csp[route.id] : undefined;
+      const hashes = route ? cspHashesFor(ctx.manifest, route, ctx.url.pathname) : undefined;
       const rsc = isRscRequest(ctx.request.headers);
       const classification = route?.classification;
       let mode: 'nonce' | 'hash' | 'unsafe-inline';

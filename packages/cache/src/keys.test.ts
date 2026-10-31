@@ -38,13 +38,23 @@ describe('buildCacheKey', () => {
     expect(head).toBe(get);
   });
 
-  it('normalises host case, default ports, duplicate slashes and trailing slashes', async () => {
-    const a = await key(input('https://X.TEST:443//docs/intro/'));
+  it('normalises host case, default ports and duplicate slashes', async () => {
+    const a = await key(input('https://X.TEST:443//docs//intro'));
     const b = await key(input('https://x.test/docs/intro'));
     expect(a).toBe(b);
-    const withSlash = await key(input('https://x.test/docs/intro', {}, { trailingSlash: true }));
-    expect(withSlash).not.toBe(b);
-    expect(await key(input('https://x.test/docs/intro/', {}, { trailingSlash: true }))).toBe(withSlash);
+  });
+
+  it('keeps /page and /page/ apart whatever the trailingSlash setting says', async () => {
+    // With Next's trailingSlash one of the two is a redirect to the other: a shared entry would serve the redirect
+    // for the page, and the page for the redirect (or loop).
+    for (const setting of [null, false, true]) {
+      const bare = await key(input('https://x.test/docs/intro', {}, { trailingSlash: setting }));
+      const slash = await key(input('https://x.test/docs/intro/', {}, { trailingSlash: setting }));
+      expect(slash).not.toBe(bare);
+    }
+    expect(await key(input('https://x.test/docs/intro', {}, { trailingSlash: true }))).toBe(
+      await key(input('https://x.test/docs/intro', {}, { trailingSlash: false })),
+    );
   });
 
   it('drops ignored (tracking) parameters and sorts the rest', async () => {

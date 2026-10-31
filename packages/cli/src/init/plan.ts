@@ -181,9 +181,16 @@ export function buildInitPlan(
 
   // Secrets template
   if (platform === 'cloudflare') {
-    if (project.devVars.exampleFile)
+    if (project.devVars.exampleFile) {
       items.push({ path: '.dev.vars.example', action: 'skip', reason: 'exists' });
-    else
+      const names = ['HYPDRIV_SESSION_SECRET', 'HYPDRIV_INTERNAL_SECRET'].filter(
+        (name) => !read(project.devVars.exampleFile as string).includes(name),
+      );
+      if (names.length)
+        notes.push(
+          `.dev.vars.example exists and does not list ${names.join(' and ')}; add ${names.map((n) => `${n}=`).join(' and ')} so \`wrangler dev\` and \`hypdriv audit\` find them.`,
+        );
+    } else
       items.push({
         path: '.dev.vars.example',
         action: 'create',

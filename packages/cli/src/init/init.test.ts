@@ -123,6 +123,21 @@ describe('wrangler and package.json edits', () => {
     ).toEqual([]);
   });
 
+  it('does not add a script whose command the project already has under another name', () => {
+    const src = JSON.stringify({
+      name: 'x',
+      scripts: { 'cf:typegen': 'wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts' },
+    });
+    const r = editPackageJson(src, {
+      scripts: {
+        'cf-typegen': 'wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts',
+        'hypdriv:doctor': 'hypdriv doctor',
+      },
+    });
+    expect(r.changes).toEqual(['script "hypdriv:doctor"']);
+    expect(JSON.parse(r.content).scripts).not.toHaveProperty('cf-typegen');
+  });
+
   it('ensures the immutable _headers rule and the tsconfig exclude', () => {
     const rule = '/_next/static/*\n  Cache-Control: public,max-age=31536000,immutable\n';
     expect(ensureHeadersRule(null, rule)).toEqual({ content: rule, changed: true });

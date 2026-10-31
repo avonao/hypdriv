@@ -792,7 +792,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     layoutFile: firstExisting(root, LAYOUT_FILES),
     sources:
       options.scan === false
-        ? { filesScanned: 0, truncated: false, edgeRuntime: [], nodeApis: [] }
+        ? { filesScanned: 0, truncated: false, edgeRuntime: [], nodeApis: [], revalidation: [] }
         : scanSources(root),
   };
 }

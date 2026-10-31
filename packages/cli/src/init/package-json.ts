@@ -23,6 +23,8 @@ export function editPackageJson(source: string, options: PackageJsonEditOptions)
   >;
   for (const [name, command] of Object.entries(options.scripts)) {
     if (scripts[name] !== undefined) continue;
+    // The project already has this command under another name (`cf:typegen` for `cf-typegen`): no twin.
+    if (Object.values(scripts).some((existing) => existing.trim() === command)) continue;
     scripts[name] = command;
     changes.push(`script "${name}"`);
   }

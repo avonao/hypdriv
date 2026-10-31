@@ -5,8 +5,12 @@ export interface NormalizeUrlOptions {
   ignoredQuery?: readonly string[];
   /** Keep only these query parameters; `'all'` keeps everything not ignored; `'none'` drops the query. */
   keepQuery?: readonly string[] | 'all' | 'none';
-  /** Next.js `trailingSlash` setting; `null` normalises to no trailing slash. */
-  trailingSlash?: boolean | null;
+  /**
+   * Next.js `trailingSlash` setting; `null` normalises to no trailing slash. `'preserve'` keeps the
+   * trailing slash exactly as requested: `/a` and `/a/` stay different URLs (cache keys use it, because
+   * the wrong-slash variant of a page is a redirect, not the page).
+   */
+  trailingSlash?: boolean | null | 'preserve';
   /** Lowercase the pathname (default false: Next routes are case-sensitive). */
   lowercasePath?: boolean;
   /** Remove the fragment (default true; fragments never reach servers anyway). */
@@ -36,7 +40,9 @@ export function normalizeUrl(input: URL | string, options: NormalizeUrlOptions =
   // Collapse duplicate slashes and resolve dot segments defensively.
   let pathname = url.pathname.replace(/\/{2,}/g, '/');
   if (options.lowercasePath) pathname = pathname.toLowerCase();
-  pathname = normalizeTrailingSlash(pathname, options.trailingSlash ?? null);
+  if (options.trailingSlash !== 'preserve') {
+    pathname = normalizeTrailingSlash(pathname, options.trailingSlash ?? null);
+  }
   url.pathname = pathname;
 
   const ignored = new Set(options.ignoredQuery ?? DEFAULT_TRACKING_PARAMS);

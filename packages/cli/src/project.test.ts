@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupProjects, installed, openNextProject, tempProject } from './__tests__/helpers';
 import { analyzeNextConfig, detectPlatform, detectProject } from './project';
-import { importSpecifiers, scanNodeApis } from './source-scan';
+import { importSpecifiers, scanNodeApis, scanRevalidation } from './source-scan';
 
 afterEach(cleanupProjects);
 
@@ -262,5 +262,23 @@ describe('source scan helpers', () => {
       api: 'fs.watch',
       line: 2,
     });
+  });
+});
+
+describe('scanRevalidation', () => {
+  const scan = (source: string) => scanRevalidation('/r/x.ts', source, '/r');
+  it('finds the APIs that need the OpenNext tag cache and queue', () => {
+    expect(scan("import { revalidateTag } from 'next/cache';\nrevalidateTag('posts');")).toHaveLength(1);
+    expect(scan("revalidatePath('/blog');")).toHaveLength(1);
+    expect(scan("'use cache';\nexport async function f() {}")).toHaveLength(1);
+    expect(scan("export async function f() {\n  'use cache: remote';\n}")).toHaveLength(1);
+    expect(scan("const r = await fetch(u, { next: { tags: ['a'] } });")).toHaveLength(1);
+    expect(scan('const r = await fetch(u, { next: { revalidate: 60 } });')).toHaveLength(1);
+    expect(scan('cacheTag("x"); cacheLife("hours");')).toHaveLength(2);
+  });
+  it('ignores code that does not touch the cache', () => {
+    expect(
+      scan("const revalidated = true;\nfetch('/x', { cache: 'no-store' });\n// revalidate later"),
+    ).toEqual([]);
   });
 });

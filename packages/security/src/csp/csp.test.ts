@@ -162,6 +162,65 @@ describe('cspStage mode selection', () => {
     expect(ctx.timings.list()).toContainEqual({ name: 'csp', desc: 'hash' });
   });
 
+  describe('routes with one document per generateStaticParams path', () => {
+    const localeRoute = route({ pathname: '/[locale]', classification: 'static' });
+    const HASH_ES = "'sha256-EsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsEsE='";
+    const HASH_FR = "'sha256-FrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrFrF='";
+    const perPath = {
+      csp: {
+        // The route-level entry is the first page's, and says nothing about the others.
+        [localeRoute.id]: { scriptHashes: [HASH_ES], styleHashes: [] },
+        [`${localeRoute.id}#/es`]: { scriptHashes: [HASH_ES], styleHashes: [] },
+        [`${localeRoute.id}#/fr`]: { scriptHashes: [HASH_FR], styleHashes: [] },
+      },
+    };
+    const scriptSrc = async (url: string, extra: Partial<typeof perPath> & { basePath?: string } = {}) => {
+      const ctx = makeCtx({ route: localeRoute, manifest: { ...perPath, ...extra }, url });
+      const { response } = await runStage(cspStage(ctx.config), ctx, htmlNext);
+      return {
+        mode: ctx.state.get(CSP_MODE_KEY),
+        scripts: parseCsp(response.headers.get('content-security-policy'))['script-src'],
+      };
+    };
+
+    it("uses the hashes of the requested page, not the first page's", async () => {
+      const fr = await scriptSrc('https://app.test/fr');
+      expect(fr.mode).toBe('hash');
+      expect(fr.scripts).toContain(HASH_FR);
+      expect(fr.scripts).not.toContain(HASH_ES);
+      expect((await scriptSrc('https://app.test/es')).scripts).toContain(HASH_ES);
+    });
+
+    it('finds the page whatever the trailing slash of the request is', async () => {
+      const fr = await scriptSrc('https://app.test/fr/');
+      expect(fr.mode).toBe('hash');
+      expect(fr.scripts).toContain(HASH_FR);
+    });
+
+    it('finds the page under a base path', async () => {
+      const fr = await scriptSrc('https://app.test/docs/fr/', { basePath: '/docs' });
+      expect(fr.mode).toBe('hash');
+      expect(fr.scripts).toContain(HASH_FR);
+    });
+
+    it('a path the build did not hash (a not-found page, a page beyond the hashed limit) gets a nonce', async () => {
+      const unknown = await scriptSrc('https://app.test/does-not-exist/');
+      expect(unknown.mode).toBe('nonce');
+      expect(unknown.scripts).toEqual(["'self'", expect.stringMatching(/^'nonce-/), "'strict-dynamic'"]);
+    });
+
+    it('a route with a route-level entry only keeps using it for every path', async () => {
+      const only = route({ pathname: '/about', classification: 'static' });
+      const ctx = makeCtx({
+        route: only,
+        manifest: { csp: { [only.id]: { scriptHashes: [HASH], styleHashes: [] } } },
+        url: 'https://app.test/about/',
+      });
+      await runStage(cspStage(ctx.config), ctx, htmlNext);
+      expect(ctx.state.get(CSP_MODE_KEY)).toBe('hash');
+    });
+  });
+
   it('dynamic route → nonce mode with request headers for Next.js', async () => {
     const ctx = makeCtx({ route: dynamicRoute, manifest, url: 'https://app.test/dash' });
     const { response, forwarded } = await runStage(cspStage(ctx.config), ctx, htmlNext);

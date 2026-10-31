@@ -158,6 +158,44 @@ describe('evaluateOpenNextCache', () => {
   });
 });
 
+describe('evaluateOpenNextCache: sites that never revalidate', () => {
+  const staticManifest = emptyManifest({ routes: [{ id: 'app:/', classification: 'static' } as HypRoute] });
+  const staticAssets = readOpenNextCacheSetup(
+    "import staticAssetsIncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache';\nexport default defineCloudflareConfig({ incrementalCache: staticAssetsIncrementalCache });",
+  );
+  const run = (usesRevalidation: boolean | null, manifest = staticManifest) =>
+    evaluateOpenNextCache({
+      setup: staticAssets,
+      wrangler: parseWranglerConfig(
+        '{ "name": "x", "assets": { "directory": ".open-next/assets", "binding": "ASSETS" } }',
+        'jsonc',
+      ),
+      workerSource: null,
+      workerFile: null,
+      manifest,
+      usesRevalidation,
+    });
+
+  it('stays quiet when there are no ISR routes and the sources never invalidate or tag', () => {
+    expect(run(false).status).toBe('pass');
+  });
+
+  it('still asks for a tag cache when the sources call revalidateTag / revalidatePath / "use cache", or were not scanned', () => {
+    for (const uses of [true, null]) {
+      const result = run(uses);
+      expect(result.status).toBe('warn');
+      expect(result.details?.join('\n')).toContain('revalidateTag()/revalidatePath()');
+    }
+  });
+
+  it('asks for a queue only where ISR routes exist', () => {
+    const quiet = run(true);
+    expect(quiet.details?.join('\n')).not.toContain('No queue');
+    const isr = run(true, isrManifest);
+    expect(isr.message).toContain('1 ISR route(s) but no revalidation queue');
+  });
+});
+
 describe('evaluateEdgeCacheMiddleware', () => {
   const withMiddleware = emptyManifest({
     routes: [{ id: 'app:/', classification: 'static' } as HypRoute],

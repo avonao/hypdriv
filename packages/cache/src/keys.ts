@@ -15,7 +15,7 @@ export const CACHE_KEY_ORIGIN = 'https://hypdriv.cache';
 export const RSC_KEY_HEADERS = ['rsc', 'next-router-state-tree', 'next-router-prefetch', 'next-url'] as const;
 
 /** Version of the key serialisation; bump when the material format changes so old entries miss cleanly. */
-const KEY_FORMAT = 'hypdriv-key/1';
+const KEY_FORMAT = 'hypdriv-key/2';
 
 /** Geo fields that may be used as vary dimensions, in the order they are serialised. */
 const GEO_FIELDS: ReadonlyArray<keyof GeoProperties & string> = [
@@ -50,7 +50,9 @@ export function serializeCacheKey(input: CacheKeyInput): CacheKeyMaterial {
   const normalized = normalizeUrl(input.url, {
     ignoredQuery: input.ignoredQuery,
     keepQuery: policy.keyQuery,
-    trailingSlash: input.trailingSlash,
+    // `/legal` and `/legal/` are different entries: with Next's `trailingSlash` one of them is a redirect to the
+    // other, and a shared key would serve the redirect for the page (and loop).
+    trailingSlash: 'preserve',
   });
   const method = request.method.toUpperCase() === 'HEAD' ? 'GET' : request.method.toUpperCase();
   const lines: string[] = [KEY_FORMAT, `${method} ${normalized.href}`];

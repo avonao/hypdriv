@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { emptyManifest, type HypRoute } from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   cleanupProjects,
@@ -360,5 +361,31 @@ describe('check isolation', () => {
     );
     expect(run.reports[0]).toMatchObject({ status: 'fail', message: 'check crashed: boom' });
     expect(run.exitCode).toBe(1);
+  });
+});
+
+describe('wrangler.self-reference on sites that never revalidate', () => {
+  const wrangler = `{ "name": "site", "main": "hypdriv.worker.ts", "assets": { "directory": ".open-next/assets", "binding": "ASSETS" } }`;
+  const only = ['--only', 'wrangler.self-reference'];
+
+  it('is informational without ISR routes and revalidation calls, and warns once the sources revalidate', async () => {
+    const quiet = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': wrangler,
+      'src/app/page.tsx': 'export default function Page() { return null; }\n',
+      '.hypdriv/manifest.json': JSON.stringify(
+        emptyManifest({ routes: [{ id: 'app:/', classification: 'static' } as HypRoute] }),
+      ),
+    });
+    const quietCheck = (await doctor(quiet.dir, only)).byId['wrangler.self-reference'];
+    expect(quietCheck?.status).toBe('pass');
+    expect(quietCheck?.message).toContain('not needed here');
+    const revalidating = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': wrangler,
+      'src/app/actions.ts':
+        "'use server';\nimport { revalidateTag } from 'next/cache';\nexport const f = () => revalidateTag('x');\n",
+    });
+    expect((await doctor(revalidating.dir, only)).byId['wrangler.self-reference']?.status).toBe('warn');
   });
 });

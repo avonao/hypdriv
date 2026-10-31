@@ -25,6 +25,8 @@ export interface SourceScanResult {
   truncated: boolean;
   edgeRuntime: EdgeRuntimeFinding[];
   nodeApis: NodeApiFinding[];
+  /** Uses of Next's cache invalidation and tagging APIs (`revalidateTag`, `revalidatePath`, `'use cache'`, fetch tags…). */
+  revalidation: SourceLocation[];
 }
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts']);
@@ -204,6 +206,19 @@ const EDGE_PAGES_RE =
   /export\s+const\s+config\s*(?::\s*[^=]+)?=\s*\{[^}]*runtime\s*:\s*['"](?:edge|experimental-edge)['"]/g;
 
 /** Finds Edge runtime declarations in a route file. */
+const REVALIDATION_RE =
+  /\b(?:revalidateTag|revalidatePath|updateTag|unstable_cache|cacheTag|cacheLife)\s*\(|^\s*['"]use cache(?::\s*\w+)?['"]|\bnext\s*:\s*\{[^}]*\b(?:tags|revalidate)\s*:/gm;
+
+/** Calls that need the OpenNext tag cache (and, for time-based revalidation, its queue) to do anything on Cloudflare. */
+export function scanRevalidation(file: string, source: string, root: string): SourceLocation[] {
+  const display = rel(root, file);
+  return [...source.matchAll(REVALIDATION_RE)].map((m) => ({
+    file: display,
+    line: lineOf(source, m.index),
+    snippet: snippetAt(source, m.index),
+  }));
+}
+
 export function scanEdgeRuntime(file: string, source: string, root: string): EdgeRuntimeFinding[] {
   const out: EdgeRuntimeFinding[] = [];
   const display = rel(root, file);
@@ -261,6 +276,7 @@ export function scanSources(root: string, options: ScanOptions = {}): SourceScan
     truncated: files.length >= limit,
     edgeRuntime: [],
     nodeApis: [],
+    revalidation: [],
   };
   for (const file of files) {
     let source: string;
@@ -282,6 +298,7 @@ export function scanSources(root: string, options: ScanOptions = {}): SourceScan
     }
     if (/\.d\.ts$/.test(file) || /\.test\.|\.spec\./.test(file)) continue;
     result.nodeApis.push(...scanNodeApis(file, source, root));
+    result.revalidation.push(...scanRevalidation(file, source, root));
   }
   return result;
 }

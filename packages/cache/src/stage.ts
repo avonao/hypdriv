@@ -131,9 +131,45 @@ function seconds(value: string | true | undefined): number | undefined {
   return Number.isFinite(n) ? Math.max(0, n) : undefined;
 }
 
+/** Each URL and its other trailing-slash form: the key keeps them apart, a purge of the page must clear both. */
+function withSlashVariants(urls: URL[]): Array<{ url: URL; variant: boolean }> {
+  const out: Array<{ url: URL; variant: boolean }> = [];
+  const seen = new Set<string>();
+  for (const url of urls) {
+    if (!seen.has(url.href)) {
+      seen.add(url.href);
+      out.push({ url, variant: false });
+    }
+    if (url.pathname === '/' || /\.[A-Za-z0-9]{1,8}$/.test(url.pathname)) continue;
+    const other = new URL(url.href);
+    other.pathname = url.pathname.endsWith('/') ? url.pathname.replace(/\/+$/, '') : `${url.pathname}/`;
+    if (!seen.has(other.href)) {
+      seen.add(other.href);
+      out.push({ url: other, variant: true });
+    }
+  }
+  return out;
+}
+
+/** A redirect to the URL that was requested. Storing it would serve the loop from the cache. */
+function isSelfRedirect(url: URL, response: Response): boolean {
+  if (response.status < 300 || response.status > 399) return false;
+  const location = response.headers.get('location');
+  if (!location) return false;
+  try {
+    const target = new URL(location, url);
+    target.hash = '';
+    const own = new URL(url.href);
+    own.hash = '';
+    return target.href === own.href;
+  } catch {
+    return false;
+  }
+}
+
 /** Decides whether an upstream response may be stored under the policy, and with which durations. */
 export function cacheability(
-  input: { method: string; policy: ResolvedEdgeCachePolicy },
+  input: { method: string; policy: ResolvedEdgeCachePolicy; url?: URL },
   response: Response,
   edge: Pick<EdgeConfig, 'negativeTtl' | 'maxBodySize'>,
 ): Verdict {
@@ -141,6 +177,7 @@ export function cacheability(
   if (input.method === 'HEAD') return { ok: false, reason: 'head' };
   const status = response.status;
   if (!policy.statuses.includes(status)) return { ok: false, reason: `status:${status}` };
+  if (input.url && isSelfRedirect(input.url, response)) return { ok: false, reason: 'self-redirect' };
   let ttl = policy.ttl;
   let swr = policy.swr;
   let sie = policy.staleIfError;
@@ -550,7 +587,11 @@ class EdgeCacheImpl implements EdgeCache {
     }
     this.dropStaleCandidate(local);
 
-    const verdict = cacheability(local, response, edge);
+    const verdict = cacheability(
+      { method: local.method, policy: local.policy, url: ctx.url },
+      response,
+      edge,
+    );
     if (!verdict.ok) {
       local.leader?.resolve(null);
       this.decide(ctx, { ...decision, reason: `uncacheable:${verdict.reason}` });
@@ -684,7 +725,11 @@ class EdgeCacheImpl implements EdgeCache {
       const request = new Request(forwarded.url, { method: 'GET', headers });
       const fetchedAt = this.now();
       const response = await upstream(request);
-      const verdict = cacheability({ method: 'GET', policy: local.policy }, response, local.edge);
+      const verdict = cacheability(
+        { method: 'GET', policy: local.policy, url: ctx.url },
+        response,
+        local.edge,
+      );
       if (!verdict.ok) {
         void response.body?.cancel().catch(() => undefined);
         ctx.log.debug('edge-cache: revalidation kept the stale entry', {
@@ -806,7 +851,7 @@ class EdgeCacheImpl implements EdgeCache {
     if (context && edge) {
       const policies = this.policiesFor(context.config, context.manifest);
       const matcher = this.matcherFor(context.manifest);
-      for (const url of absolute) {
+      for (const { url, variant } of withSlashVariants(absolute)) {
         const route: RouteMatch | null = matcher.match(url.pathname);
         const policy = matchPolicyFor(policies, url, route, context.manifest.basePath);
         if (!policy) continue;
@@ -820,7 +865,7 @@ class EdgeCacheImpl implements EdgeCache {
         });
         try {
           await this.store.delete(key);
-          deleted.add(key);
+          if (!variant) deleted.add(key);
         } catch (err) {
           this.log.warn('edge-cache: delete failed', { key: key.slice(0, 16), error: toError(err).message });
         }
