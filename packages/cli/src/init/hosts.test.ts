@@ -157,3 +157,38 @@ describe('hypdriv init (plain Vite)', () => {
     expect(JSON.parse(n.read('package.json')).scripts.start).toBe('hypdriv serve');
   });
 });
+
+describe('hypdriv init (Astro)', () => {
+  it('registers the integration and writes the Worker shell on Cloudflare', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'blog', dependencies: { astro: '^7.4.4' } }),
+      ...installed('astro', '7.4.4'),
+      'astro.config.mjs':
+        "import cloudflare from '@astrojs/cloudflare';\nimport { defineConfig } from 'astro/config';\n\nexport default defineConfig({\n  adapter: cloudflare(),\n  integrations: [],\n});\n",
+    });
+    const io = memoryIO(p.dir);
+    await runCommand('init', ['--platform', 'cloudflare', '--skip-doctor', '--json'], io);
+    const config = p.read('astro.config.mjs');
+    expect(config).toContain("import hypdriv from '@hypdriv/astro';");
+    expect(config).toContain('integrations: [hypdriv()]');
+    expect(p.read('src/worker.ts')).toContain("from '@astrojs/cloudflare/handler'");
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler.assets).toMatchObject({ run_worker_first: ['/*', '!/_astro/*'] });
+    expect(JSON.parse(p.read('package.json')).dependencies['@hypdriv/astro']).toBeDefined();
+    expect(JSON.parse(io.out).notes).toEqual([]);
+  });
+
+  it('asks for an adapter and static headers on Node', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'blog', dependencies: { astro: '^7.4.4' } }),
+      ...installed('astro', '7.4.4'),
+      'astro.config.mjs': "import { defineConfig } from 'astro/config';\nexport default defineConfig({});\n",
+    });
+    const io = memoryIO(p.dir);
+    await runCommand('init', ['--platform', 'node', '--skip-doctor', '--json'], io);
+    const notes = JSON.parse(io.out).notes.join('\n');
+    expect(notes).toContain('staticHeaders: true');
+    expect(notes).toContain('adapter');
+    expect(p.read('astro.config.mjs')).toContain('integrations: [hypdriv()]');
+  });
+});

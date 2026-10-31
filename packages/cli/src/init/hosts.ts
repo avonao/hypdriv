@@ -26,6 +26,8 @@ export interface HostContext {
   items: PlanItem[];
   notes: string[];
   nextSteps: string[];
+  /** More config files a host registers in (e.g. `vite.config.*` next to `svelte.config.js`). */
+  extraConfigFiles?: string[];
 }
 
 export interface HostSpec {
@@ -133,44 +135,60 @@ export default defineConfig({
 `;
 }
 
-/** Registers plugins in a `vite.config.*` (creating it when the project has none). */
-export function registerVitePlugins(
+export interface ConfigEntry {
+  element: string;
+  importLine: string;
+  from: string;
+  position?: 'first' | 'last';
+  property?: string;
+}
+
+/**
+ * Registers entries in arrays of the framework's config file (`plugins` in `vite.config.*`, `integrations` in
+ * `astro.config.*`, `modules` in `nuxt.config.*`), creating the file from `fallback` when the project has none
+ * that matches `file`.
+ */
+export function registerInConfig(
   ctx: HostContext,
-  plugins: Array<{ element: string; importLine: string; from: string; position?: 'first' | 'last' }>,
-  fallback: { path: string; content: string },
+  entries: ConfigEntry[],
+  o: { file: RegExp; fallback: { path: string; content: string }; property?: string },
 ): void {
-  const file = ctx.project.framework.configFile;
-  if (!file || !/vite\.config\./.test(file)) {
+  const candidates = [ctx.project.framework.configFile, ...(ctx.extraConfigFiles ?? [])].filter(
+    (f): f is string => Boolean(f) && o.file.test(f as string),
+  );
+  const file = candidates[0];
+  if (!file) {
     ctx.items.push({
-      path: fallback.path,
+      path: o.fallback.path,
       action: 'create',
-      reason: 'Vite config with HypDriv',
-      content: fallback.content,
+      reason: 'config with HypDriv',
+      content: o.fallback.content,
     });
     return;
   }
   let content = ctx.read(file);
   const reasons: string[] = [];
-  for (const p of plugins) {
+  for (const e of entries) {
+    const property = e.property ?? o.property ?? 'plugins';
     const r = addToConfigArray(content, {
-      property: 'plugins',
-      element: p.element,
-      importLine: p.importLine,
-      importFrom: p.from,
-      position: p.position ?? 'last',
+      property,
+      element: e.element,
+      importLine: e.importLine,
+      importFrom: e.from,
+      position: e.position ?? 'last',
     });
     if (!r.changed && /no exported config|could not parse/.test(r.reason)) {
       ctx.items.push({
         path: rel(ctx.project.root, file),
         action: 'manual',
         reason: r.reason,
-        hint: `${plugins.map((x) => x.importLine).join('\n')}\n// plugins: [${plugins.map((x) => x.element).join(', ')}]`,
+        hint: `${entries.map((x) => x.importLine).join('\n')}\n// ${property}: [${entries.map((x) => x.element).join(', ')}]`,
       });
       return;
     }
     if (r.changed) {
       content = r.content;
-      reasons.push(p.element);
+      reasons.push(e.element);
     }
   }
   ctx.items.push(
@@ -181,8 +199,37 @@ export function registerVitePlugins(
           reason: `register ${reasons.join(', ')}`,
           content,
         }
-      : { path: rel(ctx.project.root, file), action: 'skip', reason: 'plugins registered' },
+      : { path: rel(ctx.project.root, file), action: 'skip', reason: 'already registered' },
   );
+}
+
+/** Registers plugins in a `vite.config.*` (creating it when the project has none). */
+export function registerVitePlugins(
+  ctx: HostContext,
+  plugins: ConfigEntry[],
+  fallback: { path: string; content: string },
+): void {
+  registerInConfig(ctx, plugins, { file: /vite\.config\./, fallback, property: 'plugins' });
+}
+
+/** Creates (or checks) a Worker entry file. */
+export function planWorkerEntry(ctx: HostContext, main: string, template: string, uses: RegExp): void {
+  const entry = join(ctx.project.root, main);
+  if (!existsSync(entry))
+    ctx.items.push({
+      path: main.replace(/^\.\//, ''),
+      action: 'create',
+      reason: 'Worker entry: the HypDriv shell around the app (jobs, Durable Objects)',
+      content: template,
+    });
+  else if (!uses.test(readFileSync(entry, 'utf8')))
+    ctx.items.push({
+      path: main,
+      action: 'manual',
+      reason: 'existing Worker entry; wrap it with the HypDriv shell',
+      hint: template,
+    });
+  else ctx.items.push({ path: main, action: 'skip', reason: 'uses the HypDriv shell' });
 }
 
 /** Cloudflare wrangler settings for a host whose Worker entry is `main`. */
@@ -311,22 +358,7 @@ export const VITE_SPEC: HostSpec = {
     if (ctx.platform === 'cloudflare') {
       const configured = project.wrangler.config?.main ?? null;
       const main = configured ?? 'src/worker.ts';
-      const entry = join(project.root, main);
-      if (!existsSync(entry))
-        ctx.items.push({
-          path: main,
-          action: 'create',
-          reason: 'Worker in front of the static assets (HypDriv shell, Durable Objects)',
-          content: viteWorkerTemplate(),
-        });
-      else if (!/assetsWorker|createWorker/.test(readFileSync(entry, 'utf8')))
-        ctx.items.push({
-          path: main,
-          action: 'manual',
-          reason: 'existing Worker entry; serve the assets through HypDriv',
-          hint: viteWorkerTemplate(),
-        });
-      else ctx.items.push({ path: main, action: 'skip', reason: 'uses the HypDriv shell' });
+      planWorkerEntry(ctx, main, viteWorkerTemplate(), /assetsWorker|createWorker/);
       const spa = isSinglePageApp(project.root);
       planHostWrangler(ctx, {
         main: configured ? null : main,
@@ -351,9 +383,97 @@ export const VITE_SPEC: HostSpec = {
   }),
 };
 
+/** `src/worker.ts` for Astro on Cloudflare: the HypDriv shell around `@astrojs/cloudflare`'s handler. */
+export function astroWorkerTemplate(): string {
+  return `/// <reference types="@hypdriv/astro/virtual" />
+// HypDriv's Worker shell around Astro's Cloudflare handler: the pipeline runs for every request that reaches the
+// Worker (prerendered pages through env.ASSETS included); the HypDriv middleware inside Astro passes through.
+import config from 'virtual:hypdriv/config';
+import { handle } from '@astrojs/cloudflare/handler';
+import { createWorker } from '@hypdriv/cloudflare';
+
+export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects';
+
+type AstroHandle = (request: Request, env: unknown, ctx: unknown) => Promise<Response>;
+
+export default createWorker({
+  config,
+  manifest: () => import('virtual:hypdriv/manifest'),
+  app: async () => ({ fetch: (request, env, ctx) => (handle as AstroHandle)(request, env, ctx) }),
+});
+`;
+}
+
+export const ASTRO_SPEC: HostSpec = {
+  framework: 'astro',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/astro', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/astro', '@hypdriv/core'],
+  install: (platform) => ({
+    dependencies: [
+      platform === 'cloudflare'
+        ? '@astrojs/cloudflare'
+        : platform === 'vercel'
+          ? '@astrojs/vercel'
+          : '@astrojs/node',
+    ],
+    ...(platform === 'cloudflare' ? { devDependencies: ['wrangler', '@cloudflare/workers-types'] } : {}),
+  }),
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [{ element: 'hypdriv()', importLine: "import hypdriv from '@hypdriv/astro';", from: '@hypdriv/astro' }],
+      {
+        file: /astro\.config\./,
+        property: 'integrations',
+        fallback: {
+          path: 'astro.config.mjs',
+          content: `import hypdriv from '@hypdriv/astro';\nimport { defineConfig } from 'astro/config';\n\nexport default defineConfig({\n  integrations: [hypdriv()],\n});\n`,
+        },
+      },
+    );
+    const source = ctx.project.framework.configFile ? ctx.read(ctx.project.framework.configFile) : '';
+    if (!/\badapter\s*:/.test(source))
+      ctx.notes.push(
+        `Astro needs an adapter for on-demand rendering: ${ctx.platform === 'cloudflare' ? '`adapter: cloudflare()` (@astrojs/cloudflare)' : ctx.platform === 'vercel' ? '`adapter: vercel()` (@astrojs/vercel)' : "`adapter: node({ mode: 'standalone', staticHeaders: true })` (@astrojs/node)"} in astro.config.`,
+      );
+    if (ctx.platform === 'node' && !/staticHeaders\s*:\s*true/.test(source))
+      ctx.notes.push(
+        "@astrojs/node: set `staticHeaders: true` so prerendered pages are served with HypDriv's headers (dist/_headers.json).",
+      );
+    if (/security\s*:\s*\{[^}]*csp/.test(source))
+      ctx.notes.push(
+        "Astro's security.csp is on: Astro owns the policy and HypDriv's CSP stays off (one policy per response).",
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform !== 'cloudflare') return;
+    const configured = ctx.project.wrangler.config?.main ?? null;
+    const main = configured ?? './src/worker.ts';
+    planWorkerEntry(ctx, main, astroWorkerTemplate(), /createWorker/);
+    planHostWrangler(ctx, {
+      main: configured ? null : main,
+      durableObjects: true,
+      assets: JSON.stringify({
+        binding: 'ASSETS',
+        directory: './dist/client',
+        run_worker_first: ['/*', '!/_astro/*'],
+      }),
+      template: () =>
+        `{\n  "$schema": "node_modules/wrangler/config-schema.json",\n  "name": "${ctx.name}",\n  "main": "./src/worker.ts",\n  "compatibility_date": "${defaultCompatibilityDate(ctx.now)}",\n  "compatibility_flags": ["nodejs_compat"],\n  // HypDriv's Worker shell runs for every request except content-hashed assets, prerendered pages included.\n  "assets": { "binding": "ASSETS", "directory": "./dist/client", "run_worker_first": ["/*", "!/_astro/*"] },\n  "observability": { "enabled": true },\n  "durable_objects": { "bindings": ${JSON.stringify(HYPDRIV_DO)} },\n  "migrations": ${JSON.stringify(HYPDRIV_MIGRATION)}\n}\n`,
+    });
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '4321'}`,
+  }),
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
+  astro: ASTRO_SPEC,
 };
 
 /** The init plan for a Vite host. */
