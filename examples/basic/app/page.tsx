@@ -6,7 +6,7 @@ export default function Home() {
     <>
       <h1>Next.js 16 on Cloudflare Workers, hyper-extended.</h1>
       <p>
-        This page is fully static: HypDriv serves it with a hash-based strict CSP, Early Hints for its
+        This page is fully static: Hypdriv serves it with a hash-based strict CSP, Early Hints for its
         stylesheet and scripts, Speculation Rules for the links below, and an edge cache in front of OpenNext.
       </p>
       <Suspense fallback={<p className="card">Loading your region…</p>}>

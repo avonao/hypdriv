@@ -8,7 +8,7 @@ The tiered store (memory → Cache API → KV) passed every local test, but on a
 
 - **Isolates.** A purge runs in one isolate. The memory tier of every other isolate kept its copy for the entry's whole lifetime (TTL + SWR).
 - **Colos.** `cache.delete()` is local to one data centre. Cache API copies elsewhere survived; zone purges by tag could not reach them because the stored copies carried no `Cache-Tag`. `purgeUrls()` could not reach them either: the store keys are synthetic URLs, and only the base variant (no `Vary` dimensions) was deleted.
-- **Requests in flight.** A response requested before the purge and stored after it was indexed and kept. Next.js applies `revalidateTag()` / `revalidatePath()` *after* the Route Handler or Server Action returns (`pendingWaitUntil`), so a request arriving between HypDriv's purge and Next's commit received the old page from Next and re-cached it at the edge for the full TTL. On the live account, a purge issued about a second after the first store missed the entry entirely: the index write had not landed yet.
+- **Requests in flight.** A response requested before the purge and stored after it was indexed and kept. Next.js applies `revalidateTag()` / `revalidatePath()` *after* the Route Handler or Server Action returns (`pendingWaitUntil`), so a request arriving between Hypdriv's purge and Next's commit received the old page from Next and re-cached it at the edge for the full TTL. On the live account, a purge issued about a second after the first store missed the entry entirely: the index write had not landed yet.
 
 ## Decision
 

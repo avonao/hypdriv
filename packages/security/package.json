@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/security",
   "version": "0.1.0",
-  "description": "HypDriv security primitives: CSP autopilot, security headers, rate limiting, bot shield, safe actions, encrypted sessions, JWT, signing, webhooks, secrets scan.",
+  "description": "Hypdriv security primitives: CSP autopilot, security headers, rate limiting, bot shield, safe actions, encrypted sessions, JWT, signing, webhooks, secrets scan.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

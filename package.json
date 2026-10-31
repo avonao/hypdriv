@@ -2,7 +2,7 @@
   "name": "hypdriv-monorepo",
   "private": true,
   "version": "0.0.0",
-  "description": "HypDriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel.",
+  "description": "Hypdriv — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

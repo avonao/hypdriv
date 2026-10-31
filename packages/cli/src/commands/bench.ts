@@ -109,7 +109,7 @@ export const benchCommand = defineCommand({
     try {
       secretName = (await ctx.loadConfig()).resolved.security.internalAuth.secretEnv;
     } catch {
-      // bench works without a HypDriv config (any Next.js deployment); keep the default variable name.
+      // bench works without a Hypdriv config (any Next.js deployment); keep the default variable name.
     }
     const auth = await auditAuth({
       root: ctx.root,

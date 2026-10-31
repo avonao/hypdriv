@@ -40,7 +40,7 @@ import { type NuxtRuntimeOptions, VIRTUAL_CLOUDFLARE_EXPORTS, VIRTUAL_OPTIONS } 
 
 /** Options of the `@hypdriv/nuxt` module (`hypdriv: { … }` in `nuxt.config.ts`). */
 export interface ModuleOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
   config?: string | HypDrivConfig;
   /** Run the pipeline in `nuxt dev` (default true). */
   dev?: boolean;
@@ -56,15 +56,15 @@ export interface ModuleOptions {
   staticHeaders?: boolean;
   vercel?: {
     /**
-     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Nitro's function
+     * Run Hypdriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Nitro's function
      * (rate limiting, bot shield, maintenance, redirects, geo; default true).
      */
     middleware?: boolean;
   };
   cloudflare?: {
     /**
-     * Build the `cloudflare-module` Worker with HypDriv's entry: the HypDriv Worker shell (`createWorker`) around
-     * Nitro, with `scheduled` / `queue` / `email` dispatch and the HypDriv Durable Objects exported (default true).
+     * Build the `cloudflare-module` Worker with Hypdriv's entry: the Hypdriv Worker shell (`createWorker`) around
+     * Nitro, with `scheduled` / `queue` / `email` dispatch and the Hypdriv Durable Objects exported (default true).
      */
     worker?: boolean;
     /**
@@ -95,7 +95,7 @@ function withSlashes(path: string): string {
 }
 
 /**
- * `@hypdriv/nuxt` — runs the HypDriv Drivetrain around every Nitro response of a Nuxt 4 app and writes the build
+ * `@hypdriv/nuxt` — runs the Hypdriv Drivetrain around every Nitro response of a Nuxt 4 app and writes the build
  * manifest and the platform's static headers.
  *
  * ```ts
@@ -130,7 +130,7 @@ export default defineNuxtModule<ModuleOptions>({
     const loaded: LoadedHypConfig = await loadHypConfig(rootDir, options.config);
     const buildAssetsPath = withSlashes(`${nuxt.options.app.baseURL}/${nuxt.options.app.buildAssetsDir}`);
 
-    // Composables work in every mode (they return null when HypDriv did not handle the request).
+    // Composables work in every mode (they return null when Hypdriv did not handle the request).
     const composables = resolve('./runtime/composables');
     addImports([
       { name: 'useHyp', from: composables },
@@ -146,7 +146,7 @@ export default defineNuxtModule<ModuleOptions>({
     const exportsModule = options.cloudflare?.exports
       ? await resolvePath(options.cloudflare.exports, { cwd: rootDir })
       : null;
-    // The Worker entry: Nitro's polyfills first (module evaluation order), then HypDriv's Worker and the exports.
+    // The Worker entry: Nitro's polyfills first (module evaluation order), then Hypdriv's Worker and the exports.
     const workerEntry = addTemplate({
       filename: 'hypdriv/cloudflare-entry.mjs',
       write: true,
@@ -210,7 +210,7 @@ export default defineNuxtModule<ModuleOptions>({
         manifestModuleCode(state.result?.manifest ?? developmentManifest(framework(), routes()));
       config.virtual[VIRTUAL_OPTIONS] = () => `export default ${JSON.stringify(runtimeOptions())};\n`;
       config.virtual[VIRTUAL_CLOUDFLARE_EXPORTS] = () => cloudflareExportsCode(exportsModule);
-      // Bundle the runtime and HypDriv's packages: they import the virtual modules and Nitro's build constants.
+      // Bundle the runtime and Hypdriv's packages: they import the virtual modules and Nitro's build constants.
       config.externals ||= {};
       config.externals.inline ||= [];
       config.externals.inline.push(packageDir, '@hypdriv/');
@@ -227,7 +227,7 @@ export default defineNuxtModule<ModuleOptions>({
           own,
         ];
       }
-      // `nuxt dev` loads server dependencies from disk instead of bundling them: point HypDriv's packages at the
+      // `nuxt dev` loads server dependencies from disk instead of bundling them: point Hypdriv's packages at the
       // files this module resolves (the application need not depend on them directly).
       if (nuxt.options.dev) {
         config.alias ||= {};
@@ -305,7 +305,7 @@ export default defineNuxtModule<ModuleOptions>({
           });
         if (!out.embedded.length)
           log.warn(
-            'hypdriv: no server file embeds the runtime manifest; the HypDriv Nitro plugin is not part of this build',
+            'hypdriv: no server file embeds the runtime manifest; the Hypdriv Nitro plugin is not part of this build',
           );
         logger.info(
           `hypdriv: ${target()} output completed (final manifest in ${out.embedded.length} server file(s)${

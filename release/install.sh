@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # install.sh <app root>
 #
-# Installs HypDriv from this release bundle into a Node application: verifies the checksums, copies the 16 tarballs the
+# Installs Hypdriv from this release bundle into a Node application: verifies the checksums, copies the 16 tarballs the
 # application needs into <app root>/vendor/hypdriv/, and runs `npm install --save` on them. Safe to run again with the
-# tarballs of a newer bundle: tarballs of the same version are not re-read by npm ("up to date"), so the HypDriv entries
+# tarballs of a newer bundle: tarballs of the same version are not re-read by npm ("up to date"), so the Hypdriv entries
 # are cleared from node_modules and from package-lock.json first (every other lock entry is kept).
 #
-# Nothing is fetched from a registry for HypDriv itself (it is not on npm). Needs: bash, node >= 22.18, npm >= 10, and
+# Nothing is fetched from a registry for Hypdriv itself (it is not on npm). Needs: bash, node >= 22.18, npm >= 10, and
 # shasum or sha256sum. See docs/guides/production-cloudflare.md section 4.
 set -euo pipefail
 
@@ -38,10 +38,10 @@ mkdir -p "$APP/vendor/hypdriv"
 find "$APP/vendor/hypdriv" -maxdepth 1 -name 'hypdriv-*.tgz' -type f -delete
 for f in "${FILES[@]}"; do cp "$BUNDLE/tarballs/$f" "$APP/vendor/hypdriv/$f"; done
 if git -C "$APP" rev-parse --git-dir >/dev/null 2>&1 && git -C "$APP" check-ignore -q "vendor/hypdriv/hypdriv-$VERSION.tgz"; then
-  echo "install.sh: warning: git ignores vendor/hypdriv/*.tgz; CI cannot install HypDriv unless you commit them (git add -f)" >&2
+  echo "install.sh: warning: git ignores vendor/hypdriv/*.tgz; CI cannot install Hypdriv unless you commit them (git add -f)" >&2
 fi
 
-echo "== clear previous HypDriv entries (node_modules and package-lock.json)"
+echo "== clear previous Hypdriv entries (node_modules and package-lock.json)"
 rm -rf "$APP/node_modules/hypdriv" "$APP/node_modules/@hypdriv"
 if [ -f "$APP/package-lock.json" ]; then
   APP="$APP" node -e '

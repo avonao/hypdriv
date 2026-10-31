@@ -1,14 +1,14 @@
 import { flag, hypdrivContext, requireHyp } from '@hypdriv/react-router/server';
 import type { Route } from './+types/ssr';
 
-// Vercel function settings for this route (read by `@vercel/react-router`; HypDriv deploys it as its own function).
+// Vercel function settings for this route (read by `@vercel/react-router`; Hypdriv deploys it as its own function).
 export const config = { maxDuration: 15 };
 
 export function meta(_: Route.MetaArgs) {
-  return [{ title: 'Request facts · HypDriv × React Router' }];
+  return [{ title: 'Request facts · Hypdriv × React Router' }];
 }
 
-// Rendered per request inside the HypDriv request context: `hyp()` / `requireHyp()` anywhere on the server, or the
+// Rendered per request inside the Hypdriv request context: `hyp()` / `requireHyp()` anywhere on the server, or the
 // same view from the router context.
 export function loader({ context }: Route.LoaderArgs) {
   const request = requireHyp();

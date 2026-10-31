@@ -255,7 +255,7 @@ describe('createWorker fetch', () => {
 });
 
 describe('createWorker hardening', () => {
-  it('never forwards client-supplied HypDriv, nonce or middleware headers to Next.js', async () => {
+  it('never forwards client-supplied Hypdriv, nonce or middleware headers to Next.js', async () => {
     const next = fakeNext();
     const worker = createWorker({ config: {}, next: next.loader, manifest });
     await worker.fetch(

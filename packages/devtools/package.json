@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/devtools",
   "version": "0.1.0",
-  "description": "HypDriv DevTools HUD: an in-app panel that reads Server-Timing, Web Vitals, flags and Purser diagnostics.",
+  "description": "Hypdriv DevTools HUD: an in-app panel that reads Server-Timing, Web Vitals, flags and Purser diagnostics.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

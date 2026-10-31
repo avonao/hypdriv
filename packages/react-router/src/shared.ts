@@ -1,12 +1,12 @@
 import { timingSafeEqual } from '@hypdriv/core';
 
-/** The framework label HypDriv reports in logs, the manifest and `/_hypdriv/health`. */
+/** The framework label Hypdriv reports in logs, the manifest and `/_hypdriv/health`. */
 export const HOST = 'react-router';
 
-/** Build-time module with the prerender token (`prerenderToken`), served by the HypDriv Vite plugin. */
+/** Build-time module with the prerender token (`prerenderToken`), served by the Hypdriv Vite plugin. */
 export const VIRTUAL_REACT_ROUTER = 'virtual:hypdriv/react-router';
 
-/** HypDriv's SSR entry for Node and Vercel builds: the React Router server build plus a full-response handler. */
+/** Hypdriv's SSR entry for Node and Vercel builds: the React Router server build plus a full-response handler. */
 export const VIRTUAL_SERVER_ENTRY = 'virtual:hypdriv/react-router/server-entry';
 
 /**

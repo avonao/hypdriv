@@ -17,7 +17,7 @@ export interface UpstashOptions {
   url: string;
   /** REST token (`KV_REST_API_TOKEN` / `UPSTASH_REDIS_REST_TOKEN`). Sent as `Authorization: Bearer`, never logged. */
   token: string;
-  /** Key prefix for everything HypDriv writes (default `hypdriv:`, config `vercel.redis.prefix`). */
+  /** Key prefix for everything Hypdriv writes (default `hypdriv:`, config `vercel.redis.prefix`). */
   prefix?: string;
   fetch?: typeof fetch;
   /** Per-request timeout in milliseconds (default 5000). */
@@ -159,7 +159,7 @@ export type UpstashKv = KVNamespaceLike & {
 };
 
 /**
- * A `KVNamespaceLike` over Upstash's REST API (Vercel Marketplace Redis), usable wherever HypDriv takes a
+ * A `KVNamespaceLike` over Upstash's REST API (Vercel Marketplace Redis), usable wherever Hypdriv takes a
  * KV binding (cache store, tag index, flags, redirects, idempotency). Strongly consistent, unlike Workers
  * KV. Text is stored as-is; binary values are stored base64-encoded behind a type marker. `expirationTtl`
  * maps to `EX` (it wins over `expiration`, which maps to `EXAT`). Redis has no per-key metadata, so

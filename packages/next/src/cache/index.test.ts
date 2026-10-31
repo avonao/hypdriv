@@ -68,7 +68,7 @@ describe('revalidateTag / revalidatePath', () => {
   });
 });
 
-describe('scheduling outside a HypDriv request context', () => {
+describe('scheduling outside a Hypdriv request context', () => {
   it('keeps the repeat purge alive with the platform waitUntil (Vercel Functions)', async () => {
     const calls = fakePurger();
     const pending: Array<Promise<unknown>> = [];

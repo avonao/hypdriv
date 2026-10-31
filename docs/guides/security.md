@@ -1,10 +1,10 @@
 # Security
 
-HypDriv's security stages are on by default with conservative settings. This guide explains what each does, how to tune it, and what it cannot do.
+Hypdriv's security stages are on by default with conservative settings. This guide explains what each does, how to tune it, and what it cannot do.
 
 ## Content Security Policy
 
-Strict CSP (no host allow-lists for scripts, nonces or hashes only) has always been at odds with static rendering: nonces need per-request rendering, hashes break when content changes. HypDriv resolves this per route (ADR 0006):
+Strict CSP (no host allow-lists for scripts, nonces or hashes only) has always been at odds with static rendering: nonces need per-request rendering, hashes break when content changes. Hypdriv resolves this per route (ADR 0006):
 
 | Route class | On the Worker | On Node (`proxy.ts`) |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ On static routes the inline scripts Next.js emits are hashed at build time; any 
 
 The preset scores A+ on securityheaders.com: HSTS (2 years, `includeSubDomains`; add `preload: true` once every subdomain is https), `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` denying sensors, camera, microphone, geolocation, payment (allow with `permissionsPolicy: { camera: ['self'] }`), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Cross-Origin-Resource-Policy: same-site`, `X-Frame-Options: DENY` (mirrors `frame-ancestors`), `Origin-Agent-Cluster`. COEP is off by default because it breaks third-party embeds that lack CORP headers; enable `coep: 'credentialless'` when you need `SharedArrayBuffer`.
 
-Headers the application sets itself are preserved; HypDriv only fills gaps (and removes `X-Powered-By`).
+Headers the application sets itself are preserved; Hypdriv only fills gaps (and removes `X-Powered-By`).
 
 ## Rate limiting
 
@@ -57,7 +57,7 @@ Stores: memory (per isolate), Cache API (per colo, approximate, zero config — 
 
 ## Bot shield
 
-Verdicts: `human`, `verified` (Cloudflare verified bots or known search/social crawlers), `likely` (Bot Management score under the threshold, missing/odd headers), `definite` (headless/automation user agents, honeypot paths, blocked agents). Policies per verdict: `allow`, `log`, `challenge` (Turnstile page, then allow), `block` (403), `tarpit` (delay then 429). Defaults: verified → allow, likely → log, definite → block. Exempt patterns default to Next internals, HypDriv internals and `/api/webhooks/**`.
+Verdicts: `human`, `verified` (Cloudflare verified bots or known search/social crawlers), `likely` (Bot Management score under the threshold, missing/odd headers), `definite` (headless/automation user agents, honeypot paths, blocked agents). Policies per verdict: `allow`, `log`, `challenge` (Turnstile page, then allow), `block` (403), `tarpit` (delay then 429). Defaults: verified → allow, likely → log, definite → block. Exempt patterns default to Next internals, Hypdriv internals and `/api/webhooks/**`.
 
 `request.cf.botManagement` is used when your plan provides it; otherwise heuristics only. For `challenge` you need a Turnstile site key and secret. Site keys usually differ per environment (and Cloudflare's always-pass test keys are handy in CI), so read both from the environment instead of hard-coding the key:
 
@@ -95,7 +95,7 @@ export const createPost = safeAction({
 
 Results are `{ ok: true, data }` or `{ ok: false, error: { code, message, fieldErrors } }`; `redirect()`/`notFound()` still work. Any [Standard Schema](https://standardschema.dev) library (Zod 4, Valibot, ArkType) validates input. `defineRoute()` offers the same for Route Handlers plus query/body parsing, CORS preflight, weak ETags with `304` and cache headers.
 
-Remember Next's guidance: Server Functions are POST requests to the page's route, so a proxy matcher that excludes a path also excludes its actions. Authorise inside every action; HypDriv's stages are defence in depth, not the authorisation layer.
+Remember Next's guidance: Server Functions are POST requests to the page's route, so a proxy matcher that excludes a path also excludes its actions. Authorise inside every action; Hypdriv's stages are defence in depth, not the authorisation layer.
 
 ## Sessions, tokens and crypto
 
@@ -114,6 +114,6 @@ All WebCrypto; no Node-only dependencies at runtime.
 - **SRI**: `security.sri: true` turns on Turbopack's Subresource Integrity for scripts.
 - **CSP hashes** for static routes come from the prerendered HTML; the Worker also validates at runtime that a static route's HTML hash set matches the manifest build id.
 
-## What HypDriv does not replace
+## What Hypdriv does not replace
 
-Authentication and authorisation, input validation inside your handlers, dependency hygiene, database security and Cloudflare's own WAF/DDoS layers. HypDriv raises the floor; it is not the ceiling.
+Authentication and authorisation, input validation inside your handlers, dependency hygiene, database security and Cloudflare's own WAF/DDoS layers. Hypdriv raises the floor; it is not the ceiling.

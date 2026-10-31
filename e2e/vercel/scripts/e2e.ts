@@ -1,5 +1,5 @@
 /**
- * Live end-to-end suite for HypDriv on Vercel. Runs against a production deployment of this app (see
+ * Live end-to-end suite for Hypdriv on Vercel. Runs against a production deployment of this app (see
  * README.md) and verifies every capability through its public behaviour and the Vercel REST API.
  *
  *   E2E_URL=https://hypdriv-e2e-vercel.example.com \
@@ -517,7 +517,7 @@ const check = (c: Check) => checks.push(c);
 check({
   id: 'health',
   area: 'platform',
-  title: 'Health endpoint lists the Vercel services HypDriv detected',
+  title: 'Health endpoint lists the Vercel services Hypdriv detected',
   async run() {
     const { status, body } = await api('/_hypdriv/health');
     assert(status === 200, `status ${status}`);
@@ -620,7 +620,7 @@ check({
       else blocked.push(attrs.trim().slice(0, 60));
     }
     assert(!blocked.length, `${blocked.length} script(s) the policy blocks: ${blocked.join(' | ')}`);
-    return `${byNonce} by nonce · ${byHash} by hash (HypDriv-owned inline scripts)`;
+    return `${byNonce} by nonce · ${byHash} by hash (Hypdriv-owned inline scripts)`;
   },
 });
 
@@ -805,7 +805,7 @@ check({
 check({
   id: 'cdn-cache',
   area: 'cache',
-  title: 'Prerendered pages come from the Vercel CDN; HypDriv reports them as CDN',
+  title: 'Prerendered pages come from the Vercel CDN; Hypdriv reports them as CDN',
   async run() {
     const out: string[] = [];
     for (const path of ['/', '/tagged']) {
@@ -1154,7 +1154,7 @@ check({
       if (r.status === 429) limited = { headers: r.headers, body: r.body };
     }
     assert(limited, `no 429 in ${statuses.join(',')} · ${rule}`);
-    assert(limited.headers.get('retry-after'), 'Retry-After from the HypDriv policy');
+    assert(limited.headers.get('retry-after'), 'Retry-After from the Hypdriv policy');
     return `${statuses.join(',')} · ${rule}`;
   },
 });

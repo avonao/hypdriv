@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/sveltekit/server` — HypDriv's request helpers for server code below the `handle` hook: `load`
+ * `@hypdriv/sveltekit/server` — Hypdriv's request helpers for server code below the `handle` hook: `load`
  * functions, form actions, `+server` endpoints, remote functions and server-rendered components.
  *
  * ```ts

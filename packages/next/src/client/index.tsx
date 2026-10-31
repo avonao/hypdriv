@@ -11,7 +11,7 @@ export interface VitalsReporterProps {
 }
 
 /**
- * Reports Core Web Vitals to HypDriv's collector (`/_hypdriv/vitals`). Place it once in the root layout.
+ * Reports Core Web Vitals to Hypdriv's collector (`/_hypdriv/vitals`). Place it once in the root layout.
  * Uses `@hypdriv/observe/client`, which prefers the `web-vitals` library when installed.
  */
 export function VitalsReporter(props: VitalsReporterProps = {}): null {
@@ -47,7 +47,7 @@ const LazyDevTools = lazy(() =>
   import('@hypdriv/devtools').then((m) => ({ default: m.HypDrivDevTools as ComponentType<DevToolsProps> })),
 );
 
-/** The HypDriv DevTools HUD, loaded lazily and only outside production unless `force` is set. */
+/** The Hypdriv DevTools HUD, loaded lazily and only outside production unless `force` is set. */
 export function HypDrivDevTools(props: DevToolsProps = {}): ReactElement | null {
   const enabled = props.force || process.env.NODE_ENV !== 'production';
   if (!enabled) return null;

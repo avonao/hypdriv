@@ -1,7 +1,7 @@
 /**
- * `@hypdriv/vinext` — HypDriv for vinext, Cloudflare's Vite implementation of the Next.js API. `hypdriv()` is
+ * `@hypdriv/vinext` — Hypdriv for vinext, Cloudflare's Vite implementation of the Next.js API. `hypdriv()` is
  * the Vite plugin (request hook around vinext's App Router handler, build manifest, static headers per
- * platform); `withHypDrivCache()` keeps HypDriv's edge cache in step with `revalidateTag()`.
+ * platform); `withHypDrivCache()` keeps Hypdriv's edge cache in step with `revalidateTag()`.
  *
  * Runtime entry points: `@hypdriv/vinext/server` (`hyp()`, `nonce()`, `flag()`…), `@hypdriv/vinext/worker`
  * (the Cloudflare Worker entry with `scheduled` / `queue` / Durable Objects), `@hypdriv/vinext/proxy`

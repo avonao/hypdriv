@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { PRERENDER_HEADER } from '../constants';
 
-/** Prerender options of TanStack Start (global or per page) that HypDriv reads or sets. */
+/** Prerender options of TanStack Start (global or per page) that Hypdriv reads or sets. */
 export interface StartPrerenderOptionsLike {
   enabled?: boolean;
   autoSubfolderIndex?: boolean;
@@ -9,7 +9,7 @@ export interface StartPrerenderOptionsLike {
   outputPath?: string;
 }
 
-/** The subset of `tanstackStart()` options HypDriv reads (route discovery, prerendering, server functions). */
+/** The subset of `tanstackStart()` options Hypdriv reads (route discovery, prerendering, server functions). */
 export interface StartOptionsLike {
   srcDirectory?: string;
   router?: {
@@ -33,7 +33,7 @@ export interface StartOptionsLike {
 export interface StartRegistration {
   /** The random per-build token Start's prerender requests carry in `x-hypdriv-prerender`. */
   token: string;
-  /** The Start options as the application wrote them (before HypDriv's additions). */
+  /** The Start options as the application wrote them (before Hypdriv's additions). */
   options: StartOptionsLike;
 }
 
@@ -74,7 +74,7 @@ function withToken(prerender: StartPrerenderOptionsLike | undefined, token: stri
 }
 
 /**
- * Prepares TanStack Start's options for HypDriv; wrap the object you pass to `tanstackStart()`:
+ * Prepares TanStack Start's options for Hypdriv; wrap the object you pass to `tanstackStart()`:
  *
  * ```ts
  * tanstackStart(withHypDriv({ prerender: { enabled: true }, pages: [{ path: '/about' }] }))
@@ -82,7 +82,7 @@ function withToken(prerender: StartPrerenderOptionsLike | undefined, token: stri
  *
  * - **Prerender requests are marked.** Every prerender request carries a random per-build token
  *   (`x-hypdriv-prerender`; also on pages and the SPA shell with their own `headers`, which replace Start's
- *   global ones), so the HypDriv middleware lets Start render the static document untouched — no per-request
+ *   global ones), so the Hypdriv middleware lets Start render the static document untouched — no per-request
  *   nonce, request id or flag baked into a file served to everyone. The build removes the token from the server
  *   output afterwards.
  * - **Prerendered pages are written as `about.html`** (`prerender.autoSubfolderIndex: false`, unless you set it):

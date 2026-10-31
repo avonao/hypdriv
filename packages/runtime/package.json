@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/runtime",
   "version": "0.1.0",
-  "description": "HypDriv's framework-neutral runtime: the Drivetrain stages, the platform assembly and a request handler that wraps any Web fetch handler on Cloudflare Workers, Vercel and Node.",
+  "description": "Hypdriv's framework-neutral runtime: the Drivetrain stages, the platform assembly and a request handler that wraps any Web fetch handler on Cloudflare Workers, Vercel and Node.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

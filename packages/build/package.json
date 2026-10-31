@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/build",
   "version": "0.1.0",
-  "description": "HypDriv's framework-neutral build engine: route manifest, CSP hashes, Early Hints, speculation graph, Purser verification, secrets scan and budgets for Next.js and Vite builds.",
+  "description": "Hypdriv's framework-neutral build engine: route manifest, CSP hashes, Early Hints, speculation graph, Purser verification, secrets scan and budgets for Next.js and Vite builds.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

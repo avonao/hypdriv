@@ -81,7 +81,7 @@ export function isSameOrigin(a: URL | string, b: URL | string): boolean {
   return x.origin === y.origin;
 }
 
-/** `true` for paths that are Next.js internal assets or HypDriv internals. */
+/** `true` for paths that are Next.js internal assets or Hypdriv internals. */
 export function isInternalPath(pathname: string, internalPrefix = '/_hypdriv'): boolean {
   return (
     pathname.startsWith('/_next/') || pathname.startsWith(`${internalPrefix}/`) || pathname === internalPrefix

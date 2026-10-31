@@ -1,6 +1,6 @@
 # @hypdriv/cloudflare
 
-The HypDriv Worker shell for [OpenNext](https://opennext.js.org/cloudflare) on Cloudflare Workers. It becomes your Worker entry, wraps `.open-next/worker.js` with the Drivetrain pipeline, answers HypDriv's internal routes and adds the `scheduled`, `queue`, `email` and `tail` handlers. It ships the `HypDrivLimiter` and `HypDrivIndex` Durable Objects and re-exports `HypDrivChannel` from `@hypdriv/live`.
+The Hypdriv Worker shell for [OpenNext](https://opennext.js.org/cloudflare) on Cloudflare Workers. It becomes your Worker entry, wraps `.open-next/worker.js` with the Drivetrain pipeline, answers Hypdriv's internal routes and adds the `scheduled`, `queue`, `email` and `tail` handlers. It ships the `HypDrivLimiter` and `HypDrivIndex` Durable Objects and re-exports `HypDrivChannel` from `@hypdriv/live`.
 
 ## Setup
 
@@ -25,7 +25,7 @@ export default createWorker({
 
 | Option | Description |
 | --- | --- |
-| `config` | HypDriv config (input or resolved) |
+| `config` | Hypdriv config (input or resolved) |
 | `next` | `() => import('./.open-next/worker.js')` |
 | `manifest` | the build manifest or a loader; a missing manifest degrades to generic behaviour with a warning |
 | `stages` | `Stage[]` or `(defaults, platform) => Stage[]` |
@@ -33,7 +33,7 @@ export default createWorker({
 | `development` | force development behaviour (dev endpoints); default from `NODE_ENV`/`NEXTJS_ENV` or a localhost URL |
 | `devState` | extra state for the DevTools endpoints |
 
-Per request the shell creates the HypDriv context (geo from `request.cf`, client IP, request id), runs it through `AsyncLocalStorage` so `hyp()` and `enqueue()` see it inside Next.js, answers `/_hypdriv/*`, runs the stages around Next.js and, when Next throws, serves a stale cached copy if the route's policy allows `stale-if-error`.
+Per request the shell creates the Hypdriv context (geo from `request.cf`, client IP, request id), runs it through `AsyncLocalStorage` so `hyp()` and `enqueue()` see it inside Next.js, answers `/_hypdriv/*`, runs the stages around Next.js and, when Next throws, serves a stale cached copy if the route's policy allows `stale-if-error`.
 
 ### Bindings it detects
 

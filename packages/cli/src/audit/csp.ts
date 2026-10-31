@@ -102,7 +102,7 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
 
   if (!sources.length)
     findings.push({ level: 'fail', message: 'policy has neither script-src nor default-src' });
-  // HypDriv declares its documented fallback for cached HTML (ISR / PPR shells) on runtimes that cannot inject
+  // Hypdriv declares its documented fallback for cached HTML (ISR / PPR shells) on runtimes that cannot inject
   // a nonce into a cached body (proxy.ts on Node and Vercel): a known trade-off, not a misconfiguration.
   const declaredFallback = input.headers.get('x-hypdriv-csp') === 'unsafe-inline-fallback';
   if (lower.includes("'unsafe-inline'") && !nonce && !hashes.length)
@@ -150,7 +150,7 @@ export function auditCsp(input: CspAuditInput, options: CspAuditOptions = {}): C
     if (mode === 'nonce') {
       const missing = executable.filter((t) => t.attrs.nonce !== nonce);
       scripts.withNonce = executable.length - missing.length;
-      // CSP3: inline scripts listed by hash run alongside nonces and 'strict-dynamic' (HypDriv's
+      // CSP3: inline scripts listed by hash run alongside nonces and 'strict-dynamic' (Hypdriv's
       // speculation rules and theme script are allowed this way).
       const allowedHashes = new Set(hashes.filter((h) => h.startsWith('sha256-')).map((h) => h.slice(7)));
       const missingInline = missing.filter(

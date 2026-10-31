@@ -1,6 +1,6 @@
 # hypdriv
 
-**HypDriv** — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel. This umbrella package installs every HypDriv module and the `hypdriv` command.
+**Hypdriv** — the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel. This umbrella package installs every Hypdriv module and the `hypdriv` command.
 
 ```sh
 npm create hypdriv@latest my-app                       # new app on Cloudflare Workers (OpenNext)
@@ -47,4 +47,4 @@ export default createWorker({
 
 [Getting started](../../docs/guides/getting-started.md) · [Configuration](../../docs/guides/configuration.md) · [Architecture](../../docs/architecture.md) · [Feature catalog](../../docs/feature-catalog.md)
 
-MIT © Avonao, Inc. and HypDriv contributors
+MIT © Avonao, Inc. and Hypdriv contributors

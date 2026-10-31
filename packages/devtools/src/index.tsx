@@ -167,7 +167,7 @@ function usePrefersDark(): boolean {
 }
 
 /**
- * The HypDriv HUD: a floating pill that opens a panel with Request (Server-Timing per stage), Vitals,
+ * The Hypdriv HUD: a floating pill that opens a panel with Request (Server-Timing per stage), Vitals,
  * Navigation (RSC fetch timings), Flags, Purser, Build and Capabilities tabs. Pure React 19, inline
  * styles, no endpoints required for the first four tabs (ADR 0008); `<endpoint>/purser` and
  * `<endpoint>/state` are optional dev routes. Render it only in development/preview — `@hypdriv/next`
@@ -341,9 +341,9 @@ export function HypDrivDevTools({
       <button
         type="button"
         data-hypdriv-devtools="pill"
-        aria-label={`Open HypDriv DevTools${hotkeyLabel ? ` (${hotkeyLabel})` : ''}`}
+        aria-label={`Open Hypdriv DevTools${hotkeyLabel ? ` (${hotkeyLabel})` : ''}`}
         aria-expanded={false}
-        title={hotkeyLabel ? `HypDriv DevTools · ${hotkeyLabel}` : 'HypDriv DevTools'}
+        title={hotkeyLabel ? `Hypdriv DevTools · ${hotkeyLabel}` : 'Hypdriv DevTools'}
         onClick={toggle}
         style={pillStyle(theme, position)}
       >
@@ -351,7 +351,7 @@ export function HypDrivDevTools({
           aria-hidden="true"
           style={{ width: 8, height: 8, borderRadius: 999, background: lcpColor, display: 'inline-block' }}
         />
-        <strong style={{ fontWeight: 600 }}>HypDriv</strong>
+        <strong style={{ fontWeight: 600 }}>Hypdriv</strong>
         {summary.total !== null ? (
           <span style={mutedStyle(theme)}>
             {summary.total < 10 ? summary.total.toFixed(1) : Math.round(summary.total)} ms
@@ -377,20 +377,20 @@ export function HypDrivDevTools({
       ref={panelRef}
       data-hypdriv-devtools="panel"
       role="dialog"
-      aria-label="HypDriv DevTools"
+      aria-label="Hypdriv DevTools"
       aria-modal={false}
       onKeyDown={onPanelKeyDown}
       style={panelStyle(theme, position)}
     >
       <div style={headerStyle(theme)}>
-        <strong style={{ fontWeight: 600 }}>HypDriv DevTools</strong>
+        <strong style={{ fontWeight: 600 }}>Hypdriv DevTools</strong>
         {data.build.build ? <span style={chipStyle(theme)}>build {data.build.build}</span> : null}
         {data.build.runner ? <span style={chipStyle(theme, 'info')}>{data.build.runner}</span> : null}
         <span style={{ flex: 1 }} />
         {hotkeyLabel ? <span style={mutedStyle(theme)}>{hotkeyLabel}</span> : null}
         <button
           type="button"
-          aria-label="Close HypDriv DevTools"
+          aria-label="Close Hypdriv DevTools"
           onClick={toggle}
           style={iconButtonStyle(theme)}
         >

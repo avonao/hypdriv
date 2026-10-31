@@ -6,7 +6,7 @@ export interface VercelCron {
   schedule: string;
 }
 
-/** The subset of `vercel.json` / `vercel.ts` HypDriv inspects. */
+/** The subset of `vercel.json` / `vercel.ts` Hypdriv inspects. */
 export interface VercelConfig {
   crons: VercelCron[];
   /** Top-level function regions (`["iad1"]`). */
@@ -20,7 +20,7 @@ export interface VercelConfig {
   raw: Record<string, unknown>;
 }
 
-/** US regions, in the order HypDriv recommends them (US-first default: `iad1`). */
+/** US regions, in the order Hypdriv recommends them (US-first default: `iad1`). */
 export const VERCEL_US_REGIONS = ['iad1', 'cle1', 'pdx1', 'sfo1'];
 export const VERCEL_DEFAULT_REGION = 'iad1';
 /** Vercel Functions: maximum uncompressed bundle size, layers included. */

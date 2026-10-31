@@ -1,8 +1,8 @@
-# HypDriv Preview — status
+# Hypdriv Preview — status
 
 _Release: 0.1.0 (Preview) · verified 2026-10-31_
 
-HypDriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](feature-catalog.md) is implemented in this repository and exercised by the test suites and the live runs below. APIs, configuration keys and the manifest format can still change before 1.0 (see [`roadmap.md`](roadmap.md)).
+Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](feature-catalog.md) is implemented in this repository and exercised by the test suites and the live runs below. APIs, configuration keys and the manifest format can still change before 1.0 (see [`roadmap.md`](roadmap.md)).
 
 ## Components
 

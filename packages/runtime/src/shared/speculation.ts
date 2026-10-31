@@ -9,7 +9,7 @@ export interface SpeculationRules {
 }
 
 function patternToHrefMatch(pattern: string, basePath: string): string {
-  // Speculation Rules use URLPattern syntax; HypDriv patterns map onto it closely.
+  // Speculation Rules use URLPattern syntax; Hypdriv patterns map onto it closely.
   let p = pattern
     .replace(/\\\?/g, '?')
     .replace(/\*\*/g, '*')

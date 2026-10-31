@@ -1,7 +1,7 @@
 import { hyp } from '@hypdriv/vinext/server';
 import { Counter } from '../counter';
 
-// `hyp()` reads the request HypDriv is handling, so (like `headers()`) it renders this page per request.
+// `hyp()` reads the request Hypdriv is handling, so (like `headers()`) it renders this page per request.
 export default function Dynamic() {
   const context = hyp();
   const newHero = context?.flag('newHero', false) ?? false;

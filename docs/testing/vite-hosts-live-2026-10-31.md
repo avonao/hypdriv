@@ -1,10 +1,10 @@
 # Live test of the Vite hosts — 2026-10-31
 
-HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4 and vinext — each deployed from its example app to **Cloudflare Workers** (a Cloudflare account) and **Vercel** (Hobby team), US-first: requests reached Cloudflare through IAD/CMH and Vercel functions run in `iad1`. Every resource is named `hypdriv-dev-<framework>`; Workers carry the `hypdriv-dev` tag, Vercel deployments the `tag=hypdriv-dev` meta. Account tokens were used from the operator's shell only and never reached a deployment.
+Hypdriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4 and vinext — each deployed from its example app to **Cloudflare Workers** (a Cloudflare account) and **Vercel** (Hobby team), US-first: requests reached Cloudflare through IAD/CMH and Vercel functions run in `iad1`. Every resource is named `hypdriv-dev-<framework>`; Workers carry the `hypdriv-dev` tag, Vercel deployments the `tag=hypdriv-dev` meta. Account tokens were used from the operator's shell only and never reached a deployment.
 
 **Every deployment is private.**
 
-- **Cloudflare:** custom domains `hypdriv-dev-<framework>.example-zone.dev` with `workers.dev` and preview URLs off, provisioned by `pnpm -F @hypdriv/e2e-hosts provision cloudflare`. The zone keeps two rules for all private HypDriv hosts (the Free plan allows five custom rules): a WAF custom rule that blocks HTTPS requests without the gate header or cookie, and a Redirect Rule that sends plain HTTP to https before anything answers. Anonymous requests get `403` over HTTPS and `308 → https` over HTTP.
+- **Cloudflare:** custom domains `hypdriv-dev-<framework>.example-zone.dev` with `workers.dev` and preview URLs off, provisioned by `pnpm -F @hypdriv/e2e-hosts provision cloudflare`. The zone keeps two rules for all private Hypdriv hosts (the Free plan allows five custom rules): a WAF custom rule that blocks HTTPS requests without the gate header or cookie, and a Redirect Rule that sends plain HTTP to https before anything answers. Anonymous requests get `403` over HTTPS and `308 → https` over HTTP.
 - **Vercel:** `ssoProtection: all` on every project, plus an automation bypass per project for tooling (`provision vercel`). Anonymous requests get Vercel's login redirect (`302`).
 
 ## What ran
@@ -12,11 +12,11 @@ HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack 
 | Framework | Cloudflare (Worker) | Vercel (prebuilt from the repository root) |
 | --- | --- | --- |
 | Vite (SPA) | `assetsWorker()` in front of Workers Static Assets, `run_worker_first` for navigations | Build Output written by `@hypdriv/vite`: static files, header routes, Routing Middleware, an `api/` function |
-| React Router 8 | `reactRouterWorker()` (assets first) | Build Output written by HypDriv: one traced function per server bundle, Routing Middleware scoped to prerendered pages |
+| React Router 8 | `reactRouterWorker()` (assets first) | Build Output written by Hypdriv: one traced function per server bundle, Routing Middleware scoped to prerendered pages |
 | TanStack Start | `createStartWorker()` (assets first), `run_worker_first` | Nitro `vercel` preset + header routes + prerender middleware |
 | Astro 7 | Worker shell around `@astrojs/cloudflare`'s handler | `@astrojs/vercel` + header routes + prerender middleware |
 | SvelteKit 3 | Worker shell around adapter-cloudflare, `run_worker_first` | adapter-vercel + header routes + prerender middleware |
-| Nuxt 4 | HypDriv's Worker entry around Nitro `cloudflare-module`, `run_worker_first` | Nitro `vercel` preset + header routes + prerender middleware |
+| Nuxt 4 | Hypdriv's Worker entry around Nitro `cloudflare-module`, `run_worker_first` | Nitro `vercel` preset + header routes + prerender middleware |
 | vinext | `createVinextWorker()`, pages packaged by `staticAssetsAdapter()` | Nitro `vercel` preset, prerendered pages copied to the CDN + prerender middleware |
 
 ## Results
@@ -35,14 +35,14 @@ HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack 
 **Prerendered pages run the request stages on both platforms.** A `curl` user agent on a prerendered page gets `403` from:
 
 - the Worker shell on Cloudflare (`run_worker_first`; the page is still served as built with its hash CSP);
-- HypDriv's Routing Middleware on Vercel, scoped to exactly the prerendered documents (`GET`/`HEAD`). On-demand routes run the pipeline once, in the function.
+- Hypdriv's Routing Middleware on Vercel, scoped to exactly the prerendered documents (`GET`/`HEAD`). On-demand routes run the pipeline once, in the function.
 
 **`hypdriv audit all` (headers, CSP, cache, HTTPS) passed on all 14.** On every deployment:
 
 - pages graded A+; JSON API routes graded A with no CSP required;
 - every inline script was covered by the page's hash or nonce;
 - prerendered documents were reported as served by the platform's static layer: Workers Static Assets, or Vercel CDN `HIT`;
-- vinext's prerendered pages were edge-cached by HypDriv on Cloudflare, following vinext's own `s-maxage`;
+- vinext's prerendered pages were edge-cached by Hypdriv on Cloudflare, following vinext's own `s-maxage`;
 - pages, `/_hypdriv/health` and a hashed asset all redirected from `http://` to https.
 
 **Feature flags by country:** `newHero` (rule: country US) rendered `true` on Vercel and Cloudflare after the geo fix below.
@@ -58,13 +58,13 @@ HypDriv on seven Vite-based frameworks — plain Vite, React Router 8, TanStack 
 | 1 | high | Without `site.origin`, `redirects.forceHttps: 'auto'` was off: Cloudflare custom domains served pages over plain HTTP with an HSTS header. | `auto` is on for Cloudflare and Vercel deployments when no origin is set (their edge terminates TLS); an explicit origin still decides, Node keeps plain HTTP unless configured. |
 | 2 | high | Workers Static Assets answer before the Worker, so content-hashed assets (and prerendered pages without `run_worker_first`) were reachable over plain HTTP on the private hosts. | The zone Redirect Rule for gated hosts. New `hypdriv audit https` probes pages, `/_hypdriv/health` and a hashed asset over `http://` anonymously, and names the zone setting when assets are served over HTTP. |
 | 3 | high | Country rules of feature flags never matched on Vercel and Node: the flags stage read geo only from Cloudflare's `request.cf`. This affected Next.js on Vercel too. | The stage falls back to the platform's geo headers (`x-vercel-ip-*`, `cf-ipcountry`). |
-| 4 | high | Prerendered pages on Vercel and on Cloudflare without the shell carried static headers only: no rate limit, bot shield or maintenance. | HypDriv's Routing Middleware scoped to prerendered documents on Vercel (`addVercelMiddleware()`, every integration). `run_worker_first` + assets-first Workers for TanStack Start and Nuxt on Cloudflare. |
+| 4 | high | Prerendered pages on Vercel and on Cloudflare without the shell carried static headers only: no rate limit, bot shield or maintenance. | Hypdriv's Routing Middleware scoped to prerendered documents on Vercel (`addVercelMiddleware()`, every integration). `run_worker_first` + assets-first Workers for TanStack Start and Nuxt on Cloudflare. |
 | 5 | high | The bundled Vercel middleware resolved its runtime from the application, so framework apps without a direct `@hypdriv/vite` dependency failed to build. | The bundle resolves `@hypdriv/vite/vercel-middleware` from the package itself. |
 | 6 | high | `@hypdriv/runtime`'s `import('cloudflare:workers')` was folded into a literal, which broke Node and Vercel bundles (Rolldown, Vercel's file tracer). | The specifier is computed at run time; a workerd test proves bindings still resolve. |
 | 7 | high | srvx's lazy `Request` look-alikes (Nitro Node presets, `@vitejs/plugin-rsc`) made `new Request(input, init)` throw, so every page returned 500 on Node. | `withRequestHeaders()` in core unwraps or rebuilds them. |
 | 8 | medium | Framework SSR documents carrying a per-request nonce had no `Cache-Control`. | The CSP stage sets `private, no-cache` when the application sets none. |
 | 9 | medium | Early Hints and static `Link` headers announced ES modules as `preload; as=script`, which downloads them twice. | `modulepreload` for Vite builds. |
-| 10 | medium | `_headers` from frameworks that cache their own hashed assets (vinext) joined with HypDriv's rule into `public, …, immutable, public, …, immutable`. | Static rules leave headers that existing rules set for the same path. |
+| 10 | medium | `_headers` from frameworks that cache their own hashed assets (vinext) joined with Hypdriv's rule into `public, …, immutable, public, …, immutable`. | Static rules leave headers that existing rules set for the same path. |
 | 11 | medium | Prerendered dynamic routes (`/blog/[slug]` with all paths prerendered) got an inferred edge-cache policy on top of the platform's cache, and the audit expected HITs. | `HypRoute.servedStatically` for routes the static layer serves, by classification. Neither the runtime nor the build infers a policy for them. |
 | 12 | medium | The SPA fallback on Vercel answered unknown `/api/*` paths with the HTML shell. | The fallback excludes `/api/*`; zero-config `api/` functions deploy alongside the Build Output. |
 | 13 | low | The cache audit expected `Vary: rsc` outside Next.js and flagged CDN-served prerendered pages. The CSP audit expected policies on JSON endpoints. | Framework-aware and endpoint-aware audits. |

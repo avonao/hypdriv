@@ -1,6 +1,6 @@
 # Roadmap
 
-HypDriv ships complete capabilities; this roadmap lists the next complete capabilities, not partial steps toward the current ones.
+Hypdriv ships complete capabilities; this roadmap lists the next complete capabilities, not partial steps toward the current ones.
 
 ## 0.1 — initial public release
 

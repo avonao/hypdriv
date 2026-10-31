@@ -2,7 +2,7 @@
 import { hyp } from '@hypdriv/astro/server';
 import Layout from '../layouts/Layout.astro';
 
-// Rendered on demand when a route throws. Astro runs the middleware again for this page; HypDriv applies the
+// Rendered on demand when a route throws. Astro runs the middleware again for this page; Hypdriv applies the
 // response stages (headers, CSP) to it without counting the request against rate limits twice.
 export const prerender = false;
 const ctx = hyp();

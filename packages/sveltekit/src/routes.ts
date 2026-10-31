@@ -13,7 +13,7 @@ export interface SvelteKitRouteLike {
   config?: unknown;
 }
 
-/** A SvelteKit route id converted to HypDriv's canonical pattern syntax. */
+/** A SvelteKit route id converted to Hypdriv's canonical pattern syntax. */
 export interface SvelteKitPattern {
   pathname: string;
   /**
@@ -112,7 +112,7 @@ export interface RoutesFromBuilderInput {
 }
 
 /**
- * Converts `builder.routes` into HypDriv routes. A route with a page is a `page` (a `+server` next to it answers
+ * Converts `builder.routes` into Hypdriv routes. A route with a page is a `page` (a `+server` next to it answers
  * non-HTML requests of the same URL); one with only `+server` is an `endpoint`. `prerender = true` routes are
  * prerendered; `'auto'` routes are classified by the documents the build produced. adapter-vercel's
  * `config.isr` marks a route as regenerated in the background (`isr`).

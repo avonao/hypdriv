@@ -26,7 +26,7 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => new Promise((r) => s.close(r))));
 });
 
-/** A Nitro app (h3 app + error handler) with the HypDriv plugin applied, served over HTTP. */
+/** A Nitro app (h3 app + error handler) with the Hypdriv plugin applied, served over HTTP. */
 async function nitro() {
   const facts: Record<string, HypEventContext | undefined> = {};
   const errors: H3ErrorLike[] = [];
@@ -71,7 +71,7 @@ async function nitro() {
   return { get, facts, errors };
 }
 
-describe('the HypDriv Nitro plugin', () => {
+describe('the Hypdriv Nitro plugin', () => {
   it('wraps the h3 app with the build’s config, manifest and options', async () => {
     const { get, facts } = await nitro();
     const response = await get('/page');

@@ -1,6 +1,6 @@
-# HypDriv live suite for Cloudflare
+# Hypdriv live suite for Cloudflare
 
-A Next.js 16 app with every HypDriv capability switched on, each backed by the binding that upgrades it, plus a runner (`scripts/e2e.ts`) that verifies them against a real Cloudflare account. Unit tests and `wrangler dev` cannot show what only production shows: colos and isolates, the Cache API on a zone, zone purges, Queues retries and dead letters, cron triggers, Analytics Engine ingestion, Workers Observability, tail consumers, 103 Early Hints, image resizing and Turnstile.
+A Next.js 16 app with every Hypdriv capability switched on, each backed by the binding that upgrades it, plus a runner (`scripts/e2e.ts`) that verifies them against a real Cloudflare account. Unit tests and `wrangler dev` cannot show what only production shows: colos and isolates, the Cache API on a zone, zone purges, Queues retries and dead letters, cron triggers, Analytics Engine ingestion, Workers Observability, tail consumers, 103 Early Hints, image resizing and Turnstile.
 
 ## What it checks (43)
 
@@ -45,7 +45,7 @@ Queue names must end in `-e2e-jobs` / `-e2e-jobs-dlq`: the app maps them with wi
 
 ### Optional checks
 
-- **Tail consumer.** Add `"tail_consumers": [{ "service": "<prefix>-e2e" }]` to another HypDriv Worker and set `E2E_TAIL_PRODUCER_URL` to its URL.
+- **Tail consumer.** Add `"tail_consumers": [{ "service": "<prefix>-e2e" }]` to another Hypdriv Worker and set `E2E_TAIL_PRODUCER_URL` to its URL.
 - **Turnstile pass flow.** Switch the deployment to Cloudflare's always-pass test keys, run the browser check, switch back — a secret change, no redeploy, because the app reads the site key from `TURNSTILE_SITE_KEY` (`siteKeyEnv`):
 
   ```sh

@@ -44,7 +44,7 @@ describe('hypdriv() Vite plugin', () => {
     return { host: host!, plugin: plugin! };
   }
 
-  it('makes HypDriv’s server entry the SSR entry of Node and Vercel builds', () => {
+  it('makes Hypdriv’s server entry the SSR entry of Node and Vercel builds', () => {
     for (const target of ['node', 'vercel'] as const) {
       const { plugin } = build(target);
       const ssr = {
@@ -101,7 +101,7 @@ describe('hypdriv() Vite plugin', () => {
     expect(middlewares).toHaveLength(1);
     const prerender = {
       headers: { 'x-react-router-prerender': 'yes', [PRERENDER_HEADER]: 'spoofed' } as Record<string, string>,
-      rawHeaders: ['X-React-Router-Prerender', 'yes', 'X-HypDriv-Prerender', 'spoofed'],
+      rawHeaders: ['X-React-Router-Prerender', 'yes', 'X-Hypdriv-Prerender', 'spoofed'],
     };
     let nexts = 0;
     middlewares[0]!(prerender, {}, () => nexts++);

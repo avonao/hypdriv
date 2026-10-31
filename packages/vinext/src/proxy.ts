@@ -10,14 +10,14 @@ import { NextResponse } from 'vinext/shims/server';
 import { isBuildPrerender } from './runtime';
 
 /**
- * `@hypdriv/vinext/proxy` — HypDriv as vinext routing middleware (`proxy.ts`), for apps the plugin's request
+ * `@hypdriv/vinext/proxy` — Hypdriv as vinext routing middleware (`proxy.ts`), for apps the plugin's request
  * hook cannot wrap: Pages Router apps served by `vinext start` or Nitro. The Drivetrain runs before vinext
  * (`runner: 'proxy'`): security headers, CSP (vinext applies the nonce to its scripts from the forwarded
  * policy), rate limiting, the bot shield, geo, flags, redirects, maintenance, `/_hypdriv/*`. It does not see
  * the rendered body, so edge-only stages (HTML rewriting, nonce injection into cached HTML) are skipped and
- * application code reads HypDriv's facts from the forwarded `x-hypdriv-*` request headers.
+ * application code reads Hypdriv's facts from the forwarded `x-hypdriv-*` request headers.
  *
- * Inside the plugin's request hook or HypDriv's Worker shell (App Router apps) the proxy passes through.
+ * Inside the plugin's request hook or Hypdriv's Worker shell (App Router apps) the proxy passes through.
  *
  * ```ts
  * // proxy.ts
@@ -52,7 +52,7 @@ export function createProxy(
     // The plugin's request hook (`host`) or the Worker shell (`worker`) already ran the stages.
     const runner = getCurrentContext()?.runner;
     if (runner === 'host' || runner === 'worker') return NextResponse.next();
-    // vinext runs proxy.ts during its build-time prerender; HypDriv's posture applies at run time.
+    // vinext runs proxy.ts during its build-time prerender; Hypdriv's posture applies at run time.
     if (isBuildPrerender()) return NextResponse.next();
     return handler(request, event);
   };

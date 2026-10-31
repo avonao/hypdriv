@@ -1,7 +1,7 @@
 import './style.css';
 
 const pages: Record<string, string> = {
-  '/': '<h1>HypDriv × Vite</h1><p>A single-page app behind the HypDriv pipeline.</p>',
+  '/': '<h1>Hypdriv × Vite</h1><p>A single-page app behind the Hypdriv pipeline.</p>',
   '/about': '<h1>About</h1><p>Client-side route served by the SPA fallback.</p>',
   '/account': '<h1>Account</h1><p>Deep links get the same CSP as the shell.</p>',
 };

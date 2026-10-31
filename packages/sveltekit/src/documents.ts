@@ -102,7 +102,7 @@ function decodeEntities(value: string): string {
 
 /**
  * Adds the hashes of SvelteKit's own `<meta>` policy to the manifest's CSP entries of the prerendered documents:
- * browsers enforce the meta policy and HypDriv's header policy together, so the header must allow everything the
+ * browsers enforce the meta policy and Hypdriv's header policy together, so the header must allow everything the
  * meta tag allows. Returns the number of documents whose entry changed.
  */
 export function mergeMetaHashes(

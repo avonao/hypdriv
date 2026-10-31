@@ -8,7 +8,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'HypDriv × TanStack Start' },
+      { title: 'Hypdriv × TanStack Start' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },

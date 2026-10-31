@@ -41,7 +41,7 @@ describe('hypdriv() from @hypdriv/sveltekit/hooks', () => {
     expect(typeof registeredHandler()).toBe('function');
     const response = await handle({ event: event('/ssr') as never, resolve: async () => page() });
     const policy = response.headers.get('content-security-policy') ?? '';
-    // SvelteKit's `csp` directives (virtual:hypdriv/sveltekit) and HypDriv's own (virtual:hypdriv/config).
+    // SvelteKit's `csp` directives (virtual:hypdriv/sveltekit) and Hypdriv's own (virtual:hypdriv/config).
     expect(policy).toContain('https://js.example.com');
     expect(policy).toContain('https://img.example.com');
     expect(response.headers.get('x-hypdriv-csp')).toBe('nonce');

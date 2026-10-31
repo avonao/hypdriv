@@ -135,7 +135,7 @@ if (!bypass)
   bypass = findBypass(
     ok(
       await vercel<Protected>('PATCH', `/v1/projects/${project.id}/protection-bypass`, {
-        generate: { note: 'HypDriv live suite runner and audits' },
+        generate: { note: 'Hypdriv live suite runner and audits' },
       }),
       'protection bypass',
     ),
@@ -214,7 +214,7 @@ interface FirewallRule {
 const ruleName = `${name}-waf`;
 const ruleValue = {
   name: ruleName,
-  description: `HypDriv live suite: @vercel/firewall rate limit "${WAF_RULE_ID}" (5 / 60 s per key)`,
+  description: `Hypdriv live suite: @vercel/firewall rate limit "${WAF_RULE_ID}" (5 / 60 s per key)`,
   active: true,
   conditionGroup: [{ conditions: [{ type: 'rate_limit_api_id', op: 'eq', value: WAF_RULE_ID }] }],
   action: {

@@ -5,7 +5,7 @@ import { defineEventHandler } from 'nuxt/server';
 export default defineEventHandler(() => {
   const context = hyp();
   return {
-    message: 'Hello from Nitro, behind HypDriv',
+    message: 'Hello from Nitro, behind Hypdriv',
     requestId: context?.requestId ?? null,
     runner: context?.runner ?? null,
     country: context?.country ?? null,

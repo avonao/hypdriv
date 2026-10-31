@@ -2,7 +2,7 @@ import { emptyManifest } from '@hypdriv/core';
 import { createHandler } from '@hypdriv/runtime';
 import { describe, expect, it } from 'vitest';
 
-// Hosts whose framework does not hand HypDriv the Worker's `env` (adapter entries, in-app hooks) read the bindings
+// Hosts whose framework does not hand Hypdriv the Worker's `env` (adapter entries, in-app hooks) read the bindings
 // from `cloudflare:workers`. The import specifier is computed at run time; this proves workerd still resolves it.
 describe('createHandler in workerd without an explicit env', () => {
   it('reads the bindings from cloudflare:workers', async () => {

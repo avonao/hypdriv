@@ -1,7 +1,7 @@
 import { createProxy } from 'hypdriv/proxy';
 import hypdrivConfig from './hypdriv.config';
 
-// Runs the HypDriv stages on `next dev` / `next start`. Inside the Cloudflare Worker the shell has already
+// Runs the Hypdriv stages on `next dev` / `next start`. Inside the Cloudflare Worker the shell has already
 // run them, so this proxy passes requests straight through there.
 export default createProxy(hypdrivConfig);
 

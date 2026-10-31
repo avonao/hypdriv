@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Live end-to-end suite for Vercel: a Next.js 16 app that exercises every HypDriv capability on a real Vercel project, and the runner that verifies it.",
+  "description": "Live end-to-end suite for Vercel: a Next.js 16 app that exercises every Hypdriv capability on a real Vercel project, and the runner that verifies it.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

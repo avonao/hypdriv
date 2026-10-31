@@ -34,7 +34,7 @@ function readTheme(): { mode: Mode; contrast: Contrast } {
 }
 
 /**
- * Writes the `hyp_theme` cookie read by HypDriv's `theme` stage (and the fallback script), then applies the
+ * Writes the `hyp_theme` cookie read by Hypdriv's `theme` stage (and the fallback script), then applies the
  * classes immediately. The next document request is pinned at the edge, so there is no flash on reload.
  */
 function persist(next: { mode: Mode; contrast: Contrast }) {

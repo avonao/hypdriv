@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/observe",
   "version": "0.1.0",
-  "description": "HypDriv observability: tracing with OTLP export, structured logging, Server-Timing and Web Vitals collection.",
+  "description": "Hypdriv observability: tracing with OTLP export, structured logging, Server-Timing and Web Vitals collection.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -4,9 +4,9 @@ import { CSP_DECISION_KEY } from '@hypdriv/security';
 import { PRERENDER_TOKEN_DEFINE, PRERENDER_TOKEN_ENV } from './constants';
 
 /**
- * `@hypdriv/vinext/runtime` — the request hook the HypDriv vinext plugin installs around vinext's App Router
+ * `@hypdriv/vinext/runtime` — the request hook the Hypdriv vinext plugin installs around vinext's App Router
  * request handler (the default export of vinext's generated RSC entry). Every request vinext answers — pages,
- * Route Handlers, Server Actions, RSC navigations, metadata routes, public files — runs through HypDriv's
+ * Route Handlers, Server Actions, RSC navigations, metadata routes, public files — runs through Hypdriv's
  * Drivetrain with `runner: 'host'`, owning the full response, and application code sees `hyp()`.
  */
 
@@ -14,7 +14,7 @@ export { PRERENDER_TOKEN_DEFINE, PRERENDER_TOKEN_ENV };
 
 declare const __HYPDRIV_VINEXT_PRERENDER_TOKEN__: string | undefined;
 
-/** The prerender token baked into this build (null in development and outside a HypDriv vinext build). */
+/** The prerender token baked into this build (null in development and outside a Hypdriv vinext build). */
 export function bakedPrerenderToken(): string | null {
   return typeof __HYPDRIV_VINEXT_PRERENDER_TOKEN__ === 'string' && __HYPDRIV_VINEXT_PRERENDER_TOKEN__
     ? __HYPDRIV_VINEXT_PRERENDER_TOKEN__
@@ -26,7 +26,7 @@ const processEnv = (): Record<string, string | undefined> | undefined =>
 
 /**
  * Whether this process is vinext's build-time prerender of the build that baked `token`: vinext sets
- * `VINEXT_PRERENDER=1` in its prerender servers and the HypDriv plugin puts the build's random token into the
+ * `VINEXT_PRERENDER=1` in its prerender servers and the Hypdriv plugin puts the build's random token into the
  * build's environment, which those servers inherit. Neither can be set by a client, and a deployed server never
  * has the token in its environment.
  */
@@ -57,7 +57,7 @@ const CACHED_CLASSIFICATIONS = new Set(['static', 'isr']);
 
 /**
  * The request vinext renders. For documents vinext may serve from (or write to) its page cache — routes
- * HypDriv classifies `static` or `isr` — the nonce policy is not forwarded: vinext renders a nonce-bearing
+ * Hypdriv classifies `static` or `isr` — the nonce policy is not forwarded: vinext renders a nonce-bearing
  * document per request and never caches it, so the page would lose ISR. The csp stage injects the request's
  * nonce into the response instead (`runner: 'host'` owns the body), which covers vinext's own scripts.
  */
@@ -115,7 +115,7 @@ const SHARED_CACHE_HEADERS = [
  * A document that carries the request's nonce is never stored by a shared cache: every visitor would receive the
  * same nonce. vinext marks its own nonce-bearing renders `no-store`; a page vinext served from its page cache
  * (`isr`, `static` in nonce mode) gets the nonce injected after the fact, so its cacheable `Cache-Control` is made
- * private here. HypDriv's own edge cache stores the document before the injection.
+ * private here. Hypdriv's own edge cache stores the document before the injection.
  */
 export function privateNonceDocument(response: Response): Response {
   if (response.headers.get('x-hypdriv-csp') !== 'nonce') return response;
@@ -170,7 +170,7 @@ export function wrapAppHandler<T>(
     ...args: unknown[]
   ): Promise<unknown> {
     const app = await resolve();
-    // vinext's build-time prerender renders the application as built; HypDriv's posture applies at run time.
+    // vinext's build-time prerender renders the application as built; Hypdriv's posture applies at run time.
     if (isBuildPrerender(prerenderToken)) return app.call(this, request, ...args);
     const ctx = args[0] as ExecutionContextLike | undefined;
     const response = await hypdriv(nativeRequest(request), {

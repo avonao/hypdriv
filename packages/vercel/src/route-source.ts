@@ -3,7 +3,7 @@ import type { PathPattern } from '@hypdriv/core';
 const SPECIAL = new Set(['(', ')', '{', '}', '[', ']', '?', '+', '*', ':', '\\']);
 
 /**
- * Translates a HypDriv route pattern into a Next.js `source` (path-to-regexp): `:name`, `:name*`, `:name?`,
+ * Translates a Hypdriv route pattern into a Next.js `source` (path-to-regexp): `:name`, `:name*`, `:name?`,
  * `/**` (any depth) and `*` (within a segment) are supported; regular expressions, `^…` patterns and query
  * patterns (`\?`) are not and yield `null`.
  */

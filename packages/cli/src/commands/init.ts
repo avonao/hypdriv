@@ -17,7 +17,7 @@ const ACTION_LABEL: Record<PlanItem['action'], string> = {
 export const initCommand = defineCommand({
   name: 'init',
   summary:
-    'Detect the project and write/update the HypDriv files (config, framework registration, worker entry, wrangler, proxy, headers, scripts)',
+    'Detect the project and write/update the Hypdriv files (config, framework registration, worker entry, wrangler, proxy, headers, scripts)',
   usage: 'hypdriv init [--platform cloudflare|vercel|node] [--purser] [--no-proxy] [--yes] [--dry-run]',
   options: {
     purser: { type: 'boolean', description: 'Scaffold the Purser CSS section of hypdriv.config.ts' },

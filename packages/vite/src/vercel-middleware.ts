@@ -3,10 +3,10 @@ import { platformWaitUntil } from '@hypdriv/core';
 import { createProxyHandler, type StageList } from '@hypdriv/runtime';
 
 /**
- * `@hypdriv/vite/vercel-middleware` — the Vercel Routing Middleware HypDriv builds for Vite apps whose pages Vercel
+ * `@hypdriv/vite/vercel-middleware` — the Vercel Routing Middleware Hypdriv builds for Vite apps whose pages Vercel
  * serves statically: the request stages (shield, bots, rate limiting, WAF rules, geo, i18n, flags, redirects,
  * maintenance, request ids, logging) run before the CDN for every path. Response headers of static pages (security
- * preset, hash CSP, Early Hints) come from the Build Output `config.json` routes HypDriv writes, so the stages that
+ * preset, hash CSP, Early Hints) come from the Build Output `config.json` routes Hypdriv writes, so the stages that
  * produce them are left out here to keep each header single.
  */
 

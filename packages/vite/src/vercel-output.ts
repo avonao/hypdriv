@@ -16,7 +16,7 @@ import { PRIVATE_BUILD_FILES } from './targets';
 /** Files of a Vite client build that only configure other platforms. */
 const PLATFORM_FILES = new Set(['_headers', '_redirects', '_routes.json', '.assetsignore']);
 
-/** The Node.js runtime of HypDriv's Vercel functions (the build machine's major when Vercel supports it). */
+/** The Node.js runtime of Hypdriv's Vercel functions (the build machine's major when Vercel supports it). */
 export function vercelNodeRuntime(version: string = process.versions.node): string {
   const major = Number(version.split('.')[0]);
   // The newest Vercel runtime not newer than the building Node (odd releases map to the LTS line below them).
@@ -47,7 +47,7 @@ function vercelMiddlewareModule(): string {
 }
 
 /**
- * Bundles HypDriv's Routing Middleware (config + final manifest + runtime) into one ESM file for a Build Output
+ * Bundles Hypdriv's Routing Middleware (config + final manifest + runtime) into one ESM file for a Build Output
  * API Node.js function.
  */
 export async function buildVercelMiddleware(input: {
@@ -122,7 +122,7 @@ export async function buildVercelMiddleware(input: {
 
 /**
  * Writes the Vercel Build Output (`.vercel/output`) for a plain Vite build: the client files as static output,
- * HypDriv's header routes, clean URLs for multi-page builds, the SPA fallback, and (by default) HypDriv's Routing
+ * Hypdriv's header routes, clean URLs for multi-page builds, the SPA fallback, and (by default) Hypdriv's Routing
  * Middleware so the request stages run before the CDN. Vercel deploys this output as is.
  */
 export async function writeVercelOutput(input: {
@@ -190,7 +190,7 @@ export async function writeVercelOutput(input: {
   return out;
 }
 
-/** The middleware path of HypDriv's Routing Middleware in a Build Output. */
+/** The middleware path of Hypdriv's Routing Middleware in a Build Output. */
 export const VERCEL_MIDDLEWARE_PATH = '_hypdriv/middleware';
 
 function escapeRegex(text: string): string {
@@ -198,7 +198,7 @@ function escapeRegex(text: string): string {
 }
 
 /**
- * The `src` regex (and raw sources) of HypDriv's Routing Middleware: every path except content-hashed assets, or —
+ * The `src` regex (and raw sources) of Hypdriv's Routing Middleware: every path except content-hashed assets, or —
  * for frameworks whose own function runs the pipeline for on-demand routes — only the prerendered documents the
  * CDN serves without application code (`/about`, `/about/`, `/about.html`), so no request runs the stages twice.
  */
@@ -219,8 +219,8 @@ export function vercelMiddlewareSource(input: { immutablePrefixes: string[]; pat
 }
 
 /**
- * Adds HypDriv's Routing Middleware to a Build Output (`.vercel/output`): bundles it as a Node.js function and
- * inserts its route right after HypDriv's header routes (before the framework's rewrites and `handle: filesystem`),
+ * Adds Hypdriv's Routing Middleware to a Build Output (`.vercel/output`): bundles it as a Node.js function and
+ * inserts its route right after Hypdriv's header routes (before the framework's rewrites and `handle: filesystem`),
  * replacing one from a previous run. Plain Vite apps run it for every path except content-hashed assets; framework
  * integrations pass `paths` (their prerendered documents), so static pages get the request stages — rate limiting,
  * bot shield, maintenance, redirects, geo — while the framework's function keeps running them for everything else.

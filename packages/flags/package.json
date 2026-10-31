@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/flags",
   "version": "0.1.0",
-  "description": "HypDriv edge feature flags: deterministic bucketing, geo/cookie/percentage rules, providers (static, env, KV, OpenFeature) and React hooks.",
+  "description": "Hypdriv edge feature flags: deterministic bucketing, geo/cookie/percentage rules, providers (static, env, KV, OpenFeature) and React hooks.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

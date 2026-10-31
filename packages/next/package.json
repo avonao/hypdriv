@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/next",
   "version": "0.1.0",
-  "description": "HypDriv for Next.js 16+: withHypDriv config wrapper, adapter chain, proxy composables, server helpers and client components.",
+  "description": "Hypdriv for Next.js 16+: withHypDriv config wrapper, adapter chain, proxy composables, server helpers and client components.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

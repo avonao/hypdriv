@@ -164,7 +164,7 @@ describe('response helpers', () => {
 });
 
 describe('sanitizeInboundRequest', () => {
-  it('drops spoofable HypDriv, nonce and middleware headers and keeps trusted ones', async () => {
+  it('drops spoofable Hypdriv, nonce and middleware headers and keeps trusted ones', async () => {
     const { sanitizeInboundRequest } = await import('./headers');
     const request = new Request('https://x.test/', {
       headers: {

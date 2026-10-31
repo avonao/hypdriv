@@ -92,7 +92,7 @@ export function basenamePrefix(basename: string | undefined): string {
   return p === '/' ? '' : p;
 }
 
-/** A React Router route path in HypDriv's canonical pattern syntax, under the app's `basename`. */
+/** A React Router route path in Hypdriv's canonical pattern syntax, under the app's `basename`. */
 export function routePattern(path: string, basename?: string): string {
   const pattern = fromColonPath(path);
   const prefix = basenamePrefix(basename);
@@ -141,7 +141,7 @@ export interface DiscoverResult {
 }
 
 /**
- * Discovers the routes of a React Router app: one HypDriv route per URL pattern (layouts and their index routes
+ * Discovers the routes of a React Router app: one Hypdriv route per URL pattern (layouts and their index routes
  * share a pattern; the deepest route answers it). Routes without a default export or `ErrorBoundary` are resource
  * routes (`endpoint`); the browser manifest decides when available, the module source otherwise. Pages carry their
  * client assets: the entry, every route module of the branch, their imports and CSS.

@@ -12,7 +12,7 @@ export default defineConfig({
   format: ['esm'],
   platform: 'neutral',
   target: 'es2023',
-  // Workspace packages, SvelteKit, Vite, SvelteKit's `$app/*` modules and HypDriv's virtual modules stay external:
+  // Workspace packages, SvelteKit, Vite, SvelteKit's `$app/*` modules and Hypdriv's virtual modules stay external:
   // the hooks entry is bundled into the application's server build, where Vite resolves them.
   deps: {
     neverBundle: [

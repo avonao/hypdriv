@@ -2,7 +2,7 @@
  * Keeps Next.js Client Component boundaries intact in the published bundles.
  *
  * Rolldown warns (`MODULE_LEVEL_DIRECTIVE`) that a module-level `'use client'` may not survive bundling, for
- * every module that has one. For HypDriv's packages the directive must sit at the top of the entry chunk of
+ * every module that has one. For Hypdriv's packages the directive must sit at the top of the entry chunk of
  * each client entry (`@hypdriv/next/client`, `hypdriv/client`, `@hypdriv/flags/react`, …), so this plugin
  * guarantees exactly that and turns every other placement into a build error:
  *

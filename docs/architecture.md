@@ -1,6 +1,6 @@
-# HypDriv architecture
+# Hypdriv architecture
 
-> **HypDriv** is a Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext: a sidecar that attaches to an application through its framework's public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, on Vercel and on Node, without forking a framework, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
+> **Hypdriv** is a Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext: a sidecar that attaches to an application through its framework's public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, on Vercel and on Node, without forking a framework, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
 
 This document is the source of truth for the design. Package READMEs and guides elaborate; they never contradict it.
 
@@ -8,13 +8,13 @@ This document is the source of truth for the design. Package READMEs and guides 
 
 ## 1. Design principles
 
-1. **Sidecar, never a fork.** HypDriv integrates through exactly five attachment points (§3). It never patches `next`, `@opennextjs/*` or `wrangler`. When Next.js changes, HypDriv adapts at the attachment point.
+1. **Sidecar, never a fork.** Hypdriv integrates through exactly five attachment points (§3). It never patches `next`, `@opennextjs/*` or `wrangler`. When Next.js changes, Hypdriv adapts at the attachment point.
 2. **Zero-infrastructure baseline.** Every feature has a mode that works on a bare Worker with the static-assets binding OpenNext already requires. Cloudflare bindings (KV, R2, D1, Durable Objects, Queues, Rate Limiting, Analytics Engine, Images, AI) are _upgrades_: optional, auto-detected at startup, never required.
-3. **Build-time knowledge, run-time use.** The Next.js Adapter API gives HypDriv a typed description of the application after `next build`. HypDriv turns it into one artifact (`.hypdriv/manifest.json`) that the runtime reads. Nothing derived from a build is baked back into that same build, which avoids circular dependencies between `next build`, `proxy.ts` and the Worker bundle.
+3. **Build-time knowledge, run-time use.** The Next.js Adapter API gives Hypdriv a typed description of the application after `next build`. Hypdriv turns it into one artifact (`.hypdriv/manifest.json`) that the runtime reads. Nothing derived from a build is baked back into that same build, which avoids circular dependencies between `next build`, `proxy.ts` and the Worker bundle.
 4. **Portable by construction, native per platform.** The proxy composables, server helpers and security primitives run on Node (`next start`), on Vercel and on Workers; a deploy target (`cloudflare` · `vercel` · `node`, detected at build and run time, [ADR 0013](adr/0013-deploy-targets.md)) selects platform overrides for the same pipeline. The Worker shell adds the capabilities only the Cloudflare edge provides (HTML streaming transforms, edge cache storage with coalescing, scheduled/queue handlers, Durable Objects); on Vercel, `@hypdriv/vercel` maps them to the Vercel CDN, Upstash Redis, Global Config, the WAF, BotID and Vercel Queues.
 5. **Secure defaults, measurable claims.** Defaults pass securityheaders.com with an A+ and Lighthouse best-practice audits. Every performance feature emits `Server-Timing` entries so its effect is visible, not assumed.
-6. **Agent-native.** Every CLI command has `--json`. The repository ships `AGENTS.md` and a skill so coding agents can adopt and operate HypDriv correctly.
-7. **Purser-native CSS.** Purser CSS is the first-class styling path: HypDriv builds it in-process, verifies that no unstyled atom ships, pins themes at the edge, and audits zero-override guarantees per route.
+6. **Agent-native.** Every CLI command has `--json`. The repository ships `AGENTS.md` and a skill so coding agents can adopt and operate Hypdriv correctly.
+7. **Purser-native CSS.** Purser CSS is the first-class styling path: Hypdriv builds it in-process, verifies that no unstyled atom ships, pins themes at the edge, and audits zero-override guarantees per route.
 
 ## 2. Compatibility targets
 
@@ -30,7 +30,7 @@ This document is the source of truth for the design. Package READMEs and guides 
 | Purser CSS                        | 0.1+ (`@avonao/purser/build` API)                                                                                |
 | Vite hosts (ADR 0019)             | Vite 8; React Router 8, TanStack Start 1.169+, Astro 7, SvelteKit 3, Nuxt 4.6, vinext 1.4, plain Vite apps — on Cloudflare (`@cloudflare/vite-plugin` / framework adapters), Vercel (Build Output API) and Node |
 
-Deprecated Next.js features (`middleware.ts`, Edge runtime route segments) are detected by `hypdriv doctor` and reported with the migration path; HypDriv does not add support for them.
+Deprecated Next.js features (`middleware.ts`, Edge runtime route segments) are detected by `hypdriv doctor` and reported with the migration path; Hypdriv does not add support for them.
 
 ## 3. Attachment points
 
@@ -64,17 +64,17 @@ Deprecated Next.js features (`middleware.ts`, Edge runtime route segments) are d
 
 ### 3.1 `next.config.ts` — `withHypDriv`
 
-`withHypDriv(nextConfig, options?)` returns an **async config function** `(phase, { defaultConfig }) => NextConfig`. Next.js supports async configuration, which lets HypDriv do work before the bundler starts:
+`withHypDriv(nextConfig, options?)` returns an **async config function** `(phase, { defaultConfig }) => NextConfig`. Next.js supports async configuration, which lets Hypdriv do work before the bundler starts:
 
 - apply safe defaults (`poweredByHeader: false`, `reactStrictMode: true`, immutable `headers()` for `/_next/static`, `deploymentId` when skew protection is on, `experimental.sri` when `security.sri` is on, Workers-friendly `serverExternalPackages` / `turbopack.resolveAlias` entries, `images.loaderFile` when the Cloudflare image loader is enabled);
 - run the **Purser bridge**: in `PHASE_PRODUCTION_BUILD` it awaits `build()` from `@avonao/purser/build` so Turbopack/webpack see a current stylesheet; in `PHASE_DEVELOPMENT_SERVER` it starts `watch()` once per process and publishes diagnostics to `.hypdriv/dev/purser.json`;
-- install the **adapter chain** (§3.2) by setting `adapterPath` to HypDriv's adapter module and recording the application's own adapter (from `options.adapter`, the existing `adapterPath`, or `NEXT_ADAPTER_PATH`) in `HYPDRIV_BASE_ADAPTER`.
+- install the **adapter chain** (§3.2) by setting `adapterPath` to Hypdriv's adapter module and recording the application's own adapter (from `options.adapter`, the existing `adapterPath`, or `NEXT_ADAPTER_PATH`) in `HYPDRIV_BASE_ADAPTER`.
 
 It never enables Cache Components, Partial Prefetching or the React Compiler by itself; those are application decisions. It validates `hypdriv.config.ts` and fails the build with a readable error list on invalid configuration.
 
 ### 3.2 Adapter chain
 
-Next.js 16.2+ exposes the stable Adapter API (`adapterPath`, `modifyConfig`, `onBuildComplete`). HypDriv registers an adapter that **delegates** both hooks to the base adapter (Vercel, Bun, a future OpenNext adapter, or none) and then performs its own work in `onBuildComplete`:
+Next.js 16.2+ exposes the stable Adapter API (`adapterPath`, `modifyConfig`, `onBuildComplete`). Hypdriv registers an adapter that **delegates** both hooks to the base adapter (Vercel, Bun, a future OpenNext adapter, or none) and then performs its own work in `onBuildComplete`:
 
 1. Build the **route table** from `outputs.appPages`, `outputs.appRoutes`, `outputs.pages`, `outputs.pagesApi`, `outputs.prerenders`, `outputs.staticFiles`, `outputs.middleware` and `routing.*`.
 2. Attach **client assets per route** from `.next/app-build-manifest.json` and `.next/build-manifest.json` (JS chunks and CSS files), and detect font preloads in prerendered HTML.
@@ -89,7 +89,7 @@ Next.js 16.2+ exposes the stable Adapter API (`adapterPath`, `modifyConfig`, `on
 
 Because OpenNext Cloudflare currently consumes the standalone build rather than the Adapter API, the chain is OpenNext-agnostic: `onBuildComplete` fires during `next build`, which OpenNext invokes before its own bundling. When OpenNext ships its Adapter-API-based adapter, it simply becomes the base adapter; Vercel's adapter (`NEXT_ENABLE_ADAPTER=1` → `NEXT_ADAPTER_PATH`) is chained the same way and receives the manifest as an extra asset.
 
-Next.js ≥ 16.4 writes prerenders to scoped paths (`server/route-cache/**`) as soon as any adapter is configured. Without a base adapter, HypDriv restores the classic `server/app/**` layout after the build (never overwriting files) so OpenNext's cache population and Vercel's legacy builder find every prerender, and adds the manifest to the server traces so every function ships it ([ADR 0014](adr/0014-scoped-build-artifacts.md)).
+Next.js ≥ 16.4 writes prerenders to scoped paths (`server/route-cache/**`) as soon as any adapter is configured. Without a base adapter, Hypdriv restores the classic `server/app/**` layout after the build (never overwriting files) so OpenNext's cache population and Vercel's legacy builder find every prerender, and adds the manifest to the server traces so every function ships it ([ADR 0014](adr/0014-scoped-build-artifacts.md)).
 
 ### 3.3 Worker entry — `createWorker`
 
@@ -107,7 +107,7 @@ export default createWorker({
 });
 ```
 
-`createWorker` returns an `ExportedHandler` with `fetch`, `scheduled`, `queue`, `email` and `tail`. The OpenNext worker is imported lazily so that HypDriv's own startup cost stays in the low-millisecond range and the Worker still meets the 1 s global-scope limit on large applications.
+`createWorker` returns an `ExportedHandler` with `fetch`, `scheduled`, `queue`, `email` and `tail`. The OpenNext worker is imported lazily so that Hypdriv's own startup cost stays in the low-millisecond range and the Worker still meets the 1 s global-scope limit on large applications.
 
 `fetch` runs the **Drivetrain** (§5) around OpenNext's `fetch`. Internal routes under `/_hypdriv/*` (vitals beacon, CSP reports, health, live channels, dev state) are answered before Next.js is loaded.
 
@@ -145,7 +145,7 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 
 | Host | Build integration | Request hook |
 | --- | --- | --- |
-| plain Vite | `hypdriv()` plugin | `assetsWorker()` (Cloudflare), HypDriv Routing Middleware (Vercel), `hypdriv serve` (Node) |
+| plain Vite | `hypdriv()` plugin | `assetsWorker()` (Cloudflare), Hypdriv Routing Middleware (Vercel), `hypdriv serve` (Node) |
 | React Router 8 | preset + Vite plugin (`@hypdriv/react-router`) | root route `middleware` / outer `createRequestHandler` wrapper |
 | TanStack Start | Vite plugin (`@hypdriv/tanstack-start`) | global request middleware (`src/start.ts`) |
 | Astro 7 | integration (`@hypdriv/astro`) | middleware (`order: 'pre'`) |
@@ -156,7 +156,7 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 **Prerendered pages.** The platform's static layer serves them (`HypRoute.servedStatically`): their posture is the static header rule (security preset, the document's hash CSP, Early Hints), and neither the build nor the runtime infers an edge-cache policy for them. To run the request stages (rate limits, bot shield, maintenance, flags) for them as well:
 
 - **Cloudflare:** `assets.run_worker_first` sends them to the Worker shell, which answers GET/HEAD from the assets binding first, so the page is still served as built, with its hash CSP. `hypdriv init` writes the right patterns per framework (`/*` minus the immutable asset directory).
-- **Vercel:** every integration writes HypDriv's Routing Middleware (`addVercelMiddleware()`) scoped to exactly the prerendered document paths (GET/HEAD; vinext also skips RSC and Server Action requests). On-demand routes run the pipeline once, in the function. A plain Vite SPA runs the middleware for every non-immutable path.
+- **Vercel:** every integration writes Hypdriv's Routing Middleware (`addVercelMiddleware()`) scoped to exactly the prerendered document paths (GET/HEAD; vinext also skips RSC and Server Action requests). On-demand routes run the pipeline once, in the function. A plain Vite SPA runs the middleware for every non-immutable path.
 
 **HTTPS.** `redirects.forceHttps: 'auto'` follows `site.origin`; without one it is on for Cloudflare and Vercel deployments (their edge terminates TLS for every hostname) and off on Node. Workers Static Assets answer before the Worker, so plain-HTTP requests for assets the Worker never sees need the zone's *Always Use HTTPS* (or a Redirect Rule); `hypdriv audit https` probes pages, `/_hypdriv/health` and a hashed asset over `http://` and names the setting when one is served.
 
@@ -262,7 +262,7 @@ Post steps run in reverse order: `edge-cache.post` stores the document exactly a
 
 ## 6. Caching model
 
-HypDriv's **edge cache** sits in front of Next.js and complements, never replaces, Next's own caches (Cache Components, ISR via OpenNext's incremental cache):
+Hypdriv's **edge cache** sits in front of Next.js and complements, never replaces, Next's own caches (Cache Components, ISR via OpenNext's incremental cache):
 
 - **Policies** are declared in `hypdriv.config.ts` (`cache.edge`), matched by route pattern, with `ttl`, `swr`, `staleIfError`, `tags`, `vary` (headers, cookies, geo dimensions, flags), `bypass` (cookie/header presence) and `methods`.
 - **Inference**: routes classified `static` default to a long edge TTL with SWR and tag `route:<id>`; `shell` routes cache only when the application opts in (streaming resumes are never cached); `dynamic` routes are bypassed unless a policy says otherwise; RSC payload requests (`RSC: 1`) are keyed separately and include the `Next-Router-State-Tree`/`Next-Url` headers in the key.
@@ -274,7 +274,7 @@ HypDriv's **edge cache** sits in front of Next.js and complements, never replace
 
 ## 7. Security model
 
-- **CSP autopilot**: the manifest tells HypDriv which routes are fully static. Static routes receive a **hash-based** strict CSP (`script-src 'self' 'sha256-…' 'strict-dynamic'`) as a response header, so they stay cacheable. Dynamic and shell routes receive a **nonce-based** strict CSP delivered through request headers so Next.js applies the nonce to its inline scripts. Report-only mode, `report-to`/`report-uri` to the built-in collector (`/_hypdriv/csp-report`), and a `hypdriv csp suggest` command that turns collected violations into policy proposals.
+- **CSP autopilot**: the manifest tells Hypdriv which routes are fully static. Static routes receive a **hash-based** strict CSP (`script-src 'self' 'sha256-…' 'strict-dynamic'`) as a response header, so they stay cacheable. Dynamic and shell routes receive a **nonce-based** strict CSP delivered through request headers so Next.js applies the nonce to its inline scripts. Report-only mode, `report-to`/`report-uri` to the built-in collector (`/_hypdriv/csp-report`), and a `hypdriv csp suggest` command that turns collected violations into policy proposals.
 - **Headers preset** (A+ on securityheaders.com): HSTS (preload-ready), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` (deny by default with an allow-list), `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `Cross-Origin-Embedder-Policy` (opt-in), `Origin-Agent-Cluster`, `X-Frame-Options` via `frame-ancestors`, `X-Permitted-Cross-Domain-Policies`, `X-DNS-Prefetch-Control`.
 - **Rate limiting**: algorithms (`fixedWindow`, `slidingWindow`, `tokenBucket`) over counters stored in memory (per isolate), Cache API (approximate, zero-config), KV, the `HypDrivLimiter` Durable Object (exact, global) or Cloudflare's Rate Limiting binding. IETF `RateLimit-*` headers and `Retry-After`.
 - **Bot shield**: uses `request.cf.botManagement` and `verifiedBotCategory` when present; falls back to UA/header heuristics, honeypot paths and `Sec-Fetch-*` validation; policies `allow | challenge | block | tarpit`; Turnstile verification for forms and actions.
@@ -292,7 +292,7 @@ HypDriv's **edge cache** sits in front of Next.js and complements, never replace
 
 ## 9. Purser CSS integration
 
-Purser produces one deterministic atomic stylesheet with provable no-override rules. HypDriv's bridge (`@hypdriv/purser`) adds:
+Purser produces one deterministic atomic stylesheet with provable no-override rules. Hypdriv's bridge (`@hypdriv/purser`) adds:
 
 1. **In-process build/watch** from `withHypDriv` (no `&` process juggling; errors become build failures or dev diagnostics).
 2. **Unstyled-atom guard**: after `next build`, every Purser class referenced by prerendered HTML must exist in the stylesheet. A stale stylesheet fails the build.
@@ -302,7 +302,7 @@ Purser produces one deterministic atomic stylesheet with provable no-override ru
 6. **Zero-override audit**: `hypdriv audit css --url` crawls the routes in the manifest with headless Chrome and runs Purser's strike-count check at several widths and theme states; CI-ready.
 7. **Layer coexistence** helpers for Tailwind/legacy CSS adoption (ordered `@layer` statement generation).
 
-HypDriv consumes only `@avonao/purser/build` and `scripts/strike-count.js`; it never modifies Purser.
+Hypdriv consumes only `@avonao/purser/build` and `scripts/strike-count.js`; it never modifies Purser.
 
 ## 10. CLI
 
@@ -355,7 +355,7 @@ Dependency rule: runtime packages have **no** dependency on `next`, `wrangler` o
 ## 12. Versioning and compatibility policy
 
 - Semantic versioning. All `@hypdriv/*` packages release in lockstep (linked in changesets) so one version number describes a compatible set.
-- A new Next.js minor is supported within one HypDriv minor; HypDriv's CI matrix pins the latest Next 16 minor and the previous one.
+- A new Next.js minor is supported within one Hypdriv minor; Hypdriv's CI matrix pins the latest Next 16 minor and the previous one.
 - The manifest schema has an explicit `version`; the runtime refuses to start on an unknown major schema version and explains how to rebuild.
 - Breaking changes require a major release and a codemod or a `hypdriv doctor --fix` rule.
 
@@ -368,6 +368,6 @@ Dependency rule: runtime packages have **no** dependency on `next`, `wrangler` o
 
 ## 14. Non-goals
 
-- Replacing OpenNext, Next's caches, Next DevTools or Vercel's observability. HypDriv composes with them.
+- Replacing OpenNext, Next's caches, Next DevTools or Vercel's observability. Hypdriv composes with them.
 - Supporting the deprecated Edge runtime or `middleware.ts`.
 - Vendor lock-in: nothing in the application API references Cloudflare types directly; `@hypdriv/cloudflare` is the only package that does.

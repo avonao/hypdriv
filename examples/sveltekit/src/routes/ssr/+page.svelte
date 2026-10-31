@@ -3,7 +3,7 @@ let { data } = $props();
 </script>
 
 <svelte:head>
-  <title>Request facts · HypDriv × SvelteKit</title>
+  <title>Request facts · Hypdriv × SvelteKit</title>
   <!-- An inline script of the application's own, carrying the request's nonce from `nonce()`. -->
   {@html data.inlineScript}
 </svelte:head>

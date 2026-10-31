@@ -23,7 +23,7 @@ import type {
 } from './purser-types';
 
 export interface PurserBridgeOptions {
-  /** The HypDriv project root (where `hypdriv.config.ts` and `.hypdriv/` live). */
+  /** The Hypdriv project root (where `hypdriv.config.ts` and `.hypdriv/` live). */
   projectDir: string;
   /** `resolveConfig(...).purser` (must not be `null`). */
   config: ResolvedPurser;
@@ -70,7 +70,7 @@ export interface WatchOptions {
 }
 
 export interface PurserBridge {
-  /** The HypDriv project root. */
+  /** The Hypdriv project root. */
   readonly projectDir: string;
   /** Purser's project root (`projectDir` joined with `config.project`). */
   readonly purserProjectDir: string;
@@ -157,7 +157,7 @@ export async function loadPurserBuildModule(projectDir: string): Promise<PurserB
   if (typeof api.build !== 'function' || typeof api.check !== 'function' || typeof api.watch !== 'function') {
     throw new HypDrivError(
       'E_UNSUPPORTED',
-      `${file} does not export build(), check() and watch(); HypDriv needs @avonao/purser >= 0.1.0`,
+      `${file} does not export build(), check() and watch(); Hypdriv needs @avonao/purser >= 0.1.0`,
       { file },
     );
   }

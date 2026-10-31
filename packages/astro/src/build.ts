@@ -72,7 +72,7 @@ export function classifyGeneratedFiles(
   return { documents, staticPaths };
 }
 
-/** Header names per path in an existing Cloudflare `_headers` file, outside HypDriv's generated block. */
+/** Header names per path in an existing Cloudflare `_headers` file, outside Hypdriv's generated block. */
 export function existingCloudflareHeaders(content: string): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
   let current: Set<string> | null = null;
@@ -104,7 +104,7 @@ export function existingCloudflareHeaders(content: string): Map<string, Set<stri
 }
 
 /**
- * Drops headers from HypDriv's rules that a rule for the same path in the existing `_headers` already sets
+ * Drops headers from Hypdriv's rules that a rule for the same path in the existing `_headers` already sets
  * (`@astrojs/cloudflare` writes `/_astro/*  Cache-Control: …`): Cloudflare joins duplicate headers of matching
  * rules with a comma.
  */
@@ -145,7 +145,7 @@ function prefixMatches(rulePath: string, pathname: string): boolean {
  * looks them up for prerendered routes). The server picks the first entry whose `pathname` contains the request
  * path, so every prerendered path gets an exact entry (both trailing-slash spellings) and entries are ordered
  * shortest first: the exact entry is then always the first match. Entries Astro wrote (its own CSP when
- * `security.csp` is on) are kept and win over HypDriv's for the same header.
+ * `security.csp` is on) are kept and win over Hypdriv's for the same header.
  */
 export function nodeHeadersEntries(input: {
   rules: StaticHeaderRule[];
@@ -202,7 +202,7 @@ interface VercelRouteLike {
 
 /**
  * Gives `@astrojs/vercel`'s catch-all error route (`{ src: '^/.*$', dest: '/404.html', status: 404 }`) the static
- * headers of the error document it serves (its hash CSP): HypDriv's per-document rules match request paths, and
+ * headers of the error document it serves (its hash CSP): Hypdriv's per-document rules match request paths, and
  * an unknown path is not the document's. Returns the number of routes changed.
  */
 export function addErrorRouteHeaders(
@@ -257,7 +257,7 @@ export interface FinalizeAstroInput {
   /** `@astrojs/node` serves `dist/_headers.json` (its `staticHeaders` option is on). */
   nodeStaticHeaders?: boolean;
   /**
-   * The loaded HypDriv config, for HypDriv's Routing Middleware on Vercel: prerendered pages, which the CDN serves
+   * The loaded Hypdriv config, for Hypdriv's Routing Middleware on Vercel: prerendered pages, which the CDN serves
    * without Astro's function, get the request stages too. Omit (or set `vercelMiddleware: false`) to skip it.
    */
   loaded?: LoadedHypConfig;
@@ -283,7 +283,7 @@ function readJson<T>(file: string): T | null {
 }
 
 /**
- * Finalises an Astro build after every adapter hook ran: the HypDriv manifest from the routes and prerendered
+ * Finalises an Astro build after every adapter hook ran: the Hypdriv manifest from the routes and prerendered
  * documents, the static header rules in the target platform's configuration (Cloudflare `_headers`, Vercel Build
  * Output routes, `@astrojs/node`'s `_headers.json`), and the final manifest patched into every server output.
  * Throws when the manifest reports build failures (budgets, Purser, secrets).
@@ -372,12 +372,12 @@ export async function finalizeAstroBuild(input: FinalizeAstroInput): Promise<Fin
     written.push(file);
     if (!input.nodeStaticHeaders && documents.length)
       log.warn(
-        "hypdriv: @astrojs/node serves prerendered pages without HypDriv's static headers unless its `staticHeaders` option is on: node({ mode: 'standalone', staticHeaders: true })",
+        "hypdriv: @astrojs/node serves prerendered pages without Hypdriv's static headers unless its `staticHeaders` option is on: node({ mode: 'standalone', staticHeaders: true })",
       );
   }
 
   const patched = patchRuntimeManifest(serverDirs, result.manifest);
   if (patched.length) log.info(`hypdriv: final manifest patched into ${patched.length} server file(s)`);
-  else log.warn('hypdriv: no server output embeds the HypDriv manifest (is the integration installed?)');
+  else log.warn('hypdriv: no server output embeds the Hypdriv manifest (is the integration installed?)');
   return { manifest: result.manifest, rules, patched, written };
 }

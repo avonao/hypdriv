@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/core",
   "version": "0.1.0",
-  "description": "HypDriv kernel: configuration schema, request pipeline, build manifest and runtime-agnostic utilities.",
+  "description": "Hypdriv kernel: configuration schema, request pipeline, build manifest and runtime-agnostic utilities.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -5,7 +5,7 @@ import { createRequestId } from '../util/id';
 import { detectRuntime, type RuntimeKind } from '../util/runtime';
 import { Timings } from './timing';
 
-/** Subset of Cloudflare's `request.cf` that HypDriv reads. All fields optional: other platforms have none. */
+/** Subset of Cloudflare's `request.cf` that Hypdriv reads. All fields optional: other platforms have none. */
 export interface GeoProperties {
   country?: string;
   region?: string;
@@ -68,7 +68,7 @@ export class StateBag {
  * Who runs the pipeline:
  * - `worker`: the Cloudflare Worker shell around the application (owns the full response);
  * - `proxy`: Next.js `proxy.ts` (sees a pass-through marker, not the rendered body);
- * - `host`: a framework hook or HypDriv-served app (`createHandler`) that owns the full response on any platform;
+ * - `host`: a framework hook or Hypdriv-served app (`createHandler`) that owns the full response on any platform;
  * - `node`, `test`: plain Node helpers and tests.
  */
 export type Runner = 'worker' | 'proxy' | 'host' | 'node' | 'test';

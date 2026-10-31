@@ -54,7 +54,7 @@ export * from './types';
 export interface CreateAdapterOptions {
   /** Module specifier or absolute path of the application's own adapter (Vercel, Bun, OpenNext...). */
   baseAdapter?: string | null;
-  /** Explicit HypDriv config (otherwise `.hypdriv/adapter-config.json`, then `hypdriv.config.*`). */
+  /** Explicit Hypdriv config (otherwise `.hypdriv/adapter-config.json`, then `hypdriv.config.*`). */
   config?: HypDrivConfig;
   log?: Logger;
   /**
@@ -110,7 +110,7 @@ async function resolveHypConfig(
 }
 
 /**
- * Creates the HypDriv adapter. It delegates `modifyConfig` and `onBuildComplete` to the base adapter
+ * Creates the Hypdriv adapter. It delegates `modifyConfig` and `onBuildComplete` to the base adapter
  * (when configured) and then derives `.hypdriv/manifest.json` and `.hypdriv/report.md` (ADR 0002).
  */
 export function createAdapter(options: CreateAdapterOptions = {}): NextAdapterLike {

@@ -5,7 +5,7 @@ import viteReact from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 
-// One app, three targets: Cloudflare Workers (`@cloudflare/vite-plugin`, HypDriv's Worker shell in src/worker.ts),
+// One app, three targets: Cloudflare Workers (`@cloudflare/vite-plugin`, Hypdriv's Worker shell in src/worker.ts),
 // Vercel and Node (Nitro). Vercel builds set VERCEL=1.
 const target = process.env.HYPDRIV_TARGET ?? (process.env.VERCEL === '1' ? 'vercel' : 'cloudflare');
 

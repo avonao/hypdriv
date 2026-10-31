@@ -1,6 +1,6 @@
-# HypDriv — guidance for coding agents
+# Hypdriv — guidance for coding agents
 
-HypDriv is the Hyper-Extension for Next.js 16+ and Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
+Hypdriv is the Hyper-Extension for Next.js 16+ and Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
 
 ## Posture
 
@@ -54,7 +54,7 @@ e2e/vercel           live suite for Vercel (Hobby plan): app + runner (runtime-l
 e2e/hosts            live checks for every Vite host example on Cloudflare, Vercel or Node + private-deployment provisioning
 scripts/             repo tooling (tsdown 'use client' boundary plugin, size/deps reports)
 docs/                architecture, catalog, ADRs, guides
-skills/hypdriv       agent skill for adopting HypDriv in an application
+skills/hypdriv       agent skill for adopting Hypdriv in an application
 ```
 
 ## Conventions
@@ -76,7 +76,7 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 6. For Vite hosts: build the host example for each target (`HYPDRIV_TARGET=cloudflare|vercel|node`), `vite preview` / `hypdriv serve`, then `pnpm -F @hypdriv/e2e-hosts check --url … --framework <name> …` and `hypdriv audit all`; on real accounts deploy privately with `pnpm -F @hypdriv/e2e-hosts provision` (see its README).
 7. For behaviour only a Vercel deployment shows (Routing Middleware vs Functions, CDN tag purge, ISR, Global Config, Vercel Queues, Cron, WAF, BotID): `pnpm -F @hypdriv/e2e-vercel provision …`, deploy prebuilt from the repository root, then `pnpm -F @hypdriv/e2e-vercel e2e` (see its README). Never put an account token into a deployment's environment.
 
-## Putting HypDriv into a production Cloudflare setup
+## Putting Hypdriv into a production Cloudflare setup
 
 `docs/guides/production-cloudflare.md` is the implementation guide for applications and platforms that go live on Cloudflare: install from a release bundle, the OpenNext production cache (populate the R2 cache before the first request), the policy, Cloudflare resources and secrets, fleets of area Workers behind a router, first-deploy probes, the launch checklist and troubleshooting. Follow it step by step and record the evidence its checklist asks for.
 
@@ -88,7 +88,7 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 - Anything a runner answers before the pipeline (internal routes, static assets) must respect `forceHttps` itself — call `httpsUpgrade()` first.
 - Workers Static Assets answer before the Worker, so `forceHttps` never sees plain-HTTP asset requests: gated test zones carry a Redirect Rule for their hosts, and `hypdriv audit https` checks pages, internal routes and a hashed asset over `http://`.
 - The runners strip every client-supplied `x-hypdriv-*` header before the stages run. The one internal route that reads such a header, `POST /_hypdriv/purge` (`x-hypdriv-purge`), gets it from `info.purgeToken`, which each runner fills from the original request. A new header-authenticated internal route needs the same hand-over.
-- A raw Cloudflare tag purge clears only the Cache API tier; HypDriv's store is memory → Cache API → KV with backfill from lower tiers. Operator purges go through `hypdriv purge` (the Worker's own `purgeTags`), never the zone API alone.
+- A raw Cloudflare tag purge clears only the Cache API tier; Hypdriv's store is memory → Cache API → KV with backfill from lower tiers. Operator purges go through `hypdriv purge` (the Worker's own `purgeTags`), never the zone API alone.
 - Egress from CI and agent sandboxes can rotate client addresses per connection: verify IP-keyed rate limits over one keep-alive connection.
 - Test deployments are private: Vercel Authentication on all deployments + automation bypass; on Cloudflare a gated custom domain (`provision --gate`) with `workers.dev` off. Tooling passes gateways with `VERCEL_AUTOMATION_BYPASS_SECRET`, `CF_ACCESS_CLIENT_ID/_SECRET` or `HYPDRIV_ACCESS_HEADERS`.
 

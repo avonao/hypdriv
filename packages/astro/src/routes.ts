@@ -8,7 +8,7 @@ export interface AstroRoutePart {
   spread: boolean;
 }
 
-/** The fields of Astro's `IntegrationResolvedRoute` HypDriv reads (structural, so tests need no Astro build). */
+/** The fields of Astro's `IntegrationResolvedRoute` Hypdriv reads (structural, so tests need no Astro build). */
 export interface AstroRouteLike {
   /** Astro's route pattern: `/blog/[slug]`, `/docs/[...path]`, `/[lang]-[version]/info`. */
   pattern: string;
@@ -43,8 +43,8 @@ function groupName(name: string, used: Set<string>): string {
 }
 
 /**
- * Converts an Astro route into HypDriv's canonical pattern and an exact matcher. Astro already uses `[param]`;
- * its rest parameters match zero or more segments, so a segment that is only `[...rest]` becomes HypDriv's
+ * Converts an Astro route into Hypdriv's canonical pattern and an exact matcher. Astro already uses `[param]`;
+ * its rest parameters match zero or more segments, so a segment that is only `[...rest]` becomes Hypdriv's
  * optional catch-all `[[...rest]]`. Segments that mix text and parameters (`[slug].json`, `[lang]-[version]`)
  * keep their spelling in the pattern and match through a regex built from Astro's segment parts, with named
  * groups so the runtime sees the parameters.
@@ -85,7 +85,7 @@ function hasMixedSegments(route: Pick<AstroRouteLike, 'segments'>): boolean {
 }
 
 /**
- * Converts the routes of `astro:routes:resolved` into HypDriv routes. Config redirects are left out (Astro answers
+ * Converts the routes of `astro:routes:resolved` into Hypdriv routes. Config redirects are left out (Astro answers
  * them before any middleware runs); Astro's internal routes (server islands, actions, the image endpoint) are kept
  * as endpoints so the runtime recognises them.
  */
@@ -117,7 +117,7 @@ export function fromAstroRoutes(
   return out;
 }
 
-/** The `routes[]` entries of Astro's serialized SSR manifest HypDriv reads (`astro:build:ssr`). */
+/** The `routes[]` entries of Astro's serialized SSR manifest Hypdriv reads (`astro:build:ssr`). */
 export interface AstroManifestRouteLike {
   routeData?: { route?: string; type?: string; prerender?: boolean };
   scripts?: Array<{ type?: string; value?: string; stage?: string; children?: string }>;

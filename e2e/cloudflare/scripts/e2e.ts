@@ -1,5 +1,5 @@
 /**
- * Live end-to-end suite for HypDriv on Cloudflare. Runs against a deployed copy of this app (see README.md)
+ * Live end-to-end suite for Hypdriv on Cloudflare. Runs against a deployed copy of this app (see README.md)
  * and verifies every capability through its public behaviour and the Cloudflare API.
  *
  *   E2E_URL=https://hypdriv-e2e.example.com \
@@ -472,7 +472,7 @@ check({
       else blocked.push(attrs.trim().slice(0, 60));
     }
     assert(!blocked.length, `${blocked.length} script(s) the policy blocks: ${blocked.join(' | ')}`);
-    return `${byNonce} by nonce · ${byHash} by hash (HypDriv-owned inline scripts)`;
+    return `${byNonce} by nonce · ${byHash} by hash (Hypdriv-owned inline scripts)`;
   },
 });
 

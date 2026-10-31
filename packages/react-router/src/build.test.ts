@@ -268,7 +268,7 @@ describe('finalizeReactRouterBuild', () => {
     expect(configJson.routes.at(-1)).toEqual({ src: '^/.*$', dest: `/${small}` });
   });
 
-  it('builds HypDriv’s Routing Middleware for the statically served paths', async () => {
+  it('builds Hypdriv’s Routing Middleware for the statically served paths', async () => {
     const root = project();
     await finalize(root, 'vercel', { vercelMiddleware: true });
     const out = join(root, '.vercel/output');

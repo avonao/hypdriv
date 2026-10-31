@@ -5,7 +5,7 @@
 "@hypdriv/cli": minor
 ---
 
-Owner audit tokens: HypDriv's own tooling passes its bot shield and rate limits.
+Owner audit tokens: Hypdriv's own tooling passes its bot shield and rate limits.
 
 - `@hypdriv/security`: `signAuditToken` / `verifyAuditToken` (host-bound HMAC with the internal secret, at most one hour) and `verifiedAudit()`; the `bots` stage classifies verified audits as `human` (`audit-token`) and the `rate-limit` stage skips them. The URL host and the `Host` header are both accepted, for servers that rewrite the URL host.
 - `@hypdriv/core`: `x-hypdriv-audit` is a trusted inbound header (`HEADER.auditToken`).

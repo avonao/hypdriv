@@ -1,6 +1,6 @@
-# Purser CSS with HypDriv
+# Purser CSS with Hypdriv
 
-[Purser CSS](https://pursercss.dev) compiles styles written next to your components into one deterministic atomic stylesheet in which no declaration is ever overridden. HypDriv makes Purser first-class in a Next.js 16 project without touching Purser itself (ADR 0009).
+[Purser CSS](https://pursercss.dev) compiles styles written next to your components into one deterministic atomic stylesheet in which no declaration is ever overridden. Hypdriv makes Purser first-class in a Next.js 16 project without touching Purser itself (ADR 0009).
 
 ## Setup
 

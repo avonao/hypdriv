@@ -7,7 +7,7 @@ export const FACTS_KEY = 'hypdriv';
  */
 export interface HypFacts {
   requestId: string;
-  /** `host` (the Nitro hook ran the pipeline) or `worker` (HypDriv's Cloudflare Worker entry did). */
+  /** `host` (the Nitro hook ran the pipeline) or `worker` (Hypdriv's Cloudflare Worker entry did). */
   runner: string;
   /** The matched manifest route id. */
   route: string | null;

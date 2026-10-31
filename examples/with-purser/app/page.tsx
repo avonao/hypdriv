@@ -7,7 +7,7 @@ export default function Home() {
     <>
       <h1 className={css.props(text.title)}>Atomic CSS that cannot be overridden, served from the edge.</h1>
       <p className={css.props(text.lead)}>
-        Purser compiles this page&apos;s styles into one deterministic stylesheet; HypDriv builds it inside{' '}
+        Purser compiles this page&apos;s styles into one deterministic stylesheet; Hypdriv builds it inside{' '}
         <code className={css.props(text.code)}>next build</code>, proves every prerendered class exists,
         preloads it with Early Hints and pins your theme before the first byte reaches the browser.
       </p>

@@ -13,7 +13,7 @@ export default defineConfig({
   format: ['esm'],
   platform: 'neutral',
   target: 'es2023',
-  // Workspace packages, the framework (Nuxt, Nitro, h3, Vue, Vite), Nitro's and HypDriv's virtual modules stay
+  // Workspace packages, the framework (Nuxt, Nitro, h3, Vue, Vite), Nitro's and Hypdriv's virtual modules stay
   // external: Nuxt and Nitro resolve them when they bundle the application.
   deps: {
     neverBundle: [

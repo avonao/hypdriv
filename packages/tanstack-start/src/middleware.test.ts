@@ -128,7 +128,7 @@ describe('createHypDrivMiddleware', () => {
     expect(body.match(/nonce=/g)).toHaveLength(2);
   });
 
-  it('installs the HypDriv context for everything Start runs below it', async () => {
+  it('installs the Hypdriv context for everything Start runs below it', async () => {
     let seen: { runner?: string; requestId?: string } = {};
     const { response } = await run(
       middleware(),
@@ -201,7 +201,7 @@ describe('createHypDrivMiddleware', () => {
     expect(response.headers.get('x-frame-options')).toBe('DENY');
   });
 
-  it('passes through inside an outer HypDriv runner (Worker shell, server entry) and still forwards its nonce', async () => {
+  it('passes through inside an outer Hypdriv runner (Worker shell, server entry) and still forwards its nonce', async () => {
     await ensureContextStore();
     const config = loadConfig({ site: { name: 'outer' } });
     const outer = createContext({

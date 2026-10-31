@@ -1,7 +1,7 @@
 import { defineConfig } from 'hypdriv';
 
 /**
- * Every HypDriv capability that applies on Vercel switched on, each backed by the platform service that
+ * Every Hypdriv capability that applies on Vercel switched on, each backed by the platform service that
  * upgrades it (Vercel CDN, Global Config, Vercel Queues, Vercel WAF, BotID, Vercel Cron), so the live suite
  * (`scripts/e2e.ts`) can verify them against a real Vercel project. Queue topics are project-scoped on
  * Vercel, so the names below need no account prefix.
@@ -30,7 +30,7 @@ export default defineConfig({
     edge: {
       policies: [
         // Prerendered pages: Vercel's CDN caches them natively (respectOrigin, the default, keeps the page's own
-        // Cache-Control in charge); HypDriv reports them as `x-hypdriv-cache: CDN`.
+        // Cache-Control in charge); Hypdriv reports them as `x-hypdriv-cache: CDN`.
         { id: 'static', match: '/', ttl: '1h', swr: '1d' },
         { id: 'tagged', match: '/tagged', ttl: '1h', swr: '1d', tags: ['e2e-tagged'] },
         // Cached per country (Vary: X-Vercel-IP-Country): withVercelCdn on Route Handlers; a page with `vary`

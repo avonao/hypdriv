@@ -1,12 +1,12 @@
-# HypDriv × SvelteKit 3
+# Hypdriv × SvelteKit 3
 
-Prerendered `/`, `/about` and `/blog/[slug]` pages, a server-rendered `/ssr`, a form action on `/form` and the endpoint `/api/hello`; SvelteKit's own `csp` option is folded into HypDriv's single policy. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [SvelteKit 3 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/sveltekit.md).
+Prerendered `/`, `/about` and `/blog/[slug]` pages, a server-rendered `/ssr`, a form action on `/form` and the endpoint `/api/hello`; SvelteKit's own `csp` option is folded into Hypdriv's single policy. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [SvelteKit 3 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/sveltekit.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

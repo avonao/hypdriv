@@ -17,7 +17,7 @@ async function zonePurge(body: Record<string, unknown>): Promise<boolean> {
   return res.ok;
 }
 
-/** Purges HypDriv's edge cache (and the Cloudflare zone cache when credentials exist) by tags or URLs. */
+/** Purges Hypdriv's edge cache (and the Cloudflare zone cache when credentials exist) by tags or URLs. */
 export async function purgeEdge(options: {
   tags?: string[];
   urls?: string[];
@@ -54,7 +54,7 @@ async function purgeTwice(options: { tags?: string[]; urls?: string[] }): Promis
 }
 
 /**
- * Keeps the repeat purge alive after the response: the HypDriv request context, else the platform's
+ * Keeps the repeat purge alive after the response: the Hypdriv request context, else the platform's
  * `waitUntil` (Vercel Functions, where Route Handlers and Server Actions run outside the proxy's context).
  */
 function schedule(task: Promise<unknown>): void {
@@ -78,7 +78,7 @@ async function nextCache(): Promise<NextCache> {
 
 /**
  * `revalidateTag` from `next/cache` followed by an edge purge of the same tag (repeated once Next has
- * applied the revalidation, see `REPURGE_DELAY_MS`), so HypDriv's edge cache and Next's data cache stay in
+ * applied the revalidation, see `REPURGE_DELAY_MS`), so Hypdriv's edge cache and Next's data cache stay in
  * sync. Accepts Next 16's cache-life profile argument.
  */
 export async function revalidateTag(tag: string, profile?: unknown): Promise<void> {

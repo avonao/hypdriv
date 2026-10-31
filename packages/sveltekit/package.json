@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/sveltekit",
   "version": "0.1.0",
-  "description": "HypDriv for SvelteKit: a wrapper adapter that writes the route manifest, CSP hashes and static headers for Cloudflare, Vercel and Node, a `handle` hook that runs the Drivetrain around every server response, the Cloudflare Worker shell and a Node server.",
+  "description": "Hypdriv for SvelteKit: a wrapper adapter that writes the route manifest, CSP hashes and static headers for Cloudflare, Vercel and Node, a `handle` hook that runs the Drivetrain around every server response, the Cloudflare Worker shell and a Node server.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

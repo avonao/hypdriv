@@ -67,7 +67,7 @@ describe('gradeHeaders', () => {
     expect(bare.notes).toEqual(
       expect.arrayContaining([
         'Cache-Control is missing.',
-        'HSTS is not graded over http (local preview); HypDriv sends it on https origins.',
+        'HSTS is not graded over http (local preview); Hypdriv sends it on https origins.',
       ]),
     );
     const reportOnly = gradeHeaders({ 'content-security-policy-report-only': "default-src 'self'" });
@@ -454,7 +454,7 @@ describe('owner audit tokens', () => {
 });
 
 describe('CSP audit of the declared cached-HTML fallback', () => {
-  it('warns instead of failing when HypDriv declares the unsafe-inline fallback', async () => {
+  it('warns instead of failing when Hypdriv declares the unsafe-inline fallback', async () => {
     const { auditCsp } = await import('./csp');
     const policy =
       "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'";

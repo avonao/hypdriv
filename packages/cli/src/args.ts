@@ -213,7 +213,7 @@ export function renderCommandHelp(info: CommandInfo): string {
 /** Top-level help listing every command. */
 export function renderGlobalHelp(commands: CommandInfo[], version: string): string {
   const lines: string[] = [];
-  lines.push(`hypdriv ${version} — the HypDriv command for Next.js 16+ on Cloudflare Workers`);
+  lines.push(`hypdriv ${version} — the Hypdriv command for Next.js 16+ on Cloudflare Workers`);
   lines.push('');
   lines.push('Usage: hypdriv <command> [options]');
   lines.push('');

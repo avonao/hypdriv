@@ -105,7 +105,7 @@ describe('vercelQueue', () => {
 });
 
 describe('toQueueCallback', () => {
-  it('hands each delivery to the consumer as a one-message batch named after the HypDriv queue', async () => {
+  it('hands each delivery to the consumer as a one-message batch named after the Hypdriv queue', async () => {
     const inputs: unknown[] = [];
     const [handler, options] = toQueueCallback(async (input) => void inputs.push(input), {
       config,

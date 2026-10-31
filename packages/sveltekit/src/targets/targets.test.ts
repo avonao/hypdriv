@@ -71,7 +71,7 @@ describe('wrapWorker', () => {
   );
   const manifest = emptyManifest({ buildId: 'b1' });
 
-  it("moves the adapter's Worker aside and writes HypDriv's shell in its place", () => {
+  it("moves the adapter's Worker aside and writes Hypdriv's shell in its place", () => {
     const layout = { pages: false, assetsDir, workerFile: join(assetsDir, '_worker.js'), configPath: null };
     const { appFile } = wrapWorker({
       layout,
@@ -108,7 +108,7 @@ describe('wrapWorker', () => {
         manifest,
         root,
       }),
-    ).toThrow(/already HypDriv's Worker shell/);
+    ).toThrow(/already Hypdriv's Worker shell/);
   });
 
   it('serialises an inline config and reports a missing Worker or exports module', () => {
@@ -167,12 +167,12 @@ describe('Vercel header routes', () => {
     { path: '/about', set: { 'content-security-policy': "script-src 'sha256-a='", 'x-hypdriv-csp': 'hash' } },
   ];
 
-  it("places HypDriv's routes before the adapter's prerender rewrites", () => {
+  it("places Hypdriv's routes before the adapter's prerender rewrites", () => {
     const outDir = join(tmp, 'vercel', '.vercel', 'output');
     mkdirSync(join(outDir, 'static', '.hypdriv'), { recursive: true });
     writeFileSync(join(outDir, 'config.json'), JSON.stringify({ version: 3, routes: adapterRoutes }));
     expect(writeVercelHeaders(outDir, rules).routes).toBe(2);
-    // Idempotent: a second run replaces HypDriv's routes.
+    // Idempotent: a second run replaces Hypdriv's routes.
     writeVercelHeaders(outDir, rules);
     const config = JSON.parse(readFileSync(join(outDir, 'config.json'), 'utf8')) as {
       routes: Array<Record<string, unknown>>;

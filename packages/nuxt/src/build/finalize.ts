@@ -103,7 +103,7 @@ export interface FinalizeNuxtInput {
 }
 
 /**
- * Builds the HypDriv manifest of a Nuxt build: pages and server routes, client assets per page, the prerendered
+ * Builds the Hypdriv manifest of a Nuxt build: pages and server routes, client assets per page, the prerendered
  * documents (CSP hashes, Early Hints) and the build checks (budgets, Purser, secrets). Writes `.hypdriv/`.
  */
 export async function finalizeNuxtManifest(input: FinalizeNuxtInput): Promise<FinalizeResult> {
@@ -199,7 +199,7 @@ export function completeNuxtOutput(input: NuxtOutputInput): NuxtOutputResult {
 }
 
 /**
- * The built server files that embed HypDriv's runtime manifest, split into those carrying `manifest` and those
+ * The built server files that embed Hypdriv's runtime manifest, split into those carrying `manifest` and those
  * carrying another one.
  */
 export function runtimeManifestFiles(

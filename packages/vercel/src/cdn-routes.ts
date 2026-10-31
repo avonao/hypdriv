@@ -27,7 +27,7 @@ export interface NextHeaderRule {
 
 /** Result of `vercelCdnRouteHeaders`. */
 export interface VercelCdnRouteHeaders {
-  /** Rules for `headers()`, ordered so that the first matching HypDriv policy wins (later rules override). */
+  /** Rules for `headers()`, ordered so that the first matching Hypdriv policy wins (later rules override). */
   rules: NextHeaderRule[];
   /** Explicit policies that could not be expressed, with the reason. */
   skipped: Array<{ policy: string; reason: string }>;
@@ -37,7 +37,7 @@ export interface VercelCdnRouteHeaders {
  * Expresses explicit edge-cache policies as `next.config` `headers()` rules carrying
  * `Vercel-CDN-Cache-Control` (+ `CDN-Cache-Control` when `downstream`) and `Vercel-Cache-Tag`. On Vercel the
  * function response is what the CDN caches and Routing Middleware cannot set caching headers, so this is how
- * page responses get CDN-cached by HypDriv policy; `withHypDriv` merges the rules into `headers()` when
+ * page responses get CDN-cached by Hypdriv policy; `withHypDriv` merges the rules into `headers()` when
  * deploying to Vercel.
  *
  * Only policies whose meaning survives static route headers are emitted: `respectOrigin: false` (static

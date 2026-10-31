@@ -127,7 +127,7 @@ export async function hashesFor(doc: string): Promise<{ scriptHashes: string[]; 
 
 /**
  * Content fingerprint of the build output (see `HypManifest.fingerprint`): the build id and deployment id,
- * every route's client assets (content-hashed names), CSP hashes of prerendered HTML, HypDriv's inline-script
+ * every route's client assets (content-hashed names), CSP hashes of prerendered HTML, Hypdriv's inline-script
  * hashes and the Purser stylesheet. Canonical JSON, SHA-256, 16 hex characters.
  */
 export async function buildFingerprint(
@@ -158,9 +158,9 @@ export async function buildFingerprint(
 }
 
 /**
- * Builds the HypDriv manifest from routes a framework integration discovered: client assets per route, CSP
+ * Builds the Hypdriv manifest from routes a framework integration discovered: client assets per route, CSP
  * hashes of static documents, Early Hints, the speculation graph, Purser verification, the secrets scan,
- * client weights and budgets, HypDriv's inline-script hashes, the content fingerprint and cache policy ids.
+ * client weights and budgets, Hypdriv's inline-script hashes, the content fingerprint and cache policy ids.
  * Shared by the Next.js adapter and the Vite integrations.
  */
 export async function assembleManifest(input: AssembleManifestInput): Promise<BuildManifestResult> {
@@ -315,7 +315,7 @@ export async function assembleManifest(input: AssembleManifestInput): Promise<Bu
   if (overBudget.length && config.budgets.failOn === 'error')
     failures.push(`${overBudget.length} budget(s) exceeded: ${overBudget.map((b) => b.id).join(', ')}`);
 
-  // Route-independent inline scripts HypDriv components render without a nonce (allowed by hash everywhere).
+  // Route-independent inline scripts Hypdriv components render without a nonce (allowed by hash everywhere).
   const inlineScriptHashes: string[] = [];
   const spec = config.performance.speculation;
   if (spec && spec.inject !== 'off') {

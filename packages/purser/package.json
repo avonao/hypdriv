@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/purser",
   "version": "0.1.0",
-  "description": "HypDriv bridge for Purser CSS: in-process build/watch, unstyled-atom guard, atom usage reports, edge theme pinning and zero-override audits.",
+  "description": "Hypdriv bridge for Purser CSS: in-process build/watch, unstyled-atom guard, atom usage reports, edge theme pinning and zero-override audits.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

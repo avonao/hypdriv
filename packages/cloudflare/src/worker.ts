@@ -129,7 +129,7 @@ function isLocalHost(hostname: string): boolean {
 }
 
 /**
- * Creates the Worker entry that wraps OpenNext's worker with the HypDriv Drivetrain (ADR 0011).
+ * Creates the Worker entry that wraps OpenNext's worker with the Hypdriv Drivetrain (ADR 0011).
  * Startup work is minimal; OpenNext is imported on the first request that needs it.
  */
 export function createWorker(options: CreateWorkerOptions): HypDrivWorker {

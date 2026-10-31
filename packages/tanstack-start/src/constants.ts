@@ -11,5 +11,5 @@ export const VIRTUAL_START = 'virtual:hypdriv/tanstack-start';
 /** Minimum length of a valid prerender token (an emptied token disables the prerender bypass). */
 export const MIN_TOKEN_LENGTH = 32;
 
-/** The framework label HypDriv reports in logs, `/_hypdriv/health` and the manifest. */
+/** The framework label Hypdriv reports in logs, `/_hypdriv/health` and the manifest. */
 export const HOST_LABEL = 'tanstack-start';

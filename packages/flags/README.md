@@ -1,6 +1,6 @@
 # @hypdriv/flags
 
-Edge feature flags for [HypDriv](https://github.com/avonao/hypdriv): deterministic percentage rollouts, geo / path / cookie / header / device / date-window rules, flag dependencies, QA overrides, pluggable providers (static, env, KV, OpenFeature) and React hooks. Flags are evaluated once per request at the edge (Worker or `proxy.ts`), forwarded to Next.js in a header and exposed to server and client code.
+Edge feature flags for [Hypdriv](https://github.com/avonao/hypdriv): deterministic percentage rollouts, geo / path / cookie / header / device / date-window rules, flag dependencies, QA overrides, pluggable providers (static, env, KV, OpenFeature) and React hooks. Flags are evaluated once per request at the edge (Worker or `proxy.ts`), forwarded to Next.js in a header and exposed to server and client code.
 
 Zero infrastructure: the static and env providers need nothing. KV and OpenFeature are optional upgrades.
 

@@ -8,7 +8,7 @@ export default async function Home() {
     <>
       <h1>Next.js 16 on Vercel, hyper-extended.</h1>
       <p>
-        The shell of this page is prerendered: Vercel serves it from its CDN, HypDriv adds a strict CSP,
+        The shell of this page is prerendered: Vercel serves it from its CDN, Hypdriv adds a strict CSP,
         Speculation Rules for the links below and per-visitor geo and flags in the streamed part.
       </p>
       <Suspense fallback={<p className="card">Loading your region…</p>}>

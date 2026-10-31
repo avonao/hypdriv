@@ -9,7 +9,7 @@ export interface VitalsPayload {
   value: number;
   rating: VitalRating;
   id: string;
-  /** HypDriv route id from `<meta name="hypdriv:route">`. */
+  /** Hypdriv route id from `<meta name="hypdriv:route">`. */
   route?: string;
   pathname: string;
   navigationType?: string;

@@ -24,10 +24,10 @@ import { type RouteManifestEntryLike, routePath, routePattern } from './routes';
 /** Files of a client build that only configure other platforms. */
 const PLATFORM_FILES = new Set(['_headers', '_redirects', '_routes.json', '.assetsignore']);
 
-/** The launcher HypDriv writes next to each server bundle: the bundle's default handler, or React Router's. */
+/** The launcher Hypdriv writes next to each server bundle: the bundle's default handler, or React Router's. */
 export const VERCEL_LAUNCHER = 'hypdriv-vercel.mjs';
 
-/** Records the functions a previous HypDriv run wrote, so a rebuild replaces them. */
+/** Records the functions a previous Hypdriv run wrote, so a rebuild replaces them. */
 const FUNCTIONS_RECORD = '.hypdriv-functions.json';
 
 /** A server bundle of the build (React Router `serverBundles`, or the single default bundle). */
@@ -183,7 +183,7 @@ export function launcherSource(serverBuildFile: string): string {
     `import * as build from ${JSON.stringify(`./${serverBuildFile}`)};`,
     "import { createRequestHandler, RouterContextProvider } from 'react-router';",
     '',
-    '// HypDriv server entry: the default export runs the Drivetrain around React Router (every request).',
+    '// Hypdriv server entry: the default export runs the Drivetrain around React Router (every request).',
     "const handler = typeof build.default === 'function'",
     '  ? build.default',
     "  : ((rr) => (request) => rr(request, new RouterContextProvider()))(createRequestHandler(build, 'production'));",
@@ -254,7 +254,7 @@ export interface ReactRouterVercelOutputInput {
   rules: StaticHeaderRule[];
   manifest: HypManifest;
   config: LoadedHypConfig;
-  /** Build HypDriv's Routing Middleware for the statically served paths (default true). */
+  /** Build Hypdriv's Routing Middleware for the statically served paths (default true). */
   middleware: boolean;
   frameworkVersion: string;
   log: Pick<Logger, 'info' | 'warn'>;
@@ -262,8 +262,8 @@ export interface ReactRouterVercelOutputInput {
 
 /**
  * Writes the Vercel Build Output (`.vercel/output`) for a React Router build: the client build as static files,
- * HypDriv's header rules before the filesystem, prerendered documents rewritten for GET/HEAD, one Node.js function
- * per server bundle (traced with `@vercel/nft`; `@vercel/react-router` route `config` honoured), and HypDriv's
+ * Hypdriv's header rules before the filesystem, prerendered documents rewritten for GET/HEAD, one Node.js function
+ * per server bundle (traced with `@vercel/nft`; `@vercel/react-router` route `config` honoured), and Hypdriv's
  * Routing Middleware in front of everything Vercel serves statically. `vercel build` deploys it as is.
  */
 export async function writeReactRouterVercelOutput(input: ReactRouterVercelOutputInput): Promise<{
@@ -307,7 +307,7 @@ export async function writeReactRouterVercelOutput(input: ReactRouterVercelOutpu
       const settings = bundleConfig(bundle);
       if (settings.runtime === 'edge')
         throw new Error(
-          `hypdriv: the server bundle "${bundle.id}" asks for the Edge runtime; HypDriv runs React Router on Vercel's Node.js runtime (Fluid compute). Remove \`runtime: 'edge'\` from the route's \`config\`.`,
+          `hypdriv: the server bundle "${bundle.id}" asks for the Edge runtime; Hypdriv runs React Router on Vercel's Node.js runtime (Fluid compute). Remove \`runtime: 'edge'\` from the route's \`config\`.`,
         );
       const serverFile = resolve(input.root, bundle.file);
       if (!existsSync(serverFile)) throw new Error(`hypdriv: server bundle not found: ${bundle.file}`);
@@ -365,7 +365,7 @@ export async function writeReactRouterVercelOutput(input: ReactRouterVercelOutpu
   }
   writeFileSync(record, `${JSON.stringify(functions)}\n`);
 
-  // Routes: skew protection → HypDriv header rules → Routing Middleware → prerendered documents → filesystem →
+  // Routes: skew protection → Hypdriv header rules → Routing Middleware → prerendered documents → filesystem →
   // functions (or the SPA fallback). Header rules precede the document rewrites so they match the URL path.
   const routes: VercelRoute[] = [];
   const headerRoutes = mergeVercelRoutes([{ handle: 'filesystem' }], input.rules).slice(0, -1);

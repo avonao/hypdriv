@@ -1,6 +1,6 @@
 # Security Policy
 
-HypDriv ships security features (CSP generation, security headers, rate limiting, bot shielding, session encryption, webhook verification, secrets scanning). Bugs in those features can weaken applications that rely on them, so we treat security reports with priority.
+Hypdriv ships security features (CSP generation, security headers, rate limiting, bot shielding, session encryption, webhook verification, secrets scanning). Bugs in those features can weaken applications that rely on them, so we treat security reports with priority.
 
 ## Supported versions
 
@@ -23,6 +23,6 @@ You will receive an acknowledgement within 72 hours and a status update at least
 
 ## Scope notes
 
-- HypDriv's CSP and header presets are defaults; the application owner remains responsible for the final policy. Reports about _defaults that are weaker than they should be_ are welcome.
+- Hypdriv's CSP and header presets are defaults; the application owner remains responsible for the final policy. Reports about _defaults that are weaker than they should be_ are welcome.
 - Reports about third-party dependencies should go to the respective project, but tell us too so we can bump versions quickly.
 - The `hypdriv secrets` scanner is heuristic. A pattern it does not detect is a feature request, not a vulnerability, unless documentation claims otherwise.

@@ -4,10 +4,10 @@ import { formatBytes, frameworkLabel } from '@hypdriv/core';
 /** Human-readable build report written next to the manifest (`.hypdriv/report.md`). */
 export function renderReport(manifest: HypManifest): string {
   const lines: string[] = [];
-  lines.push('# HypDriv build report');
+  lines.push('# Hypdriv build report');
   lines.push('');
   lines.push(
-    `- Build: \`${manifest.buildId}\` · ${frameworkLabel(manifest)} · HypDriv ${manifest.hypdrivVersion} · ${manifest.generatedAt}`,
+    `- Build: \`${manifest.buildId}\` · ${frameworkLabel(manifest)} · Hypdriv ${manifest.hypdrivVersion} · ${manifest.generatedAt}`,
   );
   lines.push(
     `- Cache Components: ${manifest.cacheComponents ? 'on' : 'off'} · basePath: \`${manifest.basePath || '/'}\` · trailingSlash: ${manifest.trailingSlash}`,

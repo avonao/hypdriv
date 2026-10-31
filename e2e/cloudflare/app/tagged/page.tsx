@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 
 // Static until `revalidateTag('e2e-tagged')`: the tag cache (Durable Object) marks it stale and the
-// HypDriv edge cache entry is purged by tag.
+// Hypdriv edge cache entry is purged by tag.
 export const dynamic = 'force-static';
 
 const stamp = unstable_cache(async () => new Date().toISOString(), ['e2e-tagged-stamp'], {

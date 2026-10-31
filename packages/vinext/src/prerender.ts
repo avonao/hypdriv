@@ -68,7 +68,7 @@ const ERROR_DOCUMENTS = new Set(['/404', '/500', '/_error', '/_not-found', '/_gl
 export interface PrerenderedPage {
   /** The concrete pathname (`/blog/hello`). */
   pathname: string;
-  /** The route in HypDriv's canonical syntax (`/blog/[slug]`). */
+  /** The route in Hypdriv's canonical syntax (`/blog/[slug]`). */
   pattern: string;
   /** The HTML document. */
   file: string;

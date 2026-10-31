@@ -1,7 +1,7 @@
 {
   "name": "hypdriv",
   "version": "0.1.0",
-  "description": "HypDriv — performance, security and observability for Next.js 16+ on Cloudflare Workers, Vercel and Node. Umbrella package re-exporting the @hypdriv/* modules a Next.js app needs and the hypdriv CLI.",
+  "description": "Hypdriv — performance, security and observability for Next.js 16+ on Cloudflare Workers, Vercel and Node. Umbrella package re-exporting the @hypdriv/* modules a Next.js app needs and the hypdriv CLI.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -1,5 +1,5 @@
 /**
- * Types of HypDriv's virtual modules. Reference them once in the application:
+ * Types of Hypdriv's virtual modules. Reference them once in the application:
  *
  * ```ts
  * /// <reference types="@hypdriv/vite/virtual" />

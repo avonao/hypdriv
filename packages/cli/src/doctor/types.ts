@@ -41,7 +41,7 @@ export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   wrangler: 'Wrangler',
   vercel: 'Vercel',
   'workers-compat': 'Workers compatibility',
-  hypdriv: 'HypDriv',
+  hypdriv: 'Hypdriv',
   size: 'Size and startup',
   security: 'Security',
   purser: 'Purser CSS',

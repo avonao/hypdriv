@@ -168,7 +168,7 @@ describe.skipIf(nodeMajor < 22)('a real vinext build', () => {
     expect(manifest.csp['page:/']?.scriptHashes.length).toBeGreaterThan(0);
     expect(manifest.csp['page:/news']).toBeUndefined();
 
-    // vinext prerendered the pages without HypDriv (no nonce, no request context).
+    // vinext prerendered the pages without Hypdriv (no nonce, no request context).
     const home = readFileSync(join(root, 'dist', 'server', 'prerendered-routes', 'index.html'), 'utf8');
     expect(home).not.toContain('nonce=');
     const inline = [...home.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(

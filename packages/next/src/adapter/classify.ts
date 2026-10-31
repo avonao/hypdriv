@@ -112,7 +112,7 @@ function prerenderInfo(
   return info;
 }
 
-/** Turns adapter outputs into HypDriv routes with classification and prerender metadata. */
+/** Turns adapter outputs into Hypdriv routes with classification and prerender metadata. */
 export function classifyOutputs(outputs: AdapterOutputs, rscSuffix = '.rsc'): ClassifiedRoute[] {
   const prerendersById = new Map<string, PrerenderOutput>();
   const primaryByRoute = new Map<string, PrerenderOutput>();

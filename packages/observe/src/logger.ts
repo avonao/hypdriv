@@ -78,7 +78,7 @@ function consoleSink(line: string, level: EmitLevel): void {
 }
 
 /**
- * Structured logger for HypDriv: the same JSON / pretty line format as core's console logger, plus
+ * Structured logger for Hypdriv: the same JSON / pretty line format as core's console logger, plus
  * the configured redaction keys, protected correlation ids and sampling of `debug`/`info` lines.
  * Sampling is decided once per request id (`requestId` field), so a request's lines are kept or
  * dropped together; `warn`/`error` are never sampled.

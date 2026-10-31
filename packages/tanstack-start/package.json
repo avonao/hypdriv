@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/tanstack-start",
   "version": "0.1.0",
-  "description": "HypDriv for TanStack Start: the Drivetrain as global request middleware (security headers, CSP nonces through the router's ssr.nonce, rate limiting, bot shield, flags, /_hypdriv/*), the route manifest with CSP hashes of prerendered pages, and static headers for Cloudflare Workers, Vercel and Node.",
+  "description": "Hypdriv for TanStack Start: the Drivetrain as global request middleware (security headers, CSP nonces through the router's ssr.nonce, rate limiting, bot shield, flags, /_hypdriv/*), the route manifest with CSP hashes of prerendered pages, and static headers for Cloudflare Workers, Vercel and Node.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -65,10 +65,10 @@ const client = {
 };
 
 describe('Node server', () => {
-  it('serves the build’s HypDriv server entry with static files first', async () => {
+  it('serves the build’s Hypdriv server entry with static files first', async () => {
     const root = project({
       ...client,
-      // A server build with HypDriv's entry (what the Vite plugin produces for Node).
+      // A server build with Hypdriv's entry (what the Vite plugin produces for Node).
       'build/server/index.js': [
         "export const assetsBuildDirectory = 'build/client';",
         "export const publicPath = '/';",
@@ -99,11 +99,11 @@ describe('Node server', () => {
     expect(await dynamic.text()).toBe('dynamic /ssr 127.0.0.1');
   });
 
-  it('wraps builds without HypDriv’s entry using hypdriv.config and .hypdriv/manifest.json', async () => {
+  it('wraps builds without Hypdriv’s entry using hypdriv.config and .hypdriv/manifest.json', async () => {
     const root = project({
       ...client,
       'hypdriv.config.mjs': "export default { site: { name: 'node-fallback' } };",
-      // A single-page app build (ssr: false) without HypDriv's entry: everything is static.
+      // A single-page app build (ssr: false) without Hypdriv's entry: everything is static.
       'build/server/index.js':
         "export const assetsBuildDirectory = 'build/client'; export const ssr = false;",
     });

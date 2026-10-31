@@ -195,7 +195,7 @@ describe('createHandler', () => {
     expect(response.headers.get('x-request-id')).toBeNull();
   });
 
-  it('strips client-supplied HypDriv headers before the application sees them', async () => {
+  it('strips client-supplied Hypdriv headers before the application sees them', async () => {
     const handler = createHandler({ config: {}, manifest, target: 'node' });
     let flags: string | null = 'unset';
     await handler(
@@ -214,7 +214,7 @@ describe('createHandler', () => {
     expect(flags).toBeNull();
   });
 
-  it('passes through when an outer HypDriv runner already handles the request', async () => {
+  it('passes through when an outer Hypdriv runner already handles the request', async () => {
     const handler = createHandler({ config: {}, manifest, target: 'node' });
     const inner = vi.fn(async () => html('<script>x()</script>'));
     const response = await handler(new Request('https://example.com/account'), {

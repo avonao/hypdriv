@@ -22,7 +22,7 @@ import {
 export { defineRoute, type ServerActionContext, safeAction } from './actions';
 export { HypDrivMeta, Speculation, ThemeScript } from './components';
 
-/** Request-scoped information HypDriv makes available to Server Components, Route Handlers and Server Actions. */
+/** Request-scoped information Hypdriv makes available to Server Components, Route Handlers and Server Actions. */
 export interface HypServerContext {
   requestId: string | null;
   nonce: string | null;
@@ -45,7 +45,7 @@ export interface HypServerContext {
   flag<T extends FlagValue>(name: string, fallback: T): T;
   flag(name: string): FlagValue | undefined;
   log: Logger;
-  /** The full pipeline context when running inside the HypDriv Worker. */
+  /** The full pipeline context when running inside the Hypdriv Worker. */
   pipeline: HypContext | undefined;
 }
 
@@ -117,7 +117,7 @@ const processEnv = (): HypDrivEnv => {
 };
 
 /**
- * The HypDriv request context. Works on the Worker (full pipeline context), on `next start` behind
+ * The Hypdriv request context. Works on the Worker (full pipeline context), on `next start` behind
  * `proxy.ts` (headers forwarded by the stages) and in `next dev`.
  */
 export async function hyp(): Promise<HypServerContext> {
@@ -210,7 +210,7 @@ export function jobHandler(
 }
 
 /**
- * Request facts HypDriv's `<HypDrivMeta/>` renders for the DevTools HUD (safe to expose to the browser).
+ * Request facts Hypdriv's `<HypDrivMeta/>` renders for the DevTools HUD (safe to expose to the browser).
  * Flags are filtered through `publicFlags`, so `serverOnly` definitions never reach the page; without the
  * flag definitions (no pipeline context and none passed) flags are omitted rather than risk a leak.
  */

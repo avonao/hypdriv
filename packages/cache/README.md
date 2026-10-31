@@ -1,6 +1,6 @@
 # @hypdriv/cache
 
-The HypDriv edge cache engine: a full-response cache that sits in front of Next.js in the Drivetrain pipeline (`edge-cache` stage) and complements Next's own caches. Policies come from `hypdriv.config.ts` and from the build manifest, keys are normalised and hashed, entries live in memory, the Workers Cache API or KV, and the stage handles stale-while-revalidate, stale-if-error, negative caching, request coalescing, `Cache-Tag`/`Surrogate-Key` emission and tag/URL purges.
+The Hypdriv edge cache engine: a full-response cache that sits in front of Next.js in the Drivetrain pipeline (`edge-cache` stage) and complements Next's own caches. Policies come from `hypdriv.config.ts` and from the build manifest, keys are normalised and hashed, entries live in memory, the Workers Cache API or KV, and the stage handles stale-while-revalidate, stale-if-error, negative caching, request coalescing, `Cache-Tag`/`Surrogate-Key` emission and tag/URL purges.
 
 Runtime-neutral: no Node built-ins, no Cloudflare types. Workers-specific stores are detected at run time (ADR 0004).
 
@@ -83,9 +83,9 @@ A MISS response is stored when all of these hold (`cacheability()`):
 | origin `Cache-Control`      | with `respectOrigin` (default): `no-store`, `private`, `no-cache` skip; `s-maxage`/`max-age` cap the TTL (`0` skips); `stale-while-revalidate`/`stale-if-error` cap swr/sie; `must-revalidate`/`proxy-revalidate` disable stale serving |
 | size                        | `content-length` or the streamed body above `maxBodySize` (default 5 MB) is not stored             |
 
-The stored copy is captured in `post`, i.e. after later stages (CSP, security headers, Early Hints, HTML transforms) ran, minus volatile headers (`Set-Cookie`, `Age`, `Server-Timing`, `x-hypdriv-*`, `Cache-Tag`, request ids). HIT responses still pass through `post` stages, so those stages must be idempotent (they are in HypDriv). Responses without an origin `Cache-Control` get `cacheControlFor(policy)` = `public, max-age=0, s-maxage=<ttl>, stale-while-revalidate=<swr>, stale-if-error=<sie>` (zero directives omitted).
+The stored copy is captured in `post`, i.e. after later stages (CSP, security headers, Early Hints, HTML transforms) ran, minus volatile headers (`Set-Cookie`, `Age`, `Server-Timing`, `x-hypdriv-*`, `Cache-Tag`, request ids). HIT responses still pass through `post` stages, so those stages must be idempotent (they are in Hypdriv). Responses without an origin `Cache-Control` get `cacheControlFor(policy)` = `public, max-age=0, s-maxage=<ttl>, stale-while-revalidate=<swr>, stale-if-error=<sie>` (zero directives omitted).
 
-Do not put a cache policy on routes that use nonce-based CSP: the cached HTML contains the nonce of the request that rendered it. HypDriv's inferred policies only cover `static`, `isr` and (opt-in) `shell` routes, which receive hash-based CSP.
+Do not put a cache policy on routes that use nonce-based CSP: the cached HTML contains the nonce of the request that rendered it. Hypdriv's inferred policies only cover `static`, `isr` and (opt-in) `shell` routes, which receive hash-based CSP.
 
 ## Keys
 

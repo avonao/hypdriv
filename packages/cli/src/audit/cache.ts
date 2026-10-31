@@ -35,8 +35,8 @@ function token(value: string | null): string | null {
 }
 
 /**
- * Cache status of a response: HypDriv's `x-hypdriv-cache`, else Vercel's CDN header `x-vercel-cache`
- * (`HIT`, `MISS`, `STALE`, `PRERENDER`, `REVALIDATED`, `BYPASS`). On Vercel HypDriv only plans the CDN's
+ * Cache status of a response: Hypdriv's `x-hypdriv-cache`, else Vercel's CDN header `x-vercel-cache`
+ * (`HIT`, `MISS`, `STALE`, `PRERENDER`, `REVALIDATED`, `BYPASS`). On Vercel Hypdriv only plans the CDN's
  * caching (`x-hypdriv-cache: CDN`), so Vercel's own status wins there.
  */
 export function cacheStatus(headers: Headers): string | null {
@@ -63,21 +63,21 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
     second === 'BYPASS' && reason?.startsWith('route-header:') ? reason.slice('route-header:'.length) : null;
 
   if (!first && !second && input.servedStatically) {
-    // Prerendered files the platform serves before HypDriv runs (Workers Static Assets without
-    // run_worker_first, a CDN): they carry HypDriv's static header rules but no request stages.
+    // Prerendered files the platform serves before Hypdriv runs (Workers Static Assets without
+    // run_worker_first, a CDN): they carry Hypdriv's static header rules but no request stages.
     findings.push({
       level: 'info',
       message:
-        "prerendered document served by the platform's static layer before HypDriv (static header rules only; on Cloudflare set assets.run_worker_first to run the request stages)",
+        "prerendered document served by the platform's static layer before Hypdriv (static header rules only; on Cloudflare set assets.run_worker_first to run the request stages)",
     });
   } else if (!first && !second) {
     findings.push({
       level: 'fail',
       message:
-        'no x-hypdriv-cache (or x-vercel-cache) header: HypDriv is not running in front of this server (or cache.edge.debugHeader is off)',
+        'no x-hypdriv-cache (or x-vercel-cache) header: Hypdriv is not running in front of this server (or cache.edge.debugHeader is off)',
     });
   } else if (second === 'CDN') {
-    // Vercel CDN headers planned by HypDriv, served without Vercel's CDN in front (next start, vercel dev).
+    // Vercel CDN headers planned by Hypdriv, served without Vercel's CDN in front (next start, vercel dev).
     const cdn =
       input.second.headers.get('vercel-cdn-cache-control') ?? input.second.headers.get('cdn-cache-control');
     if (!cdn)

@@ -1,4 +1,4 @@
-/** `@hypdriv/vercel`: HypDriv on Vercel (CDN headers and purge, Upstash/Global Config stores, WAF, BotID, Queues). */
+/** `@hypdriv/vercel`: Hypdriv on Vercel (CDN headers and purge, Upstash/Global Config stores, WAF, BotID, Queues). */
 export {
   type BotIdGuardOptions,
   type BotIdVerdict,

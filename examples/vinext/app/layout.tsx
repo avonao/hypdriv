@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'HypDriv on vinext',
+  title: 'Hypdriv on vinext',
   description:
-    'The HypDriv Drivetrain around a vinext App Router app on Cloudflare Workers, Vercel and Node.',
+    'The Hypdriv Drivetrain around a vinext App Router app on Cloudflare Workers, Vercel and Node.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

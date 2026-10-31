@@ -3,7 +3,7 @@ import type { HypDrivConfig, HypManifest, ResolvedConfig } from '@hypdriv/core';
 
 /**
  * `@hypdriv/vite/worker` — the Cloudflare Worker for a plain Vite app (single- or multi-page): the static assets
- * (`env.ASSETS`, with the `not_found_handling` your wrangler config chooses) served through the full HypDriv
+ * (`env.ASSETS`, with the `not_found_handling` your wrangler config chooses) served through the full Hypdriv
  * shell — security headers, CSP, rate limiting, bot shield, geo, flags, redirects, maintenance, `/_hypdriv/*`,
  * plus `scheduled`, `queue` and `email` handlers. Use it with `@cloudflare/vite-plugin` and
  * `assets.run_worker_first` for navigations:

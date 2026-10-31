@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { nextHeaderSource, vercelCdnRouteHeaders } from './cdn-routes';
 
 describe('nextHeaderSource', () => {
-  it('translates HypDriv patterns into path-to-regexp sources', () => {
+  it('translates Hypdriv patterns into path-to-regexp sources', () => {
     expect(nextHeaderSource('/')).toBe('/');
     expect(nextHeaderSource('/pricing')).toBe('/pricing');
     expect(nextHeaderSource('/blog/:slug')).toBe('/blog/:slug');
@@ -26,7 +26,7 @@ describe('nextHeaderSource', () => {
     expect(nextHeaderSource('/a/**.js')).toBeNull();
   });
 
-  it('stays consistent with the HypDriv matcher on literal paths', () => {
+  it('stays consistent with the Hypdriv matcher on literal paths', () => {
     expect(compilePattern('/pricing').regex.test('/pricing')).toBe(true);
     expect(nextHeaderSource('/pricing')).toBe('/pricing');
   });

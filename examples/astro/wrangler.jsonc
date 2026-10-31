@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hypdriv-astro",
-  // HypDriv's Worker shell (src/worker.ts) wraps Astro's Cloudflare handler: the pipeline runs for every request
+  // Hypdriv's Worker shell (src/worker.ts) wraps Astro's Cloudflare handler: the pipeline runs for every request
   // except content-hashed assets, prerendered pages included.
   "main": "./src/worker.ts",
   "compatibility_date": "2026-10-01",

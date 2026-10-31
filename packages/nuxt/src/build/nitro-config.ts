@@ -14,7 +14,7 @@ export function withExternal(existing: RollupExternal | undefined, pattern: RegE
   return [...list, pattern] as RollupExternal;
 }
 
-/** The entry files of the HypDriv packages the server runtime imports, resolved from this module. */
+/** The entry files of the Hypdriv packages the server runtime imports, resolved from this module. */
 export function runtimePackages(from: string = import.meta.url): Record<string, string> {
   const require = createRequire(from);
   const out: Record<string, string> = {};

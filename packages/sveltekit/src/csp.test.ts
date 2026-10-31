@@ -55,7 +55,7 @@ describe('quoteSource / svelteKitDirectives', () => {
 });
 
 describe('withSvelteKitCsp', () => {
-  it('unions SvelteKit directives with HypDriv directives', () => {
+  it('unions SvelteKit directives with Hypdriv directives', () => {
     const config = withSvelteKitCsp(
       { security: { csp: { directives: { 'img-src': ['https://img.example.com'] } } } },
       { mode: 'auto', directives: { 'script-src': ['self', 'https://js.example.com'], 'img-src': ['self'] } },
@@ -65,7 +65,7 @@ describe('withSvelteKitCsp', () => {
       'script-src': ["'self'", 'https://js.example.com'],
       'img-src': ["'self'", 'https://img.example.com'],
     });
-    // The merged config still resolves (and keeps HypDriv's strict defaults).
+    // The merged config still resolves (and keeps Hypdriv's strict defaults).
     const resolved = loadConfig(config);
     expect(resolved.security.csp?.directives['script-src']).toContain('https://js.example.com');
   });
@@ -78,7 +78,7 @@ describe('withSvelteKitCsp', () => {
     });
   });
 
-  it('leaves the config untouched when HypDriv CSP is off or SvelteKit sets nothing', () => {
+  it('leaves the config untouched when Hypdriv CSP is off or SvelteKit sets nothing', () => {
     const off = { security: { csp: false as const } };
     expect(withSvelteKitCsp(off, { directives: { 'script-src': ['self'] } })).toBe(off);
     const plain = { site: { name: 'x' } };
@@ -126,7 +126,7 @@ describe('adoptSvelteKitCsp', () => {
   const html = (nonce: string) =>
     `<html><head><script nonce="${nonce}">a()</script></head><body><script nonce="${nonce}">b()</script></body></html>`;
 
-  it("swaps SvelteKit's nonce for HypDriv's and removes SvelteKit's policy", async () => {
+  it("swaps SvelteKit's nonce for Hypdriv's and removes SvelteKit's policy", async () => {
     const response = new Response(streamOf([html('SVELTEKIT1')]), {
       status: 200,
       headers: {
@@ -159,7 +159,7 @@ describe('adoptSvelteKitCsp', () => {
     expect(await out.text()).toBe(html('none'));
   });
 
-  it("leaves SvelteKit's policy alone without a HypDriv nonce, for non-HTML and for HypDriv's own policy", () => {
+  it("leaves SvelteKit's policy alone without a Hypdriv nonce, for non-HTML and for Hypdriv's own policy", () => {
     const page = () =>
       new Response('x', { headers: { 'content-type': 'text/html', 'content-security-policy': kitPolicy } });
     const a = page();

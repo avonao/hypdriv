@@ -1,6 +1,6 @@
 /**
  * Wrangler configuration reading: `wrangler.jsonc` / `wrangler.json` (JSON with comments and trailing
- * commas) and `wrangler.toml` (a small TOML subset covering the keys HypDriv inspects).
+ * commas) and `wrangler.toml` (a small TOML subset covering the keys Hypdriv inspects).
  */
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };

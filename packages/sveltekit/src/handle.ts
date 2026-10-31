@@ -36,7 +36,7 @@ export interface HypDrivHandleOptions
 export interface SvelteKitHandleInput extends HypDrivHandleOptions {
   config: HypDrivConfig;
   manifest: CreateHandlerOptions['manifest'];
-  /** SvelteKit's `csp` option (its directives join HypDriv's policy). */
+  /** SvelteKit's `csp` option (its directives join Hypdriv's policy). */
   csp?: SvelteKitCsp | null;
   /** SvelteKit is analysing or prerendering the app (`building` from `$app/env`): the hook passes through. */
   building: () => boolean;
@@ -44,7 +44,7 @@ export interface SvelteKitHandleInput extends HypDrivHandleOptions {
   dev?: () => boolean;
 }
 
-/** The global slot the hook registers its handler in, for HypDriv's Node server (`@hypdriv/sveltekit/node`). */
+/** The global slot the hook registers its handler in, for Hypdriv's Node server (`@hypdriv/sveltekit/node`). */
 export const HANDLER_SLOT = Symbol.for('hypdriv.sveltekit.handler');
 
 /** The handler the application's `handle` hook created, when the server build has one (Node server). */
@@ -86,9 +86,9 @@ export function platformInput(event: RequestEventLike, trustSocket: boolean): Om
 /**
  * Builds SvelteKit's `handle` around `createHandler()`. The pipeline owns the full response (upstream =
  * `resolve(event)` with the forwarded request), passes through while SvelteKit builds and prerenders, for
- * SvelteKit's internal sub-requests (`event.fetch` to the app itself) and inside an outer HypDriv runner (the
- * Cloudflare Worker shell, HypDriv's Node server). A policy SvelteKit adds (its `csp` option) is folded into
- * HypDriv's: same nonce, one header.
+ * SvelteKit's internal sub-requests (`event.fetch` to the app itself) and inside an outer Hypdriv runner (the
+ * Cloudflare Worker shell, Hypdriv's Node server). A policy SvelteKit adds (its `csp` option) is folded into
+ * Hypdriv's: same nonce, one header.
  */
 export function createSvelteKitHandle<E extends RequestEventLike>(
   input: SvelteKitHandleInput,

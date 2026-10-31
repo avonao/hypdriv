@@ -1,6 +1,6 @@
 # Live channels
 
-Next.js has no realtime primitive on serverless platforms. HypDriv's live channels use a Durable Object (`HypDrivChannel`) per channel with WebSocket hibernation and an SSE endpoint, plus a polling fallback when the binding is missing (ADR 0012).
+Next.js has no realtime primitive on serverless platforms. Hypdriv's live channels use a Durable Object (`HypDrivChannel`) per channel with WebSocket hibernation and an SSE endpoint, plus a polling fallback when the binding is missing (ADR 0012).
 
 ```jsonc
 // wrangler.jsonc

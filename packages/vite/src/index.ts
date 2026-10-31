@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/vite` — HypDriv for Vite. `hypdriv()` is the plugin for plain Vite apps; the rest is the toolkit the
+ * `@hypdriv/vite` — Hypdriv for Vite. `hypdriv()` is the plugin for plain Vite apps; the rest is the toolkit the
  * framework integrations (`@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`,
  * `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`) are built from: config and manifest virtual modules,
  * manifest finalisation, static headers per platform and the post-build manifest patch.

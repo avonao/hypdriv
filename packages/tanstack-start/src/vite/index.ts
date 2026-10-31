@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/tanstack-start/vite` — the build side of HypDriv for TanStack Start: `withHypDriv()` for the options of
+ * `@hypdriv/tanstack-start/vite` — the build side of Hypdriv for TanStack Start: `withHypDriv()` for the options of
  * `tanstackStart()` and the `hypdriv()` Vite plugin (route discovery, the manifest after prerendering, static
  * headers per platform, the final manifest patched into the server output).
  *

@@ -124,7 +124,7 @@ export function buildBriefing(project: ProjectInfo, loaded: LoadedConfig): Agent
     issues.push(`${rel(project.root, project.middlewareFile)} is deprecated; rename to proxy.ts.`);
   if (project.sources.edgeRuntime.length)
     issues.push(
-      `${project.sources.edgeRuntime.length} Edge runtime segment(s); HypDriv targets the Node.js runtime.`,
+      `${project.sources.edgeRuntime.length} Edge runtime segment(s); Hypdriv targets the Node.js runtime.`,
     );
   if (p === 'cloudflare' && project.sources.nodeApis.some((f) => f.severity === 'error'))
     issues.push(
@@ -200,10 +200,10 @@ export function buildBriefing(project: ProjectInfo, loaded: LoadedConfig): Agent
 export function renderBriefing(b: AgentBriefing): string {
   const runtime = PLATFORM_RUNTIME_PACKAGE[b.project.platform];
   const lines: string[] = [];
-  lines.push(`# HypDriv briefing — ${b.project.name}`);
+  lines.push(`# Hypdriv briefing — ${b.project.name}`);
   lines.push('');
   lines.push(
-    `HypDriv is a sidecar for Next.js 16+: \`withHypDriv()\` in next.config, \`createProxy()\` in proxy.ts${b.project.platform === 'cloudflare' ? ', `createWorker()` in hypdriv.worker.ts (the Cloudflare Worker entry)' : ''}, all configured in \`hypdriv.config.ts\`. Never patch \`next\`, \`@opennextjs/*\` or \`wrangler\`; never hand-edit \`.hypdriv/\` (build output).`,
+    `Hypdriv is a sidecar for Next.js 16+: \`withHypDriv()\` in next.config, \`createProxy()\` in proxy.ts${b.project.platform === 'cloudflare' ? ', `createWorker()` in hypdriv.worker.ts (the Cloudflare Worker entry)' : ''}, all configured in \`hypdriv.config.ts\`. Never patch \`next\`, \`@opennextjs/*\` or \`wrangler\`; never hand-edit \`.hypdriv/\` (build output).`,
   );
   lines.push('');
   lines.push('## Project');

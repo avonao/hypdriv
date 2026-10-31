@@ -1,6 +1,6 @@
 # @hypdriv/purser
 
-The HypDriv bridge for [Purser CSS](https://pursercss.dev) (`@avonao/purser`), the compile-time atomic CSS tool in which an overridden declaration cannot happen. Purser builds one deterministic stylesheet from your components; this package makes it first-class in a Next.js 16 application running on Cloudflare Workers (or anywhere HypDriv runs) without touching Purser itself: HypDriv consumes only `@avonao/purser/build` and `scripts/strike-count.js` ([ADR 0009](../../docs/adr/0009-purser-boundary.md)).
+The Hypdriv bridge for [Purser CSS](https://pursercss.dev) (`@avonao/purser`), the compile-time atomic CSS tool in which an overridden declaration cannot happen. Purser builds one deterministic stylesheet from your components; this package makes it first-class in a Next.js 16 application running on Cloudflare Workers (or anywhere Hypdriv runs) without touching Purser itself: Hypdriv consumes only `@avonao/purser/build` and `scripts/strike-count.js` ([ADR 0009](../../docs/adr/0009-purser-boundary.md)).
 
 ## What the bridge adds to Purser
 
@@ -56,7 +56,7 @@ export default defineConfig({
 });
 ```
 
-Every `purser.*` option maps onto Purser's `BuildOptions` (`projectDir`, `src`, `tokens`, `out`, `prefix`, `salt`, `packageName`, `cssModule`, `layers`). `purser.project` (default `.`) is Purser's project root relative to the HypDriv project.
+Every `purser.*` option maps onto Purser's `BuildOptions` (`projectDir`, `src`, `tokens`, `out`, `prefix`, `salt`, `packageName`, `cssModule`, `layers`). `purser.project` (default `.`) is Purser's project root relative to the Hypdriv project.
 
 `withHypDriv` (from `@hypdriv/next`) then:
 
@@ -114,7 +114,7 @@ Purser class names are `prefix` + seven base-36 characters, computed identically
 
 ## Flashless themes
 
-Purser themes are root conditions: `axes: { mode: { light: ':not(.dark)', dark: '.dark' } }` in `defineTokens` makes every token switch with a class on `<html>`. The usual way to avoid a flash of the wrong theme is an inline script before hydration, which costs a CSP exception and still paints after the HTML arrived. HypDriv pins the classes **before the HTML leaves the edge** and keeps the script only as a fallback.
+Purser themes are root conditions: `axes: { mode: { light: ':not(.dark)', dark: '.dark' } }` in `defineTokens` makes every token switch with a class on `<html>`. The usual way to avoid a flash of the wrong theme is an inline script before hydration, which costs a CSP exception and still paints after the HTML arrived. Hypdriv pins the classes **before the HTML leaves the edge** and keeps the script only as a fallback.
 
 ### Resolution
 
@@ -256,4 +256,4 @@ Purser's own types are mirrored as `PurserBuildOptions`, `PurserBuildResult`, `P
 | Build, watch, guard, usage report | — | — | ✅ (needs `@avonao/purser` + TS ≤ 6 in the project) |
 | Zero-override audit | — | — | ✅ (needs Chrome and Node 22+ for the global `WebSocket`) |
 
-Part of [HypDriv](https://github.com/avonao/hypdriv). See `docs/architecture.md` §9 and `docs/contracts.md` for the integration contracts.
+Part of [Hypdriv](https://github.com/avonao/hypdriv). See `docs/architecture.md` §9 and `docs/contracts.md` for the integration contracts.

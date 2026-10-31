@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/build` — HypDriv's framework-neutral build engine (Node): turns the routes a framework integration
+ * `@hypdriv/build` — Hypdriv's framework-neutral build engine (Node): turns the routes a framework integration
  * discovered into `.hypdriv/manifest.json` (classification, client assets, CSP hashes, Early Hints, speculation
  * graph, Purser verification, secrets scan, weights and budgets) and renders the build report. Used by the
  * Next.js adapter and every Vite integration.

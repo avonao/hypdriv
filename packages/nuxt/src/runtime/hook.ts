@@ -30,7 +30,7 @@ export interface NitroAppLike {
 }
 
 export interface NitroHookOptions {
-  /** The HypDriv handler (`createHandler({ config, manifest, host: 'nuxt', skip })`). */
+  /** The Hypdriv handler (`createHandler({ config, manifest, host: 'nuxt', skip })`). */
   handler: HypHandler;
   /**
    * Requests answered by the application without the pipeline (the same predicate passed to `createHandler`'s
@@ -81,7 +81,7 @@ function attachFacts(event: H3EventLike, ctx: HypContext, options: NitroHookOpti
   event.context[FACTS_KEY] = factsFor(ctx, { nonce });
 }
 
-/** Whether a HypDriv runner already owns this request (the Cloudflare Worker entry, or an outer host request). */
+/** Whether a Hypdriv runner already owns this request (the Cloudflare Worker entry, or an outer host request). */
 function ownedByOuterRunner(ctx: HypContext | undefined): ctx is HypContext {
   return !!ctx && (ctx.runner === 'worker' || ctx.runner === 'host');
 }
@@ -96,7 +96,7 @@ function fallbackError(capture: CaptureResponse, error: H3ErrorLike): void {
 
 /**
  * Wraps Nitro's h3 app handler (`nitroApp.h3App.handler`, the single function every request of every preset goes
- * through) with the HypDriv pipeline:
+ * through) with the Hypdriv pipeline:
  *
  * - The pipeline's request stages run first; a short-circuit (rate limit, bot block, redirect, maintenance,
  *   `/_hypdriv/*`) answers without rendering.
@@ -105,7 +105,7 @@ function fallbackError(capture: CaptureResponse, error: H3ErrorLike): void {
  *   stages (security headers, CSP with nonce injection, Server-Timing…) and the result is written to the client.
  * - Errors are rendered by Nitro's error handler (Nuxt's error page) inside the same capture, so error responses
  *   get the full pipeline too.
- * - Requests inside an outer HypDriv runner (the Cloudflare Worker entry, Nitro sub-requests made while rendering)
+ * - Requests inside an outer Hypdriv runner (the Cloudflare Worker entry, Nitro sub-requests made while rendering)
  *   and Nitro's own in-memory sub-requests pass straight through.
  */
 export function createNitroHandler(
@@ -173,7 +173,7 @@ export function createNitroHandler(
         ...platformOf(req),
         ...(ip ? { ip } : {}),
         upstream: async (forwarded) => {
-          // Build assets: rendered straight onto the client response, exactly as without HypDriv.
+          // Build assets: rendered straight onto the client response, exactly as without Hypdriv.
           if (skipped) {
             await inner(event);
             return direct;
@@ -229,7 +229,7 @@ export function createNitroHandler(
   };
 }
 
-/** Installs the HypDriv handler around a Nitro 2 app (called from the Nitro plugin). */
+/** Installs the Hypdriv handler around a Nitro 2 app (called from the Nitro plugin). */
 export function installNitroHook(nitroApp: NitroAppLike, options: NitroHookOptions): void {
   const inner = nitroApp.h3App.handler;
   nitroApp.h3App.handler = createNitroHandler(inner, nitroApp, options);

@@ -1,7 +1,7 @@
 import type { Route } from './+types/about';
 
 export function meta(_: Route.MetaArgs) {
-  return [{ title: 'About · HypDriv × React Router' }];
+  return [{ title: 'About · Hypdriv × React Router' }];
 }
 
 // Runs once, at build time (the page is prerendered): its data ships as `about.data` next to the HTML.

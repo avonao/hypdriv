@@ -93,7 +93,7 @@ export interface AiBindingLike {
   run(model: string, inputs: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
 }
 
-/** A Worker `env` with the bindings HypDriv knows how to use, all optional. */
+/** A Worker `env` with the bindings Hypdriv knows how to use, all optional. */
 export interface HypDrivEnv {
   HYPDRIV_KV?: KVNamespaceLike;
   HYPDRIV_INDEX?: DurableObjectNamespaceLike;

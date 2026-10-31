@@ -16,7 +16,7 @@ import {
 import { type AstroBuildFacts, type AstroTarget, astroVitePlugin } from './vite';
 
 export interface HypDrivAstroOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
   config?: string | HypDrivConfig;
   /**
    * Platforms whose static configuration the build writes (Cloudflare `_headers`, Vercel Build Output routes,
@@ -24,14 +24,14 @@ export interface HypDrivAstroOptions {
    */
   targets?: AstroTarget[];
   /**
-   * Inject the on-demand route `/_hypdriv/[...path]` so HypDriv's internal routes (`/_hypdriv/health`, CSP reports,
+   * Inject the on-demand route `/_hypdriv/[...path]` so Hypdriv's internal routes (`/_hypdriv/health`, CSP reports,
    * Web Vitals, DevTools) reach the middleware in production, where Astro answers unmatched paths without it.
    * Default true when an adapter is configured.
    */
   internalRoutes?: boolean;
   vercel?: {
     /**
-     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Astro's function
+     * Run Hypdriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without Astro's function
      * (rate limiting, bot shield, maintenance, redirects, geo; default true).
      */
     middleware?: boolean;
@@ -47,7 +47,7 @@ export function adapterTarget(name: string | undefined): AstroTarget | null {
   return null;
 }
 
-/** Wraps Astro's integration logger as a HypDriv logger. */
+/** Wraps Astro's integration logger as a Hypdriv logger. */
 export function astroLogger(
   logger: Pick<AstroIntegrationLogger, 'info' | 'warn' | 'error' | 'debug'>,
 ): Logger {
@@ -71,7 +71,7 @@ function astroVersion(root: string): string {
   }
 }
 
-/** The config the build finalises with: Astro's `security.csp` owns the policy, so HypDriv's CSP is off. */
+/** The config the build finalises with: Astro's `security.csp` owns the policy, so Hypdriv's CSP is off. */
 export function effectiveConfig(loaded: LoadedHypConfig, astroCsp: boolean) {
   if (!astroCsp || !loaded.resolved.security.csp) return loaded.resolved;
   return loadConfig({ ...loaded.raw, security: { ...(loaded.raw.security ?? {}), csp: false } });
@@ -85,7 +85,7 @@ interface DevServerLike {
 }
 
 /**
- * The HypDriv integration for Astro 7. Runs the HypDriv Drivetrain around Astro's middleware on every route Astro
+ * The Hypdriv integration for Astro 7. Runs the Hypdriv Drivetrain around Astro's middleware on every route Astro
  * renders on demand, writes the route manifest (routes, classifications, CSP hashes of prerendered pages, Early
  * Hints) and the static header rules of the adapter's platform after the build, and patches the final manifest into
  * the server output.
@@ -133,11 +133,11 @@ export function hypdriv(options: HypDrivAstroOptions = {}): AstroIntegration {
         facts.astroCsp = !!config.security?.csp;
         if (facts.astroCsp && loaded.resolved.security.csp)
           logger.info(
-            "Astro's security.csp is enabled: Astro owns the Content-Security-Policy and HypDriv's CSP is off. Remove security.csp from the Astro config to use HypDriv's nonce and hash policy.",
+            "Astro's security.csp is enabled: Astro owns the Content-Security-Policy and Hypdriv's CSP is off. Remove security.csp from the Astro config to use Hypdriv's nonce and hash policy.",
           );
         if (adapterName && !target && !options.targets)
           logger.warn(
-            `HypDriv writes static headers for Cloudflare, Vercel and Node; the ${adapterName} adapter gets the manifest and the middleware only (set the integration's \`targets\` option to write one of those).`,
+            `Hypdriv writes static headers for Cloudflare, Vercel and Node; the ${adapterName} adapter gets the manifest and the middleware only (set the integration's \`targets\` option to write one of those).`,
           );
         host = hostPlugin({
           name: 'hypdriv:astro-host',

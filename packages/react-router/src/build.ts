@@ -42,7 +42,7 @@ export interface ReactRouterBuildInput {
   token?: string | null;
   /** The runtime manifest module was bundled into a server environment (its absence from the output is fatal). */
   manifestBundled?: boolean;
-  /** Vercel: build HypDriv's Routing Middleware for statically served paths (default true). */
+  /** Vercel: build Hypdriv's Routing Middleware for statically served paths (default true). */
   vercelMiddleware?: boolean;
   /** Extra directories whose built server code embeds the runtime manifest. */
   serverDirs?: string[];
@@ -139,7 +139,7 @@ function resolveDir(root: string, dir: string | undefined, fallback: string): st
 }
 
 /**
- * Finishes a React Router build for HypDriv once React Router is done (prerendering included): discovers the routes
+ * Finishes a React Router build for Hypdriv once React Router is done (prerendering included): discovers the routes
  * and prerendered documents, writes `.hypdriv/manifest.json`, patches the final manifest into the server output and
  * erases the prerender token from it, then writes the platform's static configuration — Cloudflare `_headers` or
  * the Vercel Build Output. Throws when the manifest reports failures (budgets, Purser, secrets).

@@ -119,7 +119,7 @@ describe('wrapAppHandler', () => {
     ).toBe(false);
   });
 
-  it('answers HypDriv’s internal routes with the vinext label', async () => {
+  it('answers Hypdriv’s internal routes with the vinext label', async () => {
     const app = vi.fn(vinextHandler());
     const wrapped = wrapAppHandler(app, { config: {}, manifest, target: 'node' });
     const response = await wrapped(get('/_hypdriv/health'));
@@ -203,7 +203,7 @@ describe('request plumbing', () => {
     expect(nativeRequest(real)).toBe(real);
   });
 
-  it('leaves requests alone outside a HypDriv request', () => {
+  it('leaves requests alone outside a Hypdriv request', () => {
     const request = new Request('https://example.com/', {
       headers: { 'content-security-policy': "script-src 'nonce-a'" },
     });

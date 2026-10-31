@@ -1,8 +1,8 @@
-# HypDriv on Cloudflare Workers
+# Hypdriv on Cloudflare Workers
 
-> **Going to production?** [Production on Cloudflare](production-cloudflare.md) is the step-by-step implementation guide: codebase, OpenNext cache, Cloudflare resources, secrets, zone, build and deploy order, verification probes, a launch checklist and troubleshooting, including fleets of area Workers behind a router. This page is the reference for how HypDriv sits in the Worker.
+> **Going to production?** [Production on Cloudflare](production-cloudflare.md) is the step-by-step implementation guide: codebase, OpenNext cache, Cloudflare resources, secrets, zone, build and deploy order, verification probes, a launch checklist and troubleshooting, including fleets of area Workers behind a router. This page is the reference for how Hypdriv sits in the Worker.
 
-HypDriv runs inside the Worker that OpenNext generates. `hypdriv.worker.ts` becomes the Worker entry; it wraps `.open-next/worker.js`, runs the Drivetrain pipeline around it, answers HypDriv's internal routes and adds the `scheduled`, `queue`, `email` and `tail` handlers.
+Hypdriv runs inside the Worker that OpenNext generates. `hypdriv.worker.ts` becomes the Worker entry; it wraps `.open-next/worker.js`, runs the Drivetrain pipeline around it, answers Hypdriv's internal routes and adds the `scheduled`, `queue`, `email` and `tail` handlers.
 
 ```ts
 // hypdriv.worker.ts
@@ -15,7 +15,7 @@ export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from 'hypdriv/durable-ob
 export default createWorker({
   config,
   next: () => import('./.open-next/worker.js'),
-  manifest: () => import('./.hypdriv/manifest.js'),   // written by `next build` (the HypDriv adapter)
+  manifest: () => import('./.hypdriv/manifest.js'),   // written by `next build` (the Hypdriv adapter)
   // stages: (defaults, platform) => [...defaults, myStage],   // optional customisation
 });
 ```
@@ -66,13 +66,13 @@ export default defineCloudflareConfig({
 "migrations": [{ "tag": "opennext-v1", "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"] }]
 ```
 
-Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone → Cache Purge) as secrets on custom domains: OpenNext's `BucketCachePurge` and HypDriv's edge cache both purge the zone by tag with them. On `*.workers.dev` the Cache API is a no-op, so the regional cache and HypDriv's Cache API tier only take effect on custom domains.
+Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone → Cache Purge) as secrets on custom domains: OpenNext's `BucketCachePurge` and Hypdriv's edge cache both purge the zone by tag with them. On `*.workers.dev` the Cache API is a no-op, so the regional cache and Hypdriv's Cache API tier only take effect on custom domains.
 
 **Populate the incremental cache before the first request.** `opennextjs-cloudflare populateCache remote --config <wrangler file>` (or `opennextjs-cloudflare deploy`, which runs it before `wrangler deploy`) writes the build's prerendered pages into the R2 bucket. Skip it and OpenNext renders every prerendered page per request: pages with a hash CSP then stream their flight data in a different chunking than the build measured, the hashes no longer match, and browsers block the inline scripts, so the page loads and never hydrates. `hypdriv doctor` fails (`opennext.cache`) for hash-CSP routes without an incremental cache. Several Workers of one platform can share one bucket: give each its own key prefix with the variable `NEXT_INC_CACHE_R2_PREFIX = "<worker>/"` (keys are `<prefix><buildId>/<hash>.cache`). Do not put a time-based lifecycle rule on the bucket: a site that is not redeployed would lose its current build's prerenders.
 
-**ISR revalidation through the Worker.** OpenNext's queue regenerates stale pages by requesting them through `WORKER_SELF_REFERENCE` with `x-prerender-revalidate: <previewModeId>`. The HypDriv Worker recognises these requests by a SHA-256 of the build's preview-mode id stored in the manifest (`manifest.revalidation`; the id itself never leaves the build output), sends them straight to Next.js — no edge cache, bot shield or rate limit in between — and, when Next.js answers `x-nextjs-cache: REVALIDATED`, purges the page's edge-cache copies by its `path:` tag. A request carrying the header with any other value runs through the Drivetrain like every other request.
+**ISR revalidation through the Worker.** OpenNext's queue regenerates stale pages by requesting them through `WORKER_SELF_REFERENCE` with `x-prerender-revalidate: <previewModeId>`. The Hypdriv Worker recognises these requests by a SHA-256 of the build's preview-mode id stored in the manifest (`manifest.revalidation`; the id itself never leaves the build output), sends them straight to Next.js — no edge cache, bot shield or rate limit in between — and, when Next.js answers `x-nextjs-cache: REVALIDATED`, purges the page's edge-cache copies by its `path:` tag. A request carrying the header with any other value runs through the Drivetrain like every other request.
 
-**Deployment ids.** Next.js 16 uses a constant `BUILD_ID` whenever `deploymentId` is set, and OpenNext keys its caches by the deployment id. HypDriv's default id is `<commit>-<build stamp>`, unique per build and per app ([ADR 0016](../adr/0016-deployment-ids-per-build.md)); never share one id between apps on the same zone (the Cache API is per zone) or between builds with different output.
+**Deployment ids.** Next.js 16 uses a constant `BUILD_ID` whenever `deploymentId` is set, and OpenNext keys its caches by the deployment id. Hypdriv's default id is `<commit>-<build stamp>`, unique per build and per app ([ADR 0016](../adr/0016-deployment-ids-per-build.md)); never share one id between apps on the same zone (the Cache API is per zone) or between builds with different output.
 
 ## Request flow
 
@@ -86,7 +86,7 @@ Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone �
 
 ## Bindings and what they unlock
 
-Everything works with no bindings. Add bindings to upgrade behaviour; HypDriv detects them at startup (`detectCapabilities`).
+Everything works with no bindings. Add bindings to upgrade behaviour; Hypdriv detects them at startup (`detectCapabilities`).
 
 | Binding (default name) | Wrangler key | Unlocks |
 | --- | --- | --- |
@@ -139,7 +139,7 @@ The Worker signs internal requests with `HYPDRIV_INTERNAL_SECRET` (HMAC over tim
 
 ## Tail Workers
 
-Every HypDriv Worker exports a `tail` handler. List it in another Worker's `tail_consumers` to receive that Worker's exceptions, `console.warn`/`console.error` lines and invocations that ended abnormally without an exception (`exceededCpu`, `exceededMemory`, `exceededWallTime`, `canceled`, …), logged as `tail exception`, `tail log` and `tail outcome` with the producer's script name, path or cron.
+Every Hypdriv Worker exports a `tail` handler. List it in another Worker's `tail_consumers` to receive that Worker's exceptions, `console.warn`/`console.error` lines and invocations that ended abnormally without an exception (`exceededCpu`, `exceededMemory`, `exceededWallTime`, `canceled`, …), logged as `tail exception`, `tail log` and `tail outcome` with the producer's script name, path or cron.
 
 ## Edge-cache purges across isolates and colos
 
@@ -157,7 +157,7 @@ Internal requests are unaffected by both: Cron Triggers, Queues, the tail consum
 
 ## Limits that matter
 
-| Limit | Value | HypDriv |
+| Limit | Value | Hypdriv |
 | --- | --- | --- |
 | Worker size | 64 MiB uncompressed (compressed size is not limited) | `hypdriv analyze` reports raw and gzip sizes and the largest modules |
 | Startup | 1 s of global-scope execution | the shell loads OpenNext lazily; `analyze` flags heavy top-level work |
@@ -167,7 +167,7 @@ Internal requests are unaffected by both: Cron Triggers, Queues, the tail consum
 
 ## Smart Placement and `run_worker_first`
 
-HypDriv's edge stages are latency-sensitive and should stay at the edge; if you enable Smart Placement for database-heavy rendering, the whole Worker (including the shell) moves. Prefer Hyperdrive for database proximity. `run_worker_first` makes asset requests hit the Worker too; only enable it when you need HypDriv headers on static assets (the `_headers` file covers immutable caching without it).
+Hypdriv's edge stages are latency-sensitive and should stay at the edge; if you enable Smart Placement for database-heavy rendering, the whole Worker (including the shell) moves. Prefer Hyperdrive for database proximity. `run_worker_first` makes asset requests hit the Worker too; only enable it when you need Hypdriv headers on static assets (the `_headers` file covers immutable caching without it).
 
 ## `next dev` and `wrangler dev`
 
@@ -175,4 +175,4 @@ HypDriv's edge stages are latency-sensitive and should stay at the edge; if you 
 - `pnpm preview` runs the real Worker locally with Miniflare; bindings declared in `wrangler.jsonc` are emulated. Put secrets in `.dev.vars`.
 - Running `wrangler dev` yourself after `opennextjs-cloudflare build`? Populate the local incremental cache first (`opennextjs-cloudflare populateCache local`; `preview` does it for you). Without it, prerendered Cache Components pages have no cache entries in the local R2 bucket and render on demand.
 - `hypdriv audit all --url http://127.0.0.1:8787` signs its requests with an audit token derived from `HYPDRIV_INTERNAL_SECRET` in `.dev.vars`, so the bot shield lets the headless-Chrome CSS audit through (`--anonymous` audits as a stranger would).
-- `initOpenNextCloudflareForDev()` in `next.config.ts` exposes emulated bindings inside `next dev` so `hyp().env` works there too. Its platform proxy warns that the Worker's own Durable Objects (`HYPDRIV_CHANNEL`, `HYPDRIV_LIMITER`, `HYPDRIV_INDEX`) "will not work in local development": that applies to `next dev` only, where HypDriv uses in-memory counters, tag indexes and the polling live transport; `wrangler dev` and production run the Durable Objects.
+- `initOpenNextCloudflareForDev()` in `next.config.ts` exposes emulated bindings inside `next dev` so `hyp().env` works there too. Its platform proxy warns that the Worker's own Durable Objects (`HYPDRIV_CHANNEL`, `HYPDRIV_LIMITER`, `HYPDRIV_INDEX`) "will not work in local development": that applies to `next dev` only, where Hypdriv uses in-memory counters, tag indexes and the polling live transport; `wrangler dev` and production run the Durable Objects.

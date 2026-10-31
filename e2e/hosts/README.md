@@ -1,4 +1,4 @@
-# Live checks for HypDriv's Vite hosts
+# Live checks for Hypdriv's Vite hosts
 
 One runner that verifies a deployed example of any Vite host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext — on Cloudflare Workers, Vercel or a Node server. The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
 
@@ -14,7 +14,7 @@ pnpm -F @hypdriv/e2e-hosts check --url https://<deployment> --framework vite \
 | `dynamic <path>` | A rendered page: the same, a request id, and a fresh nonce per request in nonce mode |
 | `hashed asset caching` | A content-hashed script or stylesheet the page references is cached `immutable` / one year |
 | `bot shield` | A request with an automation user agent (`curl/…`, no browser headers) gets `403` |
-| `stages on prerendered pages` | The same for every `--static` page: the request stages run for documents the static layer serves (Worker shell with `run_worker_first` on Cloudflare, HypDriv's prerender Routing Middleware on Vercel); `--no-static-stages` skips it for deployments that serve them with static headers only |
+| `stages on prerendered pages` | The same for every `--static` page: the request stages run for documents the static layer serves (Worker shell with `run_worker_first` on Cloudflare, Hypdriv's prerender Routing Middleware on Vercel); `--no-static-stages` skips it for deployments that serve them with static headers only |
 | `api <path>` | `200`, a request id and a non-HTML content type (not a page or SPA fallback) |
 | `rate limit` | Back-to-back requests over one keep-alive connection (one client address, even behind a NAT pool) reach `429` with `Retry-After` within three windows' worth |
 | `http → https` | Plain HTTP redirects to https |

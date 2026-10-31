@@ -1,6 +1,6 @@
-# HypDriv × Purser CSS — Cloudflare example
+# Hypdriv × Purser CSS — Cloudflare example
 
-Next.js 16 (Cache Components on) on Cloudflare Workers with OpenNext, HypDriv and [Purser CSS](https://github.com/avonao/purser).
+Next.js 16 (Cache Components on) on Cloudflare Workers with OpenNext, Hypdriv and [Purser CSS](https://github.com/avonao/purser).
 
 ```sh
 pnpm install

@@ -1,6 +1,6 @@
 # create-hypdriv
 
-Scaffold a production-ready application with [HypDriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt or vinext — on **Cloudflare Workers**, **Vercel** or **Node**.
+Scaffold a production-ready application with [Hypdriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt or vinext — on **Cloudflare Workers**, **Vercel** or **Node**.
 
 > **Preview install.** The 0.1.0 packages are not on a package registry. Run the scaffolder from a release bundle or a source build with `--no-install` (`node dist/index.js my-app --no-install`), then run the bundle's `install.sh my-app`. The commands below show the registry form that applies once the packages are published.
 
@@ -37,9 +37,9 @@ Every template is one of the repository's example apps, built and audited end to
 | --- | --- | --- |
 | `cloudflare` | `examples/basic` | Worker shell (`hypdriv.worker.ts`) around OpenNext, edge cache, strict CSP with edge nonces, Durable Objects for exact rate limits, live channels and tag purges, cron jobs, Zod-validated Server Action |
 | `cloudflare-purser` | `examples/with-purser` | The above plus Purser CSS, edge-pinned themes and the zero-override audit |
-| `vercel` | `examples/vercel` | HypDriv stages in `proxy.ts`, Vercel CDN cache headers by policy, tag purge on Vercel's CDN, Vercel Cron, Vercel Queues, Upstash Redis counters, region `iad1` |
+| `vercel` | `examples/vercel` | Hypdriv stages in `proxy.ts`, Vercel CDN cache headers by policy, tag purge on Vercel's CDN, Vercel Cron, Vercel Queues, Upstash Redis counters, region `iad1` |
 | `vercel-purser` | `examples/vercel-purser` | The Vercel setup with Purser CSS and hashed theme script |
-| `vite` | `examples/vite` | Single-page Vite app: `assetsWorker()` on Cloudflare, Build Output with HypDriv's Routing Middleware and an `api/` function on Vercel, `hypdriv serve` on Node |
+| `vite` | `examples/vite` | Single-page Vite app: `assetsWorker()` on Cloudflare, Build Output with Hypdriv's Routing Middleware and an `api/` function on Vercel, `hypdriv serve` on Node |
 | `react-router` | `examples/react-router` | React Router 8 framework mode: preset, root middleware, nonce-aware server entry, prerendered pages, `reactRouterWorker()` |
 | `tanstack-start` | `examples/tanstack-start` | TanStack Start with `withHypDriv()`, global request middleware (CSRF kept), router nonces, Nitro for Vercel and Node |
 | `astro` | `examples/astro` | Astro 7 integration: prerendered pages with a server island, on-demand pages, endpoints, `src/fetch.ts` |
@@ -71,4 +71,4 @@ scaffold({
 });
 ```
 
-MIT licensed. Part of [HypDriv](https://github.com/avonao/hypdriv).
+MIT licensed. Part of [Hypdriv](https://github.com/avonao/hypdriv).

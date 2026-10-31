@@ -24,7 +24,7 @@ export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
 export type DeployPlatform = 'cloudflare' | 'vercel' | 'node' | 'unknown';
 export const DEPLOY_PLATFORMS: readonly DeployPlatform[] = ['cloudflare', 'vercel', 'node', 'unknown'];
 
-/** HypDriv's runtime package per platform (the Worker shell, the Vercel runtime, none for plain Node). */
+/** Hypdriv's runtime package per platform (the Worker shell, the Vercel runtime, none for plain Node). */
 export const PLATFORM_RUNTIME_PACKAGE: Record<DeployPlatform, string | null> = {
   cloudflare: '@hypdriv/cloudflare',
   vercel: '@hypdriv/vercel',
@@ -32,10 +32,10 @@ export const PLATFORM_RUNTIME_PACKAGE: Record<DeployPlatform, string | null> = {
   unknown: null,
 };
 
-/** The application framework HypDriv integrates with (`unknown` when none is recognised). */
+/** The application framework Hypdriv integrates with (`unknown` when none is recognised). */
 export type ProjectFramework = FrameworkName | 'unknown';
 
-/** HypDriv's integration package per framework. */
+/** Hypdriv's integration package per framework. */
 export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   next: 'hypdriv',
   vinext: '@hypdriv/vinext',
@@ -64,7 +64,7 @@ export interface FrameworkInfo {
   name: ProjectFramework;
   /** Installed (or declared) framework version. */
   version: string | null;
-  /** The HypDriv integration package for the framework. */
+  /** The Hypdriv integration package for the framework. */
   integration: string | null;
   /** Installed version of the integration package. */
   integrationInstalled: string | null;
@@ -220,14 +220,14 @@ export interface ProjectInfo {
   repoRoot: string;
   platform: DeployPlatform;
   platformDetection: PlatformDetection;
-  /** The application framework and its HypDriv integration. */
+  /** The application framework and its Hypdriv integration. */
   framework: FrameworkInfo;
   vercel: VercelInfo;
   /** `.env*` files (Next.js / Vercel) with their variable names; values are never read into memory beyond parsing. */
   envFiles: EnvFileInfo[];
   /** `tsconfig.json` excludes `hypdriv.worker.ts` (needed before `.open-next/` exists). */
   tsconfigExcludesWorker: boolean | null;
-  /** Running inside the HypDriv monorepo itself. */
+  /** Running inside the Hypdriv monorepo itself. */
   inHypDrivMonorepo: boolean;
   /** `pnpm-workspace.yaml` exists at the repo root. */
   workspace: boolean;
@@ -592,7 +592,7 @@ interface PlatformInputs {
 /**
  * Picks the deployment platform from the project's tooling. A Vercel build environment (`VERCEL`)
  * wins; otherwise the platform with the stronger evidence (config files and adapters weigh more than
- * a linked `.vercel/` folder or incidental `@vercel/*` packages). Ties go to Cloudflare, HypDriv's
+ * a linked `.vercel/` folder or incidental `@vercel/*` packages). Ties go to Cloudflare, Hypdriv's
  * reference target.
  */
 export function detectPlatform(input: PlatformInputs, forced?: DeployPlatform | null): PlatformDetection {

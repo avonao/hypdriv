@@ -69,4 +69,4 @@ export const { register, onRequestError } = createInstrumentation();
 
 ## Tail Workers
 
-`createWorker()` exports a `tail` handler, so any HypDriv Worker can be the tail consumer of others (`"tail_consumers": [{ "service": "<this worker>" }]` in the producer's wrangler config). It logs the producer's exceptions (`tail exception`), `console.warn`/`console.error` lines (`tail log`) and invocations that ended abnormally without an exception — CPU, memory or wall-time limits, cancellations — as `tail outcome` with the script name and the path, cron or queue. The last kind leaves no trace in the producer's own logs.
+`createWorker()` exports a `tail` handler, so any Hypdriv Worker can be the tail consumer of others (`"tail_consumers": [{ "service": "<this worker>" }]` in the producer's wrangler config). It logs the producer's exceptions (`tail exception`), `console.warn`/`console.error` lines (`tail log`) and invocations that ended abnormally without an exception — CPU, memory or wall-time limits, cancellations — as `tail outcome` with the script name and the path, cron or queue. The last kind leaves no trace in the producer's own logs.

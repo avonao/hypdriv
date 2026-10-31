@@ -23,7 +23,7 @@ export const MANIFEST_SENTINEL_KEY = '__hypdriv';
 export const MANIFEST_SENTINEL_VALUE = 'runtime-manifest';
 const SENTINEL_JSON = `{"${MANIFEST_SENTINEL_KEY}":"${MANIFEST_SENTINEL_VALUE}"`;
 
-/** The application's HypDriv config as the plugin loaded it. */
+/** The application's Hypdriv config as the plugin loaded it. */
 export interface LoadedHypConfig {
   resolved: ResolvedConfig;
   raw: HypDrivConfig;
@@ -168,11 +168,11 @@ export function patchRuntimeManifest(dirs: string[], manifest: HypManifest): str
   return patched;
 }
 
-/** Options shared by every HypDriv Vite integration. */
+/** Options shared by every Hypdriv Vite integration. */
 export interface HostPluginOptions {
   /** Plugin name (`hypdriv:astro`). */
   name: string;
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the root) or an inline config. */
   config?: string | HypDrivConfig;
   /** The framework that builds the app. */
   framework: () => ManifestFramework;
@@ -194,7 +194,7 @@ export interface HostPluginApi {
 }
 
 /**
- * The plugin every HypDriv Vite integration starts from: loads the HypDriv config and serves the
+ * The plugin every Hypdriv Vite integration starts from: loads the Hypdriv config and serves the
  * `virtual:hypdriv/config` and `virtual:hypdriv/manifest` modules to server code.
  */
 export function hostPlugin(options: HostPluginOptions): Plugin & { api: HostPluginApi } {

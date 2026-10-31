@@ -5,7 +5,7 @@ import { sendWebResponse, toWebRequest } from './node/index';
 type Next = (err?: unknown) => void;
 
 /**
- * Connect middleware that runs a HypDriv handler in Vite's dev or preview server. `render` produces the
+ * Connect middleware that runs a Hypdriv handler in Vite's dev or preview server. `render` produces the
  * application's response for requests the pipeline should wrap (HTML documents, `/_hypdriv/*`); returning `null`
  * hands the request back to Vite untouched (modules, assets, HMR).
  */

@@ -1,6 +1,6 @@
 # @hypdriv/testing
 
-Testing kit for [HypDriv](https://github.com/avonao/hypdriv) packages and applications: in-memory fakes for every Cloudflare binding HypDriv knows (`KVNamespace`, `Cache`, `DurableObjectNamespace`, `Queue`, `AnalyticsEngine`, `ExecutionContext`, Rate Limiting), a controllable clock, a Drivetrain harness (`createTestContext`, `runStage`), header/cookie assertions and vitest presets for Node and Workers projects.
+Testing kit for [Hypdriv](https://github.com/avonao/hypdriv) packages and applications: in-memory fakes for every Cloudflare binding Hypdriv knows (`KVNamespace`, `Cache`, `DurableObjectNamespace`, `Queue`, `AnalyticsEngine`, `ExecutionContext`, Rate Limiting), a controllable clock, a Drivetrain harness (`createTestContext`, `runStage`), header/cookie assertions and vitest presets for Node and Workers projects.
 
 The fakes implement the structural `*Like` interfaces from `@hypdriv/core`, so a stage or store written against `KVNamespaceLike` or `CacheLike` runs unchanged in plain Node tests; the Workers preset runs the same files inside workerd when you need the real thing.
 

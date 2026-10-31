@@ -18,7 +18,7 @@ function queueSdk(): NonNullable<VercelSdk['queue']> {
   return queue;
 }
 
-/** The Vercel Queues topic of a HypDriv queue name (`vercel.queues[name]`, else the name itself). */
+/** The Vercel Queues topic of a Hypdriv queue name (`vercel.queues[name]`, else the name itself). */
 export function queueTopic(name: string, configInput: ConfigInput): string {
   const config = resolveInput(configInput);
   return config.vercel.queues[name] ?? name;
@@ -70,7 +70,7 @@ export function vercelQueue<Body = unknown>(name: string, configInput: ConfigInp
   };
 }
 
-/** One message as HypDriv queue consumers receive it (the JSON `dispatchQueue` posts on Cloudflare). */
+/** One message as Hypdriv queue consumers receive it (the JSON `dispatchQueue` posts on Cloudflare). */
 export interface QueueJobMessage {
   id: string;
   /** ISO-8601 publish time. */
@@ -80,21 +80,21 @@ export interface QueueJobMessage {
   attempts: number;
 }
 
-/** Input of a HypDriv queue consumer. */
+/** Input of a Hypdriv queue consumer. */
 export interface QueueJobInput {
-  /** The HypDriv queue name (reverse-mapped from the Vercel topic). */
+  /** The Hypdriv queue name (reverse-mapped from the Vercel topic). */
   job: string;
   messages: QueueJobMessage[];
 }
 
-/** A HypDriv queue consumer: returns the ids of messages to retry (others are acknowledged). */
+/** A Hypdriv queue consumer: returns the ids of messages to retry (others are acknowledged). */
 export type QueueJobHandler = (input: QueueJobInput) => Promise<{ retry?: string[] } | void>;
 
 /** Options of `queueConsumer` / `toQueueCallback`. */
 export interface QueueConsumerOptions {
   /** Message lock duration while the handler runs (SDK default 300, max 3600). */
   visibilityTimeoutSeconds?: number;
-  /** Reverse-maps topics to HypDriv queue names (`vercel.queues`) and supplies `jobs.queues[name].retry`. */
+  /** Reverse-maps topics to Hypdriv queue names (`vercel.queues`) and supplies `jobs.queues[name].retry`. */
   config?: ConfigInput;
   /** Fixed job name (overrides the topic mapping). */
   job?: string;
@@ -114,7 +114,7 @@ class RetryRequested extends Error {
 const defaultDelay = (attempts: number) => Math.min(900, 5 * 2 ** Math.max(0, attempts - 1));
 
 /**
- * Translates a HypDriv queue consumer into the arguments of `@vercel/queue`'s `handleCallback`: each Vercel
+ * Translates a Hypdriv queue consumer into the arguments of `@vercel/queue`'s `handleCallback`: each Vercel
  * delivery becomes a one-message `{ job, messages }` batch; a message id in the returned `retry` list is
  * redelivered after `retryDelaySeconds`, a thrown error follows Vercel's default retry, and
  * `jobs.queues[job].retry: 'none'` acknowledges instead of retrying. Use it directly when the route file
@@ -168,7 +168,7 @@ export function toQueueCallback(
 }
 
 /**
- * A Route Handler consuming Vercel Queues deliveries with a HypDriv queue consumer (built on the registered
+ * A Route Handler consuming Vercel Queues deliveries with a Hypdriv queue consumer (built on the registered
  * `handleCallback`, so authentication, visibility extension and acknowledgement stay the SDK's). Configure
  * the route as a queue trigger in `vercel.json` (`experimentalTriggers: [{ type: 'queue/v2beta', topic }]`).
  * Answers 503 while `@vercel/queue` is not registered, so Vercel redelivers later.

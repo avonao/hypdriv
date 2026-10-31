@@ -11,8 +11,8 @@ import {
 import { unstable_noStore } from 'vinext/shims/cache';
 
 /**
- * `@hypdriv/vinext/server` — HypDriv's request context for Server Components, Route Handlers, Server Actions
- * and `proxy.ts` in a vinext app (`hyp()` reads the AsyncLocalStorage context of the request hook the HypDriv
+ * `@hypdriv/vinext/server` — Hypdriv's request context for Server Components, Route Handlers, Server Actions
+ * and `proxy.ts` in a vinext app (`hyp()` reads the AsyncLocalStorage context of the request hook the Hypdriv
  * plugin installs).
  *
  * The request-scoped readers (`hyp`, `requireHyp`, `nonce`, `flag`, `geo`, `devtoolsMeta`) are dynamic APIs,
@@ -37,13 +37,13 @@ function dynamic(): void {
   }
 }
 
-/** The HypDriv request context of the current request, or `null` outside one (build-time prerendering). */
+/** The Hypdriv request context of the current request, or `null` outside one (build-time prerendering). */
 export function hyp(): HypRequestContext | null {
   dynamic();
   return runtimeHyp();
 }
 
-/** Like `hyp()`, but throws when called outside a HypDriv request. */
+/** Like `hyp()`, but throws when called outside a Hypdriv request. */
 export function requireHyp(): HypRequestContext {
   dynamic();
   return runtimeRequireHyp();

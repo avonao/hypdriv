@@ -49,7 +49,7 @@ export interface PreparedBuild {
   documents: string[];
 }
 
-/** A HypDriv logger that prints through SvelteKit's builder log. */
+/** A Hypdriv logger that prints through SvelteKit's builder log. */
 export function builderLogger(log: BuilderLike['log']): Logger {
   const logger: Logger = {
     level: 'info',
@@ -125,7 +125,7 @@ export async function prepareBuild(input: {
     throw new Error(`hypdriv: build failed\n${result.failures.map((f) => `  - ${f}`).join('\n')}`);
   const manifest = result.manifest;
 
-  // SvelteKit's `<meta http-equiv="content-security-policy">` (its `csp` option) is enforced with HypDriv's header.
+  // SvelteKit's `<meta http-equiv="content-security-policy">` (its `csp` option) is enforced with Hypdriv's header.
   const byPath = new Map(documents.map((d) => [normalizePathname(d.pathname), d]));
   const merged = mergeMetaHashes(
     manifest,
@@ -158,7 +158,7 @@ export async function prepareBuild(input: {
 const CODE_FILE = /\.(?:m?js|cjs)$/;
 
 /**
- * Built server files under `dirs` that embed HypDriv's runtime manifest, split by whether they carry `manifest`
+ * Built server files under `dirs` that embed Hypdriv's runtime manifest, split by whether they carry `manifest`
  * (matched by its `generatedAt` stamp) or another one. Function bundles (`*.func`) are searched including their
  * traced `node_modules`; symbolic links are not followed (adapter-vercel links route functions to one bundle).
  */

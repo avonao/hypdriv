@@ -48,7 +48,7 @@ export function parseHeaderLines(input: string | string[]): Record<string, strin
 }
 
 /**
- * Headers that get HypDriv's tooling through a gateway in front of the deployment: Vercel Deployment
+ * Headers that get Hypdriv's tooling through a gateway in front of the deployment: Vercel Deployment
  * Protection (`VERCEL_AUTOMATION_BYPASS_SECRET`), Cloudflare Access service tokens (`CF_ACCESS_CLIENT_ID` +
  * `CF_ACCESS_CLIENT_SECRET`), and any other gate through `HYPDRIV_ACCESS_HEADERS` or `--header` (e.g. a WAF
  * rule that requires a secret header). Read from the environment, `.dev.vars`, `.env*` or `vercel pull`'s files;
@@ -103,7 +103,7 @@ export async function auditAuth(input: {
 }): Promise<AuditAuth> {
   const secretName = input.secretName ?? 'HYPDRIV_INTERNAL_SECRET';
   // Gateways in front of the deployment (Deployment Protection, Cloudflare Access, WAF gates) are independent
-  // of the HypDriv token, so `--anonymous` keeps them.
+  // of the Hypdriv token, so `--anonymous` keeps them.
   const base = accessHeaders(input.root, input.io.env, input.headers);
   const unsigned = (reason: string): AuditAuth => ({ headers: base, source: null, secretName, reason });
   if (input.anonymous) return unsigned('--anonymous');
@@ -128,5 +128,5 @@ export async function auditAuth(input: {
 export function describeAuditAuth(auth: AuditAuth): string {
   return auth.source
     ? `Requests carry a signed audit token (${auth.secretName} from ${auth.source}); the bot shield and rate limits let them through.`
-    : `Requests are unsigned (${auth.reason}); HypDriv's bot shield and rate limits treat them like any visitor.`;
+    : `Requests are unsigned (${auth.reason}); Hypdriv's bot shield and rate limits treat them like any visitor.`;
 }

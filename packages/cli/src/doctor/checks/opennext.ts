@@ -83,7 +83,7 @@ export const opennextChecks: Check[] = [
       if (!v) return skip('not installed.');
       if (!atLeast(v, MIN_OPENNEXT))
         return fail(
-          `@opennextjs/cloudflare ${v} is too old; HypDriv needs ${MIN_OPENNEXT}+ (Next.js 16 support, Durable Object exports).`,
+          `@opennextjs/cloudflare ${v} is too old; Hypdriv needs ${MIN_OPENNEXT}+ (Next.js 16 support, Durable Object exports).`,
         );
       return pass(`@opennextjs/cloudflare ${v}`);
     },

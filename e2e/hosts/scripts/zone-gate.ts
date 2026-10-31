@@ -46,7 +46,7 @@ export interface ZoneGateResult {
 
 /** Rule descriptions for a prefix. */
 export function gateDescriptions(prefix: string): { gate: string; https: string } {
-  const marker = `${prefix}: private HypDriv test deployments`;
+  const marker = `${prefix}: private Hypdriv test deployments`;
   return { gate: `${marker} (gate header or cookie)`, https: `${marker} (https)` };
 }
 

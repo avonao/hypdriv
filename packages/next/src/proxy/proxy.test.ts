@@ -61,7 +61,7 @@ const event = () => {
 };
 
 describe('createProxy', () => {
-  it('runs the stages and forwards HypDriv headers to the application', async () => {
+  it('runs the stages and forwards Hypdriv headers to the application', async () => {
     const { next, seen } = markerNext();
     const proxy = createProxy({ site: { name: 'shop' } }, undefined, { manifest, env: {}, next });
     const response = await proxy(
@@ -166,7 +166,7 @@ describe('createProxy', () => {
 });
 
 describe('matcher', () => {
-  it('skips Next internals and static files but keeps internal HypDriv routes', () => {
+  it('skips Next internals and static files but keeps internal Hypdriv routes', () => {
     const [main, internal] = matcher.matcher;
     const re = new RegExp(`^${main!.replace('/(', '/(').replace(/\(\?!/, '(?!')}$`);
     expect(re.test('/pricing')).toBe(true);
@@ -177,7 +177,7 @@ describe('matcher', () => {
 });
 
 describe('createProxy hardening', () => {
-  it('drops client-supplied HypDriv headers before the stages run', async () => {
+  it('drops client-supplied Hypdriv headers before the stages run', async () => {
     const { next, seen } = markerNext();
     const proxy = createProxy({}, undefined, { manifest, env: {}, next });
     await proxy(
@@ -192,7 +192,7 @@ describe('createProxy hardening', () => {
     expect(forwarded.get('x-hypdriv-flags')).toBeNull();
   });
 
-  it('passes through untouched inside the HypDriv Worker', async () => {
+  it('passes through untouched inside the Hypdriv Worker', async () => {
     const { AsyncLocalStorage } = await import('node:async_hooks');
     const { createContext, loadConfig, setContextStore, runWithContext } = await import('@hypdriv/core');
     const als = new AsyncLocalStorage<ReturnType<typeof createContext>>();

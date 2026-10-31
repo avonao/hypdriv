@@ -69,7 +69,7 @@ export interface TagIndex {
 }
 
 export type CacheStatus =
-  /** Cached by the hosting platform's CDN (Vercel) from headers HypDriv wrote, not by HypDriv's store. */
+  /** Cached by the hosting platform's CDN (Vercel) from headers Hypdriv wrote, not by Hypdriv's store. */
   'CDN' | 'HIT' | 'MISS' | 'STALE' | 'BYPASS' | 'REVALIDATED' | 'ERROR-STALE' | 'DYNAMIC' | 'NEGATIVE';
 
 /** The outcome of the edge-cache stage for one request (`ctx.state.get(CACHE_DECISION_KEY)`). */

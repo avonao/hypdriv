@@ -1,11 +1,11 @@
-# Contributing to HypDriv
+# Contributing to Hypdriv
 
-Thanks for helping make Next.js and Vite-based applications on Cloudflare Workers, Vercel and Node faster, safer and more observable. HypDriv is in Preview (0.1.0); issues and pull requests are welcome.
+Thanks for helping make Next.js and Vite-based applications on Cloudflare Workers, Vercel and Node faster, safer and more observable. Hypdriv is in Preview (0.1.0); issues and pull requests are welcome.
 
 ## Ground rules
 
 - **Production posture.** Every feature is built to its complete, production-grade form. We do not land stubs, "MVP" paths or TODO-driven partial implementations. If a feature needs a new subsystem, build the subsystem.
-- **Sidecar only.** HypDriv never forks or patches Next.js, OpenNext, Vite or a framework. It integrates through public contracts: `next.config.ts`, the Adapter API, `proxy.ts`, Vite plugins and framework integrations, the Worker entry, and application code.
+- **Sidecar only.** Hypdriv never forks or patches Next.js, OpenNext, Vite or a framework. It integrates through public contracts: `next.config.ts`, the Adapter API, `proxy.ts`, Vite plugins and framework integrations, the Worker entry, and application code.
 - **Zero-infrastructure baseline.** Everything must work on a bare Worker with the static-assets binding that OpenNext already requires. Bindings (KV, R2, D1, Durable Objects, Queues, Rate Limiting, Analytics Engine, Images) only _upgrade_ behaviour and are always optional and auto-detected.
 - **Purser stays untouched.** The `@hypdriv/purser` bridge consumes Purser's public build API; we never modify Purser from this repository.
 

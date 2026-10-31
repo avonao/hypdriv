@@ -1,6 +1,6 @@
 /// <reference types="@hypdriv/vinext/virtual" />
-// The Worker entry (wrangler `main`): HypDriv's Worker shell around vinext's fetch handler, with the
-// `scheduled` / `queue` / `email` handlers and HypDriv's Durable Objects.
+// The Worker entry (wrangler `main`): Hypdriv's Worker shell around vinext's fetch handler, with the
+// `scheduled` / `queue` / `email` handlers and Hypdriv's Durable Objects.
 
 import config from 'virtual:hypdriv/config';
 import manifest from 'virtual:hypdriv/manifest';

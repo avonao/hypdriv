@@ -11,7 +11,7 @@ function Post() {
     <main>
       <h1>{post.title}</h1>
       <p>
-        A dynamic route (<code>/posts/[slug]</code> in the HypDriv manifest), rendered on demand.
+        A dynamic route (<code>/posts/[slug]</code> in the Hypdriv manifest), rendered on demand.
       </p>
     </main>
   );

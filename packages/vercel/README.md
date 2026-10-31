@@ -1,6 +1,6 @@
 # @hypdriv/vercel
 
-[HypDriv](https://github.com/avonao/hypdriv) on Vercel: edge-cache policies expressed as Vercel CDN headers with tag purge, Upstash Redis and Global Config (formerly Edge Config) as stores, Vercel WAF rate limits, BotID and Vercel Queues.
+[Hypdriv](https://github.com/avonao/hypdriv) on Vercel: edge-cache policies expressed as Vercel CDN headers with tag purge, Upstash Redis and Global Config (formerly Edge Config) as stores, Vercel WAF rate limits, BotID and Vercel Queues.
 
 The package has **no runtime dependencies** besides `@hypdriv/*`. It talks to Vercel services over `fetch` (Upstash REST, the Global Config read endpoint, the purge REST API) or through Vercel's request-context global, and it never imports Vercel SDK packages: features that only exist in an SDK (`@vercel/firewall`, `botid`, `@vercel/queue`) are **registered** by your application, so an uninstalled package can never break your build. Runtime code uses Web APIs only and runs in Vercel Functions, Routing Middleware (`proxy.ts`) and any other runtime.
 
@@ -31,9 +31,9 @@ export default defineConfig({
   security: { rateLimit: [{ id: 'login', match: '/login', methods: ['POST'], limit: 5, window: '10m' }] },
   vercel: {
     cdn: { downstream: false }, // true: also emit CDN-Cache-Control for a CDN in front of Vercel
-    firewall: { rateLimitRules: { login: 'login-attempts' } }, // HypDriv policy id → WAF rule id
+    firewall: { rateLimitRules: { login: 'login-attempts' } }, // Hypdriv policy id → WAF rule id
     botId: { checkLevel: 'basic' },
-    queues: { emails: 'transactional-email' }, // HypDriv queue name → Vercel Queues topic
+    queues: { emails: 'transactional-email' }, // Hypdriv queue name → Vercel Queues topic
   },
 });
 ```
@@ -89,7 +89,7 @@ Vary: Accept-Language
 ```
 
 - **Tags**: the policy's tags, `route:<id>` and `build:<id>`, plus `hyp:route:<routeId>` and `hyp:path:<pathname>`. Tags are sanitised exactly like the purger sanitises them (commas, whitespace and non-ASCII percent-encoded, at most 256 bytes, at most 128 per response).
-- **Vary**: `vary.headers`, bypass headers, `vary.geo` (`X-Vercel-IP-Country`, `-Country-Region`, `-City`, `-Continent`, `-Timezone`; `colo` needs nothing because Vercel's cache is regional), `vary.language` (`Accept-Language`, plus `X-Vercel-IP-Country` when `i18n.geoMap` is set) and `vary.device` (`Sec-CH-UA-Mobile` and `User-Agent`, because HypDriv falls back to the user agent when browsers send no client hints).
+- **Vary**: `vary.headers`, bypass headers, `vary.geo` (`X-Vercel-IP-Country`, `-Country-Region`, `-City`, `-Continent`, `-Timezone`; `colo` needs nothing because Vercel's cache is regional), `vary.language` (`Accept-Language`, plus `X-Vercel-IP-Country` when `i18n.geoMap` is set) and `vary.device` (`Sec-CH-UA-Mobile` and `User-Agent`, because Hypdriv falls back to the user agent when browsers send no client hints).
 - **Not expressible** on Vercel's CDN (URL plus `Vary` request headers is the whole cache key, and `Vary: Cookie` makes a response uncacheable): `vary.cookies`, `vary.flags`, `bypass.cookies`, `bypass.when`, and `vary.language` with the `cookie` i18n strategy. Such policies get no CDN headers, a `cache;desc=BYPASS` Server-Timing marker and a one-time warning.
 - **Per request**: non-GET/HEAD, `Authorization`, bypass headers/query and RSC requests of `includeRsc: false` policies are not cached. After the response: `Set-Cookie` (also one queued by an earlier stage or the pending flags cookie), uncacheable statuses, `Vary: *`/`Cookie` and, with `respectOrigin`, an origin `no-store`/`private`/`no-cache` drop the headers; shorter origin lifetimes win; 404/410 get `cache.edge.negativeTtl`.
 - The decision is in `ctx.state.get(CDN_DECISION_KEY)` (`CDN`, `BYPASS` or `DYNAMIC`) and in the `cache` Server-Timing marker.
@@ -146,7 +146,7 @@ Inside a Vercel Function or Middleware, the request-context purge API is used (w
 
 ## WAF rate limits
 
-Map HypDriv policies to [Vercel WAF rate-limit rules](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting) whose condition is a `@vercel/firewall` rule id:
+Map Hypdriv policies to [Vercel WAF rate-limit rules](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting) whose condition is a `@vercel/firewall` rule id:
 
 - `vercelRateLimitStage(config)` (`rate-limit-vercel`, inserted after `rate-limit` by `vercelStages`) checks every mapped policy that applies to the request, concurrently and with the request (host and client IP), and answers with the policy's 429 response (`Retry-After`, `RateLimit-*`) when the WAF limits it. The local `rate-limit` stage still counts the policy too.
 - Policies with `store: 'binding'` go to the WAF through the platform binding (`vercelRateLimitRouter`: the policy's rule, else the first rule) and are skipped by the stage.
@@ -190,7 +190,7 @@ The consumer receives the same `{ job, messages: [{ id, timestamp, body, attempt
 
 ## Cloudflare ↔ Vercel
 
-| HypDriv capability | Cloudflare | Vercel |
+| Hypdriv capability | Cloudflare | Vercel |
 | --- | --- | --- |
 | Edge cache | `edge-cache` stage storing in Cache API / KV | `vercelCdnStage` + `withVercelCdn` + `vercelCdnRouteHeaders` → Vercel CDN |
 | Tag purge | tag index + zone purge (`Cache-Tag`) | `Vercel-Cache-Tag` + request-context / REST purge |

@@ -1,8 +1,8 @@
 # @hypdriv/devtools
 
-The [HypDriv](https://github.com/avonao/hypdriv) in-app HUD: a floating pill that opens a panel with per-stage **Server-Timing**, **Web Vitals**, **RSC navigation** timings, **feature flags**, **Purser** diagnostics, **build** info and runtime **capabilities**. Pure React 19, inline styles only, zero dependencies besides `@hypdriv/core`, no Next.js import.
+The [Hypdriv](https://github.com/avonao/hypdriv) in-app HUD: a floating pill that opens a panel with per-stage **Server-Timing**, **Web Vitals**, **RSC navigation** timings, **feature flags**, **Purser** diagnostics, **build** info and runtime **capabilities**. Pure React 19, inline styles only, zero dependencies besides `@hypdriv/core`, no Next.js import.
 
-Per ADR 0008 the HUD needs no endpoint for its core data: every HypDriv stage emits a `Server-Timing` entry and the browser exposes those through `PerformanceNavigationTiming.serverTiming` / `PerformanceResourceTiming.serverTiming`.
+Per ADR 0008 the HUD needs no endpoint for its core data: every Hypdriv stage emits a `Server-Timing` entry and the browser exposes those through `PerformanceNavigationTiming.serverTiming` / `PerformanceResourceTiming.serverTiming`.
 
 ## Install
 

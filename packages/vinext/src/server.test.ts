@@ -54,7 +54,7 @@ describe('@hypdriv/vinext/server', () => {
     expect(hyp()).toBeNull();
     expect(nonce()).toBeUndefined();
     expect(flag('x', 'fallback')).toBe('fallback');
-    expect(() => requireHyp()).toThrow(/no HypDriv request context/);
+    expect(() => requireHyp()).toThrow(/no Hypdriv request context/);
     expect(noStore).toHaveBeenCalledTimes(4);
     expect(typeof defer).toBe('function');
     expect(typeof jobHandler).toBe('function');

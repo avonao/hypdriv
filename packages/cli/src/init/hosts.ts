@@ -12,7 +12,7 @@ import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, plan
 import { addRootKey, editWranglerJsonc, rootValueText } from './wrangler';
 
 /**
- * `hypdriv init` for Vite hosts (ADR 0019): the HypDriv config, the integration registered in the framework's own
+ * `hypdriv init` for Vite hosts (ADR 0019): the Hypdriv config, the integration registered in the framework's own
  * config file, and the platform files the integration needs (a Worker entry and wrangler settings on Cloudflare,
  * nothing extra on Vercel, a start script on Node). Edits are targeted text insertions; anything that cannot be
  * placed safely becomes a manual step with the exact snippet.
@@ -57,7 +57,7 @@ const HYPDRIV_MIGRATION = [
 export function hostConfigTemplate(o: { name: string; framework: FrameworkName }): string {
   return `import { defineConfig } from '@hypdriv/core';
 
-// ${FRAMEWORK_LABEL[o.framework]} + HypDriv. Every section is optional; defaults: docs/guides/configuration.md.
+// ${FRAMEWORK_LABEL[o.framework]} + Hypdriv. Every section is optional; defaults: docs/guides/configuration.md.
 export default defineConfig({
   site: { name: '${o.name}' /* , origin: 'https://www.example.com' */ },
   security: {
@@ -77,7 +77,7 @@ export default defineConfig({
 `;
 }
 
-/** `src/worker.ts` for a plain Vite app on Cloudflare: the static assets behind the HypDriv shell. */
+/** `src/worker.ts` for a plain Vite app on Cloudflare: the static assets behind the Hypdriv shell. */
 export function viteWorkerTemplate(): string {
   return `/// <reference types="@hypdriv/vite/virtual" />
 import { assetsWorker } from '@hypdriv/vite/worker';
@@ -173,7 +173,7 @@ export function registerInConfig(
     ctx.items.push({
       path: o.fallback.path,
       action: 'create',
-      reason: 'config with HypDriv',
+      reason: 'config with Hypdriv',
       content: o.fallback.content,
     });
     return;
@@ -232,17 +232,17 @@ export function planWorkerEntry(ctx: HostContext, main: string, template: string
     ctx.items.push({
       path: main.replace(/^\.\//, ''),
       action: 'create',
-      reason: 'Worker entry: the HypDriv shell around the app (jobs, Durable Objects)',
+      reason: 'Worker entry: the Hypdriv shell around the app (jobs, Durable Objects)',
       content: template,
     });
   else if (!uses.test(readFileSync(entry, 'utf8')))
     ctx.items.push({
       path: main,
       action: 'manual',
-      reason: 'existing Worker entry; wrap it with the HypDriv shell',
+      reason: 'existing Worker entry; wrap it with the Hypdriv shell',
       hint: template,
     });
-  else ctx.items.push({ path: main, action: 'skip', reason: 'uses the HypDriv shell' });
+  else ctx.items.push({ path: main, action: 'skip', reason: 'uses the Hypdriv shell' });
 }
 
 /** Cloudflare wrangler settings for a host whose Worker entry is `main`. */
@@ -256,7 +256,7 @@ export function planHostWrangler(
     ctx.items.push({
       path: 'wrangler.jsonc',
       action: 'create',
-      reason: 'Worker config for HypDriv',
+      reason: 'Worker config for Hypdriv',
       content: o.template(),
     });
     return;
@@ -297,7 +297,7 @@ export function planHostWrangler(
       changes.push('assets: binding ASSETS, run_worker_first for navigations');
     } else if (!/run_worker_first/.test(assets))
       ctx.notes.push(
-        `${path}: add "run_worker_first": ["/*", "!/assets/*"] to "assets" so navigations run HypDriv's request stages (static pages otherwise get only the _headers rules).`,
+        `${path}: add "run_worker_first": ["/*", "!/assets/*"] to "assets" so navigations run Hypdriv's request stages (static pages otherwise get only the _headers rules).`,
       );
   }
   if (o.durableObjects) {
@@ -306,7 +306,7 @@ export function planHostWrangler(
       content =
         addRootKey(content, 'durable_objects', JSON.stringify({ bindings: HYPDRIV_DO }), 'observability') ??
         content;
-      changes.push('durable_objects: HypDriv limiter, tag index, channels');
+      changes.push('durable_objects: Hypdriv limiter, tag index, channels');
       const migrations = addRootKey(
         content,
         'migrations',
@@ -320,14 +320,14 @@ export function planHostWrangler(
         );
     } else if (!/HypDrivLimiter/.test(dos))
       ctx.notes.push(
-        `${path}: bind HypDriv's Durable Objects (HYPDRIV_LIMITER/HypDrivLimiter, HYPDRIV_INDEX/HypDrivIndex, HYPDRIV_CHANNEL/HypDrivChannel) for exact rate limits, tag purges and live channels.`,
+        `${path}: bind Hypdriv's Durable Objects (HYPDRIV_LIMITER/HypDrivLimiter, HYPDRIV_INDEX/HypDrivIndex, HYPDRIV_CHANNEL/HypDrivChannel) for exact rate limits, tag purges and live channels.`,
       );
   }
   if (!/nodejs_compat/.test(rootValueText(content, 'compatibility_flags') ?? ''))
-    ctx.notes.push(`${path}: HypDriv needs "compatibility_flags": ["nodejs_compat"] (AsyncLocalStorage).`);
+    ctx.notes.push(`${path}: Hypdriv needs "compatibility_flags": ["nodejs_compat"] (AsyncLocalStorage).`);
   ctx.items.push(
     changes.length
-      ? { path, action: 'modify', reason: 'HypDriv Worker settings', details: changes, content }
+      ? { path, action: 'modify', reason: 'Hypdriv Worker settings', details: changes, content }
       : { path, action: 'skip', reason: 'already configured' },
   );
 }
@@ -386,7 +386,7 @@ export const VITE_SPEC: HostSpec = {
       });
     } else if (ctx.platform === 'vercel')
       ctx.notes.push(
-        'On Vercel the plugin writes .vercel/output itself (static files, HypDriv header routes, Routing Middleware); keep the Vite framework preset and `vite build` as the build command. Functions in api/ deploy alongside.',
+        'On Vercel the plugin writes .vercel/output itself (static files, Hypdriv header routes, Routing Middleware); keep the Vite framework preset and `vite build` as the build command. Functions in api/ deploy alongside.',
       );
   },
   scripts: (platform) => ({
@@ -396,11 +396,11 @@ export const VITE_SPEC: HostSpec = {
   }),
 };
 
-/** `src/worker.ts` for Astro on Cloudflare: the HypDriv shell around `@astrojs/cloudflare`'s handler. */
+/** `src/worker.ts` for Astro on Cloudflare: the Hypdriv shell around `@astrojs/cloudflare`'s handler. */
 export function astroWorkerTemplate(): string {
   return `/// <reference types="@hypdriv/astro/virtual" />
-// HypDriv's Worker shell around Astro's Cloudflare handler: the pipeline runs for every request that reaches the
-// Worker (prerendered pages through env.ASSETS included); the HypDriv middleware inside Astro passes through.
+// Hypdriv's Worker shell around Astro's Cloudflare handler: the pipeline runs for every request that reaches the
+// Worker (prerendered pages through env.ASSETS included); the Hypdriv middleware inside Astro passes through.
 import config from 'virtual:hypdriv/config';
 import { handle } from '@astrojs/cloudflare/handler';
 import { createWorker } from '@hypdriv/cloudflare';
@@ -453,11 +453,11 @@ export const ASTRO_SPEC: HostSpec = {
       );
     if (ctx.platform === 'node' && !/staticHeaders\s*:\s*true/.test(source))
       ctx.notes.push(
-        "@astrojs/node: set `staticHeaders: true` so prerendered pages are served with HypDriv's headers (dist/_headers.json).",
+        "@astrojs/node: set `staticHeaders: true` so prerendered pages are served with Hypdriv's headers (dist/_headers.json).",
       );
     if (/security\s*:\s*\{[^}]*csp/.test(source))
       ctx.notes.push(
-        "Astro's security.csp is on: Astro owns the policy and HypDriv's CSP stays off (one policy per response).",
+        "Astro's security.csp is on: Astro owns the policy and Hypdriv's CSP stays off (one policy per response).",
       );
   },
   platform(ctx) {
@@ -474,7 +474,7 @@ export const ASTRO_SPEC: HostSpec = {
         run_worker_first: ['/*', '!/_astro/*'],
       }),
       template: () =>
-        `{\n  "$schema": "node_modules/wrangler/config-schema.json",\n  "name": "${ctx.name}",\n  "main": "./src/worker.ts",\n  "compatibility_date": "${defaultCompatibilityDate(ctx.now)}",\n  "compatibility_flags": ["nodejs_compat"],\n  // HypDriv's Worker shell runs for every request except content-hashed assets, prerendered pages included.\n  "assets": { "binding": "ASSETS", "directory": "./dist/client", "run_worker_first": ["/*", "!/_astro/*"] },\n  "observability": { "enabled": true },\n  "durable_objects": { "bindings": ${JSON.stringify(HYPDRIV_DO)} },\n  "migrations": ${JSON.stringify(HYPDRIV_MIGRATION)}\n}\n`,
+        `{\n  "$schema": "node_modules/wrangler/config-schema.json",\n  "name": "${ctx.name}",\n  "main": "./src/worker.ts",\n  "compatibility_date": "${defaultCompatibilityDate(ctx.now)}",\n  "compatibility_flags": ["nodejs_compat"],\n  // Hypdriv's Worker shell runs for every request except content-hashed assets, prerendered pages included.\n  "assets": { "binding": "ASSETS", "directory": "./dist/client", "run_worker_first": ["/*", "!/_astro/*"] },\n  "observability": { "enabled": true },\n  "durable_objects": { "bindings": ${JSON.stringify(HYPDRIV_DO)} },\n  "migrations": ${JSON.stringify(HYPDRIV_MIGRATION)}\n}\n`,
     });
   },
   scripts: (platform) => ({
@@ -493,7 +493,7 @@ export function planFileEdit(
   const file = join(ctx.project.root, path);
   if (!existsSync(file)) {
     if (o.fallback !== undefined)
-      ctx.items.push({ path, action: 'create', reason: 'HypDriv wiring', content: o.fallback });
+      ctx.items.push({ path, action: 'create', reason: 'Hypdriv wiring', content: o.fallback });
     else ctx.items.push({ path, action: 'manual', reason: 'file not found', hint: o.hint });
     return;
   }
@@ -525,7 +525,7 @@ export function planNewFile(
     ctx.items.push({
       path,
       action: 'manual',
-      reason: o.existing ?? `${path} exists; wire HypDriv in`,
+      reason: o.existing ?? `${path} exists; wire Hypdriv in`,
       hint: content,
     });
 }
@@ -610,8 +610,8 @@ export const REACT_ROUTER_SPEC: HostSpec = {
         );
         return {
           changed: true,
-          content: `${withImport.replace(/\s*$/, '')}\n\n// HypDriv's request stages around every route (security headers, CSP nonce, rate limiting, bot shield).\nexport const middleware = [hypdrivMiddleware()];\n`,
-          reason: 'export the HypDriv root middleware',
+          content: `${withImport.replace(/\s*$/, '')}\n\n// Hypdriv's request stages around every route (security headers, CSP nonce, rate limiting, bot shield).\nexport const middleware = [hypdrivMiddleware()];\n`,
+          reason: 'export the Hypdriv root middleware',
         };
       },
       {
@@ -622,12 +622,12 @@ export const REACT_ROUTER_SPEC: HostSpec = {
     planNewFile(
       ctx,
       'app/entry.server.tsx',
-      "// React Router's server entry with HypDriv's CSP nonce on every script ServerRouter and React render.\nexport { default, streamTimeout } from '@hypdriv/react-router/entry.server';\n",
+      "// React Router's server entry with Hypdriv's CSP nonce on every script ServerRouter and React render.\nexport { default, streamTimeout } from '@hypdriv/react-router/entry.server';\n",
       {
         uses: /@hypdriv\/react-router/,
-        reason: "server entry that hands HypDriv's nonce to ServerRouter",
+        reason: "server entry that hands Hypdriv's nonce to ServerRouter",
         existing:
-          "app/entry.server.tsx exists; pass the request nonce to ServerRouter (or re-export HypDriv's entry)",
+          "app/entry.server.tsx exists; pass the request nonce to ServerRouter (or re-export Hypdriv's entry)",
       },
     );
   },
@@ -638,7 +638,7 @@ export const REACT_ROUTER_SPEC: HostSpec = {
       planWorkerEntry(
         ctx,
         main,
-        `/// <reference types="@hypdriv/vite/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport { reactRouterWorker } from '@hypdriv/react-router/cloudflare';\n\n${DO_EXPORTS}\n\n// HypDriv's Worker shell around React Router: prerendered pages and public files from the assets binding, the\n// rest from React Router; scheduled/queue/email dispatch HypDriv's jobs.\nexport default reactRouterWorker({ config });\n`,
+        `/// <reference types="@hypdriv/vite/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport { reactRouterWorker } from '@hypdriv/react-router/cloudflare';\n\n${DO_EXPORTS}\n\n// Hypdriv's Worker shell around React Router: prerendered pages and public files from the assets binding, the\n// rest from React Router; scheduled/queue/email dispatch Hypdriv's jobs.\nexport default reactRouterWorker({ config });\n`,
         /reactRouterWorker|createWorker/,
       );
       const assets = {
@@ -666,7 +666,7 @@ export const REACT_ROUTER_SPEC: HostSpec = {
       });
     } else if (ctx.platform === 'vercel')
       ctx.notes.push(
-        "On Vercel HypDriv writes the Build Output itself (static files, header routes, one traced function per server bundle, Routing Middleware for prerendered pages); @vercel/react-router's vercelPreset() is optional (route `config`).",
+        "On Vercel Hypdriv writes the Build Output itself (static files, header routes, one traced function per server bundle, Routing Middleware for prerendered pages); @vercel/react-router's vercelPreset() is optional (route `config`).",
       );
   },
   scripts: (platform) => ({
@@ -735,10 +735,10 @@ export const TANSTACK_START_SPEC: HostSpec = {
     planNewFile(
       ctx,
       'src/start.ts',
-      "import { hypdrivRequestMiddleware } from '@hypdriv/tanstack-start';\nimport { createStart } from '@tanstack/react-start';\n\n// HypDriv first (it wraps SSR documents, server routes, server functions, 404s), then Start's CSRF protection.\nconst requestMiddleware = hypdrivRequestMiddleware();\n\nexport const startInstance = createStart(() => ({ requestMiddleware }));\n",
+      "import { hypdrivRequestMiddleware } from '@hypdriv/tanstack-start';\nimport { createStart } from '@tanstack/react-start';\n\n// Hypdriv first (it wraps SSR documents, server routes, server functions, 404s), then Start's CSRF protection.\nconst requestMiddleware = hypdrivRequestMiddleware();\n\nexport const startInstance = createStart(() => ({ requestMiddleware }));\n",
       {
         uses: /hypdriv/i,
-        reason: "global request middleware (HypDriv, then Start's CSRF)",
+        reason: "global request middleware (Hypdriv, then Start's CSRF)",
         existing: 'src/start.ts exists; put hypdrivRequestMiddleware() first in requestMiddleware',
       },
     );
@@ -820,10 +820,10 @@ export const SVELTEKIT_SPEC: HostSpec = {
     planNewFile(
       ctx,
       'src/hooks.server.ts',
-      "import { hypdriv } from '@hypdriv/sveltekit/hooks';\n\n// HypDriv owns the full response (security headers, CSP, rate limiting, bot shield, `/_hypdriv/*`). With hooks of\n// your own: export const handle = sequence(hypdriv(), yourHandle) (import { sequence } from '@sveltejs/kit/hooks').\nexport const handle = hypdriv();\n",
+      "import { hypdriv } from '@hypdriv/sveltekit/hooks';\n\n// Hypdriv owns the full response (security headers, CSP, rate limiting, bot shield, `/_hypdriv/*`). With hooks of\n// your own: export const handle = sequence(hypdriv(), yourHandle) (import { sequence } from '@sveltejs/kit/hooks').\nexport const handle = hypdriv();\n",
       {
         uses: /@hypdriv\/sveltekit\/hooks/,
-        reason: 'the HypDriv handle hook',
+        reason: 'the Hypdriv handle hook',
         existing:
           'src/hooks.server.ts exists; export const handle = sequence(hypdriv(), …) with hypdriv() first',
       },
@@ -857,7 +857,7 @@ export const SVELTEKIT_SPEC: HostSpec = {
       planNewFile(
         ctx,
         'server.js',
-        "// adapter-node's build behind the HypDriv pipeline (static files and prerendered pages included).\nimport { serve } from '@hypdriv/sveltekit/node';\n\nawait serve({ dir: 'build' });\n",
+        "// adapter-node's build behind the Hypdriv pipeline (static files and prerendered pages included).\nimport { serve } from '@hypdriv/sveltekit/node';\n\nawait serve({ dir: 'build' });\n",
         { uses: /@hypdriv\/sveltekit\/node/, reason: "Node server around adapter-node's handler" },
       );
   },
@@ -897,7 +897,7 @@ export const NUXT_SPEC: HostSpec = {
       const source = ctx.project.framework.configFile ? ctx.read(ctx.project.framework.configFile) : '';
       if (!/cloudflare-module/.test(source))
         ctx.notes.push(
-          "Build Nuxt for Workers with Nitro's `cloudflare-module` preset and `cloudflare: { deployConfig: true }` (nitro in nuxt.config): HypDriv's module then puts its Worker shell around Nitro.",
+          "Build Nuxt for Workers with Nitro's `cloudflare-module` preset and `cloudflare: { deployConfig: true }` (nitro in nuxt.config): Hypdriv's module then puts its Worker shell around Nitro.",
         );
     }
   },
@@ -1043,7 +1043,7 @@ export function buildHostPlan(
     ctx.items.push({
       path: 'hypdriv.config.ts',
       action: 'create',
-      reason: 'HypDriv configuration with commented defaults',
+      reason: 'Hypdriv configuration with commented defaults',
       content: hostConfigTemplate({ name: ctx.name, framework }),
     });
 

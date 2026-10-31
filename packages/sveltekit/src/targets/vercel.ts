@@ -17,7 +17,7 @@ interface VercelConfigJson {
 const isHypDriv = (route: VercelRoute) => route.headers?.[VERCEL_ROUTE_MARKER] !== undefined;
 
 /**
- * Places HypDriv's header routes in a Build Output route list: after the leading `continue: true` routes and
+ * Places Hypdriv's header routes in a Build Output route list: after the leading `continue: true` routes and
  * before the first route that ends the phase. adapter-vercel serves prerendered pages through rewrites without
  * `continue` (`{ src: '/about', dest: '/about/' }`), which come before `handle: filesystem`; header routes placed
  * after them would never apply to those pages.
@@ -31,7 +31,7 @@ export function placeHeaderRoutes(routes: VercelRoute[]): VercelRoute[] {
 }
 
 /**
- * Writes HypDriv's static header rules into adapter-vercel's `.vercel/output/config.json` (replacing the routes of a
+ * Writes Hypdriv's static header rules into adapter-vercel's `.vercel/output/config.json` (replacing the routes of a
  * previous run) and removes build metadata from the static output. Returns the number of header routes.
  */
 export function writeVercelHeaders(

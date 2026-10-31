@@ -19,7 +19,7 @@ import { signing } from '@hypdriv/security';
 import { decodeGeoHeader, type GeoInfo } from './stages/geo';
 
 /**
- * Request-scoped information HypDriv makes available to application code running below a HypDriv handler
+ * Request-scoped information Hypdriv makes available to application code running below a Hypdriv handler
  * (framework hooks, `createHandler`, the Worker shell): loaders, endpoints, server functions, components.
  */
 export interface HypRequestContext {
@@ -100,7 +100,7 @@ export function requestContextFrom(ctx: HypContext): HypRequestContext {
 }
 
 /**
- * The HypDriv request context of the current request, or `null` outside one (build-time prerendering, code
+ * The Hypdriv request context of the current request, or `null` outside one (build-time prerendering, code
  * that runs outside a request). Synchronous: framework hooks run the application inside the context.
  */
 export function hyp(): HypRequestContext | null {
@@ -108,13 +108,13 @@ export function hyp(): HypRequestContext | null {
   return ctx ? requestContextFrom(ctx) : null;
 }
 
-/** Like `hyp()`, but throws when called outside a HypDriv request. */
+/** Like `hyp()`, but throws when called outside a Hypdriv request. */
 export function requireHyp(): HypRequestContext {
   const context = hyp();
   if (!context)
     throw new HypDrivError(
       'E_UNSUPPORTED',
-      'hyp(): no HypDriv request context; is the HypDriv hook installed and the call inside a request?',
+      'hyp(): no Hypdriv request context; is the Hypdriv hook installed and the call inside a request?',
     );
   return context;
 }
@@ -289,7 +289,7 @@ export function createJobHandler(
 }
 
 /**
- * Wraps an endpoint so it only accepts HypDriv's signed job dispatch and Vercel Cron (see
+ * Wraps an endpoint so it only accepts Hypdriv's signed job dispatch and Vercel Cron (see
  * `createJobHandler`). Mount it on the path `jobs.cron` / `jobs.queues` point at.
  */
 export function jobHandler(

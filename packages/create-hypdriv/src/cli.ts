@@ -34,7 +34,7 @@ export interface CliIO {
 
 const HELP = `create-hypdriv ${VERSION}
 
-Scaffold an app with HypDriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
+Scaffold an app with Hypdriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
 (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel or Node.
 
 Usage
@@ -244,7 +244,7 @@ export async function main(io: CliIO): Promise<number> {
   const hostSteps =
     platform === 'cloudflare'
       ? [
-          `${runScript(packageManager, 'build:cloudflare')}   # the Worker (HypDriv shell) + static assets`,
+          `${runScript(packageManager, 'build:cloudflare')}   # the Worker (Hypdriv shell) + static assets`,
           `${runScript(packageManager, 'deploy:cloudflare')}`,
         ]
       : platform === 'vercel'
@@ -254,7 +254,7 @@ export async function main(io: CliIO): Promise<number> {
           ]
         : [
             `${runScript(packageManager, 'build:node')}`,
-            `${runScript(packageManager, 'start')}              # Node server behind the HypDriv pipeline`,
+            `${runScript(packageManager, 'start')}              # Node server behind the Hypdriv pipeline`,
           ];
   const steps = [
     relative(io.cwd, result.root) ? `cd ${relative(io.cwd, result.root)}` : null,

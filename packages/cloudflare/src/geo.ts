@@ -1,6 +1,6 @@
 import type { GeoProperties } from '@hypdriv/core';
 
-/** Narrows Cloudflare's `request.cf` to the fields HypDriv uses (and keeps the rest accessible). */
+/** Narrows Cloudflare's `request.cf` to the fields Hypdriv uses (and keeps the rest accessible). */
 export function cloudflareGeo(cf: Record<string, unknown> | undefined): GeoProperties | undefined {
   if (!cf) return undefined;
   const s = (k: string) => (typeof cf[k] === 'string' ? (cf[k] as string) : undefined);

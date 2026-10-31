@@ -5,8 +5,8 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'HypDriv basic example', template: '%s · HypDriv' },
-  description: 'Next.js 16 on Cloudflare Workers with HypDriv.',
+  title: { default: 'Hypdriv basic example', template: '%s · Hypdriv' },
+  description: 'Next.js 16 on Cloudflare Workers with Hypdriv.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <header className="site-header">
           <a href="/" className="brand">
-            HypDriv
+            Hypdriv
           </a>
           <nav>
             <a href="/blog">Blog</a>

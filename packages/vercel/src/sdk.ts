@@ -1,6 +1,6 @@
 /**
  * Registration of Vercel SDK functions that only exist as npm packages (`@vercel/firewall`, `botid`,
- * `@vercel/queue`). HypDriv never imports them: a literal `import()` of an uninstalled package breaks the
+ * `@vercel/queue`). Hypdriv never imports them: a literal `import()` of an uninstalled package breaks the
  * application's build, so the application imports them itself and hands the functions over once, in
  * `instrumentation.ts` or `proxy.ts`:
  *
@@ -130,7 +130,7 @@ export type QueueHandleCallbackFn = (
   options?: QueueCallbackOptions,
 ) => (request: Request) => Promise<Response>;
 
-/** The SDK functions HypDriv can use. Every entry is optional. */
+/** The SDK functions Hypdriv can use. Every entry is optional. */
 export interface VercelSdk {
   /** `checkRateLimit` (or `unstable_checkRateLimit`) from `@vercel/firewall`. */
   checkRateLimit?: CheckRateLimitFn;
@@ -147,7 +147,7 @@ export interface VercelSdk {
 const SDK_KEY = Symbol.for('hypdriv.vercel.sdk');
 
 /**
- * Registers Vercel SDK functions for HypDriv (merged with earlier registrations, so packages can be
+ * Registers Vercel SDK functions for Hypdriv (merged with earlier registrations, so packages can be
  * registered from different modules). Call it once per process, before the first request needs them.
  */
 export function registerVercelSdk(sdk: VercelSdk): void {

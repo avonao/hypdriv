@@ -1,12 +1,12 @@
-# HypDriv × vinext
+# Hypdriv × vinext
 
-The Next.js App Router API on Vite: prerendered `/` and `/about`, a dynamic `/dynamic` page that renders `hyp()` facts, and the Route Handler `/api/hello`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [vinext guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/vinext.md).
+The Next.js App Router API on Vite: prerendered `/` and `/about`, a dynamic `/dynamic` page that renders `hyp()` facts, and the Route Handler `/api/hello`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [vinext guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/vinext.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

@@ -1,6 +1,6 @@
 import { getGlobalStartContext } from '@tanstack/react-start';
 
-/** The router's `ssr` option HypDriv fills in. */
+/** The router's `ssr` option Hypdriv fills in. */
 export interface HypDrivSsrOptions {
   nonce?: string;
 }

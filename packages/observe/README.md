@@ -1,6 +1,6 @@
 # @hypdriv/observe
 
-Observability for HypDriv applications: a dependency-free span model with W3C `traceparent` propagation and console / OTLP-HTTP / Analytics Engine exporters, a structured logger with redaction and sampling, the `request-id` and `observe` Drivetrain stages (ids, `Server-Timing`, request summary lines), the Web Vitals beacon endpoint with log and Analytics Engine sinks, Next's `onRequestError` hook, and a tiny browser entry (`@hypdriv/observe/client`) that reports vitals with route, build and cache attribution.
+Observability for Hypdriv applications: a dependency-free span model with W3C `traceparent` propagation and console / OTLP-HTTP / Analytics Engine exporters, a structured logger with redaction and sampling, the `request-id` and `observe` Drivetrain stages (ids, `Server-Timing`, request summary lines), the Web Vitals beacon endpoint with log and Analytics Engine sinks, Next's `onRequestError` hook, and a tiny browser entry (`@hypdriv/observe/client`) that reports vitals with route, build and cache attribution.
 
 Runtime-neutral: no Node built-ins, no Cloudflare types, no OpenTelemetry SDK.
 

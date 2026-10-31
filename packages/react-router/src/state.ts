@@ -4,7 +4,7 @@ import type { RouteManifestEntryLike } from './routes';
 /** Where a build deploys: decides the server entry, the static header files and the Vercel Build Output. */
 export type ReactRouterTarget = 'cloudflare' | 'vercel' | 'node';
 
-/** The parts of React Router's resolved config HypDriv reads. */
+/** The parts of React Router's resolved config Hypdriv reads. */
 export interface ResolvedReactRouterConfigLike {
   appDirectory: string;
   basename: string;

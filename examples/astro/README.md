@@ -1,12 +1,12 @@
-# HypDriv × Astro 7
+# Hypdriv × Astro 7
 
-A prerendered home page with a server island, prerendered `/blog/[slug]` pages, an on-demand `/ssr` page, the endpoint `/api/hello`, custom 404/500 pages and `src/fetch.ts` (unmatched URLs through the pipeline). One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [Astro 7 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/astro.md).
+A prerendered home page with a server island, prerendered `/blog/[slug]` pages, an on-demand `/ssr` page, the endpoint `/api/hello`, custom 404/500 pages and `src/fetch.ts` (unmatched URLs through the pipeline). One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [Astro 7 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/astro.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

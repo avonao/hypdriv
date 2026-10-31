@@ -1,6 +1,6 @@
 # @hypdriv/image
 
-Images for [HypDriv](https://github.com/avonao/hypdriv) on Cloudflare: a `next/image` loader that emits `/cdn-cgi/image/...` URLs, build-time blur placeholders, and `createHypImage()` — a thin wrapper around `next/image` that applies the placeholders and sensible defaults.
+Images for [Hypdriv](https://github.com/avonao/hypdriv) on Cloudflare: a `next/image` loader that emits `/cdn-cgi/image/...` URLs, build-time blur placeholders, and `createHypImage()` — a thin wrapper around `next/image` that applies the placeholders and sensible defaults.
 
 OpenNext already serves `/_next/image` through the Images binding, so nothing here is required for images to work. The loader is an **optimisation for applications on a Cloudflare zone**: `/cdn-cgi/image` transformations are resized and cached by the zone without invoking the Worker.
 

@@ -10,7 +10,7 @@ import { buildThemeScript, themeScriptHash } from '../theme/script';
 export type PrerenderedHtml = Record<string, string>;
 
 export interface VerifyBuildOptions {
-  /** The HypDriv project root. */
+  /** The Hypdriv project root. */
   projectDir: string;
   /** `resolveConfig(...).purser` (must not be `null`). */
   config: ResolvedPurser;

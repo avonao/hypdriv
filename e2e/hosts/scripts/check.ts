@@ -1,5 +1,5 @@
 /**
- * Live checks for a deployed HypDriv Vite-host example (any framework, any platform):
+ * Live checks for a deployed Hypdriv Vite-host example (any framework, any platform):
  *
  *   pnpm -F @hypdriv/e2e-hosts check --url https://example.dev --framework astro \
  *     --static / --dynamic /ssr --api /api/hello --rate-limit 5 [--asset-cache immutable]
@@ -9,7 +9,7 @@
  * (hash or nonce — the nonce must be the policy's and fresh per request on dynamic pages), request ids and
  * Server-Timing, the bot shield (an automation user agent gets 403) on rendered and on prerendered pages (the
  * request stages reach documents the platform's static layer serves: the Worker shell with `run_worker_first` on
- * Cloudflare, HypDriv's prerender Routing Middleware on Vercel; `--no-static-stages` for deployments that serve
+ * Cloudflare, Hypdriv's prerender Routing Middleware on Vercel; `--no-static-stages` for deployments that serve
  * them with static headers only), rate limiting on the API (a 429 with `Retry-After` within the configured
  * limit), HTTP → HTTPS, and immutable caching of content-hashed assets.
  *

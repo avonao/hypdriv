@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/vinext",
   "version": "0.1.0",
-  "description": "HypDriv for vinext (Cloudflare's Vite implementation of the Next.js API): the Drivetrain around every vinext request on Cloudflare Workers, Vercel and Node, the build manifest with CSP hashes of prerendered pages, static headers per platform, and revalidateTag purges that reach HypDriv's edge cache.",
+  "description": "Hypdriv for vinext (Cloudflare's Vite implementation of the Next.js API): the Drivetrain around every vinext request on Cloudflare Workers, Vercel and Node, the build manifest with CSP hashes of prerendered pages, static headers per platform, and revalidateTag purges that reach Hypdriv's edge cache.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

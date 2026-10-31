@@ -11,10 +11,10 @@ import { cloudflareContext } from './server';
 import { isPrerenderRequest } from './shared';
 
 /**
- * `@hypdriv/react-router/cloudflare` — the Worker entry of a React Router app on Cloudflare: HypDriv's Worker shell
+ * `@hypdriv/react-router/cloudflare` — the Worker entry of a React Router app on Cloudflare: Hypdriv's Worker shell
  * (`createWorker`) around React Router, so the pipeline runs for every request the Worker receives — routes, 404s,
  * `/__manifest` and, with `assets.run_worker_first`, prerendered pages and other static files — plus `scheduled`,
- * `queue` and `email` handlers for HypDriv's jobs. The root `middleware` passes through inside it.
+ * `queue` and `email` handlers for Hypdriv's jobs. The root `middleware` passes through inside it.
  *
  * ```ts
  * // workers/app.ts (wrangler `main`)
@@ -80,7 +80,7 @@ async function virtualToken(): Promise<string> {
 }
 
 /**
- * Creates the Cloudflare Worker of a React Router app with HypDriv. Static files come from the assets binding
+ * Creates the Cloudflare Worker of a React Router app with Hypdriv. Static files come from the assets binding
  * first (GET/HEAD); single-page apps (`ssr: false`) get their shell (`__spa-fallback.html`, else `index.html`) for
  * unknown navigations; everything else goes to React Router with `cloudflareContext` in the router context. The
  * build's own prerender requests skip the shell.

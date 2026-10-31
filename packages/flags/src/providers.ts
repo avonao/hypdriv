@@ -185,7 +185,7 @@ export function kvProvider(
   };
 }
 
-/** The subset of an OpenFeature client HypDriv calls. */
+/** The subset of an OpenFeature client Hypdriv calls. */
 export interface OpenFeatureClientLike {
   getBooleanValue(
     flagKey: string,

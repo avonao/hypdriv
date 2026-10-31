@@ -1,9 +1,9 @@
 # Caching
 
-Next.js 16 already has two caches: the client router cache and the server-side caches behind `'use cache'` / ISR (stored by OpenNext in R2/KV with D1 or Durable Object tag caches). HypDriv adds a third, in front of all of them: the **edge cache**, a full-response cache that runs in the Worker before Next.js is invoked.
+Next.js 16 already has two caches: the client router cache and the server-side caches behind `'use cache'` / ISR (stored by OpenNext in R2/KV with D1 or Durable Object tag caches). Hypdriv adds a third, in front of all of them: the **edge cache**, a full-response cache that runs in the Worker before Next.js is invoked.
 
 ```
-browser ──► Cloudflare edge ──► [HypDriv edge cache] ──► OpenNext/Next.js ──► 'use cache' / ISR stores
+browser ──► Cloudflare edge ──► [Hypdriv edge cache] ──► OpenNext/Next.js ──► 'use cache' / ISR stores
 ```
 
 ## Why a third cache

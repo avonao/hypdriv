@@ -7,9 +7,9 @@ export const MAX_TAGS_PER_RESPONSE = 128;
 /** Vercel limit: tags per purge call. */
 export const MAX_TAGS_PER_PURGE = 16;
 
-/** Prefix of the per-path tag HypDriv adds to every CDN-cached response (`hyp:path:/blog/hello`). */
+/** Prefix of the per-path tag Hypdriv adds to every CDN-cached response (`hyp:path:/blog/hello`). */
 export const PATH_TAG_PREFIX = 'hyp:path:';
-/** Prefix of the per-route tag HypDriv adds to every CDN-cached response (`hyp:route:app:/blog/[slug]`). */
+/** Prefix of the per-route tag Hypdriv adds to every CDN-cached response (`hyp:route:app:/blog/[slug]`). */
 export const ROUTE_TAG_PREFIX = 'hyp:route:';
 
 function escapedLength(tag: string): number {

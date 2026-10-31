@@ -2,7 +2,7 @@ import { type CspConfig, type CspDirectives, HEADER, type HypDrivConfig } from '
 import { mergeDirectives } from '@hypdriv/security';
 
 /**
- * SvelteKit's `csp` option as the HypDriv integration carries it into the runtime (the `directives` of the
+ * SvelteKit's `csp` option as the Hypdriv integration carries it into the runtime (the `directives` of the
  * `sveltekit({ csp })` config; SvelteKit writes keywords unquoted: `['self', 'strict-dynamic']`).
  */
 export interface SvelteKitCsp {
@@ -38,9 +38,9 @@ export function quoteSource(source: string): string {
 }
 
 /**
- * Converts SvelteKit `csp.directives` into HypDriv directives: keywords quoted, `undefined` entries dropped,
+ * Converts SvelteKit `csp.directives` into Hypdriv directives: keywords quoted, `undefined` entries dropped,
  * nonces and hashes dropped (they belong to one response, never to a configuration) and `report-to` dropped
- * (it names a reporting group, and HypDriv's `security.csp.reportTo` owns the `Reporting-Endpoints` header).
+ * (it names a reporting group, and Hypdriv's `security.csp.reportTo` owns the `Reporting-Endpoints` header).
  * Returns null when SvelteKit's config sets no directive.
  */
 export function svelteKitDirectives(
@@ -66,9 +66,9 @@ export function svelteKitDirectives(
 }
 
 /**
- * Folds SvelteKit's `csp.directives` into the HypDriv config, so one policy (HypDriv's, per request) carries both:
- * SvelteKit's sources are unioned with `security.csp.directives`; HypDriv's own `false` entries still remove a
- * directive. A disabled HypDriv CSP (`security.csp: false`) leaves the config untouched: SvelteKit's policy then
+ * Folds SvelteKit's `csp.directives` into the Hypdriv config, so one policy (Hypdriv's, per request) carries both:
+ * SvelteKit's sources are unioned with `security.csp.directives`; Hypdriv's own `false` entries still remove a
+ * directive. A disabled Hypdriv CSP (`security.csp: false`) leaves the config untouched: SvelteKit's policy then
  * applies on its own.
  */
 export function withSvelteKitCsp(config: HypDrivConfig, csp: SvelteKitCsp | null | undefined): HypDrivConfig {
@@ -95,11 +95,11 @@ export function policyNonce(policy: string | null | undefined): string | null {
 }
 
 /**
- * Makes a response SvelteKit rendered with its own CSP (the `csp` option of `sveltekit()`) carry HypDriv's policy
- * instead: SvelteKit's nonce is replaced by the request's HypDriv nonce everywhere in the streamed body (its
+ * Makes a response SvelteKit rendered with its own CSP (the `csp` option of `sveltekit()`) carry Hypdriv's policy
+ * instead: SvelteKit's nonce is replaced by the request's Hypdriv nonce everywhere in the streamed body (its
  * hydration script, streamed `load` data, Svelte's `hydratable` script, `%sveltekit.nonce%`), and SvelteKit's
- * policy headers are removed so the `csp` stage emits HypDriv's policy (which already contains SvelteKit's
- * directives, see `withSvelteKitCsp`). Without a HypDriv nonce (HypDriv's CSP off, hash mode) the response is
+ * policy headers are removed so the `csp` stage emits Hypdriv's policy (which already contains SvelteKit's
+ * directives, see `withSvelteKitCsp`). Without a Hypdriv nonce (Hypdriv's CSP off, hash mode) the response is
  * returned untouched and SvelteKit's policy applies as the application's own.
  */
 export function adoptSvelteKitCsp(response: Response, nonce: string | null | undefined): Response {
@@ -108,7 +108,7 @@ export function adoptSvelteKitCsp(response: Response, nonce: string | null | und
   const enforced = response.headers.get('content-security-policy');
   const reportOnly = response.headers.get('content-security-policy-report-only');
   if (!enforced && !reportOnly) return response;
-  // A policy marked by HypDriv is its own (a static rule), never SvelteKit's.
+  // A policy marked by Hypdriv is its own (a static rule), never SvelteKit's.
   if (response.headers.has(HEADER.cspMode)) return response;
   const theirs = policyNonce(enforced) ?? policyNonce(reportOnly);
   const headers = new Headers(response.headers);

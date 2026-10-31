@@ -58,7 +58,7 @@ export interface AuditOverridesOptions {
   height?: number;
   /**
    * Extra request headers for requests to the audited origins only (never third-party origins), e.g. the
-   * signed `x-hypdriv-audit` token that lets the headless browser past HypDriv's bot shield.
+   * signed `x-hypdriv-audit` token that lets the headless browser past Hypdriv's bot shield.
    */
   headers?: Record<string, string>;
   log?: Logger;

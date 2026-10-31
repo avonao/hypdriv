@@ -23,7 +23,7 @@ export default async function ProductPage({ params }: PageProps<'/products/[id]'
         <strong>${product.price}</strong>
       </p>
       <p>
-        HypDriv&apos;s <code>products</code> policy adds <code>Vercel-CDN-Cache-Control</code> and the{' '}
+        Hypdriv&apos;s <code>products</code> policy adds <code>Vercel-CDN-Cache-Control</code> and the{' '}
         <code>catalog</code> cache tag; <code>revalidateTag(&apos;catalog&apos;)</code> from{' '}
         <code>hypdriv/cache</code> purges it on Vercel&apos;s CDN.
       </p>

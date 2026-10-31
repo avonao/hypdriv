@@ -121,7 +121,7 @@ export function assetFileFor(clientDir: string, base: string, publicPath: string
 }
 
 /**
- * Turns the routes and prerendered documents of a Vite build into the HypDriv manifest (routes, assets, CSP
+ * Turns the routes and prerendered documents of a Vite build into the Hypdriv manifest (routes, assets, CSP
  * hashes, Early Hints, speculation graph, Purser verification, secrets scan, budgets) and writes it to
  * `.hypdriv/`. Documents are assigned to the most specific route that matches their path; documents no route
  * matches become static page routes of their own.

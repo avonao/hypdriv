@@ -19,7 +19,7 @@ import { packageVersion } from './plugin';
 const pkg = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const src = join(pkg, 'src');
 
-// A real TanStack Start app, built (client, server, prerendering) with the HypDriv plugin from source. It lives
+// A real TanStack Start app, built (client, server, prerendering) with the Hypdriv plugin from source. It lives
 // below the package's node_modules so the app resolves React and TanStack from there.
 const cwd = process.cwd();
 let root = '';

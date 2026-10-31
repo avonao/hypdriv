@@ -11,7 +11,7 @@ export interface RequestFacts {
 }
 
 // Runs on the server: inside the SSR render (called in-process by the loader) and as an RPC on client
-// navigations. `hyp()` reads the HypDriv context the request middleware (or the Worker shell) installed.
+// navigations. `hyp()` reads the Hypdriv context the request middleware (or the Worker shell) installed.
 export const getRequestFacts = createServerFn({ method: 'GET' }).handler(async (): Promise<RequestFacts> => {
   const context = hyp();
   return {

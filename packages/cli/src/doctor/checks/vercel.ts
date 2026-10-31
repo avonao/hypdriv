@@ -172,7 +172,7 @@ export const vercelChecks: Check[] = [
       );
       if (regions.length && !isUsRegion(regions[0]!))
         return warn(
-          `regions start with "${regions[0]}"; HypDriv's defaults are US-first — place functions in ${VERCEL_DEFAULT_REGION} unless your data lives elsewhere.`,
+          `regions start with "${regions[0]}"; Hypdriv's defaults are US-first — place functions in ${VERCEL_DEFAULT_REGION} unless your data lives elsewhere.`,
           { details: nonUs.map((r) => `non-US region: ${r}`) },
         );
       if (regions.length && regions[0] !== VERCEL_DEFAULT_REGION)
@@ -200,7 +200,7 @@ export const vercelChecks: Check[] = [
         /runtime\s*:\s*['"](?:edge|experimental-edge)['"]/.test(source)
       ) {
         return fail(
-          `${rel(ctx.root, proxy)} selects the Edge runtime; Next.js 16 proxy runs on Node.js and HypDriv's stages need it. Remove the runtime option.`,
+          `${rel(ctx.root, proxy)} selects the Edge runtime; Next.js 16 proxy runs on Node.js and Hypdriv's stages need it. Remove the runtime option.`,
         );
       }
       return pass(`${rel(ctx.root, proxy)} uses the Node.js runtime (Next.js 16 default for proxy).`);
@@ -208,14 +208,14 @@ export const vercelChecks: Check[] = [
   },
   {
     id: 'vercel.runtime-package',
-    title: 'HypDriv Vercel runtime',
+    title: 'Hypdriv Vercel runtime',
     category: 'vercel',
     severity: 'info',
     run(ctx) {
       const v = ctx.project.hypdriv.packages['@hypdriv/vercel'];
       if (v) return pass(`@hypdriv/vercel ${v}`);
       return info(
-        '@hypdriv/vercel is not installed; proxy.ts and the server helpers run the HypDriv stages. Install it for the Vercel-native cache, cron and runtime integrations when available.',
+        '@hypdriv/vercel is not installed; proxy.ts and the server helpers run the Hypdriv stages. Install it for the Vercel-native cache, cron and runtime integrations when available.',
       );
     },
   },

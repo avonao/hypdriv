@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/flags` — edge feature flags for HypDriv.
+ * `@hypdriv/flags` — edge feature flags for Hypdriv.
  *
  * - `evaluateFlags()` is the pure evaluator (rules, deterministic percentage buckets, dependencies,
  *   date windows, overrides).

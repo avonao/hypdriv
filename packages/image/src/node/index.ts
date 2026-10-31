@@ -61,7 +61,7 @@ export interface GeneratePlaceholdersResult {
   errors: Array<{ path: string; error: string }>;
 }
 
-/** Minimal structural type of the `sharp` module HypDriv uses. */
+/** Minimal structural type of the `sharp` module Hypdriv uses. */
 export type SharpLike = (input: string | Buffer) => SharpInstanceLike;
 export interface SharpInstanceLike {
   metadata(): Promise<{ width?: number; height?: number }>;

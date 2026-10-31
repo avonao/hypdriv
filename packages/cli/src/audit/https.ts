@@ -95,7 +95,7 @@ export function plainHttpUrl(base: string, path: string): string {
 const FIX: Record<HttpsProbeKind, string> = {
   page: 'set site.origin to your https origin (redirects.forceHttps auto) or redirects.forceHttps: true',
   internal:
-    'the runner answers internal routes before the redirects stage; update HypDriv (httpsUpgrade runs first)',
+    'the runner answers internal routes before the redirects stage; update Hypdriv (httpsUpgrade runs first)',
   asset:
     'static assets are served before your code: on Cloudflare turn on Always Use HTTPS for the zone (SSL/TLS → Edge Certificates) or add a Redirect Rule for the hostname',
 };

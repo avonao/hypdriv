@@ -50,7 +50,7 @@ export interface CspStageOptions {
   /** Override the `HTMLRewriter` implementation (tests, custom runtimes). Default `globalThis.HTMLRewriter`. */
   htmlRewriter?: HtmlRewriterConstructor | null;
   /**
-   * The runner owns the response body (a framework hook or HypDriv-served HTML rather than `proxy.ts`): without
+   * The runner owns the response body (a framework hook or Hypdriv-served HTML rather than `proxy.ts`): without
    * `HTMLRewriter`, nonces are injected with the portable streaming tokenizer (`injectNonceStream`) instead of
    * degrading cached HTML to the `'unsafe-inline'` fallback. Default `false`.
    */
@@ -122,7 +122,7 @@ export function policyHeadersFor(
   // Inline scripts injected by edge stages (speculation rules, theme pinning) are allowed by hash in both
   // modes: in nonce mode the injected tags carry no nonce on uncached responses, and CSP3 permits hashes
   // alongside 'strict-dynamic'. The 'unsafe-inline' fallback mode needs no hashes.
-  // HypDriv's own route-independent inline scripts (speculation document rules, the Purser theme
+  // Hypdriv's own route-independent inline scripts (speculation document rules, the Purser theme
   // fallback) render without a nonce so layouts stay prerenderable; the manifest carries their hashes.
   const manifest = (ctx as { manifest?: HypContext['manifest'] }).manifest;
   const manifestHashes = [
@@ -267,7 +267,7 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
         ctx.timings.mark('csp', 'off');
         return withHeaders(response, headers);
       }
-      // A policy carrying `x-hypdriv-csp` is HypDriv's own static rule (Cloudflare `_headers` applied to a static
+      // A policy carrying `x-hypdriv-csp` is Hypdriv's own static rule (Cloudflare `_headers` applied to a static
       // asset the Worker fetched): the request's policy replaces it rather than counting as the application's.
       if (response.headers.has(HEADER.cspMode)) {
         response = withoutHeaders(response, [

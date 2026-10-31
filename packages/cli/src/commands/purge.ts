@@ -129,7 +129,7 @@ export const purgeCommand = defineCommand({
         headers: {
           ...accessHeaders(ctx.root, io.env, rawList(args, 'header')),
           'content-type': 'application/json',
-          'user-agent': 'HypDriv-CLI',
+          'user-agent': 'Hypdriv-CLI',
           [PURGE_TOKEN_HEADER]: token,
         },
         body: JSON.stringify(payload),

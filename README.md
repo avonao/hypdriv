@@ -1,6 +1,9 @@
 <p align="center">
-  <strong>HypDriv</strong><br/>
-  Performance, security and observability for Next.js 16+ and Vite-based frameworks on Cloudflare Workers, Vercel and Node.
+  <img src="docs/assets/hypdriv-banner.png" alt="Hypdriv" width="100%">
+</p>
+
+<p align="center">
+  <strong>Performance, security and observability for Next.js 16+ and Vite-based frameworks on Cloudflare Workers, Vercel and Node.</strong>
 </p>
 
 <p align="center">
@@ -14,7 +17,7 @@
   <img alt="Node 20.9+" src="https://img.shields.io/badge/node-%E2%89%A520.9-339933">
 </p>
 
-HypDriv is a **sidecar**. It attaches to a web application through the public extension points of its framework and platform (`next.config.ts`, the Adapter API, `proxy.ts`, Vite plugins, framework integrations, the Worker entry and your application code) and adds an edge cache, a CSP autopilot, rate limiting, a bot shield, feature flags, tracing and a command-line toolchain. It never patches Next.js, OpenNext, Vite, a framework or a platform builder.
+Hypdriv is a **sidecar**. It attaches to a web application through the public extension points of its framework and platform (`next.config.ts`, the Adapter API, `proxy.ts`, Vite plugins, framework integrations, the Worker entry and your application code) and adds an edge cache, a CSP autopilot, rate limiting, a bot shield, feature flags, tracing and a command-line toolchain. It never patches Next.js, OpenNext, Vite, a framework or a platform builder.
 
 It runs the same ordered pipeline, the **Drivetrain**, on three targets:
 
@@ -22,9 +25,9 @@ It runs the same ordered pipeline, the **Drivetrain**, on three targets:
 - **Vercel**: Next.js and every supported Vite host, with the stages in Routing Middleware.
 - **Node**: `next start`, `hypdriv serve` and each framework's Node server.
 
-HypDriv needs **no infrastructure beyond the platform itself**. Platform services are optional upgrades that it detects at run time: Cloudflare KV, R2, D1, Durable Objects, Queues, Rate Limiting, Analytics Engine and Images on Workers; the Vercel CDN, Upstash Redis, Global Config, the Vercel WAF, BotID and Vercel Queues on Vercel.
+Hypdriv needs **no infrastructure beyond the platform itself**. Platform services are optional upgrades that it detects at run time: Cloudflare KV, R2, D1, Durable Objects, Queues, Rate Limiting, Analytics Engine and Images on Workers; the Vercel CDN, Upstash Redis, Global Config, the Vercel WAF, BotID and Vercel Queues on Vercel.
 
-> **Preview.** HypDriv 0.1.0 is a Preview release. Preview releases are available to build with and evaluate ahead of general availability. Configuration keys, package APIs and the manifest format can change between Preview versions, and Preview builds are not covered by a service-level agreement. The [Preview status](#preview-status) section lists what is included, what has been verified and the constraints that apply.
+> **Preview.** Hypdriv 0.1.0 is a Preview release. Preview releases are available to build with and evaluate ahead of general availability. Configuration keys, package APIs and the manifest format can change between Preview versions, and Preview builds are not covered by a service-level agreement. The [Preview status](#preview-status) section lists what is included, what has been verified and the constraints that apply.
 
 ## Contents
 
@@ -48,7 +51,7 @@ HypDriv needs **no infrastructure beyond the platform itself**. Platform service
 
 ## Highlights
 
-| Area | HypDriv adds |
+| Area | Hypdriv adds |
 | --- | --- |
 | **Speed** | Edge full-response cache with stale-while-revalidate, stale-if-error, tags, request coalescing and normalised keys · Early Hints (103) per route · Speculation Rules per route · flashless themes pinned at the edge · Worker weight reports and budgets · skew-protection assist · cache warming · Cloudflare image loader with placeholders · resilient `hypFetch` |
 | **Security** | CSP autopilot (hash mode for static routes, nonce mode elsewhere, edge nonce injection for cached HTML, report-only rollout, collector and suggestions) · A+ security headers · rate limiting (fixed window, sliding window, token bucket; memory → Cache API → KV → Durable Object → Rate Limiting binding) · bot shield with Turnstile challenges · WAF-lite shield · `safeAction()` and `defineRoute()` with Standard Schema validation · encrypted sessions · JWT/JWKS · signed URLs and internal requests · webhook verification · password hashing · build-time secrets scan · Subresource Integrity |
@@ -233,7 +236,7 @@ Every stage reports a `Server-Timing` entry, so its effect is visible on every r
 
 ### Three identifiers
 
-A deployment carries three distinct identifiers, and each has one job: the Next.js build id (used by Next.js itself and in the `build:<id>` cache tag), the HypDriv deployment id (R2 key prefix and the `deployment` field of the health route) and the content fingerprint (edge-cache keys and the `x-hypdriv-build` header on HTML). See [ADR 0016](docs/adr/0016-deployment-ids-per-build.md) and [caching](docs/guides/caching.md).
+A deployment carries three distinct identifiers, and each has one job: the Next.js build id (used by Next.js itself and in the `build:<id>` cache tag), the Hypdriv deployment id (R2 key prefix and the `deployment` field of the health route) and the content fingerprint (edge-cache keys and the `x-hypdriv-build` header on HTML). See [ADR 0016](docs/adr/0016-deployment-ids-per-build.md) and [caching](docs/guides/caching.md).
 
 ## Capabilities
 
@@ -379,7 +382,7 @@ The end-to-end suites in [`e2e/`](e2e) (`cloudflare`, `vercel`, `hosts`) run eve
 - **Purser CSS.** The Purser integration needs `@avonao/purser` 0.1+, which is installed separately.
 - **Node.js.** Several host packages require Node 22 or later (see [Requirements](#requirements)). The vinext build test is skipped on Node 20.
 - **Next.js versions.** Next.js 16.x is supported; Next.js 17 support is planned for 1.0 ([roadmap](docs/roadmap.md)).
-- **OpenNext.** HypDriv builds on `@opennextjs/cloudflare`'s current output. The Adapter-API-based integration is planned for 0.2.
+- **OpenNext.** Hypdriv builds on `@opennextjs/cloudflare`'s current output. The Adapter-API-based integration is planned for 0.2.
 - **Early Hints.** HTTP 103 responses are produced on Cloudflare; Vercel does not forward them.
 - **Exact global rate limits on Vercel** need Upstash Redis; without it, counters are per function instance.
 - **Inbound email** (`email` handler) and the Turnstile pass flow are covered by tests and by separate runs with test credentials, and are skipped in the live suites.
@@ -419,4 +422,4 @@ Continuous integration runs lint, build, typecheck, tests and `publint` on Node 
 
 ## License
 
-[MIT](LICENSE) © 2026 Avonao, Inc. and HypDriv contributors.
+[MIT](LICENSE) © 2026 Avonao, Inc. and Hypdriv contributors.

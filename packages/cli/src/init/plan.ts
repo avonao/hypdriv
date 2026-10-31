@@ -59,7 +59,7 @@ export interface InitOptions {
   noProxy: boolean;
   now: Date;
   cliVersion: string;
-  /** Target platform; defaults to the detected one (`node`/`unknown` → `cloudflare`, HypDriv's reference target). */
+  /** Target platform; defaults to the detected one (`node`/`unknown` → `cloudflare`, Hypdriv's reference target). */
   platform?: InitPlatform;
 }
 
@@ -100,7 +100,7 @@ export function buildInitPlan(
     items.push({
       path: 'hypdriv.config.ts',
       action: 'create',
-      reason: 'HypDriv configuration with commented defaults',
+      reason: 'Hypdriv configuration with commented defaults',
       content: hypdrivConfigTemplate({
         name,
         purser,
@@ -135,7 +135,7 @@ export function buildInitPlan(
       });
     if (project.nextConfig.output === 'export')
       notes.push(
-        "next.config sets `output: 'export'`; a static export has no server for HypDriv's stages. Remove it before deploying.",
+        "next.config sets `output: 'export'`; a static export has no server for Hypdriv's stages. Remove it before deploying.",
       );
   }
 
@@ -177,7 +177,7 @@ export function buildInitPlan(
     items.push({
       path: proxyPath,
       action: 'create',
-      reason: 'runs the HypDriv stages on next dev / next start',
+      reason: 'runs the Hypdriv stages on next dev / next start',
       content: proxyTemplate({ srcDir: project.srcDir }),
     });
 
@@ -205,7 +205,7 @@ export function buildInitPlan(
     items.push({
       path: '.env.example',
       action: 'create',
-      reason: 'documents the secrets HypDriv reads',
+      reason: 'documents the secrets Hypdriv reads',
       content: envExampleTemplate({ crons: platform === 'vercel' && crons.length > 0 }),
     });
 
@@ -228,7 +228,7 @@ export function buildInitPlan(
       action: existsSync(file) ? 'modify' : 'create',
       reason: 'local secrets, build output and init backups stay out of git',
       details: missingIgnore.map(([entry]) => `add ${entry}`),
-      content: `${current}${current && !current.endsWith('\n') ? '\n' : ''}${current ? '\n' : ''}# HypDriv\n${missingIgnore.map(([entry]) => entry).join('\n')}\n`,
+      content: `${current}${current && !current.endsWith('\n') ? '\n' : ''}${current ? '\n' : ''}# Hypdriv\n${missingIgnore.map(([entry]) => entry).join('\n')}\n`,
       backup: false,
     });
   }
@@ -297,11 +297,11 @@ export function buildInitPlan(
     );
   if (project.sources.edgeRuntime.length)
     notes.push(
-      `${project.sources.edgeRuntime.length} route file(s) export the Edge runtime; HypDriv targets the Node.js runtime (see \`hypdriv doctor\`).`,
+      `${project.sources.edgeRuntime.length} route file(s) export the Edge runtime; Hypdriv targets the Node.js runtime (see \`hypdriv doctor\`).`,
     );
 
   nextSteps.push(
-    'Build once so the HypDriv adapter writes .hypdriv/manifest.json: `next build` (or your build script).',
+    'Build once so the Hypdriv adapter writes .hypdriv/manifest.json: `next build` (or your build script).',
   );
   if (platform === 'cloudflare') {
     nextSteps.push(
@@ -403,7 +403,7 @@ function planCloudflare(
         items.push({
           path,
           action: 'modify',
-          reason: 'point main at the HypDriv worker',
+          reason: 'point main at the Hypdriv worker',
           details: edit.changes,
           content: edit.content,
         });

@@ -7,7 +7,7 @@
 ```sh
 npm create hypdriv@latest my-app -- --pm pnpm
 cd my-app
-pnpm dev          # next dev (proxy.ts runs the HypDriv stages)
+pnpm dev          # next dev (proxy.ts runs the Hypdriv stages)
 pnpm preview      # opennextjs-cloudflare build && opennextjs-cloudflare preview (the Worker shell)
 pnpm deploy       # opennextjs-cloudflare build && opennextjs-cloudflare deploy
 ```
@@ -17,7 +17,7 @@ Add `--purser` to scaffold the Purser CSS integration as well. For Vercel:
 ```sh
 npm create hypdriv@latest my-app -- --platform vercel --pm pnpm
 cd my-app
-pnpm dev          # next dev (proxy.ts runs the HypDriv stages)
+pnpm dev          # next dev (proxy.ts runs the Hypdriv stages)
 pnpm build        # next build (withHypDriv emits the Vercel CDN route headers)
 vercel deploy
 ```
@@ -54,7 +54,7 @@ The same steps without the Worker entry: `proxy.ts` runs the stages in Routing M
 
 ## Existing project on another host
 
-To move to Cloudflare, run `npx @opennextjs/cloudflare migrate` first (it configures OpenNext), then `npx hypdriv init`. HypDriv also runs on any Node host (`next start`, containers): `withHypDriv()` and `createProxy()` work there, and the Worker-only capabilities (edge cache storage, nonce injection for cached HTML, live channels over Durable Objects, scheduled handlers) are reported as unavailable by `hypdriv doctor --platform node`.
+To move to Cloudflare, run `npx @opennextjs/cloudflare migrate` first (it configures OpenNext), then `npx hypdriv init`. Hypdriv also runs on any Node host (`next start`, containers): `withHypDriv()` and `createProxy()` work there, and the Worker-only capabilities (edge cache storage, nonce injection for cached HTML, live channels over Durable Objects, scheduled handlers) are reported as unavailable by `hypdriv doctor --platform node`.
 
 ## Verify
 

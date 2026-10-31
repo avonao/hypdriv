@@ -9,9 +9,9 @@ import config from '../hypdriv.config';
 import './purser.css';
 
 export const metadata: Metadata = {
-  title: { default: 'HypDriv × Purser CSS', template: '%s · HypDriv × Purser' },
+  title: { default: 'Hypdriv × Purser CSS', template: '%s · Hypdriv × Purser' },
   description:
-    'Next.js 16 on Cloudflare Workers with HypDriv and Purser CSS: zero overrides, flashless themes.',
+    'Next.js 16 on Cloudflare Workers with Hypdriv and Purser CSS: zero overrides, flashless themes.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <header className={css.props(layout.header)}>
           <a href="/" className={css.props(layout.brand)}>
-            HypDriv × Purser
+            Hypdriv × Purser
           </a>
           <nav className={css.props(layout.nav)}>
             <a href="/docs/themes" className={css.props(layout.navLink)}>

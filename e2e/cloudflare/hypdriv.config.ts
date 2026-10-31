@@ -1,7 +1,7 @@
 import { defineConfig } from 'hypdriv';
 
 /**
- * Every HypDriv capability switched on, each backed by the binding that upgrades it, so the live suite
+ * Every Hypdriv capability switched on, each backed by the binding that upgrades it, so the live suite
  * (`scripts/e2e.ts`) can verify them against a real Cloudflare account. Queue names are matched with
  * wildcards: each account names its queues (`<prefix>-e2e-jobs`, `<prefix>-e2e-jobs-dlq`).
  */

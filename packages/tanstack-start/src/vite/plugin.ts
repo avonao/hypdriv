@@ -42,7 +42,7 @@ import {
 } from './targets';
 
 export interface HypDrivStartPluginOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
   config?: string | HypDrivConfig;
   /**
    * Targets to write static configuration for. Default: detected — `cloudflare` with `@cloudflare/vite-plugin`,
@@ -55,7 +55,7 @@ export interface HypDrivStartPluginOptions {
    */
   start?: StartOptionsLike;
   /**
-   * Run HypDriv's Routing Middleware on Vercel for prerendered pages, which the CDN serves without Start's function
+   * Run Hypdriv's Routing Middleware on Vercel for prerendered pages, which the CDN serves without Start's function
    * (rate limiting, bot shield, maintenance, redirects, geo; default true).
    */
   vercelMiddleware?: boolean;
@@ -91,7 +91,7 @@ export function packageVersion(root: string, name: string): string | null {
 }
 
 /**
- * The HypDriv plugin for TanStack Start. List it after `tanstackStart()` (and `nitro()`):
+ * The Hypdriv plugin for TanStack Start. List it after `tanstackStart()` (and `nitro()`):
  *
  * ```ts
  * plugins: [tanstackStart(withHypDriv({ ... })), nitro(), viteReact(), hypdriv()]
@@ -133,7 +133,7 @@ export function hypdriv(options: HypDrivStartPluginOptions = {}): Plugin[] {
       .catch((err: unknown) => {
         discovered = null;
         throw new Error(
-          `hypdriv: route discovery failed (${(err as Error).message}). Pass TanStack Start's options through withHypDriv() so HypDriv reads the same router configuration.`,
+          `hypdriv: route discovery failed (${(err as Error).message}). Pass TanStack Start's options through withHypDriv() so Hypdriv reads the same router configuration.`,
           { cause: err },
         );
       });
@@ -218,11 +218,11 @@ export function hypdriv(options: HypDrivStartPluginOptions = {}): Plugin[] {
     const leaked = documentsWithNonce(documents);
     if (leaked.length)
       throw new Error(
-        `hypdriv: prerendered pages carry a per-request CSP nonce (${leaked.join(', ')}): HypDriv's middleware ran while TanStack Start prerendered them. Pass the options of tanstackStart() through withHypDriv() so prerender requests are recognised.`,
+        `hypdriv: prerendered pages carry a per-request CSP nonce (${leaked.join(', ')}): Hypdriv's middleware ran while TanStack Start prerendered them. Pass the options of tanstackStart() through withHypDriv() so prerender requests are recognised.`,
       );
     if (documents.length && !registration && !options.start)
       log.warn(
-        'hypdriv: TanStack Start prerendered pages but its options were not passed through withHypDriv(): prerender requests ran through the HypDriv pipeline. Use tanstackStart(withHypDriv({ ... })).',
+        'hypdriv: TanStack Start prerendered pages but its options were not passed through withHypDriv(): prerender requests ran through the Hypdriv pipeline. Use tanstackStart(withHypDriv({ ... })).',
       );
 
     const startRoutes = await discover(root);
@@ -273,7 +273,7 @@ export function hypdriv(options: HypDrivStartPluginOptions = {}): Plugin[] {
         log.info(
           `hypdriv: Vercel Build Output header routes written (${mapped} prerendered page(s) at clean URLs)`,
         );
-        // Prerendered pages are served by Vercel's CDN without Start's function: HypDriv's Routing Middleware runs
+        // Prerendered pages are served by Vercel's CDN without Start's function: Hypdriv's Routing Middleware runs
         // the request stages for them (the function keeps running them for everything else).
         await addVercelMiddleware({
           root,
@@ -297,7 +297,7 @@ export function hypdriv(options: HypDrivStartPluginOptions = {}): Plugin[] {
     if (patched.length) log.info(`hypdriv: final manifest patched into ${patched.length} server file(s)`);
     else
       log.warn(
-        'hypdriv: no server output embeds the HypDriv manifest; register hypdrivMiddleware() in src/start.ts (or use createStartWorker / the server entry)',
+        'hypdriv: no server output embeds the Hypdriv manifest; register hypdrivMiddleware() in src/start.ts (or use createStartWorker / the server entry)',
       );
     if (registration) {
       const scrubbed = scrubPrerenderToken(serverDirs, registration.token);

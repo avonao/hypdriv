@@ -10,8 +10,8 @@ import { type H3ErrorLike, installNitroHook, type NitroAppLike, nuxtSkip } from 
 import type { H3EventLike } from './request';
 
 /**
- * HypDriv's Nitro plugin (registered by the `@hypdriv/nuxt` module): wraps Nitro's h3 app handler so every
- * request runs through the HypDriv pipeline. Never active while Nuxt prerenders: `import.meta.prerender` is a
+ * Hypdriv's Nitro plugin (registered by the `@hypdriv/nuxt` module): wraps Nitro's h3 app handler so every
+ * request runs through the Hypdriv pipeline. Never active while Nuxt prerenders: `import.meta.prerender` is a
  * build-time constant, so the prerender bundle skips the pipeline and production bundles carry no bypass.
  */
 export default function hypdrivNitroPlugin(nitroApp: NitroApp): void {

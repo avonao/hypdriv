@@ -81,7 +81,7 @@ async function readDevState(): Promise<Record<string, unknown>> {
 
 /**
  * The routing-middleware runner shared by Next.js `proxy.ts` and Vercel Routing Middleware: runs the Drivetrain
- * before the application without seeing its rendered body (edge-only stages are skipped) and forwards HypDriv's
+ * before the application without seeing its rendered body (edge-only stages are skipped) and forwards Hypdriv's
  * headers through `options.next`.
  */
 export function createProxyHandler(
@@ -130,7 +130,7 @@ export function createProxyHandler(
 
   return async function proxy(incoming: ProxyRequestLike, event: ProxyEventLike): Promise<Response> {
     const passThrough = options.next;
-    // Inside the HypDriv Worker (OpenNext runs proxy.ts in the same isolate) the stages already ran around
+    // Inside the Hypdriv Worker (OpenNext runs proxy.ts in the same isolate) the stages already ran around
     // this request; the Worker's context is visible here through AsyncLocalStorage and cannot be spoofed.
     if (getCurrentContext()?.runner === 'worker') return passThrough(incoming);
     ready ??= init();

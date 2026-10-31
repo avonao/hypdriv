@@ -67,8 +67,8 @@ export function cdnAdapterModuleCode(spec: CdnAdapterSpec): string {
 }
 
 /**
- * Wraps vinext's `cache` option so `revalidateTag()` / `revalidatePath()` also purge HypDriv's edge cache (and
- * the platform purger HypDriv registers, such as Vercel's CDN). The application's CDN adapter — or vinext's
+ * Wraps vinext's `cache` option so `revalidateTag()` / `revalidatePath()` also purge Hypdriv's edge cache (and
+ * the platform purger Hypdriv registers, such as Vercel's CDN). The application's CDN adapter — or vinext's
  * default when none is configured — still does its own work; its build output hooks and capabilities are kept.
  *
  * ```ts

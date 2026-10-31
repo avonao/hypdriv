@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe('createProxy', () => {
-  it('runs the stages before vinext and forwards HypDriv’s request headers', async () => {
+  it('runs the stages before vinext and forwards Hypdriv’s request headers', async () => {
     const proxy = createProxy({ config: {}, manifest, target: 'node' });
     const response = await proxy(get('/account'), event);
     expect(response.headers.get('x-middleware-next')).toBe('1');

@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/cache",
   "version": "0.1.0",
-  "description": "HypDriv edge cache engine: policies, normalised keys, SWR, coalescing, tags and purge over Cache API, memory or KV stores.",
+  "description": "Hypdriv edge cache engine: policies, normalised keys, SWR, coalescing, tags and purge over Cache API, memory or KV stores.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

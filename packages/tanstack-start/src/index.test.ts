@@ -50,7 +50,7 @@ describe('default entry', () => {
     expect(body.framework).toContain('TanStack Start');
   });
 
-  it("puts Start's CSRF protection for server functions after HypDriv", async () => {
+  it("puts Start's CSRF protection for server functions after Hypdriv", async () => {
     const [, csrf] = hypdrivRequestMiddleware();
     const crossSite = new Request('https://shop.example/_serverFn/abc', {
       method: 'POST',

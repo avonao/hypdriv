@@ -5,7 +5,7 @@ import { defineRoute as baseDefineRoute, safeAction as baseSafeAction } from '@h
 type BaseSafeAction = typeof baseSafeAction;
 type BaseDefineRoute = typeof baseDefineRoute;
 
-/** Context HypDriv provides to `safeAction` handlers in Next.js. */
+/** Context Hypdriv provides to `safeAction` handlers in Next.js. */
 export interface ServerActionContext {
   requestId: string | null;
   ip: string;

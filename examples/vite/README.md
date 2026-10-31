@@ -1,12 +1,12 @@
-# HypDriv × Vite
+# Hypdriv × Vite
 
-A single-page Vite 8 app: `index.html` with an inline script and style (hash CSP), a client-routed `/about`, and `/api/time`, answered by the Worker on Cloudflare (`src/worker.ts`) and by a Vercel Function on Vercel (`api/time.ts`). One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [Vite guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/vite.md).
+A single-page Vite 8 app: `index.html` with an inline script and style (hash CSP), a client-routed `/about`, and `/api/time`, answered by the Worker on Cloudflare (`src/worker.ts`) and by a Vercel Function on Vercel (`api/time.ts`). One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [Vite guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/vite.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

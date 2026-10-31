@@ -6,7 +6,7 @@ const fixture = (name: string) => fileURLToPath(new URL(`./src/__fixtures__/${na
 export default defineConfig({
   resolve: {
     conditions: ['source'],
-    // The virtual modules HypDriv's Vite plugin and React Router serve in an application build.
+    // The virtual modules Hypdriv's Vite plugin and React Router serve in an application build.
     alias: {
       'virtual:hypdriv/config': fixture('virtual-config.ts'),
       'virtual:hypdriv/manifest': fixture('virtual-manifest.ts'),

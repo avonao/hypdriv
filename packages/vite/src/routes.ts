@@ -9,7 +9,7 @@ import {
 } from '@hypdriv/core';
 
 /**
- * A route as a framework integration discovers it. `pathname` uses HypDriv's canonical pattern syntax
+ * A route as a framework integration discovers it. `pathname` uses Hypdriv's canonical pattern syntax
  * (`/blog/[slug]`, `/docs/[...path]`, `/[[lang]]/about`); the converters below translate framework syntaxes.
  */
 export interface DiscoveredRoute {

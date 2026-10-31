@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/vercel",
   "version": "0.1.0",
-  "description": "HypDriv on Vercel: CDN cache headers and tag purge, Upstash Redis and Global Config stores, WAF rate limits, BotID and Queues integration.",
+  "description": "Hypdriv on Vercel: CDN cache headers and tag purge, Upstash Redis and Global Config stores, WAF rate limits, BotID and Queues integration.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

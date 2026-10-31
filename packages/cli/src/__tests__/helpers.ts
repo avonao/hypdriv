@@ -114,7 +114,7 @@ const fixtureDir = fileURLToPath(
   new URL('../../../next/src/adapter/__fixtures__/next-16.4/', import.meta.url),
 ).replace(/\/$/, '');
 
-/** Builds the HypDriv manifest from the captured Next 16.4 build (the same fixture the adapter tests use). */
+/** Builds the Hypdriv manifest from the captured Next 16.4 build (the same fixture the adapter tests use). */
 export async function fixtureManifest(
   config: Parameters<typeof resolveConfig>[0] = {},
 ): Promise<HypManifest> {

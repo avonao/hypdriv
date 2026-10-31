@@ -1,13 +1,13 @@
-# HypDriv × Purser CSS — Vercel example
+# Hypdriv × Purser CSS — Vercel example
 
-Next.js 16 (Cache Components on) on Vercel with HypDriv and [Purser CSS](https://github.com/avonao/purser), US-first (`iad1`).
+Next.js 16 (Cache Components on) on Vercel with Hypdriv and [Purser CSS](https://github.com/avonao/purser), US-first (`iad1`).
 
 ```sh
 pnpm install
 cp .env.example .env.local   # or: vercel env pull .env.local
 pnpm dev                     # next dev: Purser watches and rebuilds app/purser.css
 pnpm build                   # next build: Purser build + unstyled-atom guard
-pnpm start                   # next start (proxy runs the HypDriv stages)
+pnpm start                   # next start (proxy runs the Hypdriv stages)
 pnpm audit:css               # zero-override audit in headless Chrome against `pnpm start`
 pnpm build:vercel            # vercel build → .vercel/output
 ```

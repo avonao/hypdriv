@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/cloudflare",
   "version": "0.1.0",
-  "description": "HypDriv Worker shell for OpenNext on Cloudflare: Drivetrain pipeline, scheduled/queue/email/tail handlers, Durable Objects and binding adapters.",
+  "description": "Hypdriv Worker shell for OpenNext on Cloudflare: Drivetrain pipeline, scheduled/queue/email/tail handlers, Durable Objects and binding adapters.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

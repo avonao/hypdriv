@@ -41,7 +41,7 @@ function inlineOrigin(config: ResolvedConfig, env: Record<string, unknown>): str
  * producer the consumer route (`jobs.queues[name].path`) is invoked after the response with a signed
  * internal request, so code keeps working on plans or environments without a queue service.
  *
- * Outside a HypDriv request context (Vercel functions, Node hosts) the config and env registered by
+ * Outside a Hypdriv request context (Vercel functions, Node hosts) the config and env registered by
  * `createInstrumentation().register()` or `createProxy()` are used; pass `config`/`env` to override.
  */
 export async function enqueue(
@@ -56,7 +56,7 @@ export async function enqueue(
   if (!env || !config)
     throw new HypDrivError(
       'E_INTERNAL',
-      'enqueue() needs the HypDriv request context, a registered runtime (createInstrumentation in instrumentation.ts) or explicit env/config',
+      'enqueue() needs the Hypdriv request context, a registered runtime (createInstrumentation in instrumentation.ts) or explicit env/config',
     );
   const record = env as Record<string, unknown>;
   const binding = config.cloudflare.bindings.queues[name];

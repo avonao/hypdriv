@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/tanstack-start` — HypDriv for TanStack Start on the server: the global request middleware that runs
+ * `@hypdriv/tanstack-start` — Hypdriv for TanStack Start on the server: the global request middleware that runs
  * the Drivetrain around everything Start answers, and the router's `ssr.nonce` option. Browsers resolve this entry
  * to inert stand-ins (`src/start.ts` and `src/router.tsx` are part of the client bundle too).
  *
@@ -51,7 +51,7 @@ const loadManifest = () => import('virtual:hypdriv/manifest');
 let shared: HypDrivMiddlewareWithHandler | null = null;
 
 /**
- * The HypDriv request middleware for `src/start.ts`. Without options it returns one shared instance (Start calls
+ * The Hypdriv request middleware for `src/start.ts`. Without options it returns one shared instance (Start calls
  * the `createStart()` callback per request, and the pipeline's platform — rate-limit counters, caches — must
  * live as long as the server). With options it creates a new instance: create it once, at module scope.
  */
@@ -74,7 +74,7 @@ export type ServerFnCsrfMiddleware = ReturnType<typeof createCsrfMiddleware>;
 export interface HypDrivRequestMiddlewareOptions extends HypDrivMiddlewareOptions {
   /**
    * Start's CSRF protection for server functions (`createCsrfMiddleware`). A custom `src/start.ts` replaces
-   * Start's default middleware, which would otherwise install it; HypDriv adds it back after itself. Pass
+   * Start's default middleware, which would otherwise install it; Hypdriv adds it back after itself. Pass
    * options to adjust it (the filter defaults to server-function requests), or `false` when you install your own.
    */
   csrf?: false | CsrfMiddlewareOptions;
@@ -83,7 +83,7 @@ export interface HypDrivRequestMiddlewareOptions extends HypDrivMiddlewareOption
 let sharedList: readonly [HypDrivRequestMiddleware, ServerFnCsrfMiddleware] | null = null;
 
 /**
- * The request middleware list for `src/start.ts`: HypDriv first, so it wraps every response below it — CSRF
+ * The request middleware list for `src/start.ts`: Hypdriv first, so it wraps every response below it — CSRF
  * rejections included — then Start's CSRF protection for server functions. Call it once at module scope (without
  * options it returns a shared list).
  */

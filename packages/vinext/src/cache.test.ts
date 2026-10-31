@@ -22,7 +22,7 @@ function fakePurger() {
 }
 
 describe('purge targets', () => {
-  it('maps vinext tags to HypDriv edge-cache tags and URLs', () => {
+  it('maps vinext tags to Hypdriv edge-cache tags and URLs', () => {
     expect(
       purgeTargets(['products', '_N_T_/blog', '_N_T_/blog/page', '_N_T_/layout'], 'https://ex.com'),
     ).toEqual({
@@ -34,7 +34,7 @@ describe('purge targets', () => {
 });
 
 describe('withHypDrivPurge', () => {
-  it('forwards to the adapter (keeping its own `this`) and purges HypDriv’s edge cache twice', async () => {
+  it('forwards to the adapter (keeping its own `this`) and purges Hypdriv’s edge cache twice', async () => {
     vi.useFakeTimers();
     const { purger, calls } = fakePurger();
     registerEdgePurger(purger);
@@ -62,7 +62,7 @@ describe('withHypDrivPurge', () => {
     expect(calls).toHaveLength(2);
   });
 
-  it('is a no-op for HypDriv without a registered purger', async () => {
+  it('is a no-op for Hypdriv without a registered purger', async () => {
     expect(await purgeHypDriv(['x'])).toBe(false);
     const revalidateTag = vi.fn(
       async (_tags: string | string[], _durations?: { expire?: number }) => undefined,

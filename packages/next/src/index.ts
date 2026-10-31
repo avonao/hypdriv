@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/next` — HypDriv for Next.js 16+.
+ * `@hypdriv/next` — Hypdriv for Next.js 16+.
  *
  * Entry points:
  * - `@hypdriv/next/config`          withHypDriv() for next.config.ts

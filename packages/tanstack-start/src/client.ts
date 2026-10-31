@@ -1,7 +1,7 @@
 /**
  * Browser build of `@hypdriv/tanstack-start` (the `browser` export condition). `src/start.ts` and `src/router.tsx`
  * are part of the client bundle as well, but request middleware never runs in the browser and the router reads
- * the nonce back from `<meta property="csp-nonce">` there: these stand-ins keep the server runtime, the HypDriv
+ * the nonce back from `<meta property="csp-nonce">` there: these stand-ins keep the server runtime, the Hypdriv
  * config and the build manifest out of the client bundle.
  */
 import { createMiddleware } from '@tanstack/react-start';

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Builds a HypDriv release bundle: every publishable package packed to a tarball, checksums, the installer, the
+// Builds a Hypdriv release bundle: every publishable package packed to a tarball, checksums, the installer, the
 // implementation guide with the docs, copy-paste templates extracted from that guide, the agent prompt and an optional
-// private overlay (platform notes, generator patch). HypDriv is not on npm; applications install from this folder.
+// private overlay (platform notes, generator patch). Hypdriv is not on npm; applications install from this folder.
 //
 //   pnpm build && node scripts/release-bundle.mjs [--out <dir>] [--date YYYY-MM-DD] [--overlay <dir>] [--force]
 //

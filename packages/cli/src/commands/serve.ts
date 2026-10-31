@@ -4,12 +4,12 @@ import { createContext } from '../context';
 import { defineCommand } from './types';
 
 /**
- * `hypdriv serve` — the production Node server for plain Vite apps: the build output behind the full HypDriv
+ * `hypdriv serve` — the production Node server for plain Vite apps: the build output behind the full Hypdriv
  * pipeline (`@hypdriv/vite/node`).
  */
 export const serveCommand = defineCommand({
   name: 'serve',
-  summary: 'Serve a Vite build on Node behind the HypDriv pipeline (production server for plain Vite apps)',
+  summary: 'Serve a Vite build on Node behind the Hypdriv pipeline (production server for plain Vite apps)',
   usage: 'hypdriv serve [--dir dist] [--port 3000] [--host 0.0.0.0] [--spa] [--trust-proxy]',
   options: {
     dir: {

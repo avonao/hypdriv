@@ -69,7 +69,7 @@ export interface AstroHandlerOptions {
 }
 
 /**
- * The HypDriv handler behind the Astro hooks: `createHandler()` with the `astro` host label, the build's target and
+ * The Hypdriv handler behind the Astro hooks: `createHandler()` with the `astro` host label, the build's target and
  * the once-per-request guard on the gating stages.
  */
 export function createAstroHandler(options: AstroHandlerOptions): HypHandler {
@@ -150,13 +150,13 @@ export interface AstroHookOptions {
 }
 
 /**
- * Creates Astro's `onRequest` middleware that runs the HypDriv Drivetrain around the rest of the request (`next()`):
+ * Creates Astro's `onRequest` middleware that runs the Hypdriv Drivetrain around the rest of the request (`next()`):
  *
  * - **Build-time prerendering passes through.** The bundle Astro prerenders with is a separate Vite environment
  *   whose `virtual:hypdriv/astro` says `prerendering: true`; a prerendered route can only render at build time in
  *   production (`context.isPrerendered` comes from the route table, not from the request). Neither can be set by
  *   a client.
- * - **Outer HypDriv runners pass through**: inside the Cloudflare Worker shell (`createWorker`), a `src/fetch.ts`
+ * - **Outer Hypdriv runners pass through**: inside the Cloudflare Worker shell (`createWorker`), a `src/fetch.ts`
  *   wrapped with `withHypDriv()`, and for rewrites Astro renders inside the same request.
  * - **Astro's error-page pass** (a render that threw → `500.astro`, an empty 404/500 response → the error page) runs
  *   the response stages again for the error page, without the rate limit, bot shield, request shield and CSRF

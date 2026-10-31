@@ -154,7 +154,7 @@ describe('budget', () => {
       manifest.buildId,
     );
     const md = await run('budget', ['--diff', '--markdown']);
-    expect(md.io.out).toContain('### HypDriv budgets');
+    expect(md.io.out).toContain('### Hypdriv budgets');
     expect(md.io.out).toContain('| `route:app:/:js` |');
     expect(md.io.out).toContain('+100 B');
   });
@@ -264,7 +264,7 @@ describe('csp', () => {
 describe('agent', () => {
   it('prints a Markdown briefing and JSON', async () => {
     const md = await run('agent', []);
-    expect(md.io.out).toContain('# HypDriv briefing — fixture-app');
+    expect(md.io.out).toContain('# Hypdriv briefing — fixture-app');
     expect(md.io.out).toContain('## Commands');
     expect(md.io.out).toContain('edge cache: 1 explicit policy (blog)');
     const json = await run('agent', ['--json']);

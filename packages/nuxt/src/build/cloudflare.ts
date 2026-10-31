@@ -10,7 +10,7 @@ export function cloudflareEntryCode(workerModule: string): string {
   ].join('\n');
 }
 
-/** Source of the Worker entry's re-exports: HypDriv's Durable Objects and the application's own exports. */
+/** Source of the Worker entry's re-exports: Hypdriv's Durable Objects and the application's own exports. */
 export function cloudflareExportsCode(exportsModule: string | null): string {
   const lines = [
     "export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects';",

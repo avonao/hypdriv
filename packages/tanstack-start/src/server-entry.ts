@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/tanstack-start/server-entry` — HypDriv as TanStack Start's server entry (`src/server.ts`), the
+ * `@hypdriv/tanstack-start/server-entry` — Hypdriv as TanStack Start's server entry (`src/server.ts`), the
  * outermost layer of the server: the pipeline also wraps what Start answers before or around the request
  * middleware (its error pages for uncaught exceptions, the redirect of protocol-relative URLs). The request
  * middleware in `src/start.ts` stays registered and passes through below it (it still hands the nonce to the
@@ -31,7 +31,7 @@ export interface HypDrivServerEntryOptions extends Omit<CreateHandlerOptions, 'c
 
 type StartOptions = { context?: Record<string, unknown> } & Record<string, unknown>;
 
-/** Creates the server entry: `{ fetch }` running the HypDriv pipeline around TanStack Start's handler. */
+/** Creates the server entry: `{ fetch }` running the Hypdriv pipeline around TanStack Start's handler. */
 export function createHypDrivServerEntry(options: HypDrivServerEntryOptions = {}): ServerEntry {
   const { config: own, manifest, handler, ...rest } = options;
   const hypdriv = createHandler({

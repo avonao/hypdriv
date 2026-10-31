@@ -18,7 +18,7 @@ import { HOST_LABEL, MIN_TOKEN_LENGTH, PRERENDER_HEADER } from './constants';
 import { renderedManifestSource } from './manifest';
 
 /**
- * What the HypDriv request middleware adds to TanStack Start's request context: the request's CSP nonce (nonce
+ * What the Hypdriv request middleware adds to TanStack Start's request context: the request's CSP nonce (nonce
  * mode), read by `hypdrivSsr()` in `getRouter()` and by `getGlobalStartContext()` anywhere on the server.
  */
 export interface HypDrivStartContext {
@@ -41,7 +41,7 @@ export interface CloudflareStartContext {
 }
 
 export interface CreateHypDrivMiddlewareOptions extends Omit<CreateHandlerOptions, 'config' | 'manifest'> {
-  /** The HypDriv config (`virtual:hypdriv/config`). */
+  /** The Hypdriv config (`virtual:hypdriv/config`). */
   config: HypDrivConfig | ResolvedConfig;
   /**
    * The build manifest (`() => import('virtual:hypdriv/manifest')`). The handler sees it through
@@ -113,12 +113,12 @@ export function platformInput(
 export type HypDrivMiddlewareWithHandler = HypDrivRequestMiddleware & { readonly handler: HypHandler };
 
 /**
- * Creates TanStack Start global request middleware that runs the HypDriv Drivetrain around everything Start
+ * Creates TanStack Start global request middleware that runs the Hypdriv Drivetrain around everything Start
  * answers — SSR documents, server routes, server functions, not-found pages, redirects — with `createHandler`
  * (`runner: 'host'`), owning the full response: internal routes (`/_hypdriv/*`), the HTTPS upgrade, security
  * headers, the CSP (a per-request nonce handed to Start through `next({ context: { nonce } })`), rate limits,
  * the bot shield, geo, flags, redirects, maintenance mode, Early Hints, logging and `Server-Timing`. Inside
- * HypDriv's Cloudflare Worker shell (or the `@hypdriv/tanstack-start/server-entry` wrapper) the stages already
+ * Hypdriv's Cloudflare Worker shell (or the `@hypdriv/tanstack-start/server-entry` wrapper) the stages already
  * ran around the request: the middleware only forwards the nonce.
  *
  * Register it first in `requestMiddleware` (`src/start.ts`), so it also wraps the responses of the middleware

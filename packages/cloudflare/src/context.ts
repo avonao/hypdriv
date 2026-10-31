@@ -6,12 +6,12 @@ export function installContextStore(): ContextStore {
   return installAsyncContext(() => new AsyncLocalStorage<HypContext>());
 }
 
-/** The HypDriv request context for the current async flow inside the Worker (undefined outside a request). */
+/** The Hypdriv request context for the current async flow inside the Worker (undefined outside a request). */
 export function getHypContext(): HypContext | undefined {
   return getCurrentContext();
 }
 
-/** Runs `fn` with `ctx` as the current HypDriv context. */
+/** Runs `fn` with `ctx` as the current Hypdriv context. */
 export function runWithHypContext<T>(ctx: HypContext, fn: () => T): T {
   return installContextStore().run(ctx, fn);
 }

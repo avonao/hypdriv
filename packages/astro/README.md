@@ -1,6 +1,6 @@
 # @hypdriv/astro
 
-HypDriv for [Astro](https://astro.build) 7 on Cloudflare Workers, Vercel and Node. One integration runs the HypDriv Drivetrain — security headers, CSP (per-request nonces or build-time hashes), rate limiting, bot shield, geo, feature flags, i18n, redirects, maintenance mode, edge cache, Early Hints, logging, tracing and `Server-Timing`, plus the `/_hypdriv/*` internal routes — around every route Astro renders on demand, and writes the route manifest and the static header rules of your adapter's platform after the build.
+Hypdriv for [Astro](https://astro.build) 7 on Cloudflare Workers, Vercel and Node. One integration runs the Hypdriv Drivetrain — security headers, CSP (per-request nonces or build-time hashes), rate limiting, bot shield, geo, feature flags, i18n, redirects, maintenance mode, edge cache, Early Hints, logging, tracing and `Server-Timing`, plus the `/_hypdriv/*` internal routes — around every route Astro renders on demand, and writes the route manifest and the static header rules of your adapter's platform after the build.
 
 ```sh
 pnpm add @hypdriv/astro @hypdriv/core
@@ -36,7 +36,7 @@ export default defineConfig({
 
 | Hook | Work |
 | --- | --- |
-| `astro:config:setup` | loads `hypdriv.config.*`, adds the Vite plugins that serve `virtual:hypdriv/config`, `virtual:hypdriv/manifest` and `virtual:hypdriv/astro`, registers the HypDriv middleware (`order: 'pre'`) and injects the on-demand route `/_hypdriv/[...path]` |
+| `astro:config:setup` | loads `hypdriv.config.*`, adds the Vite plugins that serve `virtual:hypdriv/config`, `virtual:hypdriv/manifest` and `virtual:hypdriv/astro`, registers the Hypdriv middleware (`order: 'pre'`) and injects the on-demand route `/_hypdriv/[...path]` |
 | `astro:routes:resolved` | converts Astro's routes (`[param]`, `[...rest]`, mixed segments such as `[slug].json`) into the manifest's routes |
 | `astro:build:ssr` | records the stylesheets and scripts of on-demand pages (Early Hints, preload candidates) |
 | `astro:build:done` | after the adapter: writes `.hypdriv/manifest.json` (routes, classifications, CSP hashes of every prerendered document, Early Hints), the static rules for the platform — Cloudflare `_headers`, Vercel Build Output header routes (and the error route's CSP), `@astrojs/node`'s `_headers.json` — and patches the final manifest into every server output (`dist/server`, `.vercel/output/functions/**`). Fails the build on budget, Purser or secrets-scan failures |
@@ -61,7 +61,7 @@ const ctx = hyp();
 
 ## Cloudflare: the Worker shell
 
-Own the Worker entry to get HypDriv's Durable Objects, `scheduled` / `queue` / `email` handlers and the pipeline in front of prerendered pages:
+Own the Worker entry to get Hypdriv's Durable Objects, `scheduled` / `queue` / `email` handlers and the pipeline in front of prerendered pages:
 
 ```ts
 // src/worker.ts — wrangler.jsonc: "main": "./src/worker.ts", "assets": { "binding": "ASSETS", "run_worker_first": ["/*", "!/_astro/*"] }
@@ -86,8 +86,8 @@ The middleware inside Astro passes through there: the shell already ran the stag
 
 ## CSP
 
-- **Astro's `security.csp` off (default):** HypDriv owns the policy. On-demand responses get a per-request nonce, injected into every `<script>` (and `<style>` unless `unsafeInlineStyles`), `is:inline` scripts included — with `HTMLRewriter` on Workers, with a streaming tokenizer on Vercel and Node. `hyp().nonce` / `nonce()` give it to code that renders its own tags. Prerendered pages get a hash policy computed from their HTML, through the platform's static rules (and through the Worker shell on Cloudflare).
-- **Astro's `security.csp` on:** Astro owns the policy (hashes in a `<meta>` tag on prerendered pages, a header on on-demand ones). The integration switches HypDriv's CSP off everywhere — middleware, `src/fetch.ts`, the Worker shell and the static rules — so no response carries two policies; every other header stays.
+- **Astro's `security.csp` off (default):** Hypdriv owns the policy. On-demand responses get a per-request nonce, injected into every `<script>` (and `<style>` unless `unsafeInlineStyles`), `is:inline` scripts included — with `HTMLRewriter` on Workers, with a streaming tokenizer on Vercel and Node. `hyp().nonce` / `nonce()` give it to code that renders its own tags. Prerendered pages get a hash policy computed from their HTML, through the platform's static rules (and through the Worker shell on Cloudflare).
+- **Astro's `security.csp` on:** Astro owns the policy (hashes in a `<meta>` tag on prerendered pages, a header on on-demand ones). The integration switches Hypdriv's CSP off everywhere — middleware, `src/fetch.ts`, the Worker shell and the static rules — so no response carries two policies; every other header stays.
 
 ## Guide
 

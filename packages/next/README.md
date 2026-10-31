@@ -1,6 +1,6 @@
 # @hypdriv/next
 
-HypDriv for Next.js 16+: the `withHypDriv()` config wrapper, the chained build adapter, the `proxy.ts` runner, the Drivetrain stage factories and the server/client helpers your application code uses.
+Hypdriv for Next.js 16+: the `withHypDriv()` config wrapper, the chained build adapter, the `proxy.ts` runner, the Drivetrain stage factories and the server/client helpers your application code uses.
 
 Most applications install the umbrella package (`pnpm add hypdriv`) and run `npx hypdriv init`; this package is what `hypdriv/next` re-exports.
 
@@ -31,7 +31,7 @@ export default withHypDriv({ cacheComponents: true });
 `withHypDriv` returns an async config function. For every phase it:
 
 - loads `hypdriv.config.*` (TypeScript configs load through Node's type stripping, with a `stripTypeScriptTypes` fallback) and validates it;
-- installs the HypDriv adapter as `adapterPath`, chaining any adapter you already had (`adapterPath`, `NEXT_ADAPTER_PATH` or `options.adapter`);
+- installs the Hypdriv adapter as `adapterPath`, chaining any adapter you already had (`adapterPath`, `NEXT_ADAPTER_PATH` or `options.adapter`);
 - applies safe defaults: `poweredByHeader: false`, `reactStrictMode`, Subresource Integrity (`experimental.sri`) when enabled, a `deploymentId` for skew protection (from `HYPDRIV_DEPLOYMENT_ID`, the CI commit SHA or git `HEAD`), and the Cloudflare image loader with its settings inlined as `env.HYPDRIV_IMAGES`;
 - runs Purser CSS when configured: a full build before `next build` (build errors fail the build) and one shared watcher per `next dev` process that also writes `.hypdriv/dev/purser.json` for the HUD.
 
@@ -62,7 +62,7 @@ export const config = {
 }; // Next.js parses this statically, so it must be a literal
 ```
 
-Next.js only accepts a literal `config` export in `proxy.ts`; the exported `matcher` constant documents the recommended value. Inside the HypDriv Worker (OpenNext bundles `proxy.ts` into it) the proxy detects the Worker's request context and passes requests through, so stages never run twice; client-supplied `x-hypdriv-*` and nonce headers are removed before the stages run.
+Next.js only accepts a literal `config` export in `proxy.ts`; the exported `matcher` constant documents the recommended value. Inside the Hypdriv Worker (OpenNext bundles `proxy.ts` into it) the proxy detects the Worker's request context and passes requests through, so stages never run twice; client-supplied `x-hypdriv-*` and nonce headers are removed before the stages run.
 
 The proxy runs the same ordered stages as the Worker on Node (`next dev`, `next start`, any Node host); edge-only stages (HTML rewriting, cached-HTML nonce injection) are skipped. Pass a function to customise the list: `createProxy(config, (defaults, platform) => [...defaults, myStage])`.
 
@@ -86,7 +86,7 @@ export default async function Page() {
 
 ## Cache helpers
 
-`revalidateTag(tag, profile?)` and `revalidatePath(path, type?)` call Next's functions and then purge HypDriv's edge cache (and the zone cache when `CACHE_PURGE_ZONE_ID`/`CACHE_PURGE_API_TOKEN` are set), so both layers stay consistent.
+`revalidateTag(tag, profile?)` and `revalidatePath(path, type?)` call Next's functions and then purge Hypdriv's edge cache (and the zone cache when `CACHE_PURGE_ZONE_ID`/`CACHE_PURGE_API_TOKEN` are set), so both layers stay consistent.
 
 ## Instrumentation
 

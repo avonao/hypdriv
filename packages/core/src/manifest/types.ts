@@ -1,5 +1,5 @@
 /**
- * The build manifest written by the HypDriv adapter (`.hypdriv/manifest.json`) and read by the
+ * The build manifest written by the Hypdriv adapter (`.hypdriv/manifest.json`) and read by the
  * Worker shell, the proxy composables and the CLI. See docs/architecture.md §4.
  */
 
@@ -14,7 +14,7 @@ export const MANIFEST_VERSION = 1 as const;
  */
 export type RouteKind = 'app-page' | 'app-route' | 'page' | 'page-api' | 'endpoint' | 'static-file';
 
-/** Frameworks HypDriv builds manifests for. */
+/** Frameworks Hypdriv builds manifests for. */
 export type FrameworkName =
   | 'next'
   | 'vite'
@@ -154,7 +154,7 @@ export interface HypManifest {
   buildId: string;
   /**
    * Content fingerprint of the build output: Next's build id plus every route's client assets
-   * (content-hashed file names), CSP hashes of prerendered HTML and HypDriv's inline-script hashes. Next.js
+   * (content-hashed file names), CSP hashes of prerendered HTML and Hypdriv's inline-script hashes. Next.js
    * derives deterministic build ids from the deployment id, so two different outputs of the same commit can
    * share a `buildId`; edge-cache keys use this fingerprint (`cacheVersion()`) so a rebuild never serves
    * HTML that references another build's chunks or hashes.
@@ -186,7 +186,7 @@ export interface HypManifest {
   earlyHints: Record<string, string[]>;
   csp: Record<string, { scriptHashes: string[]; styleHashes: string[] }>;
   /**
-   * CSP hashes of HypDriv-owned inline scripts that render identically on every route (the `<Speculation/>`
+   * CSP hashes of Hypdriv-owned inline scripts that render identically on every route (the `<Speculation/>`
    * document rules, the Purser theme fallback script). The CSP stage allows them in hash and nonce mode,
    * so these components never need a request nonce and layouts stay prerenderable.
    */

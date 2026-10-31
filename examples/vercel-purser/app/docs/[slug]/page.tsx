@@ -12,7 +12,7 @@ const docs = {
   },
   guard: {
     title: 'Unstyled-atom guard',
-    body: 'After next build, HypDriv collects every prerendered document and RSC payload, extracts the Purser classes they use and compares them with the generated stylesheet. Missing atoms fail the build (purser.verify: "error").',
+    body: 'After next build, Hypdriv collects every prerendered document and RSC payload, extracts the Purser classes they use and compares them with the generated stylesheet. Missing atoms fail the build (purser.verify: "error").',
   },
   audit: {
     title: 'Zero-override audit',
@@ -48,7 +48,7 @@ export default async function DocPage(props: { params: Promise<{ slug: string }>
       <h1 className={css.props(text.title)}>{doc.title}</h1>
       <p className={css.props(text.lead)}>{doc.body}</p>
       <Card title="Back to the overview" href="/">
-        All features of the HypDriv × Purser integration.
+        All features of the Hypdriv × Purser integration.
       </Card>
     </>
   );

@@ -34,7 +34,7 @@ export const nextjsChecks: Check[] = [
       const v = ctx.project.next.installed;
       if (!v) return skip('next is not installed.');
       if (!atLeast(v, MIN_NEXT))
-        return fail(`next ${v} is not supported; HypDriv targets Next.js ${MIN_NEXT}+.`);
+        return fail(`next ${v} is not supported; Hypdriv targets Next.js ${MIN_NEXT}+.`);
       if (!atLeast(v, ADAPTER_API_NEXT))
         return warn(
           `next ${v}: the stable Adapter API (adapterPath, onBuildComplete) arrived in ${ADAPTER_API_NEXT}; without it no .hypdriv/manifest.json is produced.`,
@@ -52,7 +52,7 @@ export const nextjsChecks: Check[] = [
       if (!v) return skip('react is not installed.');
       if (!atLeast(v, MIN_REACT))
         return warn(
-          `react ${v}; Next.js 16 features HypDriv relies on (View Transitions, useEffectEvent, Activity) need React ${MIN_REACT}+.`,
+          `react ${v}; Next.js 16 features Hypdriv relies on (View Transitions, useEffectEvent, Activity) need React ${MIN_REACT}+.`,
         );
       return pass(`react ${v}`);
     },
@@ -103,7 +103,7 @@ export const nextjsChecks: Check[] = [
         return info(
           `adapterPath "${nc.adapterPath}" is set; withHypDriv() chains it as the base adapter and runs its own hooks after it.`,
         );
-      return pass('No application adapter; HypDriv is the only adapter.');
+      return pass('No application adapter; Hypdriv is the only adapter.');
     },
   },
   {
@@ -133,12 +133,12 @@ export const nextjsChecks: Check[] = [
       const proxy = ctx.project.proxyFile;
       if (!proxy)
         return info(
-          'No proxy.ts: HypDriv stages run only inside the Worker. `hypdriv init` writes one so `next dev` and `next start` get the same headers.',
+          'No proxy.ts: Hypdriv stages run only inside the Worker. `hypdriv init` writes one so `next dev` and `next start` get the same headers.',
         );
       const source = readFileSync(proxy, 'utf8');
       if (/createProxy\s*\(/.test(source)) return pass(`${rel(ctx.root, proxy)} uses createProxy().`);
       return warn(
-        `${rel(ctx.root, proxy)} exists but does not use createProxy(); compose it so development gets the HypDriv stages (see \`hypdriv init\`).`,
+        `${rel(ctx.root, proxy)} exists but does not use createProxy(); compose it so development gets the Hypdriv stages (see \`hypdriv init\`).`,
       );
     },
   },
@@ -191,7 +191,7 @@ export const nextjsChecks: Check[] = [
         );
       }
       return warn(
-        `${findings.length} file(s) opt into the Edge runtime. HypDriv's server helpers and proxy stages target the Node.js runtime (Edge segments get no nonce/geo context helpers); remove the export unless you need Edge.`,
+        `${findings.length} file(s) opt into the Edge runtime. Hypdriv's server helpers and proxy stages target the Node.js runtime (Edge segments get no nonce/geo context helpers); remove the export unless you need Edge.`,
         { details },
       );
     },
@@ -206,7 +206,7 @@ export const nextjsChecks: Check[] = [
       if (!nc) return skip('no next.config file.');
       if (nc.output === 'export')
         return fail(
-          "`output: 'export'` produces a static site; OpenNext Cloudflare and HypDriv need the server build. Remove the option (OpenNext sets what it needs).",
+          "`output: 'export'` produces a static site; OpenNext Cloudflare and Hypdriv need the server build. Remove the option (OpenNext sets what it needs).",
         );
       if (nc.output === 'standalone')
         return pass("`output: 'standalone'` (OpenNext consumes the standalone build).");
@@ -224,7 +224,7 @@ export const nextjsChecks: Check[] = [
       if (!nc) return skip('no next.config file.');
       if (nc.imagesUnoptimized)
         return info(
-          'images.unoptimized is set; the HypDriv image loader is inactive and <Image> serves originals.',
+          'images.unoptimized is set; the Hypdriv image loader is inactive and <Image> serves originals.',
         );
       if (ctx.project.platform === 'vercel') {
         const explicit = ctx.config.config.images?.loader;
@@ -250,7 +250,7 @@ export const nextjsChecks: Check[] = [
       }
       if (loader === 'cloudflare' && nc.imagesLoaderFile && !/hypdriv/.test(nc.imagesLoaderFile)) {
         return warn(
-          `next.config sets images.loaderFile "${nc.imagesLoaderFile}"; HypDriv's loader is not applied while a custom loaderFile exists.`,
+          `next.config sets images.loaderFile "${nc.imagesLoaderFile}"; Hypdriv's loader is not applied while a custom loaderFile exists.`,
         );
       }
       return pass(
@@ -269,7 +269,7 @@ export const nextjsChecks: Check[] = [
       const on = ctx.manifest?.cacheComponents ?? ctx.project.nextConfig?.cacheComponents ?? false;
       if (on) return pass('cacheComponents is enabled (shell routes are classified and cached per policy).');
       return info(
-        'cacheComponents is off. Consider `cacheComponents: true` in next.config for streaming shells; HypDriv classifies them as `shell` and caches them when `cache.edge.inferredShell` is set.',
+        'cacheComponents is off. Consider `cacheComponents: true` in next.config for streaming shells; Hypdriv classifies them as `shell` and caches them when `cache.edge.inferredShell` is set.',
       );
     },
   },
@@ -290,12 +290,12 @@ export const nextjsChecks: Check[] = [
       if (skew.deploymentId)
         return warn(`deploymentId "${skew.deploymentId}" is a constant in hypdriv.config; ${sharedIdRisk}.`, {
           details: [
-            'Remove `performance.skewProtection.deploymentId`: HypDriv derives a per-build id (<commit>-<build stamp>, ADR 0016).',
+            'Remove `performance.skewProtection.deploymentId`: Hypdriv derives a per-build id (<commit>-<build stamp>, ADR 0016).',
           ],
         });
       if (ctx.project.nextConfig?.setsDeploymentId)
         return info(
-          'next.config sets deploymentId itself; make sure it is unique per build and per app (HypDriv derives <commit>-<build stamp> otherwise).',
+          'next.config sets deploymentId itself; make sure it is unique per build and per app (Hypdriv derives <commit>-<build stamp> otherwise).',
         );
       const env = ctx.io.env;
       if (env.HYPDRIV_DEPLOYMENT_ID)
@@ -324,7 +324,7 @@ export const nextjsChecks: Check[] = [
         );
       const source = readFileSync(file, 'utf8');
       if (/@hypdriv\/next\/instrumentation|hypdriv\/instrumentation/.test(source))
-        return pass(`${rel(ctx.root, file)} uses HypDriv's instrumentation helpers.`);
+        return pass(`${rel(ctx.root, file)} uses Hypdriv's instrumentation helpers.`);
       return pass(`${rel(ctx.root, file)} present (custom).`);
     },
   },

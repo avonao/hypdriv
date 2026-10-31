@@ -38,7 +38,7 @@ export function astroModuleCode(facts: AstroBuildFacts, environment: string | un
 
 /**
  * Source of the config overlay served as `virtual:hypdriv/config` when Astro's `security.csp` is on: the
- * application's config with HypDriv's CSP switched off, so one policy owner (Astro) remains on every runner —
+ * application's config with Hypdriv's CSP switched off, so one policy owner (Astro) remains on every runner —
  * the middleware, `src/fetch.ts` and a custom Cloudflare Worker entry all import this module.
  */
 export function cspOverlayCode(): string {
@@ -52,9 +52,9 @@ export function cspOverlayCode(): string {
 
 /**
  * The Vite plugin of the Astro integration (placed before the host plugin): serves `virtual:hypdriv/astro` per
- * environment, overlays the config module when Astro owns the CSP, and bundles HypDriv into every server
+ * environment, overlays the config module when Astro owns the CSP, and bundles Hypdriv into every server
  * environment — Astro builds a separate `prerender` environment that `ssr.noExternal` does not reach, and
- * HypDriv's runtime entries import virtual modules, so they must never be left to Node's resolver.
+ * Hypdriv's runtime entries import virtual modules, so they must never be left to Node's resolver.
  */
 export function astroVitePlugin(input: { facts: () => AstroBuildFacts; host: HostPluginApi }): Plugin {
   return {

@@ -1,5 +1,5 @@
 /**
- * Browser-only helpers: Web Vitals reporting to `/_hypdriv/vitals` and reading HypDriv's
+ * Browser-only helpers: Web Vitals reporting to `/_hypdriv/vitals` and reading Hypdriv's
  * `Server-Timing` / `<meta name="hypdriv:*">` attribution. No Node APIs; `web-vitals` (a dependency) is
  * loaded as a separate chunk on first use, with a `PerformanceObserver` fallback when the chunk cannot load.
  */

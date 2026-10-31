@@ -1,6 +1,6 @@
-# HypDriv live suite for Vercel
+# Hypdriv live suite for Vercel
 
-A Next.js 16 app with every HypDriv capability that applies on Vercel switched on, each backed by the Vercel service that upgrades it, plus a runner (`scripts/e2e.ts`) that verifies them against a real Vercel project. It is the Vercel counterpart of [`e2e/cloudflare`](../cloudflare/README.md): unit tests and `next start` cannot show what only a deployment shows — Routing Middleware and Functions as separate invocations, the Vercel CDN and its tag purge, ISR regeneration, Global Config propagation, Vercel Queues deliveries and retries, Vercel Cron authentication, WAF rate-limit rules, BotID and Vercel Image Optimization.
+A Next.js 16 app with every Hypdriv capability that applies on Vercel switched on, each backed by the Vercel service that upgrades it, plus a runner (`scripts/e2e.ts`) that verifies them against a real Vercel project. It is the Vercel counterpart of [`e2e/cloudflare`](../cloudflare/README.md): unit tests and `next start` cannot show what only a deployment shows — Routing Middleware and Functions as separate invocations, the Vercel CDN and its tag purge, ISR regeneration, Global Config propagation, Vercel Queues deliveries and retries, Vercel Cron authentication, WAF rate-limit rules, BotID and Vercel Image Optimization.
 
 Everything runs on the **Hobby** plan.
 

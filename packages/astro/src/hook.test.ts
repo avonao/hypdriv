@@ -85,7 +85,7 @@ describe('createOnRequest', () => {
     expect(res.headers.get('x-request-id')).toBeTruthy();
   });
 
-  it('passes through inside an outer HypDriv runner (the Cloudflare Worker shell, src/fetch.ts)', async () => {
+  it('passes through inside an outer Hypdriv runner (the Cloudflare Worker shell, src/fetch.ts)', async () => {
     await ensureContextStore();
     const onRequest = setup();
     const req = request('/ssr');
@@ -95,7 +95,7 @@ describe('createOnRequest', () => {
     expect(res).toBe(original);
   });
 
-  it("answers HypDriv's internal routes without rendering", async () => {
+  it("answers Hypdriv's internal routes without rendering", async () => {
     const next = vi.fn<AstroNext>(async () => page());
     const res = await setup()(context(request('/_hypdriv/health')), next);
     expect(res.status).toBe(200);

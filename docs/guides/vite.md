@@ -1,6 +1,6 @@
-# HypDriv with plain Vite apps
+# Hypdriv with plain Vite apps
 
-`@hypdriv/vite` brings HypDriv to Vite 8 apps without a server framework: single-page apps and multi-page static sites. The pipeline runs in front of the built files — on Cloudflare in a Worker that serves the static assets, on Vercel in HypDriv's Routing Middleware, on Node in `hypdriv serve` — and every response the platform serves on its own carries HypDriv's static header rules. Framework apps use their own package (`docs/guides/react-router.md`, `tanstack-start.md`, `astro.md`, `sveltekit.md`, `nuxt.md`, `vinext.md`), built on the same toolkit.
+`@hypdriv/vite` brings Hypdriv to Vite 8 apps without a server framework: single-page apps and multi-page static sites. The pipeline runs in front of the built files — on Cloudflare in a Worker that serves the static assets, on Vercel in Hypdriv's Routing Middleware, on Node in `hypdriv serve` — and every response the platform serves on its own carries Hypdriv's static header rules. Framework apps use their own package (`docs/guides/react-router.md`, `tanstack-start.md`, `astro.md`, `sveltekit.md`, `nuxt.md`, `vinext.md`), built on the same toolkit.
 
 ## Install
 
@@ -102,7 +102,7 @@ Build on Vercel (`VERCEL=1`) or with `HYPDRIV_TARGET=vercel`: the plugin writes 
 
 - `static/`: the client files (`.vite/` and Cloudflare-only files removed),
 - header routes before `handle: filesystem` (security preset, page CSPs, Early Hints, immutable assets),
-- `functions/_hypdriv/middleware.func`: HypDriv's Routing Middleware, a bundled Node.js function that runs the request stages before the CDN for every path except content-hashed assets (`hypdriv({ vercelMiddleware: false })` leaves it out),
+- `functions/_hypdriv/middleware.func`: Hypdriv's Routing Middleware, a bundled Node.js function that runs the request stages before the CDN for every path except content-hashed assets (`hypdriv({ vercelMiddleware: false })` leaves it out),
 - the SPA fallback (`/index.html` for unknown extensionless paths) or clean URLs for multi-page builds.
 
 Vercel deploys the directory as is (`vercel build && vercel deploy --prebuilt`, or a Git deployment whose build command is `vite build`). Vercel services (Global Config, Upstash, WAF rules) are picked up from the environment like on Next.js; see `docs/guides/vercel.md`.

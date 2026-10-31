@@ -261,7 +261,7 @@ Commands and flags per architecture §10. Implementation notes: `src/commands/<n
 
 ## `create-hypdriv`
 
-Interactive-free when flags are passed: `create-hypdriv <dir> [--purser] [--pm pnpm] [--template basic|with-purser]`. Copies `templates/*` bundled in the package, runs the package manager install, prints next steps. Templates are complete Next 16 + OpenNext + HypDriv apps (same content as `examples/`).
+Interactive-free when flags are passed: `create-hypdriv <dir> [--purser] [--pm pnpm] [--template basic|with-purser]`. Copies `templates/*` bundled in the package, runs the package manager install, prints next steps. Templates are complete Next 16 + OpenNext + Hypdriv apps (same content as `examples/`).
 
 ## `hypdriv` (umbrella)
 

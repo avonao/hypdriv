@@ -1,4 +1,4 @@
-# ADR 0015 — Owner audit tokens let HypDriv's own tooling through its bot shield
+# ADR 0015 — Owner audit tokens let Hypdriv's own tooling through its bot shield
 
 **Status:** accepted · **Date:** 2026-10-30
 

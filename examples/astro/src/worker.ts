@@ -1,7 +1,7 @@
 /// <reference types="@hypdriv/astro/virtual" />
-// Cloudflare Worker entry (wrangler `main`): HypDriv's Worker shell around Astro's Cloudflare handler. The shell runs
+// Cloudflare Worker entry (wrangler `main`): Hypdriv's Worker shell around Astro's Cloudflare handler. The shell runs
 // the Drivetrain for every request that reaches the Worker (prerendered pages through `env.ASSETS` included), adds
-// `scheduled` / `queue` / `email` handlers for HypDriv jobs, and exports HypDriv's Durable Objects. The HypDriv
+// `scheduled` / `queue` / `email` handlers for Hypdriv jobs, and exports Hypdriv's Durable Objects. The Hypdriv
 // middleware inside Astro passes through here: the shell already ran the stages.
 
 import config from 'virtual:hypdriv/config';

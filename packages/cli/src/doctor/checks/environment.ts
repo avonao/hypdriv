@@ -27,7 +27,7 @@ export const environmentChecks: Check[] = [
     run(ctx) {
       const v = ctx.project.node;
       if (!atLeast(v, MIN_NODE))
-        return fail(`Node.js ${v} is too old; HypDriv needs ${MIN_NODE}+ (22+ recommended).`);
+        return fail(`Node.js ${v} is too old; Hypdriv needs ${MIN_NODE}+ (22+ recommended).`);
       if (!atLeast(v, RECOMMENDED_NODE))
         return pass(
           `Node.js ${v} (22+ recommended: native TypeScript config loading and WebSocket for audits).`,

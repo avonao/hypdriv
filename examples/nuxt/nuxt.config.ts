@@ -1,4 +1,4 @@
-// One app, three targets: Cloudflare Workers (HypDriv's Worker entry around Nitro), Vercel (Build Output) and
+// One app, three targets: Cloudflare Workers (Hypdriv's Worker entry around Nitro), Vercel (Build Output) and
 // Node (`node .output/server/index.mjs`). Vercel builds set VERCEL=1.
 import { readFileSync } from 'node:fs';
 
@@ -29,7 +29,7 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   telemetry: false,
   modules: ['@hypdriv/nuxt'],
-  // Options of @hypdriv/nuxt (all optional; `hypdriv.config.ts` holds the HypDriv config itself).
+  // Options of @hypdriv/nuxt (all optional; `hypdriv.config.ts` holds the Hypdriv config itself).
   hypdriv: {},
   routeRules: {
     // Prerendered at build time: served by Workers Static Assets / the Vercel CDN with hash-based CSP.

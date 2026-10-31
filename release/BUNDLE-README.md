@@ -1,6 +1,6 @@
-# HypDriv release bundle {{VERSION}} ({{DATE}})
+# Hypdriv release bundle {{VERSION}} ({{DATE}})
 
-HypDriv is not on npm. This folder is everything an application needs to install it, configure it for production on Cloudflare and go live. Built from commit `{{COMMIT}}`.
+Hypdriv is not on npm. This folder is everything an application needs to install it, configure it for production on Cloudflare and go live. Built from commit `{{COMMIT}}`.
 
 ## Start here
 
@@ -18,9 +18,9 @@ HypDriv is not on npm. This folder is everything an application needs to install
 | `tarballs/` | {{TARBALLS}} packed packages. A Next.js app installs 16 of them (the umbrella `hypdriv` and 15 `@hypdriv/*`); the rest are Vite-host integrations. Never install all of them at once. |
 | `install.sh` | The verified installer. Also the updater: run a newer bundle's `install.sh` against the same app. |
 | `templates/` | `hypdriv.config.ts`, `next.config.ts`, `open-next.config.ts`, `hypdriv.worker.ts`, `wrangler.jsonc`, `dev.vars.example`. |
-| `docs/` | The HypDriv docs as of this commit; the implementation guide is `docs/guides/production-cloudflare.md`. |
-| `skills/hypdriv/` | The HypDriv skill for coding agents. |
-| `AGENTS.md` | Posture and conventions for agents working on HypDriv itself. |
+| `docs/` | The Hypdriv docs as of this commit; the implementation guide is `docs/guides/production-cloudflare.md`. |
+| `skills/hypdriv/` | The Hypdriv skill for coding agents. |
+| `AGENTS.md` | Posture and conventions for agents working on Hypdriv itself. |
 | `PROMPT-FOR-CHATS.md` | The prompt to paste into a chat that has to implement this. |
 
 A private bundle may also carry `PLATFORMS.md` (hosts, names and deltas of each platform), `fleet/` (the generator patch of guide §9.2 and a reference diff) and `platforms/<platform>/` (the simulation reports, final config files and change sets of single-app platforms). They are not part of the open-source repository.
@@ -41,4 +41,4 @@ Bundles are immutable. A new bundle is a new folder. Run its `install.sh` agains
 
 ## Reporting a defect
 
-Write what you ran, what you expected, what happened, and the smallest reproduction you can produce (a config, a request, the doctor JSON). Do not paste secrets or customer data. Put it in `HYPDRIV-FEEDBACK.md` in the application repository so it can be carried back to HypDriv.
+Write what you ran, what you expected, what happened, and the smallest reproduction you can produce (a config, a request, the doctor JSON). Do not paste secrets or customer data. Put it in `HYPDRIV-FEEDBACK.md` in the application repository so it can be carried back to Hypdriv.

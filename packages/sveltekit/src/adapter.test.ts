@@ -169,7 +169,7 @@ describe('targetOf / kitCsp', () => {
 });
 
 describe('hypdriv(adapter)', () => {
-  it("contributes HypDriv's plugins before the adapter's and keeps the adapter's Vite settings", () => {
+  it("contributes Hypdriv's plugins before the adapter's and keeps the adapter's Vite settings", () => {
     const getRequest = vi.fn();
     const own: Plugin = { name: 'adapter-own' };
     const post: Plugin = { name: 'adapter-post' };
@@ -260,7 +260,7 @@ describe('hypdriv(adapter)', () => {
     expect(builder.logs.some((l) => l.includes('final manifest embedded in 2 server file(s)'))).toBe(true);
   });
 
-  it('warns when the server build has no HypDriv handle', async () => {
+  it('warns when the server build has no Hypdriv handle', async () => {
     const root = join(tmp, 'no-hook');
     const builder = fixtureBuild(root) as Builder & { logs: string[] };
     rmSync(join(root, '.svelte-kit', 'output', 'server', 'entries'), { recursive: true });

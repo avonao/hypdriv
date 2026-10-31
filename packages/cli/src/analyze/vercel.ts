@@ -5,7 +5,7 @@ import { readJsonFile } from '../util/fs';
 import { VERCEL_EDGE_LIMITS, VERCEL_FUNCTION_LIMIT } from '../vercel-config';
 import { packageOf } from './packages';
 
-/** `.vc-config.json` fields HypDriv reads (Build Output API v3). */
+/** `.vc-config.json` fields Hypdriv reads (Build Output API v3). */
 export interface VcConfig {
   runtime?: string;
   handler?: string;

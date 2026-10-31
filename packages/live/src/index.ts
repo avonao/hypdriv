@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/live` — live channels for HypDriv (ADR 0012).
+ * `@hypdriv/live` — live channels for Hypdriv (ADR 0012).
  *
  * - Worker/handler side: `createLiveHandler(config, env)` answers `/_hypdriv/live/<channel>`.
  * - Server code: `publish(env, channel, event)`; `createPublisher(env)`; `clearChannel(env, channel)`.

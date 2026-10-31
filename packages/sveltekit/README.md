@@ -1,6 +1,6 @@
 # @hypdriv/sveltekit
 
-HypDriv for [SvelteKit](https://svelte.dev/docs/kit) 3 on Cloudflare Workers, Vercel and Node. It runs the HypDriv Drivetrain — security headers, CSP with build-time hashes or per-request nonces, rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, the edge cache, Early Hints, logging/tracing/`Server-Timing` and the `/_hypdriv/*` routes — around every response of a SvelteKit app, and gives prerendered pages and static files their headers through the platform's static configuration.
+Hypdriv for [SvelteKit](https://svelte.dev/docs/kit) 3 on Cloudflare Workers, Vercel and Node. It runs the Hypdriv Drivetrain — security headers, CSP with build-time hashes or per-request nonces, rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, the edge cache, Early Hints, logging/tracing/`Server-Timing` and the `/_hypdriv/*` routes — around every response of a SvelteKit app, and gives prerendered pages and static files their headers through the platform's static configuration.
 
 ```sh
 pnpm add @hypdriv/sveltekit @hypdriv/core
@@ -49,10 +49,10 @@ export const load = () => ({ requestId: hyp()?.requestId, nonce: nonce(), newHer
 
 | Import | What it is |
 | --- | --- |
-| `@hypdriv/sveltekit` | `hypdriv(adapter, options?)`: the wrapper adapter. It contributes HypDriv's Vite plugins (config and manifest modules, `ssr.noExternal`) and, after SvelteKit built and prerendered the app, writes `.hypdriv/manifest.json`, patches the final manifest into the server output, runs your adapter, writes the platform's static headers and (Cloudflare Workers) the Worker shell. Also exports the toolkit it is built from (`routesFromBuilder`, `svelteKitPattern`, `routeAssets`, `withSvelteKitCsp`, `adoptSvelteKitCsp`, …). |
+| `@hypdriv/sveltekit` | `hypdriv(adapter, options?)`: the wrapper adapter. It contributes Hypdriv's Vite plugins (config and manifest modules, `ssr.noExternal`) and, after SvelteKit built and prerendered the app, writes `.hypdriv/manifest.json`, patches the final manifest into the server output, runs your adapter, writes the platform's static headers and (Cloudflare Workers) the Worker shell. Also exports the toolkit it is built from (`routesFromBuilder`, `svelteKitPattern`, `routeAssets`, `withSvelteKitCsp`, `adoptSvelteKitCsp`, …). |
 | `@hypdriv/sveltekit/hooks` | `hypdriv(options?)`: the `handle` hook, built on `createHandler()` (`runner: 'host'`). Options: `stages`, `onError`, `skip`, `target`, `development`, `platform`, `devState`. |
 | `@hypdriv/sveltekit/server` | `hyp`, `requireHyp`, `nonce`, `flag`, `geo`, `defer`, `jobHandler`. |
-| `@hypdriv/sveltekit/worker` | `createSvelteKitWorker()`: the Cloudflare Worker entry the build generates (HypDriv's `createWorker` around adapter-cloudflare's Worker). |
+| `@hypdriv/sveltekit/worker` | `createSvelteKitWorker()`: the Cloudflare Worker entry the build generates (Hypdriv's `createWorker` around adapter-cloudflare's Worker). |
 | `@hypdriv/sveltekit/durable-objects` | `HypDrivLimiter`, `HypDrivIndex`, `HypDrivChannel`, re-exported for that entry. |
 | `@hypdriv/sveltekit/node` | `serve()` / `createRequestListener()`: adapter-node's `build/handler.js` behind the pipeline. |
 
@@ -60,9 +60,9 @@ export const load = () => ({ requestId: hyp()?.requestId, nonce: nonce(), newHer
 
 | Option | Description |
 | --- | --- |
-| `config` | HypDriv config file path or inline config (default `hypdriv.config.*`) |
+| `config` | Hypdriv config file path or inline config (default `hypdriv.config.*`) |
 | `target` | `cloudflare` \| `vercel` \| `node` (default: from the adapter's name; `adapter-auto` by its environment) |
-| `cloudflare.worker` | wrap adapter-cloudflare's Worker in HypDriv's Worker shell (default: true for Workers, false for Pages) |
+| `cloudflare.worker` | wrap adapter-cloudflare's Worker in Hypdriv's Worker shell (default: true for Workers, false for Pages) |
 | `cloudflare.exports` | a module whose named exports the Worker re-exports (your Durable Objects, Workflows, entrypoints) |
 | `cloudflare.wranglerConfig` | the wrangler config, when you pass `config` to adapter-cloudflare |
 | `node.out` | adapter-node's `out` (default `build`) |
@@ -78,7 +78,7 @@ export const load = () => ({ requestId: hyp()?.requestId, nonce: nonce(), newHer
 
 ## CSP
 
-HypDriv owns the policy. Dynamic responses get a per-request nonce that HypDriv adds to every `<script>`, `<link rel="modulepreload">` and (without `unsafeInlineStyles`) `<style>` the response streams, including SvelteKit's streamed `load` data; prerendered pages get a hash policy from their inline scripts. When you also set SvelteKit's `csp` option, its directives join HypDriv's policy, SvelteKit's nonce is replaced by HypDriv's in the streamed body (so `nonce()`, `%sveltekit.nonce%` and SvelteKit's scripts all carry the same value) and only HypDriv's header is sent; the hashes of SvelteKit's `<meta>` policy in prerendered pages are added to their static policy. With `security.csp: false`, SvelteKit's own policy applies unchanged. See [docs/guides/sveltekit.md](../../docs/guides/sveltekit.md).
+Hypdriv owns the policy. Dynamic responses get a per-request nonce that Hypdriv adds to every `<script>`, `<link rel="modulepreload">` and (without `unsafeInlineStyles`) `<style>` the response streams, including SvelteKit's streamed `load` data; prerendered pages get a hash policy from their inline scripts. When you also set SvelteKit's `csp` option, its directives join Hypdriv's policy, SvelteKit's nonce is replaced by Hypdriv's in the streamed body (so `nonce()`, `%sveltekit.nonce%` and SvelteKit's scripts all carry the same value) and only Hypdriv's header is sent; the hashes of SvelteKit's `<meta>` policy in prerendered pages are added to their static policy. With `security.csp: false`, SvelteKit's own policy applies unchanged. See [docs/guides/sveltekit.md](../../docs/guides/sveltekit.md).
 
 ## License
 

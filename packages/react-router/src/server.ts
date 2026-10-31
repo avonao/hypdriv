@@ -27,7 +27,7 @@ import { dataRedirect, withDataRequests } from './data-requests';
 import { HOST, isPrerenderRequest, isRedirect } from './shared';
 
 /**
- * `@hypdriv/react-router/server` — the HypDriv runtime for React Router: the root `middleware`, the server entry
+ * `@hypdriv/react-router/server` — the Hypdriv runtime for React Router: the root `middleware`, the server entry
  * that wraps the whole request handler (Node, Vercel), router-context keys and the request helpers application
  * code uses (`hyp()`, `nonce()`, `flag()`, `geo()`, `defer()`, `jobHandler()`).
  */
@@ -52,11 +52,11 @@ export {
 } from './data-requests';
 export { isPrerenderRequest, PRERENDER_HEADER } from './shared';
 
-/** The HypDriv request context in React Router's router context: `context.get(hypdrivContext)` in loaders. */
+/** The Hypdriv request context in React Router's router context: `context.get(hypdrivContext)` in loaders. */
 export const hypdrivContext: RouterContext<HypRequestContext | null> =
   createContext<HypRequestContext | null>(null);
 
-/** What HypDriv's Cloudflare Worker entry puts into the router context of each request. */
+/** What Hypdriv's Cloudflare Worker entry puts into the router context of each request. */
 export interface CloudflareRequestContext<Env = Record<string, unknown>> {
   env: Env;
   ctx: { waitUntil(promise: Promise<unknown>): void; passThroughOnException?(): void };
@@ -78,7 +78,7 @@ export interface PlatformInput {
 type HandlerOptions = Pick<CreateHandlerOptions, 'stages' | 'onError' | 'development' | 'target' | 'skip'>;
 
 export interface HypDrivMiddlewareOptions extends HandlerOptions {
-  /** The HypDriv config (default: `virtual:hypdriv/config`, served by the HypDriv Vite plugin). */
+  /** The Hypdriv config (default: `virtual:hypdriv/config`, served by the Hypdriv Vite plugin). */
   config?: HypDrivConfig | ResolvedConfig;
   /** The build manifest (default: `virtual:hypdriv/manifest`). */
   manifest?: ManifestSource;
@@ -120,7 +120,7 @@ function handlerOptions(options: HandlerOptions): HandlerOptions {
   return out;
 }
 
-/** Lazily creates the HypDriv handler (config, manifest and token load on the first request). */
+/** Lazily creates the Hypdriv handler (config, manifest and token load on the first request). */
 function runtimeLoader(options: {
   config?: HypDrivConfig | ResolvedConfig | undefined;
   manifest?: ManifestSource | undefined;
@@ -164,9 +164,9 @@ function withPlatform(input: PlatformInput | undefined): Omit<HandleInput, 'upst
 }
 
 /**
- * The root route `middleware` that runs the HypDriv Drivetrain around every request React Router answers with a
+ * The root route `middleware` that runs the Hypdriv Drivetrain around every request React Router answers with a
  * route — documents, `.data` requests, actions and resource routes — in development and production on every
- * platform. Inside an outer HypDriv runner (the Cloudflare Worker entry, the Node server, Vercel functions) the
+ * platform. Inside an outer Hypdriv runner (the Cloudflare Worker entry, the Node server, Vercel functions) the
  * stages already ran and it only exposes the request context; during the build's prerendering it stays out of the
  * way, so prerendered HTML carries no per-request data.
  *
@@ -204,7 +204,7 @@ export function hypdrivMiddleware(options: HypDrivMiddlewareOptions = {}): Middl
       upstream: () => {
         if (rendered)
           throw new Error(
-            'hypdriv: the React Router middleware renders a request once; background revalidation needs an outer HypDriv runner',
+            'hypdriv: the React Router middleware renders a request once; background revalidation needs an outer Hypdriv runner',
           );
         expose(context);
         rendered = Promise.resolve(next());
@@ -226,11 +226,11 @@ export interface ServerFetchInput extends PlatformInput {
   context?: (request: Request, context: RouterContextProvider) => void | Promise<void>;
 }
 
-/** HypDriv around a React Router server build: one full-response handler for every request. */
+/** Hypdriv around a React Router server build: one full-response handler for every request. */
 export interface HypDrivServer {
   /** Answers a request: the pipeline around the static files (when given) and React Router. */
   fetch(request: Request, input?: ServerFetchInput): Promise<Response>;
-  /** The HypDriv handler (config, manifest, runtime). */
+  /** The Hypdriv handler (config, manifest, runtime). */
   handler(): Promise<HypHandler>;
   /** The React Router server build. */
   build(): Promise<ServerBuild>;
@@ -239,7 +239,7 @@ export interface HypDrivServer {
 export interface ServerEntryOptions extends HandlerOptions {
   /** The React Router server build (`virtual:react-router/server-build`) or a loader of it. */
   build: ServerBuild | (() => ServerBuild | Promise<ServerBuild>);
-  /** The HypDriv config (default: `virtual:hypdriv/config`). */
+  /** The Hypdriv config (default: `virtual:hypdriv/config`). */
   config?: HypDrivConfig | ResolvedConfig;
   /** The build manifest (default: `virtual:hypdriv/manifest`). */
   manifest?: ManifestSource;
@@ -261,9 +261,9 @@ function isBuildModule(value: unknown): value is ServerBuild {
 }
 
 /**
- * Creates the HypDriv server entry of a React Router build: `fetch(request)` runs the pipeline around the whole
+ * Creates the Hypdriv server entry of a React Router build: `fetch(request)` runs the pipeline around the whole
  * request handler — every route, 404s, 405s, `/__manifest` and (with `assets`) the static files — and the root
- * middleware passes through inside it. HypDriv's Vite plugin makes it the SSR entry of Node and Vercel builds
+ * middleware passes through inside it. Hypdriv's Vite plugin makes it the SSR entry of Node and Vercel builds
  * (`build/server/index.js` exports it as `hypdriv`, and its `fetch` as the default export).
  */
 export function createServerEntry(options: ServerEntryOptions): HypDrivServer {

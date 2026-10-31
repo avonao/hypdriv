@@ -1,11 +1,11 @@
-# HypDriv — Vercel example
+# Hypdriv — Vercel example
 
-Next.js 16 (Cache Components on) deployed to Vercel with HypDriv, US-first (`iad1`).
+Next.js 16 (Cache Components on) deployed to Vercel with Hypdriv, US-first (`iad1`).
 
 ```sh
 pnpm install
 cp .env.example .env.local   # or: vercel env pull .env.local
-pnpm dev                     # next dev with the proxy running HypDriv stages
+pnpm dev                     # next dev with the proxy running Hypdriv stages
 pnpm build                   # next build (withHypDriv detects Vercel from vercel.json / VERCEL=1)
 pnpm build:vercel            # vercel build → .vercel/output (Build Output API)
 pnpm deploy                  # vercel deploy --prebuilt
@@ -17,7 +17,7 @@ What the example shows:
 | Feature | Where |
 | --- | --- |
 | Drivetrain stages in Routing Middleware (CSP, security headers, bots, rate limits, geo, flags, Speculation Rules) | `proxy.ts` (`createProxy` wires `@hypdriv/vercel` automatically) |
-| CDN caching of pages by HypDriv policy (`Vercel-CDN-Cache-Control`, `Vercel-Cache-Tag`) | `products` policy → `next.config` `headers()` via `withHypDriv` |
+| CDN caching of pages by Hypdriv policy (`Vercel-CDN-Cache-Control`, `Vercel-Cache-Tag`) | `products` policy → `next.config` `headers()` via `withHypDriv` |
 | CDN caching of a Route Handler by policy | `app/api/products/route.ts` (`withVercelCdn`) |
 | Tag purge on Vercel's CDN | `revalidateTag('catalog')` / `purgeEdge` from `hypdriv/cache` |
 | Vercel Cron with `CRON_SECRET` | `vercel.json#crons` → `app/api/jobs/digest/route.ts` (`jobHandler`) |

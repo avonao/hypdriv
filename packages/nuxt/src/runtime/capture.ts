@@ -56,7 +56,7 @@ type Callback = (error?: Error | null) => void;
 
 /**
  * A stand-in for Node's `ServerResponse` that turns what Nitro writes into a Web `Response` with a streaming body.
- * The integration installs it as `event.node.res` while the application renders, so HypDriv's pipeline can
+ * The integration installs it as `event.node.res` while the application renders, so Hypdriv's pipeline can
  * post-process the response (headers, CSP nonces, Server-Timing) before it reaches the client. The `response`
  * promise settles as soon as the head is known (first `writeHead`, `write`, `flushHeaders` or `end`); the body
  * keeps streaming afterwards, with backpressure (`write()` returns `false` and `drain` fires when the reader

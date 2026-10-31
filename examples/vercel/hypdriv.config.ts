@@ -49,7 +49,7 @@ export default defineConfig({
     queues: { emails: { path: '/api/queues/emails' } },
   },
   vercel: {
-    // HypDriv queue name → Vercel Queues topic (vercel.json triggers the consumer route).
+    // Hypdriv queue name → Vercel Queues topic (vercel.json triggers the consumer route).
     queues: { emails: 'transactional-email' },
   },
 });

@@ -252,7 +252,7 @@ export function acceptsHtml(headers: Headers): boolean {
 }
 
 /**
- * Inbound `x-hypdriv-*` headers HypDriv accepts from clients. Everything else under that prefix is set by
+ * Inbound `x-hypdriv-*` headers Hypdriv accepts from clients. Everything else under that prefix is set by
  * the stages and forwarded to the application, so a client-supplied copy must never reach it. The
  * internal-request headers are claims that `jobHandler()` verifies against the HMAC signature, and the
  * audit token is verified by `verifiedAudit()` before the bot shield or rate limiter trust it.
@@ -269,7 +269,7 @@ export const TRUSTED_INBOUND_HYPDRIV_HEADERS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Removes request headers a client could use to impersonate HypDriv's stages: every `x-hypdriv-*` header
+ * Removes request headers a client could use to impersonate Hypdriv's stages: every `x-hypdriv-*` header
  * outside {@link TRUSTED_INBOUND_HYPDRIV_HEADERS}, the CSP nonce header (`x-nonce` or the configured name)
  * and Next.js' internal `x-middleware-*` headers (in front of Next.js only; pass `middlewareHeaders: false`
  * inside `proxy.ts`, where Next.js already sanitised them). Returns the same `Request` when nothing was removed.

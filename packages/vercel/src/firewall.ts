@@ -77,7 +77,7 @@ export function vercelRateLimitBinding(
 }
 
 /**
- * The platform-level WAF binding: the HypDriv limiter calls it for policies with `store: 'binding'`, passing
+ * The platform-level WAF binding: the Hypdriv limiter calls it for policies with `store: 'binding'`, passing
  * keys that start with the policy id (`<policy>|ip=…`). The policy's own rule from
  * `vercel.firewall.rateLimitRules` is used, otherwise the first configured rule. Returns `null` when no rule
  * is configured.
@@ -114,7 +114,7 @@ export interface VercelRateLimitStageOptions {
 }
 
 /**
- * The `rate-limit-vercel` stage: for every HypDriv rate-limit policy listed in
+ * The `rate-limit-vercel` stage: for every Hypdriv rate-limit policy listed in
  * `vercel.firewall.rateLimitRules` that applies to the request, asks the mapped Vercel WAF rule (with the
  * request, so host and client IP are known) and short-circuits with the policy's 429 response
  * (`rateLimitedResponse` from `@hypdriv/security`, including `Retry-After`) when the WAF limits it. Checks run

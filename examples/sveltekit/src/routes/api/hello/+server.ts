@@ -3,7 +3,7 @@ import { hyp } from '@hypdriv/sveltekit/server';
 // Rate limited by the `api` policy in hypdriv.config.ts (60 requests per minute per IP).
 export const GET = () =>
   Response.json({
-    message: 'Hello from SvelteKit behind HypDriv',
+    message: 'Hello from SvelteKit behind Hypdriv',
     requestId: hyp()?.requestId ?? null,
     country: hyp()?.country ?? null,
   });

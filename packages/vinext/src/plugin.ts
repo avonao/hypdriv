@@ -39,7 +39,7 @@ import { discoverRoutes, findRouterDirs, type RouterDirs } from './routes';
 export type VinextTarget = 'cloudflare' | 'vercel' | 'node';
 
 export interface HypDrivVinextOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
   config?: string | HypDrivConfig;
   /** vinext's `appDir` option when you set it (the directory that contains `app/` and `pages/`). */
   appDir?: string;
@@ -49,14 +49,14 @@ export interface HypDrivVinextOptions {
    */
   target?: VinextTarget;
   /**
-   * Install HypDriv's request hook around vinext's App Router request handler (default true). Turn it off only
-   * when the app runs HypDriv elsewhere (a `proxy.ts` built with `@hypdriv/vinext/proxy`).
+   * Install Hypdriv's request hook around vinext's App Router request handler (default true). Turn it off only
+   * when the app runs Hypdriv elsewhere (a `proxy.ts` built with `@hypdriv/vinext/proxy`).
    */
   hook?: boolean;
   /** Vercel: serve vinext's prerendered static pages from the CDN (default true). */
   vercelStaticPages?: boolean;
   /**
-   * Run HypDriv's Routing Middleware on Vercel for the prerendered pages its CDN serves without vinext's function
+   * Run Hypdriv's Routing Middleware on Vercel for the prerendered pages its CDN serves without vinext's function
    * (rate limiting, bot shield, maintenance, redirects, geo; default true).
    */
   vercelMiddleware?: boolean;
@@ -64,7 +64,7 @@ export interface HypDrivVinextOptions {
 
 /** vinext's generated App Router request handler module. */
 export const VINEXT_RSC_ENTRY = 'virtual:vinext-rsc-entry';
-/** The module the plugin puts in its place: vinext's handler wrapped with HypDriv's request hook. */
+/** The module the plugin puts in its place: vinext's handler wrapped with Hypdriv's request hook. */
 export const VIRTUAL_HOOK = 'virtual:hypdriv/vinext-hook';
 const RESOLVED_HOOK = `\0${VIRTUAL_HOOK}`;
 
@@ -140,11 +140,11 @@ function readText(file: string): string | null {
   }
 }
 
-/** A HypDriv route id per canonical pattern, as the manifest assigns it. */
+/** A Hypdriv route id per canonical pattern, as the manifest assigns it. */
 const pageId = (pathname: string) => `page:${pathname}`;
 
 /**
- * The HypDriv plugin for vinext. Add it after `vinext()` (and after `cloudflare()` / `nitro()` when you use them):
+ * The Hypdriv plugin for vinext. Add it after `vinext()` (and after `cloudflare()` / `nitro()` when you use them):
  *
  * ```ts
  * import vinext from 'vinext';
@@ -152,7 +152,7 @@ const pageId = (pathname: string) => `page:${pathname}`;
  * export default defineConfig({ plugins: [vinext({ prerender: true }), hypdriv()] });
  * ```
  *
- * - Installs HypDriv's request hook around vinext's App Router request handler on every runtime (`vinext start`,
+ * - Installs Hypdriv's request hook around vinext's App Router request handler on every runtime (`vinext start`,
  *   Cloudflare Workers, Nitro on Vercel and Node, `vite dev`): the Drivetrain owns every response vinext renders
  *   and application code reads the request through `hyp()`.
  * - After the complete build (vinext's prerender and the platform output included) writes
@@ -220,7 +220,7 @@ export function hypdriv(options: HypDrivVinextOptions = {}): Plugin[] {
     resolveId: {
       order: 'pre',
       handler(id, importer) {
-        // HypDriv's runtime reads `cloudflare:workers` only when it runs in workerd; Node and Nitro builds keep
+        // Hypdriv's runtime reads `cloudflare:workers` only when it runs in workerd; Node and Nitro builds keep
         // the (never evaluated) dynamic import external instead of failing to resolve it.
         if (id.startsWith('cloudflare:') && !workerd) return { id, external: true };
         if (parseCdnAdapterId(id) && !id.startsWith('\0')) return `\0${id}`;
@@ -256,7 +256,7 @@ export function hypdriv(options: HypDrivVinextOptions = {}): Plugin[] {
       target === 'cloudflare' ? 'cloudflare' : target === 'vercel' ? 'vercel' : nitro ? 'nitro' : 'node';
     if (hook && dirs.appDir && !hookInstalled)
       throw new Error(
-        `hypdriv: vinext's App Router entry (${VINEXT_RSC_ENTRY}) was never loaded, so HypDriv's request hook is not installed. @hypdriv/vinext supports vinext ^1.4; check that vinext() is in the plugin list.`,
+        `hypdriv: vinext's App Router entry (${VINEXT_RSC_ENTRY}) was never loaded, so Hypdriv's request hook is not installed. @hypdriv/vinext supports vinext ^1.4; check that vinext() is in the plugin list.`,
       );
 
     const basePath = basePathOf(vite);
@@ -364,7 +364,7 @@ export function hypdriv(options: HypDrivVinextOptions = {}): Plugin[] {
       );
       const copied = writeVercelStaticPages({ outputDir, pages: servedPages });
       writeVercelStatic({ outputDir, rules, manifestJson: JSON.stringify(manifest), log });
-      // The CDN serves those pages without vinext's function: HypDriv's Routing Middleware runs the request stages
+      // The CDN serves those pages without vinext's function: Hypdriv's Routing Middleware runs the request stages
       // for them. RSC payloads, Server Actions and other methods go to the function, which runs them itself.
       await addVercelMiddleware({
         root,

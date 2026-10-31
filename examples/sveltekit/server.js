@@ -1,4 +1,4 @@
-// Node: adapter-node's build behind the HypDriv pipeline (static files and prerendered pages included).
+// Node: adapter-node's build behind the Hypdriv pipeline (static files and prerendered pages included).
 // `pnpm build:node && pnpm start`
 import { serve } from '@hypdriv/sveltekit/node';
 

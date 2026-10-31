@@ -201,7 +201,7 @@ describe('completeNuxtOutput', () => {
     expect(headers).toMatch(/\n\/about\n {2}content-security-policy: [^\n]*'sha256-/);
     expect(headers).toMatch(/\n\/about\/\n/);
     expect(headers).toContain('x-content-type-options: nosniff');
-    // Nitro's own asset caching rule is kept, and HypDriv does not add a second one.
+    // Nitro's own asset caching rule is kept, and Hypdriv does not add a second one.
     expect(headers.match(/^\/_nuxt\/\*$/gm)).toHaveLength(1);
     // A second run (no changes) finds the final manifest already embedded.
     const again = completeNuxtOutput({
@@ -289,7 +289,7 @@ describe('runtimeManifestFiles', () => {
 });
 
 describe('Worker entry sources', () => {
-  it('imports Nitro’s polyfills before HypDriv’s Worker and re-exports the Durable Objects', () => {
+  it('imports Nitro’s polyfills before Hypdriv’s Worker and re-exports the Durable Objects', () => {
     const entry = cloudflareEntryCode('/pkg/dist/runtime/cloudflare-worker');
     const lines = entry.trim().split('\n');
     expect(lines[0]).toBe("import '#nitro-internal-pollyfills';");

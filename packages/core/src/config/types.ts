@@ -1,5 +1,5 @@
 /**
- * HypDriv configuration schema.
+ * Hypdriv configuration schema.
  *
  * `hypdriv.config.ts` exports `defineConfig({...})` with this shape. Every section is optional;
  * `resolveConfig()` applies the documented defaults and produces a `ResolvedConfig` whose
@@ -644,7 +644,7 @@ export interface CloudflareConfig {
   };
   smartPlacement?: boolean;
   runWorkerFirst?: boolean | string[];
-  /** Prefix for HypDriv's internal routes (default `/_hypdriv`). */
+  /** Prefix for Hypdriv's internal routes (default `/_hypdriv`). */
   internalPathPrefix?: string;
   /** Bypass the Drivetrain for static asset paths entirely (default true). */
   skipStaticAssets?: boolean;
@@ -669,7 +669,7 @@ export interface VercelConfig {
   globalConfig?: false | { connectionEnv?: string[] };
   /** Redis over Upstash's REST API (Vercel Marketplace) as the KV store for rate limits, tag index and idempotency. */
   redis?: false | { urlEnv?: string[]; tokenEnv?: string[]; prefix?: string };
-  /** Vercel WAF rate-limit rules (`@vercel/firewall`) to enforce per HypDriv rate-limit policy id. */
+  /** Vercel WAF rate-limit rules (`@vercel/firewall`) to enforce per Hypdriv rate-limit policy id. */
   firewall?: { rateLimitRules?: Record<string, string> };
   /**
    * Vercel BotID: the default check level of `botIdGuard()` (`basic` is free on every plan; `deepAnalysis` is
@@ -681,7 +681,7 @@ export interface VercelConfig {
   purge?: { tokenEnv?: string; teamIdEnv?: string; projectIdEnv?: string };
   /** Env holding the secret Vercel Cron sends as `Authorization: Bearer …` (default `CRON_SECRET`). */
   cronSecretEnv?: string;
-  /** Vercel Queues topic per HypDriv queue name (default: the queue name). */
+  /** Vercel Queues topic per Hypdriv queue name (default: the queue name). */
   queues?: Record<string, string>;
 }
 

@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { serve } from './node';
 
 /**
- * `hypdriv-react-router-serve [build/server/index.js]` — serves a React Router build with HypDriv on Node
+ * `hypdriv-react-router-serve [build/server/index.js]` — serves a React Router build with Hypdriv on Node
  * (`--port`, `--host`, `--client <dir>`, `--trust-proxy`; `PORT` and `HOST` from the environment by default).
  */
 async function main(): Promise<void> {

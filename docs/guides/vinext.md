@@ -1,6 +1,6 @@
-# HypDriv on vinext
+# Hypdriv on vinext
 
-[vinext](https://github.com/cloudflare/vinext) is Cloudflare's Vite implementation of the Next.js API: `app/` and `pages/`, Server Components, Route Handlers, Server Actions, `proxy.ts`, `next/*` imports — built by Vite and deployed to Cloudflare Workers, Vercel (through Nitro) or a Node server. `@hypdriv/vinext` runs HypDriv's Drivetrain around every request vinext answers, on all three, and builds the HypDriv manifest from the vinext build.
+[vinext](https://github.com/cloudflare/vinext) is Cloudflare's Vite implementation of the Next.js API: `app/` and `pages/`, Server Components, Route Handlers, Server Actions, `proxy.ts`, `next/*` imports — built by Vite and deployed to Cloudflare Workers, Vercel (through Nitro) or a Node server. `@hypdriv/vinext` runs Hypdriv's Drivetrain around every request vinext answers, on all three, and builds the Hypdriv manifest from the vinext build.
 
 Requirements: vinext `^1.4`, Vite 8, Node 22+. App Router apps (including hybrid `app/` + `pages/` apps) get the full integration; Pages Router-only apps use the `proxy.ts` mode described at the end.
 
@@ -36,14 +36,14 @@ No `proxy.ts`, no custom server and no code change in the app is needed: the plu
 **The request hook.** vinext's App Router request handler is the default export of its generated RSC entry (`virtual:vinext-rsc-entry`). The plugin resolves that module to a wrapper (`virtual:hypdriv/vinext-hook`) that re-exports the entry and wraps the handler with `createHandler({ runner: 'host' })` from `@hypdriv/runtime`. Every runtime calls that handler — `vinext start`, the standalone server, the Cloudflare Worker, Nitro's Vercel and Node functions, `vite dev` and `vite preview` — so the Drivetrain owns the full response everywhere:
 
 - security headers, CSP, rate limiting, the bot shield, geo, flags, i18n, redirects, maintenance, the edge cache, Early Hints, logging, tracing and `Server-Timing`;
-- HypDriv's internal routes (`/_hypdriv/health`, CSP reports, vitals, live polling, DevTools endpoints);
+- Hypdriv's internal routes (`/_hypdriv/health`, CSP reports, vitals, live polling, DevTools endpoints);
 - `hyp()` in Server Components, Route Handlers, Server Actions and `proxy.ts` (AsyncLocalStorage).
 
 vinext serves its content-hashed build assets (`/_next/static/*`) before the handler; public files pass through the hook.
 
 **The build.** After the complete build — vinext's prerender, cache packaging and the platform output included — the plugin writes `.hypdriv/manifest.json` (and `report.md`): routes from `app/` and `pages/` (Next.js conventions: route groups, parallel slots, private folders, intercepting routes, dynamic and catch-all segments, `route.ts`, the `sitemap` / `robots` / `manifest` metadata routes), the vinext build id, client assets and Early Hints, the CSP hashes of prerendered pages the platform serves as built, Purser verification, the secrets scan and budgets. It then patches the final manifest into every server output (the embedded manifest of the server bundle is built before the prerender), writes the platform's static headers and fails the build on budget, Purser or secrets failures.
 
-**vinext's build-time prerender.** vinext prerenders by running the built server (and `proxy.ts`) in Node. The plugin bakes a random per-build token into the server code and puts it into the build's environment, which vinext's prerender servers inherit; a request is a prerender request only when `VINEXT_PRERENDER=1` and that token are both in the process environment. Clients cannot set either, and a deployed server never has the token. Prerender requests go straight to vinext, so prerendered pages are HypDriv-free HTML (no nonce, no request facts) that the build then hashes.
+**vinext's build-time prerender.** vinext prerenders by running the built server (and `proxy.ts`) in Node. The plugin bakes a random per-build token into the server code and puts it into the build's environment, which vinext's prerender servers inherit; a request is a prerender request only when `VINEXT_PRERENDER=1` and that token are both in the process environment. Clients cannot set either, and a deployed server never has the token. Prerender requests go straight to vinext, so prerendered pages are Hypdriv-free HTML (no nonce, no request facts) that the build then hashes.
 
 ## Classification and CSP
 
@@ -53,7 +53,7 @@ vinext serves its content-hashed build assets (`/_next/static/*`) before the han
 | `isr` | prerendered or `export const revalidate = N`, but the document can change at run time (revalidation, `cacheTag()` / `fetch` tags) or the platform re-renders it | nonce policy; the nonce is **injected** into vinext's cached HTML | kept: the nonce policy is not forwarded to vinext |
 | `dynamic` | everything else (pages that call `headers()`, `cookies()`, `hyp()`…) | nonce policy; vinext applies the nonce to its own scripts | not cached (vinext renders nonce documents per request) |
 
-For dynamic pages HypDriv forwards the nonce policy in the request's `Content-Security-Policy` header, which vinext reads (like Next.js) and applies to its bootstrap scripts, module preloads, inline RSC payload scripts and fonts. For `isr` and `static` routes in nonce mode, HypDriv withholds that header so vinext keeps serving from (and filling) its page cache, then injects the nonce into every `<script>` and `<style>` of the cached document (`HTMLRewriter` on Workers, the streaming injector elsewhere). A document with an injected nonce is marked `Cache-Control: private, no-store` so no shared cache hands one nonce to every visitor; HypDriv's own edge cache stores the document before the injection.
+For dynamic pages Hypdriv forwards the nonce policy in the request's `Content-Security-Policy` header, which vinext reads (like Next.js) and applies to its bootstrap scripts, module preloads, inline RSC payload scripts and fonts. For `isr` and `static` routes in nonce mode, Hypdriv withholds that header so vinext keeps serving from (and filling) its page cache, then injects the nonce into every `<script>` and `<style>` of the cached document (`HTMLRewriter` on Workers, the streaming injector elsewhere). A document with an injected nonce is marked `Cache-Control: private, no-store` so no shared cache hands one nonce to every visitor; Hypdriv's own edge cache stores the document before the injection.
 
 Use `nonce()` (or `hyp()?.nonce`) for scripts the application renders itself, for example `<Script nonce={nonce()}>`. A policy the application sets itself (`next.config` `headers()`, a Route Handler) wins: the csp stage reports `x-hypdriv-csp: app` and leaves it alone.
 
@@ -72,7 +72,7 @@ export default function Page() {
 
 ## Cache purges
 
-`withHypDrivCache()` wraps vinext's `cache` option so `revalidateTag()` and `revalidatePath()` also purge HypDriv's edge cache, or the purger HypDriv registered for the platform (Vercel's CDN):
+`withHypDrivCache()` wraps vinext's `cache` option so `revalidateTag()` and `revalidatePath()` also purge Hypdriv's edge cache, or the purger Hypdriv registered for the platform (Vercel's CDN):
 
 ```ts
 import { kvDataAdapter } from '@vinext/cloudflare/cache/kv-data-adapter';
@@ -98,7 +98,7 @@ vinext start                     # or output: 'standalone' → node dist/standal
 
 Two set-ups, both with `@cloudflare/vite-plugin` and `cloudflare({ viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] } })`:
 
-**HypDriv's Worker shell (recommended).** Own the Worker entry: the shell runs the Drivetrain with `runner: 'worker'` (HTML rewriting, the Cache API edge cache, Durable Object rate limits and tag index) and adds `scheduled`, `queue`, `email` and `tail` handlers; the in-app hook passes through.
+**Hypdriv's Worker shell (recommended).** Own the Worker entry: the shell runs the Drivetrain with `runner: 'worker'` (HTML rewriting, the Cache API edge cache, Durable Object rate limits and tag index) and adds `scheduled`, `queue`, `email` and `tail` handlers; the in-app hook passes through.
 
 ```ts
 // worker/index.ts
@@ -138,12 +138,12 @@ export default createVinextWorker({ config, manifest, app: handler });
 }
 ```
 
-**vinext's own entry.** With `"main": "vinext/server/fetch-handler"` the hook runs inside the Worker with `runner: 'host'`, `HTMLRewriter` and the bindings of the invocation; Durable Object stores are used when their bindings exist, but the Worker has no `scheduled` / `queue` handlers of HypDriv's.
+**vinext's own entry.** With `"main": "vinext/server/fetch-handler"` the hook runs inside the Worker with `runner: 'host'`, `HTMLRewriter` and the bindings of the invocation; Durable Object stores are used when their bindings exist, but the Worker has no `scheduled` / `queue` handlers of Hypdriv's.
 
 Build with `vite build`, run locally with `vite preview` or `wrangler dev --config dist/server/wrangler.json`, deploy with `wrangler deploy --config dist/server/wrangler.json` (or `vinext-cloudflare deploy`).
 
 - **Prerendered pages** are served on Workers only through vinext's `staticAssetsAdapter()` (`cache.cdn`), which packages them into Workers Static Assets: the plugin matches the packaged documents by content and gives those routes a hash policy. Without it vinext re-renders prerendered pages per isolate, so they are `isr`.
-- **Static headers.** The plugin merges HypDriv's rules into `_headers` in the assets directory (vinext writes a default `_headers` only when none exists; its immutable rule for `/_next/static/*` is kept) and keeps `.vite` / `.hypdriv` out of the upload.
+- **Static headers.** The plugin merges Hypdriv's rules into `_headers` in the assets directory (vinext writes a default `_headers` only when none exists; its immutable rule for `/_next/static/*` is kept) and keeps `.vite` / `.hypdriv` out of the upload.
 - vinext refuses Node and Nitro builds of a project with a root `wrangler.jsonc`: an app that builds for several platforms keeps the file elsewhere and passes `configPath` to `cloudflare()` (as `examples/vinext` does with `cloudflare/wrangler.jsonc`).
 
 ## Vercel (Nitro)
@@ -156,10 +156,10 @@ plugins: [vinext({ prerender: true, cache: withHypDrivCache() }), nitro({ preset
 Nitro selects the Vercel preset on Vercel builds by itself (`VERCEL=1`); `vite build` writes `.vercel/output`. Set the project's build command to `vite build` and its output directory to `.vercel/output`.
 
 - The Vercel Function runs the hook with Vercel's platform wiring: the Vercel CDN stage owns the cache headers of the function's responses, tag purges go to Vercel, Upstash / Global Config / WAF / BotID when configured.
-- **Prerendered pages.** Nitro packages the function before vinext prerenders, so vinext's prerendered HTML is not part of Nitro's output. The plugin copies the pages that never change (no revalidation, no explicit cache tags) into `.vercel/output/static` (with `overrides` so `/about` serves `about.html`) and adds routes before the filesystem that send their RSC navigations (`RSC` header), Server Actions (`Next-Action` header) and non-GET requests to the function. HypDriv's static header routes give those files the security headers and their hash policy. Turn this off with `hypdriv({ vercelStaticPages: false })`; the pages are then rendered by the function (`isr`).
+- **Prerendered pages.** Nitro packages the function before vinext prerenders, so vinext's prerendered HTML is not part of Nitro's output. The plugin copies the pages that never change (no revalidation, no explicit cache tags) into `.vercel/output/static` (with `overrides` so `/about` serves `about.html`) and adds routes before the filesystem that send their RSC navigations (`RSC` header), Server Actions (`Next-Action` header) and non-GET requests to the function. Hypdriv's static header routes give those files the security headers and their hash policy. Turn this off with `hypdriv({ vercelStaticPages: false })`; the pages are then rendered by the function (`isr`).
 - The function's `.hypdriv/manifest.json` and its embedded manifest are the final ones.
 
-Other Nitro presets (`node-server`, …) work the same way without the static pages: everything vinext renders goes through the hook, and Nitro serves `public/` and `/_next/static/*` itself (without HypDriv's headers).
+Other Nitro presets (`node-server`, …) work the same way without the static pages: everything vinext renders goes through the hook, and Nitro serves `public/` and `/_next/static/*` itself (without Hypdriv's headers).
 
 ## Development
 
@@ -167,7 +167,7 @@ Other Nitro presets (`node-server`, …) work the same way without the static pa
 
 ## Pages Router apps: `proxy.ts`
 
-vinext's Pages Router on Node and Nitro has no single request handler to wrap. Run HypDriv as routing middleware instead:
+vinext's Pages Router on Node and Nitro has no single request handler to wrap. Run Hypdriv as routing middleware instead:
 
 ```ts
 // proxy.ts
@@ -180,7 +180,7 @@ export const proxy = createProxy({ config: hypdrivConfig, manifest });
 export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)', '/_hypdriv/:path*'] };
 ```
 
-The stages run before vinext (`runner: 'proxy'`): headers, CSP (vinext applies the forwarded nonce), rate limits, the bot shield, flags, redirects, maintenance and `/_hypdriv/*`. The proxy does not see the rendered body, so nonces are not injected into cached HTML and `hyp()` returns `null`; application code reads HypDriv's facts from the forwarded `x-hypdriv-*` request headers (`headers()`). Inside the plugin's hook or the Worker shell the proxy passes through, so an App Router app can keep its own `proxy.ts` for its own logic. On Cloudflare, `createVinextWorker` covers Pages Router apps fully.
+The stages run before vinext (`runner: 'proxy'`): headers, CSP (vinext applies the forwarded nonce), rate limits, the bot shield, flags, redirects, maintenance and `/_hypdriv/*`. The proxy does not see the rendered body, so nonces are not injected into cached HTML and `hyp()` returns `null`; application code reads Hypdriv's facts from the forwarded `x-hypdriv-*` request headers (`headers()`). Inside the plugin's hook or the Worker shell the proxy passes through, so an App Router app can keep its own `proxy.ts` for its own logic. On Cloudflare, `createVinextWorker` covers Pages Router apps fully.
 
 ## Limitations
 

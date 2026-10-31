@@ -191,7 +191,7 @@ export const manifestCommand = defineCommand({
       else {
         ui.heading(`Manifest ${ui.color.dim(file)}`);
         ui.kv([
-          ['build', `${summary.buildId} · ${frameworkLabel(m)} · HypDriv ${summary.hypdrivVersion}`],
+          ['build', `${summary.buildId} · ${frameworkLabel(m)} · Hypdriv ${summary.hypdrivVersion}`],
           ['generated', summary.generatedAt],
           [
             'routes',

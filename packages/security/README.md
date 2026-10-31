@@ -1,6 +1,6 @@
 # @hypdriv/security
 
-Security primitives for HypDriv, the Hyper-Extension for Next.js 16+ on Cloudflare Workers: CSP autopilot, an A+ security-header preset, rate limiting, a bot shield, WAF-lite request shielding, CSRF, `safeAction()` / `defineRoute()`, encrypted sessions, JWT, signing, webhook verification, password hashing, an open-redirect guard and a build-time secrets scan.
+Security primitives for Hypdriv, the Hyper-Extension for Next.js 16+ on Cloudflare Workers: CSP autopilot, an A+ security-header preset, rate limiting, a bot shield, WAF-lite request shielding, CSRF, `safeAction()` / `defineRoute()`, encrypted sessions, JWT, signing, webhook verification, password hashing, an open-redirect guard and a build-time secrets scan.
 
 Everything in the main entry is built on web standards (`fetch`, `Request`/`Response`, WebCrypto) and runs unchanged on Cloudflare Workers, Node (`next start`, `proxy.ts`) and Vercel. Node APIs live only in `@hypdriv/security/node`. The package has zero runtime dependencies besides `@hypdriv/core`.
 

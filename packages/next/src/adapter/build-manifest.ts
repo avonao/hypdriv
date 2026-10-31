@@ -90,7 +90,7 @@ export function collectDocuments(
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-/** Derives the HypDriv manifest from a Next.js `onBuildComplete` context and the build directory. */
+/** Derives the Hypdriv manifest from a Next.js `onBuildComplete` context and the build directory. */
 export async function buildManifest(input: BuildManifestInput): Promise<BuildManifestResult> {
   const { context, config, fs } = input;
   const basePath = context.config.basePath ?? '';

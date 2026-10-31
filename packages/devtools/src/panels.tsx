@@ -182,7 +182,7 @@ export function RequestPanel({ theme, data }: PanelProps) {
       <Empty theme={theme}>
         No Server-Timing entries on this navigation. Enable{' '}
         <code style={codeStyle(theme)}>observe.serverTiming</code> (verbose in development) and make sure the
-        page was served through the HypDriv Worker or proxy.
+        page was served through the Hypdriv Worker or proxy.
       </Empty>
     );
   }
@@ -304,7 +304,7 @@ export function FlagsPanel({ theme, data }: PanelProps) {
   if (!data.flags) {
     return (
       <Empty theme={theme}>
-        No <code style={codeStyle(theme)}>{'<meta name="hypdriv:flags">'}</code> tag. Render the HypDriv meta
+        No <code style={codeStyle(theme)}>{'<meta name="hypdriv:flags">'}</code> tag. Render the Hypdriv meta
         tags from the server helpers (<code style={codeStyle(theme)}>@hypdriv/next</code>) to see the flags
         evaluated for this request.
       </Empty>

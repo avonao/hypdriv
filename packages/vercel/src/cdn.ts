@@ -73,7 +73,7 @@ export interface CdnPlan {
 
 const PLAN_KEY = stateKey<CdnPlan>('vercel.cdn.plan');
 
-/** Vercel request headers carrying the geo dimensions HypDriv policies can vary on. */
+/** Vercel request headers carrying the geo dimensions Hypdriv policies can vary on. */
 const GEO_VARY: Record<string, string | null> = {
   country: 'X-Vercel-IP-Country',
   region: 'X-Vercel-IP-Country-Region',
@@ -128,10 +128,10 @@ export function cdnExpressibility(
   }
   if (policy.vary.language) {
     vary.push('Accept-Language');
-    // Without Accept-Language, HypDriv's negotiation falls back to the visitor's country.
+    // Without Accept-Language, Hypdriv's negotiation falls back to the visitor's country.
     if (config.i18n && Object.keys(config.i18n.geoMap).length) vary.push('X-Vercel-IP-Country');
   }
-  // HypDriv's device class uses the client hint and falls back to the user agent (Safari and Firefox send no
+  // Hypdriv's device class uses the client hint and falls back to the user agent (Safari and Firefox send no
   // hints), so both must key the entry or mobile and desktop variants would be mixed up.
   if (policy.vary.device) vary.push('Sec-CH-UA-Mobile', 'User-Agent');
   const seen = new Set<string>();
@@ -175,7 +175,7 @@ export function writeCdnHeaders(
   if (plan.tags.length) headers.set(VERCEL_CACHE_TAG, plan.tags.join(','));
 }
 
-/** Removes the CDN headers HypDriv writes. */
+/** Removes the CDN headers Hypdriv writes. */
 export function removeCdnHeaders(headers: Headers): void {
   headers.delete(VERCEL_CDN_CACHE_CONTROL);
   headers.delete(CDN_CACHE_CONTROL);

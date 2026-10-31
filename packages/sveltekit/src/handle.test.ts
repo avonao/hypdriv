@@ -105,7 +105,7 @@ describe('createSvelteKitHandle', () => {
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
-  it("adopts SvelteKit's own policy: one header, HypDriv's nonce everywhere, SvelteKit's directives kept", async () => {
+  it("adopts SvelteKit's own policy: one header, Hypdriv's nonce everywhere, SvelteKit's directives kept", async () => {
     const { handle } = setup({
       csp: { mode: 'auto', directives: { 'script-src': ['self', 'https://js.example.com'] } },
     });
@@ -150,7 +150,7 @@ describe('createSvelteKitHandle', () => {
     expect(await response.json()).toEqual({ name: 'Ada' });
   });
 
-  it('passes through for SvelteKit sub-requests and inside an outer HypDriv runner', async () => {
+  it('passes through for SvelteKit sub-requests and inside an outer Hypdriv runner', async () => {
     const { handle } = setup();
     const sub = await handle({
       event: event('/api/data', {}, { isSubRequest: true }),
@@ -158,7 +158,7 @@ describe('createSvelteKitHandle', () => {
     });
     expect(sub.headers.get('x-request-id')).toBeNull();
 
-    // HypDriv's Node server (or the Worker shell) already runs the pipeline around SvelteKit.
+    // Hypdriv's Node server (or the Worker shell) already runs the pipeline around SvelteKit.
     const outer = createHandler({ config: {}, manifest, target: 'node', development: false });
     let runs = 0;
     const response = await outer(

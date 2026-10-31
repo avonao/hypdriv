@@ -247,7 +247,7 @@ export interface VercelPurgerOptions {
 }
 
 /**
- * Creates the purger HypDriv's `revalidateTag` / `revalidatePath` / `purgeEdge` reach on Vercel. Tags are
+ * Creates the purger Hypdriv's `revalidateTag` / `revalidatePath` / `purgeEdge` reach on Vercel. Tags are
  * invalidated (not deleted), so visitors keep getting the stale entry while Vercel revalidates it. URLs, and
  * `path:<pathname>` tags, map to the `hyp:path:<pathname>` tag the CDN stage puts on every cached response.
  */

@@ -1,7 +1,7 @@
 /** HTTP helpers shared by audit, warm and bench: realistic browser headers, timeouts, no redirects. */
 
 export const DESKTOP_UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 HypDriv-CLI';
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Hypdriv-CLI';
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 

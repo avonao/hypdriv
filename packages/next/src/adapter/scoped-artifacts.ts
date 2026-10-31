@@ -6,7 +6,7 @@ import { dirname, join, relative, sep } from 'node:path';
  * adapter is configured ("scoped build artifacts"). Deployment tools that read the classic layout —
  * OpenNext's cache population and Vercel's legacy builder read `server/app/**` and `server/pages/**` —
  * then find no prerenders, and pages render on demand (on workerd that means Cache Components shells
- * without their prerendered data). Because HypDriv installs an adapter only to observe the build, it
+ * without their prerendered data). Because Hypdriv installs an adapter only to observe the build, it
  * restores the classic layout next to the scoped one: every scoped file is copied to the classic path
  * (`$/blog.html` → `server/app/blog.html`). The `.meta` files keep their `routeCache.key`, so tools that
  * understand scoped keys (OpenNext ≥ 4.1 for Next ≥ 16.3.8) still key cache entries identically.

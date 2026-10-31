@@ -5,7 +5,7 @@ let { form } = $props();
 </script>
 
 <svelte:head>
-  <title>Form · HypDriv × SvelteKit</title>
+  <title>Form · Hypdriv × SvelteKit</title>
 </svelte:head>
 
 <h1>Form action</h1>

@@ -15,7 +15,7 @@ export function hyp(): HypRequestContext | null {
 
 export function requireHyp(): HypRequestContext {
   throw new Error(
-    'hyp(): no HypDriv request context in the browser; read request facts in a server function (createServerFn) instead',
+    'hyp(): no Hypdriv request context in the browser; read request facts in a server function (createServerFn) instead',
   );
 }
 

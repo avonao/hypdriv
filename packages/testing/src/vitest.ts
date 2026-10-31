@@ -1,5 +1,5 @@
 /**
- * Vitest presets for HypDriv packages and applications.
+ * Vitest presets for Hypdriv packages and applications.
  *
  * - `hypdrivNodeProject(name)` → a Node project config (source-condition resolution, `*.test.ts(x)`).
  * - `hypdrivWorkersProject(name, options)` → the same for workerd, returning the plugin options for

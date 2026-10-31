@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/tanstack-start/cloudflare` — TanStack Start inside HypDriv's Cloudflare Worker shell. The shell
+ * `@hypdriv/tanstack-start/cloudflare` — TanStack Start inside Hypdriv's Cloudflare Worker shell. The shell
  * (`createWorker` from `@hypdriv/cloudflare`) runs the full Drivetrain with `HTMLRewriter` around Start, answers
  * `/_hypdriv/*`, and handles `scheduled`, `queue` and `email` events (dispatched to your job endpoints as signed
  * requests). The request middleware in `src/start.ts` passes through inside it and still hands the nonce to the
@@ -53,7 +53,7 @@ export interface StartWorkerOptions extends Omit<CreateWorkerOptions, 'next' | '
 
 /**
  * The application worker `createWorker({ app })` expects, wrapping Start's server entry: Workers' `env` and
- * `ctx` reach Start (and HypDriv's middleware) as `context.cloudflare`, never as Start's request options.
+ * `ctx` reach Start (and Hypdriv's middleware) as `context.cloudflare`, never as Start's request options.
  */
 export function startApp(
   entry: () => Promise<StartServerEntry | { default: StartServerEntry }> = () =>

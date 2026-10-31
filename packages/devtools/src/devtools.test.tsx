@@ -91,7 +91,7 @@ describe('HypDrivDevTools (SSR)', () => {
   it('renders the pill without crashing and without touching browser globals', () => {
     const html = renderToString(<HypDrivDevTools />);
     expect(html).toContain('data-hypdriv-devtools="pill"');
-    expect(html).toContain('aria-label="Open HypDriv DevTools (Alt+Shift+H)"');
+    expect(html).toContain('aria-label="Open Hypdriv DevTools (Alt+Shift+H)"');
     expect(html).toContain('position:fixed');
     expect(html).toContain('z-index:2147483000');
     expect(html).toContain('bottom:12px');
@@ -112,7 +112,7 @@ describe('HypDrivDevTools (SSR)', () => {
       expect(html).toContain(`>${tab}<`);
     expect(html).toContain('No Server-Timing entries');
     const noHotkey = renderToString(<HypDrivDevTools hotkey={false} />);
-    expect(noHotkey).toContain('aria-label="Open HypDriv DevTools"');
+    expect(noHotkey).toContain('aria-label="Open Hypdriv DevTools"');
   });
 });
 

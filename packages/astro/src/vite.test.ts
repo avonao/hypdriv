@@ -56,7 +56,7 @@ describe('virtual:hypdriv/astro', () => {
     expect(ssr).toContain('export const target = "cloudflare";');
   });
 
-  it('bundles HypDriv into every server environment, including prerender', () => {
+  it('bundles Hypdriv into every server environment, including prerender', () => {
     const plugin = astroVitePlugin({ facts: () => facts(), host: hostApi(tmpdir()) });
     expect(call(plugin.configEnvironment, {}, 'client', {})).toBeUndefined();
     for (const name of ['ssr', 'prerender', 'astro'])
@@ -67,7 +67,7 @@ describe('virtual:hypdriv/astro', () => {
 });
 
 describe('Astro security.csp', () => {
-  it("overlays the config module with HypDriv's CSP off only when Astro owns the policy", async () => {
+  it("overlays the config module with Hypdriv's CSP off only when Astro owns the policy", async () => {
     const root = mkdtempSync(join(tmpdir(), 'hypdriv-astro-config-'));
     writeFileSync(
       join(root, 'hypdriv.config.mjs'),

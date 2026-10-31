@@ -17,11 +17,11 @@ import { discoverRoutes } from './routes';
 import { cloudflareLayout, readWranglerConfig, wrapWorker } from './targets/cloudflare';
 import { writeVercelHeaders } from './targets/vercel';
 
-/** The platforms HypDriv writes static configuration for. */
+/** The platforms Hypdriv writes static configuration for. */
 export type SvelteKitTarget = 'cloudflare' | 'vercel' | 'node';
 
 export interface HypDrivSvelteKitOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the project root) or an inline config. */
   config?: string | HypDrivConfig;
   /**
    * The platform the adapter builds for. Default: from the adapter (`@sveltejs/adapter-cloudflare`, `-vercel`,
@@ -30,13 +30,13 @@ export interface HypDrivSvelteKitOptions {
   target?: SvelteKitTarget;
   cloudflare?: {
     /**
-     * Put HypDriv's Worker shell in front of the adapter's Worker (Durable Objects, `scheduled` / `queue` / `email`
+     * Put Hypdriv's Worker shell in front of the adapter's Worker (Durable Objects, `scheduled` / `queue` / `email`
      * handlers, the Drivetrain for responses SvelteKit sends before `handle`). Default: true for Workers, false for
      * Pages (Pages Functions cannot export Durable Objects or cron handlers).
      */
     worker?: boolean;
     /**
-     * A module whose named exports the Worker re-exports next to HypDriv's Durable Objects: your own Durable
+     * A module whose named exports the Worker re-exports next to Hypdriv's Durable Objects: your own Durable
      * Objects, Workflows and `WorkerEntrypoint`s (path relative to the project root).
      */
     exports?: string;
@@ -49,7 +49,7 @@ export interface HypDrivSvelteKitOptions {
   };
   vercel?: {
     /**
-     * Run HypDriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without SvelteKit's
+     * Run Hypdriv's Routing Middleware for prerendered pages, which Vercel's CDN serves without SvelteKit's
      * function (rate limiting, bot shield, maintenance, redirects, geo; default true). On-demand routes run the
      * pipeline in the function's `handle` either way.
      */
@@ -111,7 +111,7 @@ interface State {
   host: (Plugin & { api: HostPluginApi }) | null;
 }
 
-/** HypDriv's Vite plugins for a SvelteKit app (contributed through the adapter, before SvelteKit's own). */
+/** Hypdriv's Vite plugins for a SvelteKit app (contributed through the adapter, before SvelteKit's own). */
 function plugins(
   state: State,
   options: HypDrivSvelteKitOptions,
@@ -144,7 +144,7 @@ function plugins(
 }
 
 /**
- * Wraps a SvelteKit adapter with HypDriv:
+ * Wraps a SvelteKit adapter with Hypdriv:
  *
  * ```ts
  * // vite.config.ts
@@ -158,7 +158,7 @@ function plugins(
  * It contributes the Vite plugins behind `@hypdriv/sveltekit/hooks` (config and manifest modules) and, after
  * SvelteKit built and prerendered the app, writes the manifest (`.hypdriv/`), patches it into the server output,
  * runs the adapter, then writes the platform's static headers (Cloudflare `_headers`, Vercel `config.json` routes)
- * and, on Cloudflare Workers, puts HypDriv's Worker shell in front of the adapter's Worker.
+ * and, on Cloudflare Workers, puts Hypdriv's Worker shell in front of the adapter's Worker.
  */
 export function hypdriv(adapter: Adapter, options: HypDrivSvelteKitOptions = {}): Adapter {
   const state: State = { kit: null, host: null };
@@ -182,7 +182,7 @@ export function hypdriv(adapter: Adapter, options: HypDrivSvelteKitOptions = {})
       const host = state.host;
       if (!host)
         throw new Error(
-          'hypdriv: the HypDriv Vite plugins did not run; pass the wrapped adapter to sveltekit({ adapter: hypdriv(adapter()) })',
+          'hypdriv: the Hypdriv Vite plugins did not run; pass the wrapped adapter to sveltekit({ adapter: hypdriv(adapter()) })',
         );
       const root = host.api.root;
       const log = builderLogger(builder.log);
@@ -190,7 +190,7 @@ export function hypdriv(adapter: Adapter, options: HypDrivSvelteKitOptions = {})
       const csp = kitCsp(builder.config);
       if (csp && svelteKitDirectives(builder.config.csp.reportOnly as SvelteKitCsp['reportOnly']))
         log.warn(
-          "hypdriv: SvelteKit's csp.reportOnly policy is replaced by HypDriv's single policy; use security.csp.reportOnly in hypdriv.config to roll out report-only",
+          "hypdriv: SvelteKit's csp.reportOnly policy is replaced by Hypdriv's single policy; use security.csp.reportOnly in hypdriv.config to roll out report-only",
         );
       const config = loadConfig(withSvelteKitCsp(loaded.raw, csp));
       const prepared = await prepareBuild({
@@ -275,7 +275,7 @@ export function hypdriv(adapter: Adapter, options: HypDrivSvelteKitOptions = {})
 
       if (!prepared.patched.length && !shell)
         log.warn(
-          "hypdriv: the HypDriv handle is not in the server build. Add it to src/hooks.server.ts: export const handle = sequence(hypdriv(), …) with hypdriv from '@hypdriv/sveltekit/hooks'",
+          "hypdriv: the Hypdriv handle is not in the server build. Add it to src/hooks.server.ts: export const handle = sequence(hypdriv(), …) with hypdriv from '@hypdriv/sveltekit/hooks'",
         );
     },
   };

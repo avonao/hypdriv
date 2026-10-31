@@ -120,7 +120,7 @@ export function gradeHeaders(
   if (!get(headers, 'cross-origin-resource-policy')) notes.push('Cross-Origin-Resource-Policy is missing.');
   if (!get(headers, 'cache-control')) notes.push('Cache-Control is missing.');
   if (options.https === false && !hsts)
-    notes.push('HSTS is not graded over http (local preview); HypDriv sends it on https origins.');
+    notes.push('HSTS is not graded over http (local preview); Hypdriv sends it on https origins.');
 
   const penalty = deductions.reduce((n, d) => n + d.points, 0);
   score = Math.max(0, Math.min(100, score - penalty));

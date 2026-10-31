@@ -394,7 +394,7 @@ describe('createNitroHandler', () => {
     normalizeError: (e) => e as H3ErrorLike,
   });
 
-  it('passes straight through inside HypDriv’s Cloudflare Worker shell and exposes its facts', async () => {
+  it('passes straight through inside Hypdriv’s Cloudflare Worker shell and exposes its facts', async () => {
     await ensureContextStore();
     const handler = vi.fn();
     const inner = vi.fn(async () => 'rendered');

@@ -1,7 +1,7 @@
 {
   "name": "create-hypdriv",
   "version": "0.1.0",
-  "description": "Scaffold a Next.js 16 app with HypDriv on Cloudflare Workers (OpenNext) or Vercel, optionally styled with Purser CSS.",
+  "description": "Scaffold a Next.js 16 app with Hypdriv on Cloudflare Workers (OpenNext) or Vercel, optionally styled with Purser CSS.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -29,7 +29,7 @@ const nitro = createHandler({});
 const prerendered = prerenderedPaths(manifest);
 
 /**
- * The application as the HypDriv Worker shell sees it: Workers Static Assets for build assets and prerendered
+ * The application as the Hypdriv Worker shell sees it: Workers Static Assets for build assets and prerendered
  * pages that reach the Worker (`assets.run_worker_first`), Nitro for everything else.
  */
 async function app(request: Request, env: HypDrivEnv, ctx: ExecutionContextLike): Promise<Response> {
@@ -53,11 +53,11 @@ const worker = createWorker({
 });
 
 /**
- * HypDriv's Worker for Nuxt's `cloudflare-module` preset (the module's generated entry imports Nitro's polyfills
- * first, then re-exports this and the Durable Objects): the HypDriv shell (`createWorker`) around Nitro,
+ * Hypdriv's Worker for Nuxt's `cloudflare-module` preset (the module's generated entry imports Nitro's polyfills
+ * first, then re-exports this and the Durable Objects): the Hypdriv shell (`createWorker`) around Nitro,
  * so the full pipeline — `HTMLRewriter` CSP nonce injection and the edge stages included — runs on a true Web
- * `Request`/`Response`. Cron triggers run HypDriv's jobs and Nitro's `cloudflare:scheduled` hooks and tasks; queue
- * batches and email go to HypDriv when `jobs.queues` / `jobs.email` configure them, otherwise to Nitro's
+ * `Request`/`Response`. Cron triggers run Hypdriv's jobs and Nitro's `cloudflare:scheduled` hooks and tasks; queue
+ * batches and email go to Hypdriv when `jobs.queues` / `jobs.email` configure them, otherwise to Nitro's
  * `cloudflare:queue` / `cloudflare:email` hooks. WebSocket upgrades (`experimental.websocket`) go straight to Nitro.
  */
 export default {

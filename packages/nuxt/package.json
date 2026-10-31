@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/nuxt",
   "version": "0.1.0",
-  "description": "HypDriv for Nuxt 4: a Nuxt module that runs the HypDriv Drivetrain around every Nitro response (security headers, CSP nonces and hashes, rate limiting, bot shield, geo, flags, Early Hints, observability) and writes the route manifest and static headers for Cloudflare Workers, Vercel and Node.",
+  "description": "Hypdriv for Nuxt 4: a Nuxt module that runs the Hypdriv Drivetrain around every Nitro response (security headers, CSP nonces and hashes, rate limiting, bot shield, geo, flags, Early Hints, observability) and writes the route manifest and static headers for Cloudflare Workers, Vercel and Node.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -98,7 +98,7 @@ describe('cache-api store inside workerd', () => {
     expect(r?.response.headers.get('location')).toBe('/new');
   });
 
-  it('ignores entries without HypDriv metadata and uses named caches on request', async () => {
+  it('ignores entries without Hypdriv metadata and uses named caches on request', async () => {
     const key = `w-${crypto.randomUUID()}`;
     keys.push(key);
     await defaultCache().put(

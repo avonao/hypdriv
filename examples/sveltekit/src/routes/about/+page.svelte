@@ -1,5 +1,5 @@
 <svelte:head>
-  <title>About · HypDriv × SvelteKit</title>
+  <title>About · Hypdriv × SvelteKit</title>
 </svelte:head>
 
 <h1>About</h1>

@@ -1,12 +1,12 @@
-# HypDriv × React Router 8
+# Hypdriv × React Router 8
 
-Framework mode with prerendered `/` and `/about`, a server-rendered `/ssr` that shows `hyp()` facts and the request nonce, and the resource route `/api/hello`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [React Router 8 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/react-router.md).
+Framework mode with prerendered `/` and `/about`, a server-rendered `/ssr` that shows `hyp()` facts and the request nonce, and the resource route `/api/hello`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [React Router 8 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/react-router.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

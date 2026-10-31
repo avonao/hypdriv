@@ -1,6 +1,6 @@
-# HypDriv feature catalog
+# Hypdriv feature catalog
 
-Every capability HypDriv adds to a Next.js 16+ application — and, through the Vite hosts (section 6), to plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext — grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Section 5 lists how each capability is delivered on Vercel, where platform services take the place of bindings. Package names tell you where the code lives.
+Every capability Hypdriv adds to a Next.js 16+ application — and, through the Vite hosts (section 6), to plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext — grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Section 5 lists how each capability is delivered on Vercel, where platform services take the place of bindings. Package names tell you where the code lives.
 
 Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end validation in the example apps · 🧭 designed, implementation tracked in `docs/roadmap.md`.
 
@@ -78,7 +78,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Locale negotiation    | `Accept-Language` + geo + cookie negotiation, proxy stage                                         | ✅                  | —                                | `next`               | ✅     |
 | Live channels         | Pub/sub with WebSocket hibernation and SSE, `useLive()` hook, server-component refresh on publish | polling transport   | `HypDrivChannel` DO              | `live`, `cloudflare` | ✅     |
 | Edge feature flags    | Deterministic bucketing, geo/cookie/percentage rules, header propagation, QA overrides            | env/static provider | KV, OpenFeature (Flagship)       | `flags`              | ✅     |
-| Edge redirects        | Redirect table evaluated before the application; `forceHttps` (default on for Cloudflare and Vercel deployments, otherwise from `site.origin`) upgrades every plain-HTTP request that reaches HypDriv (internal routes and static assets included) before anything answers; `hypdriv audit https` verifies pages, internal routes and hashed assets over `http://` | config              | KV-backed table without redeploy | `runtime`, `cloudflare`, `next` | ✅     |
+| Edge redirects        | Redirect table evaluated before the application; `forceHttps` (default on for Cloudflare and Vercel deployments, otherwise from `site.origin`) upgrades every plain-HTTP request that reaches Hypdriv (internal routes and static assets included) before anything answers; `hypdriv audit https` verifies pages, internal routes and hashed assets over `http://` | config              | KV-backed table without redeploy | `runtime`, `cloudflare`, `next` | ✅     |
 | Maintenance mode      | Branded maintenance page toggled by env or KV                                                     | ✅                  | KV                               | `cloudflare`         | ✅     |
 | Typed bindings access | `hyp().env` typed from `CloudflareEnv`, dev fallback via OpenNext                                 | ✅                  | —                                | `cloudflare`, `next` | ✅     |
 | Background work       | `defer()` → `waitUntil`/`after()`, `enqueue()` → Queues, else a signed consumer-route call        | ✅                  | Queues                           | `cloudflare`         | ✅     |
@@ -95,7 +95,7 @@ Detected from `VERCEL=1`, `vercel.json` / `.vercel` or `platform: 'vercel'` ([AD
 | Bot shield | Heuristics, honeypots, `Sec-Fetch-*`, Turnstile (site key per deployment env) | ✅ | BotID (`botIdGuard()`, `verifyBotId()`, default level `vercel.botId.checkLevel`) | `vercel`, `security` | ✅ |
 | Flags, redirects, maintenance | KV-backed providers read Global Config (live within seconds; `config store` line in health) | config / env | Global Config (read-only), Upstash Redis | `vercel`, `flags` | ✅ |
 | Cron | Vercel Cron (`GET` + `Authorization: Bearer $CRON_SECRET` + `x-vercel-cron-schedule`) accepted by `jobHandler`, job name and schedule from `jobs.cron` by path, secret env names from config; `hypdriv init` syncs `vercel.json#crons` | ✅ | — | `next`, `cli` | ✅ |
-| Queues | `enqueue()` → Vercel Queues; `queueConsumer()` / `toQueueCallback()` with HypDriv's retry contract (redelivery with attempts, `retry: 'none'` acknowledges) | signed consumer-route call | `@vercel/queue` | `vercel`, `cloudflare` | ✅ |
+| Queues | `enqueue()` → Vercel Queues; `queueConsumer()` / `toQueueCallback()` with Hypdriv's retry contract (redelivery with attempts, `retry: 'none'` acknowledges) | signed consumer-route call | `@vercel/queue` | `vercel`, `cloudflare` | ✅ |
 | CSP | Hash for static routes, nonce for dynamic routes; declared `'unsafe-inline'` fallback for ISR, tag-revalidated prerenders ([ADR 0018](adr/0018-tag-revalidated-prerenders.md)) and PPR shells (no `HTMLRewriter`) | ✅ | — | `security`, `next` | ✅ |
 | Geo | `x-vercel-ip-*` headers (country, region, city, coordinates, postal code, timezone) and the `x-vercel-id` region | ✅ | — | `next` | ✅ |
 | Build integration | Classic prerender layout restored for Vercel's builder, chaining with Vercel's adapter (`NEXT_ENABLE_ADAPTER=1`), manifest traced into every function | ✅ | — | `next` | ✅ |
@@ -108,7 +108,7 @@ Not available on Vercel (documented fallbacks): HTML transforms and edge nonce i
 
 ## 6. Vite hosts
 
-The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019-vite-hosts.md)). Each integration wraps the framework's own request hook with `createHandler()` (the full response is HypDriv's: CSP nonces are injected on every platform), builds the manifest after prerendering, patches it into the built server and writes static header rules for the platform.
+The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019-vite-hosts.md)). Each integration wraps the framework's own request hook with `createHandler()` (the full response is Hypdriv's: CSP nonces are injected on every platform), builds the manifest after prerendering, patches it into the built server and writes static header rules for the platform.
 
 | Feature | What it does | Package | Status |
 | --- | --- | --- | --- |
@@ -117,14 +117,14 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Static header rules | Security preset, per-document hash CSP, Early Hints and immutable caching for responses the platform serves without code: Cloudflare `_headers` (merged, within limits, SPA-aware), Vercel Build Output routes | `build`, `vite` | ✅ |
 | Portable nonce injection | Streaming, tokenizer-based nonce injection for HTML on runners without `HTMLRewriter` (framework hooks on Node and Vercel Functions); `modulepreload` links included | `security` | ✅ |
 | Runtime manifest patch | Server bundles embed the manifest as a tagged literal, replaced with the final manifest after prerendering and the adapter ran | `vite` | ✅ |
-| Plain Vite apps | `hypdriv()` plugin; `assetsWorker()` on Cloudflare, Build Output + HypDriv Routing Middleware on Vercel, `hypdriv serve` on Node; dev/preview pipeline | `vite`, `cli` | ✅ |
+| Plain Vite apps | `hypdriv()` plugin; `assetsWorker()` on Cloudflare, Build Output + Hypdriv Routing Middleware on Vercel, `hypdriv serve` on Node; dev/preview pipeline | `vite`, `cli` | ✅ |
 | React Router 8 | `hypdriv()` Vite plugin + `hypdrivPreset()` (runs after prerendering), root `middleware`, nonce-aware `entry.server`; `reactRouterWorker()` on Cloudflare, a complete Build Output with traced per-config functions on Vercel, `hypdriv-react-router-serve` on Node; request-gating rules extended to `.data` requests | `react-router` | ✅ |
 | TanStack Start | `tanstackStart(withHypDriv(...))` + `hypdriv()` Vite plugin, global request middleware (`hypdrivRequestMiddleware()`, CSRF kept), `ssr: hypdrivSsr()` nonces; `createStartWorker()` on Cloudflare, Nitro `vercel` / `node-server` presets | `tanstack-start` | ✅ |
 | Astro 7 | Integration (`integrations: [hypdriv()]`) with `pre` middleware, injected `/_hypdriv/*` route, `withHypDriv()` for `src/fetch.ts`; Worker shell on Cloudflare, header routes on Vercel, `_headers.json` for `@astrojs/node`; defers to Astro's `security.csp` | `astro` | ✅ |
-| SvelteKit 3 | `hypdriv(adapter())` wrapper + `sequence(hypdriv(), …)` hook; one policy merged with `kit.csp` (HypDriv's nonce everywhere); Worker shell around adapter-cloudflare, adapter-vercel header routes, `@hypdriv/sveltekit/node` around adapter-node | `sveltekit` | ✅ |
+| SvelteKit 3 | `hypdriv(adapter())` wrapper + `sequence(hypdriv(), …)` hook; one policy merged with `kit.csp` (Hypdriv's nonce everywhere); Worker shell around adapter-cloudflare, adapter-vercel header routes, `@hypdriv/sveltekit/node` around adapter-node | `sveltekit` | ✅ |
 | Nuxt 4 | `modules: ['@hypdriv/nuxt']`: Nitro plugin around the h3 app (error pages included), Nuxt-stamped nonces, `useHyp()`; Worker entry around Nitro's `cloudflare-module`, Vercel and Node presets | `nuxt` | ✅ |
 | vinext | `hypdriv()` around vinext's App Router entry (every runtime: `vinext start`, Workers, Nitro), `createVinextWorker()`, `withHypDrivCache()` purge bridge, CDN-served prerendered pages on Vercel | `vinext` | ✅ |
-| Prerendered pages on Vercel | HypDriv's Routing Middleware scoped to the prerendered documents (GET/HEAD) so CDN-served pages get rate limiting, the bot shield, maintenance, redirects and geo; on-demand routes run the pipeline once, in the function | `vite` + every integration | ✅ |
+| Prerendered pages on Vercel | Hypdriv's Routing Middleware scoped to the prerendered documents (GET/HEAD) so CDN-served pages get rate limiting, the bot shield, maintenance, redirects and geo; on-demand routes run the pipeline once, in the function | `vite` + every integration | ✅ |
 | Private live verification | `e2e/hosts`: `check` (health, CSP coverage, nonces, asset caching, bot shield on rendered and prerendered pages, API, rate limit, HTTPS) and `provision` for private Cloudflare (one gate rule + HTTPS redirect per prefix) and Vercel (protection + automation bypass) deployments | `e2e/hosts` | ✅ |
 | Framework-aware tooling | `doctor` detects the framework (Vite-host checks, Next-only checks skipped), `init` registers the integration in the framework's config and writes the platform files, `routes`/`manifest` show the framework, `audit` knows static-layer documents and endpoints, `serve` | `cli` | ✅ |
 
@@ -163,5 +163,5 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 ## 9. Deliberately not included
 
 - A replacement image optimiser (OpenNext + Cloudflare Images and Vercel Image Optimization already cover it).
-- A replacement for Next's Cache Components / ISR storage (OpenNext's incremental cache covers it; HypDriv layers an edge cache on top).
-- A hosted service. HypDriv is code only.
+- A replacement for Next's Cache Components / ISR storage (OpenNext's incremental cache covers it; Hypdriv layers an edge cache on top).
+- A hosted service. Hypdriv is code only.

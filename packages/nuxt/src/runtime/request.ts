@@ -90,7 +90,7 @@ export function toWebRequest(
 }
 
 /**
- * Applies the request headers the pipeline forwards (sanitised client headers plus HypDriv's `x-hypdriv-*`, the
+ * Applies the request headers the pipeline forwards (sanitised client headers plus Hypdriv's `x-hypdriv-*`, the
  * CSP nonce…) to the Node request Nitro reads. `accept-encoding` is dropped so the application answers with an
  * identity-encoded body the pipeline can transform; compression stays with the CDN or reverse proxy.
  */
@@ -113,7 +113,7 @@ export function applyForwardedHeaders(event: H3EventLike, forwarded: Headers): v
 
 /**
  * Whether the event is one of Nitro's own in-memory sub-requests (`$fetch('/api/…')`, `localFetch`) made outside a
- * HypDriv request: those carry `__unenv__` without a platform context. Clients cannot produce it — it is a property
+ * Hypdriv request: those carry `__unenv__` without a platform context. Clients cannot produce it — it is a property
  * of the request object, not a header.
  */
 export function isInternalSubRequest(req: NodeRequestLike): boolean {

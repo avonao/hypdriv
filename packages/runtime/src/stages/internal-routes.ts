@@ -185,7 +185,7 @@ export function internalRoutes(
   const livePath = platform.config.live.path;
   const noStore = { 'cache-control': 'no-store' };
 
-  // HypDriv's own deployment id (Cloudflare, skew protection) or the platform's (Vercel sets no Next.js
+  // Hypdriv's own deployment id (Cloudflare, skew protection) or the platform's (Vercel sets no Next.js
   // deploymentId without Skew Protection, but every function knows VERCEL_DEPLOYMENT_ID).
   const deploymentId =
     platform.manifest.deploymentId ??

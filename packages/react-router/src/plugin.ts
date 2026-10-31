@@ -16,7 +16,7 @@ import { HOST, PRERENDER_HEADER, VIRTUAL_REACT_ROUTER, VIRTUAL_SERVER_ENTRY } fr
 import { type ReactRouterTarget, registry, rootState } from './state';
 
 export interface HypDrivReactRouterOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
   config?: string | HypDrivConfig;
   /**
    * Where the build deploys. Default: `HYPDRIV_TARGET`, else `vercel` on Vercel (`VERCEL=1`), else `cloudflare` when
@@ -24,7 +24,7 @@ export interface HypDrivReactRouterOptions {
    */
   target?: ReactRouterTarget;
   /**
-   * Node and Vercel builds: make HypDriv's server entry the SSR entry, so `build/server/index.js` also exports a
+   * Node and Vercel builds: make Hypdriv's server entry the SSR entry, so `build/server/index.js` also exports a
    * full-response handler (`default`, and `hypdriv` for the Node server) that runs the pipeline around every
    * request — 404s, `/__manifest` and static files included. Ignored on Cloudflare (the Worker is the entry) and
    * when the config sets its own SSR input. Default true.
@@ -71,7 +71,7 @@ export function detectTarget(
   return 'node';
 }
 
-/** Source of HypDriv's SSR entry for Node and Vercel builds. */
+/** Source of Hypdriv's SSR entry for Node and Vercel builds. */
 export function serverEntryCode(): string {
   return [
     "export * from 'virtual:react-router/server-build';",
@@ -81,7 +81,7 @@ export function serverEntryCode(): string {
     `import { prerenderToken } from ${JSON.stringify(VIRTUAL_REACT_ROUTER)};`,
     "import { createServerEntry } from '@hypdriv/react-router/server';",
     '',
-    '/** HypDriv around the whole app: the Node server and Vercel functions call this for every request. */',
+    '/** Hypdriv around the whole app: the Node server and Vercel functions call this for every request. */',
     'export const hypdriv = createServerEntry({ build, config, manifest, prerenderToken });',
     'export default function handler(request) {',
     '  return hypdriv.fetch(request);',
@@ -91,9 +91,9 @@ export function serverEntryCode(): string {
 }
 
 /**
- * The HypDriv Vite plugin for React Router apps (use it with `hypdrivPreset()` in `react-router.config.ts`):
+ * The Hypdriv Vite plugin for React Router apps (use it with `hypdrivPreset()` in `react-router.config.ts`):
  * serves `virtual:hypdriv/config`, `virtual:hypdriv/manifest` and the build's prerender token to the server code,
- * makes HypDriv's server entry the SSR entry of Node and Vercel builds, marks React Router's prerender requests on
+ * makes Hypdriv's server entry the SSR entry of Node and Vercel builds, marks React Router's prerender requests on
  * the build-time preview server, and answers `/_hypdriv/*` in `react-router dev`.
  *
  * ```ts
@@ -151,7 +151,7 @@ export function hypdriv(options: HypDrivReactRouterOptions = {}): Plugin[] {
     },
     configEnvironment(name, environment, env) {
       // React Router's server environments (`ssr`, or one per server bundle) build `virtual:react-router/server-build`
-      // by default: Node and Vercel builds get HypDriv's entry instead, which re-exports it. Custom inputs stay.
+      // by default: Node and Vercel builds get Hypdriv's entry instead, which re-exports it. Custom inputs stay.
       if (env.command !== 'build' || preview || target === 'cloudflare' || options.serverEntry === false)
         return;
       if (name !== 'ssr' && !name.startsWith('ssrBundle_')) return;
@@ -173,12 +173,12 @@ export function hypdriv(options: HypDrivReactRouterOptions = {}): Plugin[] {
         // React Router resolved its config (and ran the presets' hooks) in its own `config` hook.
         if (resolved.plugins.some((p) => p.name === 'react-router') && !registry().presetInstalled)
           resolved.logger?.warn(
-            'hypdriv: hypdrivPreset() is missing from react-router.config.ts; the build gets no HypDriv manifest, static headers or platform output',
+            'hypdriv: hypdrivPreset() is missing from react-router.config.ts; the build gets no Hypdriv manifest, static headers or platform output',
           );
       }
     },
     onLog(_level, log) {
-      // The runtime imports the virtual modules lazily (it also runs outside Vite builds); HypDriv's server entry
+      // The runtime imports the virtual modules lazily (it also runs outside Vite builds); Hypdriv's server entry
       // imports them statically. Both end up in one chunk, which is what the warning reports.
       if (log.code === 'INEFFECTIVE_DYNAMIC_IMPORT' && log.message.includes('virtual:hypdriv/')) return false;
       return undefined;

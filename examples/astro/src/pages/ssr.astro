@@ -2,11 +2,11 @@
 import RequestFacts from '../components/RequestFacts.astro';
 import Layout from '../layouts/Layout.astro';
 
-// Rendered per request: HypDriv injects the request's nonce into every script and style.
+// Rendered per request: Hypdriv injects the request's nonce into every script and style.
 export const prerender = false;
 ---
 
-<Layout title="On demand · HypDriv × Astro">
+<Layout title="On demand · Hypdriv × Astro">
   <h1>Rendered on demand</h1>
   <RequestFacts />
   <p id="status">Scripts did not run.</p>

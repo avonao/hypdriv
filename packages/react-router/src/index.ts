@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/react-router` — HypDriv for React Router (framework mode). The build side lives here: `hypdriv()`, the
+ * `@hypdriv/react-router` — Hypdriv for React Router (framework mode). The build side lives here: `hypdriv()`, the
  * Vite plugin, and `hypdrivPreset()`, the React Router preset that finalises the manifest and writes the platform
  * output after prerendering. The runtime lives in `@hypdriv/react-router/server` (root middleware, server entry,
  * helpers), `/entry.server` (CSP nonces), `/cloudflare` (Worker entry) and `/node` (production server).

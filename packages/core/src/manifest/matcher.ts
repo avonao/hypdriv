@@ -8,7 +8,7 @@ export interface RouteMatcher {
 }
 
 /**
- * Converts a route pattern in HypDriv's canonical (Next.js) syntax — `/blog/[slug]`, `/docs/[...path]`,
+ * Converts a route pattern in Hypdriv's canonical (Next.js) syntax — `/blog/[slug]`, `/docs/[...path]`,
  * `/shop/[[...slug]]`, `/[[lang]]/about` (optional segment), `/(group)/about`, `/@slot/page` — into a regular
  * expression with named groups. Other frameworks' patterns are converted to this syntax at build time.
  */

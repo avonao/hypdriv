@@ -8,10 +8,10 @@ import type { HypDrivConfig, HypDrivEnv, HypManifest, ResolvedConfig } from '@hy
 import { isBuildPrerender } from './runtime';
 
 /**
- * `@hypdriv/vinext/worker` — a Cloudflare Worker entry for vinext that owns the Worker: HypDriv's Worker shell
+ * `@hypdriv/vinext/worker` — a Cloudflare Worker entry for vinext that owns the Worker: Hypdriv's Worker shell
  * (`createWorker`) runs the full Drivetrain around vinext's fetch handler (HTML rewriting, edge cache, Durable
  * Object rate limits and tag index) and adds `scheduled`, `queue`, `email` and `tail` handlers. The request hook
- * the HypDriv plugin installs inside vinext passes through, since the shell already ran the stages.
+ * the Hypdriv plugin installs inside vinext passes through, since the shell already ran the stages.
  *
  * ```ts
  * // worker/index.ts (wrangler `main`)

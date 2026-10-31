@@ -15,7 +15,7 @@ import { writeVercelOutput } from './vercel-output';
 export type ViteTarget = 'cloudflare' | 'vercel' | 'node';
 
 export interface HypDrivPluginOptions {
-  /** The HypDriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
+  /** The Hypdriv config: a file path (default `hypdriv.config.*` in the Vite root) or an inline config. */
   config?: string | HypDrivConfig;
   /**
    * Single-page app: unknown navigations serve `index.html` (and get its CSP). Default: Vite's `appType` is
@@ -27,7 +27,7 @@ export interface HypDrivPluginOptions {
    * `cloudflare` when `@cloudflare/vite-plugin` built the app, `vercel` when building on Vercel (`VERCEL=1`).
    */
   targets?: ViteTarget[];
-  /** Vercel: build HypDriv's Routing Middleware so the request stages run before the CDN (default true). */
+  /** Vercel: build Hypdriv's Routing Middleware so the request stages run before the CDN (default true). */
   vercelMiddleware?: boolean;
   /** Run the pipeline around HTML documents in `vite dev` and `vite preview` (default true). */
   dev?: boolean;
@@ -47,9 +47,9 @@ export function htmlPathname(fileName: string): string {
 }
 
 /**
- * The HypDriv plugin for plain Vite apps (single- and multi-page). After `vite build` it writes
+ * The Hypdriv plugin for plain Vite apps (single- and multi-page). After `vite build` it writes
  * `.hypdriv/manifest.json` (pages, assets, CSP hashes of the built HTML, Early Hints), the static headers of the
- * detected platform (Cloudflare `_headers`, Vercel Build Output with HypDriv's Routing Middleware) and patches
+ * detected platform (Cloudflare `_headers`, Vercel Build Output with Hypdriv's Routing Middleware) and patches
  * the manifest into a Cloudflare Worker built alongside; in `vite dev` / `vite preview` it runs the pipeline around
  * HTML documents.
  *
@@ -315,7 +315,7 @@ function detectTargets(vite: ViteResolvedConfig, builder?: ViteBuilder): ViteTar
   return out;
 }
 
-/** A HypDriv logger that prints through Vite's logger. */
+/** A Hypdriv logger that prints through Vite's logger. */
 export function viteLogger(vite: Pick<ViteResolvedConfig, 'logger'>): Logger {
   const logger: Logger = {
     level: 'info',

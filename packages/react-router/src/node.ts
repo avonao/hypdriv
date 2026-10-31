@@ -8,7 +8,7 @@ import type { ServerBuild } from 'react-router';
 import { createServerEntry, type HypDrivServer } from './server';
 
 /**
- * `@hypdriv/react-router/node` — the production Node server for a React Router build with HypDriv: the pipeline
+ * `@hypdriv/react-router/node` — the production Node server for a React Router build with Hypdriv: the pipeline
  * around every request (prerendered pages and other static files included, with their hash CSP), the client
  * build's assets with immutable caching, and React Router for everything else. `hypdriv-react-router-serve` runs
  * it; `react-router-serve` keeps working too (the root middleware then covers the routes only).
@@ -33,7 +33,7 @@ export interface LoadedServer {
   server: HypDrivServer;
   build: ServerBuild;
   clientDir: string;
-  /** Whether the build carries HypDriv's server entry (`export const hypdriv`). */
+  /** Whether the build carries Hypdriv's server entry (`export const hypdriv`). */
   entry: boolean;
   serveStatic: (request: Request) => Promise<Response | null>;
 }
@@ -74,7 +74,7 @@ export function compressStatic(request: Request, response: Response): Response {
 }
 
 /**
- * Loads a React Router server build for serving: its HypDriv server entry (Node builds with the HypDriv Vite
+ * Loads a React Router server build for serving: its Hypdriv server entry (Node builds with the Hypdriv Vite
  * plugin export one), or — for builds without it — a server entry created from `hypdriv.config.*` and
  * `.hypdriv/manifest.json`.
  */
@@ -115,7 +115,7 @@ export async function loadServer(options: ServeOptions = {}): Promise<LoadedServ
 }
 
 /**
- * A Node request listener for a React Router build: HypDriv's pipeline around the static files and React Router.
+ * A Node request listener for a React Router build: Hypdriv's pipeline around the static files and React Router.
  */
 export async function createRequestListener(
   options: ServeOptions = {},

@@ -10,7 +10,7 @@ let pending: Promise<ContextStore | null> | null = null;
 
 /**
  * Installs the `AsyncLocalStorage`-backed request-context store (once per isolate) so server helpers such as
- * `hyp()` see the request context anywhere below a HypDriv handler. `node:async_hooks` is imported lazily:
+ * `hyp()` see the request context anywhere below a Hypdriv handler. `node:async_hooks` is imported lazily:
  * it exists on Node, Vercel Functions, Bun, Deno and Workers with `nodejs_compat`. Resolves to `null` on
  * runtimes without it; requests still run, only the ambient context is unavailable there.
  */

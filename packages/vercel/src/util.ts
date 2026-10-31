@@ -99,7 +99,7 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
-/** A HypDriv config as written in `hypdriv.config.ts`, or already resolved. */
+/** A Hypdriv config as written in `hypdriv.config.ts`, or already resolved. */
 export type ConfigInput = HypDrivConfig | ResolvedConfig;
 
 /** Resolves `hypdriv.config` input once (cached on the object by `loadConfig`); resolved configs pass through. */
@@ -108,7 +108,7 @@ export function resolveInput(config: ConfigInput): ResolvedConfig {
 }
 
 /**
- * Reads `.hypdriv/manifest.json` from the working directory of a Node function (the HypDriv adapter adds it
+ * Reads `.hypdriv/manifest.json` from the working directory of a Node function (the Hypdriv adapter adds it
  * to every function's traced files). Uses `process.getBuiltinModule`, so bundlers neither trace nor inline
  * Node built-ins; `null` on runtimes without it (Edge) or when the file is missing or invalid.
  */

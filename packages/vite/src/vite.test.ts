@@ -249,7 +249,7 @@ describe('Vercel Routing Middleware', () => {
     for (const no of ['/ssr', '/blog/aXb', '/about/x', '/api/hello']) expect(re.test(no)).toBe(false);
   });
 
-  it("inserts the route after HypDriv's header routes and before the framework's rewrites, once", async () => {
+  it("inserts the route after Hypdriv's header routes and before the framework's rewrites, once", async () => {
     const out = mkdtempSync(join(tmpdir(), 'hypdriv-vc-'));
     writeFileSync(
       join(out, 'config.json'),

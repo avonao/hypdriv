@@ -5,9 +5,9 @@ import { type DiscoveredRoute, fromTanStackPath, normalizePathname } from '@hypd
 import { type Config, Generator, getConfig, type RouteNode } from '@tanstack/router-generator';
 import type { StartOptionsLike } from './options';
 
-/** A route of the application as HypDriv sees it. */
+/** A route of the application as Hypdriv sees it. */
 export interface StartRoute {
-  /** HypDriv's canonical pattern (`/posts/[postId]`, `/files/[...splat]`, `/[[lang]]/docs`). */
+  /** Hypdriv's canonical pattern (`/posts/[postId]`, `/files/[...splat]`, `/[[lang]]/docs`). */
   pathname: string;
   /** `page` renders a component; `endpoint` is a server route (only `server` handlers). */
   kind: 'page' | 'endpoint';
@@ -118,7 +118,7 @@ function toPosix(path: string): string {
 }
 
 /**
- * HypDriv routes from the generator's nodes: pathless layouts are dropped, server-only routes become endpoints,
+ * Hypdriv routes from the generator's nodes: pathless layouts are dropped, server-only routes become endpoints,
  * everything else is a page; a layout and its index route (`/posts` and `/posts/`) are one page.
  */
 export function startRoutesFromNodes(nodes: RouteNode[], root: string): StartRoute[] {

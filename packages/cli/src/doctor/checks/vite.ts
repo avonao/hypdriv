@@ -6,7 +6,7 @@ import { rel } from '../../util/fs';
 import { type Check, fail, info, pass, skip, warn } from '../types';
 import { HYPDRIV_DO_CLASSES } from './wrangler';
 
-/** Vite-based hosts (everything HypDriv supports besides Next.js). */
+/** Vite-based hosts (everything Hypdriv supports besides Next.js). */
 export const VITE_HOSTS: ProjectFramework[] = [
   'vite',
   'react-router',
@@ -17,17 +17,17 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'vinext',
 ];
 
-/** Where each host registers HypDriv, for messages. */
+/** Where each host registers Hypdriv, for messages. */
 const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
   vite: "plugins: [hypdriv()] in vite.config.ts (import { hypdriv } from '@hypdriv/vite')",
   'react-router':
-    "the HypDriv preset in react-router.config.ts and its Vite plugin (import from '@hypdriv/react-router')",
-  'tanstack-start': "the HypDriv Vite plugin in vite.config.ts (import from '@hypdriv/tanstack-start')",
+    "the Hypdriv preset in react-router.config.ts and its Vite plugin (import from '@hypdriv/react-router')",
+  'tanstack-start': "the Hypdriv Vite plugin in vite.config.ts (import from '@hypdriv/tanstack-start')",
   astro: "integrations: [hypdriv()] in astro.config.mjs (import hypdriv from '@hypdriv/astro')",
   sveltekit:
-    "the HypDriv adapter wrapper and Vite plugin in vite.config.ts (import from '@hypdriv/sveltekit')",
+    "the Hypdriv adapter wrapper and Vite plugin in vite.config.ts (import from '@hypdriv/sveltekit')",
   nuxt: "modules: ['@hypdriv/nuxt'] in nuxt.config.ts",
-  vinext: "the HypDriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
+  vinext: "the Hypdriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */
@@ -60,7 +60,7 @@ function generatedWorkerEntry(root: string): string | null {
 export const viteChecks: Check[] = [
   {
     id: 'vite.integration',
-    title: 'HypDriv integration package',
+    title: 'Hypdriv integration package',
     category: 'vite',
     severity: 'error',
     frameworks: VITE_HOSTS,
@@ -102,7 +102,7 @@ export const viteChecks: Check[] = [
       if (!ctx.manifest) return skip('no build manifest yet (run the production build).');
       const built = manifestFramework(ctx.manifest);
       const detected = ctx.project.framework.name;
-      if (!built) return warn('The manifest does not record a framework; rebuild with the current HypDriv.');
+      if (!built) return warn('The manifest does not record a framework; rebuild with the current Hypdriv.');
       if (built.name !== detected)
         return warn(
           `The manifest was built by ${FRAMEWORK_LABEL[built.name]}, the project is ${FRAMEWORK_LABEL[detected]}; rebuild.`,
@@ -127,7 +127,7 @@ export const viteChecks: Check[] = [
       const missing = files.filter((f) => !readFileSync(f, 'utf8').includes('# hypdriv:start'));
       if (missing.length)
         return warn(
-          `${missing.map((f) => rel(ctx.root, f)).join(', ')} has no HypDriv block: prerendered pages ship without HypDriv's CSP and security headers. Is the integration registered?`,
+          `${missing.map((f) => rel(ctx.root, f)).join(', ')} has no Hypdriv block: prerendered pages ship without Hypdriv's CSP and security headers. Is the integration registered?`,
         );
       const ignored = files.every((f) => {
         const ignore = join(f, '..', '.assetsignore');
@@ -137,7 +137,7 @@ export const viteChecks: Check[] = [
         return warn(
           'The assets directory does not ignore .vite/ (build metadata would be uploaded as public files).',
         );
-      return pass(`${files.map((f) => rel(ctx.root, f)).join(', ')} carries HypDriv's rules.`);
+      return pass(`${files.map((f) => rel(ctx.root, f)).join(', ')} carries Hypdriv's rules.`);
     },
   },
   {
@@ -158,13 +158,13 @@ export const viteChecks: Check[] = [
             : `run_worker_first for ${rwf.length} pattern(s): prerendered pages get the full pipeline.`,
         );
       return info(
-        'Static and prerendered pages are served before the Worker: they get HypDriv\'s static header rules (_headers) but not the request stages (rate limiting, bot shield, maintenance, geo, flags). Set assets.run_worker_first (e.g. ["/*", "!/assets/*"]) to run them.',
+        'Static and prerendered pages are served before the Worker: they get Hypdriv\'s static header rules (_headers) but not the request stages (rate limiting, bot shield, maintenance, geo, flags). Set assets.run_worker_first (e.g. ["/*", "!/assets/*"]) to run them.',
       );
     },
   },
   {
     id: 'vite.durable-objects',
-    title: 'HypDriv Durable Objects exported',
+    title: 'Hypdriv Durable Objects exported',
     category: 'vite',
     severity: 'warn',
     frameworks: VITE_HOSTS,
@@ -175,7 +175,7 @@ export const viteChecks: Check[] = [
       const bound = cfg.durable_objects.bindings.filter((d) =>
         HYPDRIV_DO_CLASSES.includes(d.class_name ?? ''),
       );
-      if (!bound.length) return skip('no HypDriv Durable Object bindings (optional upgrades).');
+      if (!bound.length) return skip('no Hypdriv Durable Object bindings (optional upgrades).');
       let main = cfg.main;
       if (!main) {
         // Frameworks whose build generates the Worker and its config (Nuxt/Nitro `cloudflare-module`).
@@ -203,12 +203,12 @@ export const viteChecks: Check[] = [
         return fail(
           `${main} does not export ${missing.map((m) => m.class_name).join(', ')}; add \`export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects'\`.`,
         );
-      return pass(`${bound.length} HypDriv Durable Object(s) bound and exported from ${main}.`);
+      return pass(`${bound.length} Hypdriv Durable Object(s) bound and exported from ${main}.`);
     },
   },
   {
     id: 'vite.vercel-output',
-    title: 'HypDriv routes in the Vercel Build Output',
+    title: 'Hypdriv routes in the Vercel Build Output',
     category: 'vite',
     severity: 'warn',
     frameworks: VITE_HOSTS,
@@ -223,14 +223,14 @@ export const viteChecks: Check[] = [
       const own = (config.routes ?? []).filter((r) => r.headers?.['x-hypdriv-static'] !== undefined).length;
       if (!own)
         return warn(
-          ".vercel/output/config.json has no HypDriv header routes: prerendered pages ship without HypDriv's CSP and security headers.",
+          ".vercel/output/config.json has no Hypdriv header routes: prerendered pages ship without Hypdriv's CSP and security headers.",
         );
       const functions = join(file, '..', 'functions');
       const staticDir = join(file, '..', 'static');
       const leaked = existsSync(join(staticDir, '.vite'));
       if (leaked) return warn('.vercel/output/static/.vite exists: build metadata would be served publicly.');
       const count = existsSync(functions) ? readdirSync(functions).length : 0;
-      return pass(`${own} HypDriv header route(s); ${count} function entr${count === 1 ? 'y' : 'ies'}.`);
+      return pass(`${own} Hypdriv header route(s); ${count} function entr${count === 1 ? 'y' : 'ies'}.`);
     },
   },
 ];

@@ -13,7 +13,7 @@ const titleStage = defineStage({
     return new HTMLRewriter()
       .on('title', {
         element(el) {
-          el.setInnerContent(`HypDriv (${country})`);
+          el.setInnerContent(`Hypdriv (${country})`);
         },
       })
       .on('html', {
@@ -44,7 +44,7 @@ describe('@hypdriv/testing inside workerd', () => {
     );
     expect(result.shortCircuited).toBe(false);
     const html = await result.response.text();
-    expect(html).toContain('<title>HypDriv (US)</title>');
+    expect(html).toContain('<title>Hypdriv (US)</title>');
     expect(html).toContain('<html data-request="req-42">');
     expectHeaders(result.response, { 'content-type': 'text/html', 'x-missing': null });
     expect(result.timings.map((t) => t.name)).toEqual(['next', 'title.post']);

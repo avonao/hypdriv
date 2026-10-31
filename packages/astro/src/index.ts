@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/astro` — HypDriv for Astro 7. The default export is the Astro integration:
+ * `@hypdriv/astro` — Hypdriv for Astro 7. The default export is the Astro integration:
  *
  * ```js
  * // astro.config.mjs

@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/runtime` — HypDriv's framework-neutral runtime: the Drivetrain stages and platform assembly shared by
+ * `@hypdriv/runtime` — Hypdriv's framework-neutral runtime: the Drivetrain stages and platform assembly shared by
  * the Cloudflare Worker shell, Next.js `proxy.ts` and every framework hook, plus `createHandler()`, which runs
  * the pipeline around any Web `fetch` handler on Cloudflare Workers, Vercel and Node.
  */

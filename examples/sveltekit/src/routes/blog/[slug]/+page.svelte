@@ -3,7 +3,7 @@ let { data } = $props();
 </script>
 
 <svelte:head>
-  <title>{data.title} · HypDriv × SvelteKit</title>
+  <title>{data.title} · Hypdriv × SvelteKit</title>
 </svelte:head>
 
 <article>

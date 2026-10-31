@@ -195,7 +195,7 @@ describe('hypdriv init', () => {
     for (const backup of ['next.config.ts', 'wrangler.jsonc', 'package.json', 'tsconfig.json'])
       expect(existsSync(join(p.dir, `${backup}.hypdriv.bak`))).toBe(true);
     expect(existsSync(join(p.dir, '.gitignore.hypdriv.bak'))).toBe(false);
-    expect(p.read('.gitignore')).toBe('node_modules\n.dev.vars\n\n# HypDriv\n.hypdriv/\n*.hypdriv.bak\n');
+    expect(p.read('.gitignore')).toBe('node_modules\n.dev.vars\n\n# Hypdriv\n.hypdriv/\n*.hypdriv.bak\n');
     expect(p.read('next.config.ts.hypdriv.bak')).not.toContain('withHypDriv');
     expect(p.read('next.config.ts')).toContain("import { withHypDriv } from 'hypdriv/config';");
     expect(p.read('next.config.ts')).toContain('export default withHypDriv(nextConfig);');

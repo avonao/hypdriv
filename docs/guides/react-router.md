@@ -1,14 +1,14 @@
-# HypDriv with React Router
+# Hypdriv with React Router
 
-`@hypdriv/react-router` runs the HypDriv Drivetrain around a React Router 8 app in framework mode — security headers, CSP (build-time hashes for prerendered pages, per-request nonces for rendered ones), rate limiting, the bot shield, geo, feature flags, redirects, maintenance mode, Early Hints, request ids, logging, tracing and the `/_hypdriv/*` routes — on Cloudflare Workers, Vercel and Node. It needs React Router 8.0+ (`react-router`, `@react-router/dev`), React 19.2.7+, Vite 8 and Node 22.22+.
+`@hypdriv/react-router` runs the Hypdriv Drivetrain around a React Router 8 app in framework mode — security headers, CSP (build-time hashes for prerendered pages, per-request nonces for rendered ones), rate limiting, the bot shield, geo, feature flags, redirects, maintenance mode, Early Hints, request ids, logging, tracing and the `/_hypdriv/*` routes — on Cloudflare Workers, Vercel and Node. It needs React Router 8.0+ (`react-router`, `@react-router/dev`), React 19.2.7+, Vite 8 and Node 22.22+.
 
 The integration has four parts:
 
 | Part | Where | Job |
 | --- | --- | --- |
-| `hypdriv()` | `vite.config.ts` | serves `virtual:hypdriv/config`, `virtual:hypdriv/manifest` and the build's prerender token to server code; makes HypDriv's server entry the SSR entry of Node and Vercel builds; marks React Router's prerender requests; answers `/_hypdriv/*` in `react-router dev` |
+| `hypdriv()` | `vite.config.ts` | serves `virtual:hypdriv/config`, `virtual:hypdriv/manifest` and the build's prerender token to server code; makes Hypdriv's server entry the SSR entry of Node and Vercel builds; marks React Router's prerender requests; answers `/_hypdriv/*` in `react-router dev` |
 | `hypdrivPreset()` | `react-router.config.ts` | after the complete build (prerendering included): the manifest, the patched server output and the platform's static configuration |
-| `hypdrivMiddleware()` | `app/root.tsx` | the pipeline around every request React Router routes, wherever no outer HypDriv runner exists |
+| `hypdrivMiddleware()` | `app/root.tsx` | the pipeline around every request React Router routes, wherever no outer Hypdriv runner exists |
 | `entry.server` | `app/entry.server.tsx` | the request's CSP nonce on every script `ServerRouter` and React render |
 
 ## Setup
@@ -69,7 +69,7 @@ The build target comes from `hypdriv({ target })`, else `HYPDRIV_TARGET`, else `
 
 ## Cloudflare Workers
 
-React Router's server environment is the Worker; its entry wraps React Router with HypDriv's Worker shell, so the pipeline runs for every request the Worker receives — routes, 404s, `/__manifest`, prerendered pages and public files.
+React Router's server environment is the Worker; its entry wraps React Router with Hypdriv's Worker shell, so the pipeline runs for every request the Worker receives — routes, 404s, `/__manifest`, prerendered pages and public files.
 
 ```ts
 // vite.config.ts
@@ -108,9 +108,9 @@ export default reactRouterWorker({ config });
 }
 ```
 
-`reactRouterWorker()` answers GET/HEAD requests from the assets binding first (prerendered pages, `.data` files, public files), serves the SPA shell for unknown navigations of `ssr: false` apps, and hands everything else to React Router. Content-hashed assets bypass the Worker (`!/assets/*`) and carry the immutable caching rule HypDriv writes into `build/client/_headers`, which also holds the security headers and hash CSP of every prerendered page (the rules a static response gets if the Worker does not run for it). When the Worker serves a page from the assets binding, the request's own policy replaces the static one.
+`reactRouterWorker()` answers GET/HEAD requests from the assets binding first (prerendered pages, `.data` files, public files), serves the SPA shell for unknown navigations of `ssr: false` apps, and hands everything else to React Router. Content-hashed assets bypass the Worker (`!/assets/*`) and carry the immutable caching rule Hypdriv writes into `build/client/_headers`, which also holds the security headers and hash CSP of every prerendered page (the rules a static response gets if the Worker does not run for it). When the Worker serves a page from the assets binding, the request's own policy replaces the static one.
 
-React Router 8 sets no `context.cloudflare`. Loaders reach the platform through `context.get(cloudflareContext)` (`env`, `ctx`, `cf`, set by the Worker entry), `import { env } from 'cloudflare:workers'`, or `hyp().env`. `getLoadContext({ request, env, ctx, context })` adds your own values. `scheduled`, `queue` and `email` dispatch HypDriv's jobs (`jobs.cron`, `jobs.queues`) to `jobHandler()` resource routes.
+React Router 8 sets no `context.cloudflare`. Loaders reach the platform through `context.get(cloudflareContext)` (`env`, `ctx`, `cf`, set by the Worker entry), `import { env } from 'cloudflare:workers'`, or `hyp().env`. `getLoadContext({ request, env, ctx, context })` adds your own values. `scheduled`, `queue` and `email` dispatch Hypdriv's jobs (`jobs.cron`, `jobs.queues`) to `jobHandler()` resource routes.
 
 ```sh
 HYPDRIV_TARGET=cloudflare react-router build && vite preview   # workerd
@@ -119,15 +119,15 @@ HYPDRIV_TARGET=cloudflare react-router build && wrangler deploy
 
 ## Vercel
 
-On Vercel, HypDriv writes the Build Output itself (`.vercel/output`), and `vercel build` deploys it as is:
+On Vercel, Hypdriv writes the Build Output itself (`.vercel/output`), and `vercel build` deploys it as is:
 
 - `static/` — the client build (prerendered pages, `.data` files, assets, public files);
-- HypDriv's header routes before the filesystem — the security headers on every path, immutable caching for `/assets/*`, and each prerendered page's hash CSP and Early Hints (restricted to GET/HEAD, so form posts reach the function with its own policy);
+- Hypdriv's header routes before the filesystem — the security headers on every path, immutable caching for `/assets/*`, and each prerendered page's hash CSP and Early Hints (restricted to GET/HEAD, so form posts reach the function with its own policy);
 - prerendered pages rewritten for GET/HEAD (`/about` → `/about/index.html`);
-- one Node.js function per server bundle: HypDriv's server entry, which runs the pipeline around React Router for every request it receives (404s, 405s and `/__manifest` included). Its files are traced with `@vercel/nft` like Vercel's own builders do;
-- HypDriv's Routing Middleware in front of the statically served paths (request stages: shield, bots, rate limits, redirects, maintenance, geo, flags), unless `hypdrivPreset({ vercelMiddleware: false })`.
+- one Node.js function per server bundle: Hypdriv's server entry, which runs the pipeline around React Router for every request it receives (404s, 405s and `/__manifest` included). Its files are traced with `@vercel/nft` like Vercel's own builders do;
+- Hypdriv's Routing Middleware in front of the statically served paths (request stages: shield, bots, rate limits, redirects, maintenance, geo, flags), unless `hypdrivPreset({ vercelMiddleware: false })`.
 
-Per-route function settings use `@vercel/react-router`'s preset: it splits the server build by each route's `export const config = { maxDuration, memory, regions }`, and HypDriv deploys every bundle as its own function with those settings. The Edge runtime is not supported (`runtime: 'edge'` fails the build): HypDriv runs React Router on Vercel's Node.js runtime.
+Per-route function settings use `@vercel/react-router`'s preset: it splits the server build by each route's `export const config = { maxDuration, memory, regions }`, and Hypdriv deploys every bundle as its own function with those settings. The Edge runtime is not supported (`runtime: 'edge'` fails the build): Hypdriv runs React Router on Vercel's Node.js runtime.
 
 ```ts
 // react-router.config.ts
@@ -159,7 +159,7 @@ HYPDRIV_TARGET=node react-router build
 hypdriv-react-router-serve ./build/server/index.js   # PORT, HOST; --trust-proxy behind a reverse proxy
 ```
 
-On Node builds, HypDriv's Vite plugin makes its server entry the SSR entry: `build/server/index.js` still exports React Router's server build and additionally `hypdriv` (the full-response handler) and a default `(request) => Response`. `hypdriv-react-router-serve` (or `serve()` / `createRequestListener()` from `@hypdriv/react-router/node`) runs the pipeline around every request — prerendered pages with their hash CSP, public files, React Router, 404s — serves `/assets/*` with immutable caching, gzips static files and passes the socket address as the client IP.
+On Node builds, Hypdriv's Vite plugin makes its server entry the SSR entry: `build/server/index.js` still exports React Router's server build and additionally `hypdriv` (the full-response handler) and a default `(request) => Response`. `hypdriv-react-router-serve` (or `serve()` / `createRequestListener()` from `@hypdriv/react-router/node`) runs the pipeline around every request — prerendered pages with their hash CSP, public files, React Router, 404s — serves `/assets/*` with immutable caching, gzips static files and passes the socket address as the client IP.
 
 `react-router-serve ./build/server/index.js` keeps working: the root middleware runs the pipeline for routed requests, while Express serves static files and answers 404s without it, and rate limits key on forwarded headers only (configure `security.trustedProxies` behind a proxy). For your own Express or `node:http` server, use `createRequestListener()` or call `build.hypdriv.fetch(request, { ip, assets })`.
 
@@ -173,7 +173,7 @@ On Node builds, HypDriv's Vite plugin makes its server entry the SSR entry: `bui
 import { flag, hyp, hypdrivContext, requireHyp } from '@hypdriv/react-router/server';
 
 export function loader({ context }: Route.LoaderArgs) {
-  const request = requireHyp();               // throws outside a HypDriv request
+  const request = requireHyp();               // throws outside a Hypdriv request
   const same = context.get(hypdrivContext);   // the same view through the router context
   return { id: request.requestId, country: request.country, newHero: flag('newHero', false) };
 }
@@ -195,15 +195,15 @@ A policy the application sets itself (a route `headers` export) wins: the csp st
 
 ## Data requests
 
-React Router fetches route data and submits actions through `<path>.data`. HypDriv extends the rules that gate requests — rate limits, CSRF, body-size limits, bot exemptions, maintenance bypass paths and redirect rules — with those spellings, so `match: '/login'` also covers client-side submissions to `/login.data`. A redirect the pipeline answers for a data request becomes a single-fetch redirect (`204` + `X-Remix-Redirect`, followed as a document navigation); other responses the pipeline answers itself (429, 403, 503) reach the nearest `ErrorBoundary`.
+React Router fetches route data and submits actions through `<path>.data`. Hypdriv extends the rules that gate requests — rate limits, CSRF, body-size limits, bot exemptions, maintenance bypass paths and redirect rules — with those spellings, so `match: '/login'` also covers client-side submissions to `/login.data`. A redirect the pipeline answers for a data request becomes a single-fetch redirect (`204` + `X-Remix-Redirect`, followed as a document navigation); other responses the pipeline answers itself (429, 403, 503) reach the nearest `ErrorBoundary`.
 
 ## Prerendering
 
-React Router prerenders through a preview server it starts during the build. HypDriv generates a random 256-bit token per build, injects it into the prerender requests on that server (`x-hypdriv-prerender`) and compiles it into the server build; the root middleware, the server entry and the Worker entry skip the pipeline for requests that carry it. Once prerendering finished, the preset erases the token from the server output (code and source maps), so a deployed build has none and no request — whatever headers it sends — can skip the pipeline. `X-React-Router-Prerender` alone means nothing to HypDriv.
+React Router prerenders through a preview server it starts during the build. Hypdriv generates a random 256-bit token per build, injects it into the prerender requests on that server (`x-hypdriv-prerender`) and compiles it into the server build; the root middleware, the server entry and the Worker entry skip the pipeline for requests that carry it. Once prerendering finished, the preset erases the token from the server output (code and source maps), so a deployed build has none and no request — whatever headers it sends — can skip the pipeline. `X-React-Router-Prerender` alone means nothing to Hypdriv.
 
 ## Limitations
 
-- **Outside an outer runner** (`react-router-serve`, custom servers that call React Router directly) the root middleware covers routed requests only: static files, 404s, 405s and `/__manifest` get no HypDriv headers, and `/_hypdriv/*` is not answered. Use the Worker entry, HypDriv's Node server or the Vercel output for full coverage.
+- **Outside an outer runner** (`react-router-serve`, custom servers that call React Router directly) the root middleware covers routed requests only: static files, 404s, 405s and `/__manifest` get no Hypdriv headers, and `/_hypdriv/*` is not answered. Use the Worker entry, Hypdriv's Node server or the Vercel output for full coverage.
 - **Vercel Edge runtime** bundles are rejected; Node.js functions only.
 - **React Server Components** (`unstable_rsc` framework mode) and `ssr: 'unstable_api-only'` are not supported.
 - On Vercel, statically served pages get the request stages from the Routing Middleware and their headers from the header routes; their response headers are fixed at build time (no per-request nonce).

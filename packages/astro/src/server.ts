@@ -1,6 +1,6 @@
 /**
- * `@hypdriv/astro/server` — HypDriv's request helpers for Astro pages, layouts, components, endpoints, server
- * islands and actions. They read the request context the HypDriv middleware (or the Cloudflare Worker shell)
+ * `@hypdriv/astro/server` — Hypdriv's request helpers for Astro pages, layouts, components, endpoints, server
+ * islands and actions. They read the request context the Hypdriv middleware (or the Cloudflare Worker shell)
  * installs, so they work anywhere below it during a request and return `null`/defaults during build-time
  * prerendering.
  *
@@ -31,7 +31,7 @@ export {
 } from '@hypdriv/runtime';
 
 /**
- * `jobHandler()` shaped as an Astro endpoint: accepts only HypDriv's signed job dispatch (Cloudflare `scheduled` /
+ * `jobHandler()` shaped as an Astro endpoint: accepts only Hypdriv's signed job dispatch (Cloudflare `scheduled` /
  * `queue` through the Worker shell, `hypdriv jobs run`) and Vercel Cron calls carrying `CRON_SECRET`.
  *
  * ```ts

@@ -12,7 +12,7 @@ const get = (path: string, init: RequestInit = {}) =>
   new Request(`https://app.example${path}`, { ...init, headers: { accept: 'text/html', ...init.headers } });
 
 describe('entry.server', () => {
-  it('renders without a nonce outside a HypDriv request', async () => {
+  it('renders without a nonce outside a Hypdriv request', async () => {
     const rr = createRequestHandler(buildWith(handleRequest), 'production');
     const res = await rr(get('/page'), new RouterContextProvider());
     expect(res.status).toBe(200);

@@ -5,7 +5,7 @@
 /// <reference types="@hypdriv/vite/virtual" />
 
 declare module 'virtual:hypdriv/sveltekit' {
-  /** SvelteKit settings the HypDriv hook needs at run time. */
+  /** SvelteKit settings the Hypdriv hook needs at run time. */
   export const kit: {
     /** SvelteKit's `csp` option (`directives` as written in `sveltekit({ csp })`), or null when unset. */
     csp: {

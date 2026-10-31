@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import type { StaticHeaderRule } from '@hypdriv/build';
 import type { StartDocument } from './documents';
 
-/** Deployment targets HypDriv writes static configuration for. */
+/** Deployment targets Hypdriv writes static configuration for. */
 export type StartTarget = 'cloudflare' | 'vercel' | 'node';
 
-/** The parts of a Nitro instance HypDriv's Nitro module reads (Nitro 3; structural, no dependency on `nitro`). */
+/** The parts of a Nitro instance Hypdriv's Nitro module reads (Nitro 3; structural, no dependency on `nitro`). */
 export interface NitroLike {
   options: {
     preset: string;
@@ -23,7 +23,7 @@ export interface NitroModuleLike {
   setup(nitro: NitroLike): void | Promise<void>;
 }
 
-/** The HypDriv target a Nitro preset deploys to (`vercel`, `cloudflare-module`, `node-server`, `bun`…). */
+/** The Hypdriv target a Nitro preset deploys to (`vercel`, `cloudflare-module`, `node-server`, `bun`…). */
 export function targetForNitroPreset(preset: string | undefined): StartTarget {
   const p = (preset ?? '').replace(/_/g, '-').toLowerCase();
   if (p.startsWith('vercel')) return 'vercel';
@@ -34,7 +34,7 @@ export function targetForNitroPreset(preset: string | undefined): StartTarget {
 /**
  * Nitro `routeRules` for a Node server: the static rules that cover files Nitro serves before any application
  * code runs (content-hashed assets). Document and catch-all rules are left out on purpose: Nitro's rule headers
- * override the application's response headers, and every page on Node is rendered by Start behind the HypDriv
+ * override the application's response headers, and every page on Node is rendered by Start behind the Hypdriv
  * middleware, which sets its own headers.
  */
 export function nodeRouteRules(

@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/react-router",
   "version": "0.1.0",
-  "description": "HypDriv for React Router (framework mode): the Drivetrain around every request on Cloudflare Workers, Vercel and Node — root middleware, Worker entry, Node server, Vercel Build Output, CSP nonces through ServerRouter and build-time manifests with hash CSP for prerendered pages.",
+  "description": "Hypdriv for React Router (framework mode): the Drivetrain around every request on Cloudflare Workers, Vercel and Node — root middleware, Worker entry, Node server, Vercel Build Output, CSP nonces through ServerRouter and build-time manifests with hash CSP for prerendered pages.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

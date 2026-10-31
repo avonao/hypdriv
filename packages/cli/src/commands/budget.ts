@@ -66,7 +66,7 @@ export function renderBudgetMarkdown(input: {
 }): string {
   const lines: string[] = [];
   const icon = (s: BudgetResult['status']) => (s === 'ok' ? '✅' : s === 'warn' ? '⚠️' : '❌');
-  lines.push(`### HypDriv budgets — build \`${input.buildId}\``);
+  lines.push(`### Hypdriv budgets — build \`${input.buildId}\``);
   lines.push('');
   if (input.budgets.length) {
     lines.push('| Budget | Target | Actual | Limit | Status |');

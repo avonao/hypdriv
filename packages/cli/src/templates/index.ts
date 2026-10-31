@@ -1,5 +1,5 @@
 /**
- * File templates written by `hypdriv init`. They mirror `examples/basic` in the HypDriv repository
+ * File templates written by `hypdriv init`. They mirror `examples/basic` in the Hypdriv repository
  * so a scaffolded project and the reference example never drift apart.
  */
 
@@ -82,7 +82,7 @@ export function workerTemplate(): string {
   return `import { createWorker } from 'hypdriv/cloudflare';
 import config from './hypdriv.config';
 
-// HypDriv's Durable Objects (optional bindings; see wrangler.jsonc).
+// Hypdriv's Durable Objects (optional bindings; see wrangler.jsonc).
 export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from 'hypdriv/durable-objects';
 // Keep OpenNext's Durable Objects available to existing bindings.
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache } from './.open-next/worker.js';
@@ -100,7 +100,7 @@ export function proxyTemplate(o: Pick<TemplateOptions, 'srcDir'>): string {
   return `import { createProxy } from 'hypdriv/proxy';
 import hypdrivConfig from '${configImport}';
 
-// Runs the HypDriv stages on \`next dev\` / \`next start\`. Inside the Cloudflare Worker the shell has already
+// Runs the Hypdriv stages on \`next dev\` / \`next start\`. Inside the Cloudflare Worker the shell has already
 // run them, so this proxy passes requests straight through there.
 export default createProxy(hypdrivConfig);
 
@@ -172,7 +172,7 @@ export function wranglerTemplate(o: TemplateOptions & { compatibilityDate: strin
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "${o.name}" }],${crons}
-  // Optional HypDriv upgrades. Each binding unlocks a capability (docs/guides/cloudflare.md):
+  // Optional Hypdriv upgrades. Each binding unlocks a capability (docs/guides/cloudflare.md):
   // "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "<create with: wrangler kv namespace create HYPDRIV_KV>" }],
   // "durable_objects": { "bindings": [
   //   { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" },
@@ -205,7 +205,7 @@ export function scriptsTemplate(
   };
 }
 
-/** How to compose an existing proxy with HypDriv (printed when proxy.ts already exists). */
+/** How to compose an existing proxy with Hypdriv (printed when proxy.ts already exists). */
 export function proxyCompositionHint(srcDir: boolean): string {
   const configImport = srcDir ? '../hypdriv.config' : './hypdriv.config';
   return `import { createProxy } from 'hypdriv/proxy';
@@ -214,7 +214,7 @@ import hypdrivConfig from '${configImport}';
 const hypdriv = createProxy(hypdrivConfig);
 
 export default async function proxy(request, event) {
-  // Your existing logic can run before or after HypDriv's stages:
+  // Your existing logic can run before or after Hypdriv's stages:
   // const own = await existingProxy(request, event); if (own) return own;
   return hypdriv(request, event);
 }

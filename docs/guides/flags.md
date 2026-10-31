@@ -42,4 +42,4 @@ const variant = useFlag('pricingVariant', 'a');
 
 ## Caching and flags
 
-Add `vary: { flags: ['newCheckout'] }` to edge cache policies for routes whose HTML depends on a flag; HypDriv then keys the cache per flag value. Flags that only affect client components do not need it.
+Add `vary: { flags: ['newCheckout'] }` to edge cache policies for routes whose HTML depends on a flag; Hypdriv then keys the cache per flag value. Flags that only affect client components do not need it.

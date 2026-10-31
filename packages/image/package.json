@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/image",
   "version": "0.1.0",
-  "description": "HypDriv images: Cloudflare image loader for next/image, placeholder generation and the HypImage component.",
+  "description": "Hypdriv images: Cloudflare image loader for next/image, placeholder generation and the HypImage component.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

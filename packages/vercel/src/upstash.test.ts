@@ -240,7 +240,7 @@ describe('upstashCounterStore', () => {
     await expect(counters.takeToken!('b', 1, 1, 0)).rejects.toThrow(/busy/);
   });
 
-  it('works as the store of the HypDriv rate limiter', async () => {
+  it('works as the store of the Hypdriv rate limiter', async () => {
     const { counters } = store();
     const config = loadConfig({
       security: {

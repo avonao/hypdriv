@@ -51,7 +51,7 @@ export function flattenPages(pages: NuxtPageLike[], parent = ''): FlatPage[] {
   return [...out.values()];
 }
 
-/** Nuxt pages as HypDriv routes (canonical `[param]` patterns). */
+/** Nuxt pages as Hypdriv routes (canonical `[param]` patterns). */
 export function pageRoutes(pages: NuxtPageLike[], rootDir: string): DiscoveredRoute[] {
   const seen = new Set<string>();
   const out: DiscoveredRoute[] = [];
@@ -100,7 +100,7 @@ export function isInternalRoute(route: string, buildAssetsPath = '/_nuxt/'): boo
   );
 }
 
-/** Nitro's server routes (API routes, `server/routes`, module handlers) as HypDriv endpoints. */
+/** Nitro's server routes (API routes, `server/routes`, module handlers) as Hypdriv endpoints. */
 export function serverRoutes(
   handlers: NitroHandlerLike[],
   options: { exclude?: Array<string | undefined>; buildAssetsPath?: string } = {},

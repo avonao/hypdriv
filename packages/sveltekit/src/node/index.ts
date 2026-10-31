@@ -23,7 +23,7 @@ export interface SvelteKitListenerOptions {
   /** Trust `x-forwarded-proto` / `x-forwarded-host` / `x-forwarded-for` from a reverse proxy (default `HYPDRIV_TRUST_PROXY=1`). */
   trustProxy?: boolean;
   /**
-   * The HypDriv handler. Default: the one the build's `handle` hook created (`hypdriv()` from
+   * The Hypdriv handler. Default: the one the build's `handle` hook created (`hypdriv()` from
    * `@hypdriv/sveltekit/hooks`), so the server and the hook share config, manifest and state; without a hook in
    * the build, one is created from `config` / `manifest` (default `hypdriv.config.*` and `.hypdriv/manifest.json`).
    */
@@ -101,7 +101,7 @@ async function loadHandler(options: SvelteKitListenerOptions, root: string): Pro
   const registered = registeredHandler();
   if (registered) return registered;
   console.warn(
-    "hypdriv: the server build has no HypDriv handle (src/hooks.server.ts: hypdriv() from '@hypdriv/sveltekit/hooks'); running the pipeline from hypdriv.config and .hypdriv/manifest.json",
+    "hypdriv: the server build has no Hypdriv handle (src/hooks.server.ts: hypdriv() from '@hypdriv/sveltekit/hooks'); running the pipeline from hypdriv.config and .hypdriv/manifest.json",
   );
   let config = options.config;
   if (!config) {
@@ -120,7 +120,7 @@ async function loadHandler(options: SvelteKitListenerOptions, root: string): Pro
 }
 
 /**
- * A Node request listener that runs the HypDriv pipeline around adapter-node's complete handler (`build/handler.js`):
+ * A Node request listener that runs the Hypdriv pipeline around adapter-node's complete handler (`build/handler.js`):
  * static files, prerendered pages and every response SvelteKit sends before `handle` (CSRF rejections, trailing-slash
  * redirects, `/_app` 404s) get the Drivetrain — security headers, the hash CSP of prerendered pages, rate limiting,
  * the bot shield, `/_hypdriv/*` — and the `handle` hook passes through inside it. adapter-node keeps serving files
@@ -183,7 +183,7 @@ export interface ServeOptions extends SvelteKitListenerOptions {
 }
 
 /**
- * Starts the production server for an adapter-node build with the HypDriv pipeline in front of every response:
+ * Starts the production server for an adapter-node build with the Hypdriv pipeline in front of every response:
  *
  * ```js
  * // server.js — `node server.js` instead of `node build`

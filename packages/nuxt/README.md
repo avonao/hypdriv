@@ -1,6 +1,6 @@
 # @hypdriv/nuxt
 
-HypDriv for Nuxt 4: a Nuxt module that runs the HypDriv Drivetrain — security headers, CSP (nonces for rendered pages, hashes for prerendered ones), rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, Early Hints, logging, tracing, Server-Timing and the `/_hypdriv/*` routes — around every Nitro response, and writes the build manifest and the platform's static headers for **Cloudflare Workers**, **Vercel** and **Node**.
+Hypdriv for Nuxt 4: a Nuxt module that runs the Hypdriv Drivetrain — security headers, CSP (nonces for rendered pages, hashes for prerendered ones), rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, Early Hints, logging, tracing, Server-Timing and the `/_hypdriv/*` routes — around every Nitro response, and writes the build manifest and the platform's static headers for **Cloudflare Workers**, **Vercel** and **Node**.
 
 Requires Nuxt 4.6+ (Nitro 2, h3 1.x).
 
@@ -29,7 +29,7 @@ export default defineConfig({
 
 | Preset | How the pipeline runs | Static headers |
 |---|---|---|
-| `cloudflare-module` | HypDriv's Worker entry: the Worker shell (`createWorker`) around Nitro, with `scheduled` / `queue` / `email` dispatch and the HypDriv Durable Objects exported | `_headers` in the assets directory |
+| `cloudflare-module` | Hypdriv's Worker entry: the Worker shell (`createWorker`) around Nitro, with `scheduled` / `queue` / `email` dispatch and the Hypdriv Durable Objects exported | `_headers` in the assets directory |
 | `vercel` | Inside the Nitro function (it owns the response) | Build Output `config.json` header routes |
 | `node-server` | Inside Nitro, for every request except build assets | — (prerendered pages are served through the pipeline) |
 
@@ -43,7 +43,7 @@ Other Cloudflare presets (`cloudflare-pages`, `cloudflare-durable`) and `hypdriv
 | `dev` | `true` | Run the pipeline in `nuxt dev` |
 | `nonce` | `true` | Nuxt stamps the request's CSP nonce on every tag it renders through unhead |
 | `staticHeaders` | `true` | Write `_headers` / `config.json` header routes |
-| `cloudflare.worker` | `true` | Use HypDriv's Worker entry for `cloudflare-module` |
+| `cloudflare.worker` | `true` | Use Hypdriv's Worker entry for `cloudflare-module` |
 | `cloudflare.exports` | — | Module whose named exports the Worker entry re-exports (your Durable Objects, Workflows…) |
 
 ## Request context

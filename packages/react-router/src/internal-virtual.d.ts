@@ -1,4 +1,4 @@
-// React Router's server build module as the HypDriv runtime imports it (the application's own typegen declares the
+// React Router's server build module as the Hypdriv runtime imports it (the application's own typegen declares the
 // same module for its code; this declaration only serves the package's type check).
 declare module 'virtual:react-router/server-build' {
   import type { ServerBuild } from 'react-router';

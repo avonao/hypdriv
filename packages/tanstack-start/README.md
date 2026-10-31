@@ -1,6 +1,6 @@
 # @hypdriv/tanstack-start
 
-HypDriv for [TanStack Start](https://tanstack.com/start) (React) on Cloudflare Workers, Vercel and Node: the Drivetrain — security headers, CSP with per-request nonces (handed to the router's `ssr.nonce`) or build-time hashes, rate limiting, the bot shield, geo, feature flags, redirects, maintenance mode, Early Hints, logging, `Server-Timing` and `/_hypdriv/*` — as TanStack Start global request middleware, plus a Vite plugin that writes the route manifest after prerendering and the platform's static headers.
+Hypdriv for [TanStack Start](https://tanstack.com/start) (React) on Cloudflare Workers, Vercel and Node: the Drivetrain — security headers, CSP with per-request nonces (handed to the router's `ssr.nonce`) or build-time hashes, rate limiting, the bot shield, geo, feature flags, redirects, maintenance mode, Early Hints, logging, `Server-Timing` and `/_hypdriv/*` — as TanStack Start global request middleware, plus a Vite plugin that writes the route manifest after prerendering and the platform's static headers.
 
 Full guide: [`docs/guides/tanstack-start.md`](../../docs/guides/tanstack-start.md).
 
@@ -22,7 +22,7 @@ export default defineConfig({
 ```
 
 ```ts
-// src/start.ts — HypDriv first, then Start's CSRF protection for server functions
+// src/start.ts — Hypdriv first, then Start's CSRF protection for server functions
 import { hypdrivRequestMiddleware } from '@hypdriv/tanstack-start';
 const requestMiddleware = hypdrivRequestMiddleware();
 export const startInstance = createStart(() => ({ requestMiddleware }));
@@ -51,7 +51,7 @@ import { flag, hyp } from '@hypdriv/tanstack-start/server';
 
 ## Platforms
 
-- **Cloudflare Workers** (`@cloudflare/vite-plugin`): `wrangler.jsonc` `main` is your `src/worker.ts` exporting `createStartWorker({ config, manifest })` and the HypDriv Durable Objects. The build writes `dist/client/_headers` (hash CSP of each prerendered page, security headers, immutable assets) and patches the manifest into `dist/server`.
+- **Cloudflare Workers** (`@cloudflare/vite-plugin`): `wrangler.jsonc` `main` is your `src/worker.ts` exporting `createStartWorker({ config, manifest })` and the Hypdriv Durable Objects. The build writes `dist/client/_headers` (hash CSP of each prerendered page, security headers, immutable assets) and patches the manifest into `dist/server`.
 - **Vercel** (Nitro `vercel` preset): header routes and clean-URL `overrides` in `.vercel/output/config.json`; the manifest is patched into the function.
 - **Node** (Nitro `node-server`): `node .output/server/index.mjs`; `routeRules` for hashed assets. Prerendered pages are rendered per request on Node (Nitro builds its asset table before Start prerenders) and get a nonce policy.
 

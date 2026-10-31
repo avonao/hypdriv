@@ -34,7 +34,7 @@ function enabledSections(ctx: Parameters<Check['run']>[0]): string[] {
 export const hypdrivChecks: Check[] = [
   {
     id: 'hypdriv.installed',
-    title: 'HypDriv packages installed',
+    title: 'Hypdriv packages installed',
     category: 'hypdriv',
     severity: 'error',
     run(ctx) {
@@ -56,12 +56,12 @@ export const hypdrivChecks: Check[] = [
     severity: 'warn',
     run(ctx) {
       const versions = new Set(Object.values(ctx.project.hypdriv.packages));
-      if (versions.size === 0) return skip('no HypDriv packages installed.');
+      if (versions.size === 0) return skip('no Hypdriv packages installed.');
       if (versions.size > 1)
         return warn(
-          `Mixed HypDriv versions installed (${[...versions].join(', ')}); the packages release in lockstep, align them.`,
+          `Mixed Hypdriv versions installed (${[...versions].join(', ')}); the packages release in lockstep, align them.`,
         );
-      return pass(`All HypDriv packages at ${[...versions][0]}.`);
+      return pass(`All Hypdriv packages at ${[...versions][0]}.`);
     },
   },
   {
@@ -105,7 +105,7 @@ export const hypdrivChecks: Check[] = [
       const m = ctx.project.manifest;
       if (!m)
         return warn(
-          'No .hypdriv/manifest.json; run the production build (`next build` with withHypDriv, or `vite build` with the HypDriv plugin) so routes, CSP hashes and weights are known.',
+          'No .hypdriv/manifest.json; run the production build (`next build` with withHypDriv, or `vite build` with the Hypdriv plugin) so routes, CSP hashes and weights are known.',
         );
       if (m.error) return fail(`.hypdriv/manifest.json is invalid: ${m.error}`);
       const d = m.data!;
@@ -114,18 +114,18 @@ export const hypdrivChecks: Check[] = [
   },
   {
     id: 'hypdriv.manifest-version',
-    title: 'Manifest written by the installed HypDriv',
+    title: 'Manifest written by the installed Hypdriv',
     category: 'hypdriv',
     severity: 'warn',
     run(ctx) {
       const m = ctx.manifest;
       if (!m) return skip('no manifest.');
       const installed = ctx.project.hypdriv.packages['@hypdriv/next'] ?? ctx.project.hypdriv.installed;
-      if (!installed) return skip('HypDriv is not installed.');
+      if (!installed) return skip('Hypdriv is not installed.');
       if (m.hypdrivVersion === installed || m.hypdrivVersion.startsWith('0.0.0'))
-        return pass(`manifest from HypDriv ${m.hypdrivVersion}.`);
+        return pass(`manifest from Hypdriv ${m.hypdrivVersion}.`);
       return warn(
-        `manifest was written by HypDriv ${m.hypdrivVersion} but ${installed} is installed; rebuild.`,
+        `manifest was written by Hypdriv ${m.hypdrivVersion} but ${installed} is installed; rebuild.`,
       );
     },
   },
@@ -140,7 +140,7 @@ export const hypdrivChecks: Check[] = [
       if (!m || !build?.buildId) return skip('manifest or .next build missing.');
       if (m.buildId === build.buildId) return pass(`build ${m.buildId}`);
       return warn(
-        `manifest build ${m.buildId} differs from .next/BUILD_ID ${build.buildId}; the last \`next build\` ran without the HypDriv adapter or the manifest is stale.`,
+        `manifest build ${m.buildId} differs from .next/BUILD_ID ${build.buildId}; the last \`next build\` ran without the Hypdriv adapter or the manifest is stale.`,
       );
     },
   },
@@ -271,7 +271,7 @@ export const hypdrivChecks: Check[] = [
       const crons =
         ctx.project.platform === 'vercel' && Object.keys(ctx.config.resolved.jobs.cron).length > 0;
       return info(
-        'No .env.example; contributors have to guess which secrets HypDriv reads (HYPDRIV_SESSION_SECRET, HYPDRIV_INTERNAL_SECRET, CRON_SECRET).',
+        'No .env.example; contributors have to guess which secrets Hypdriv reads (HYPDRIV_SESSION_SECRET, HYPDRIV_INTERNAL_SECRET, CRON_SECRET).',
         {
           fix: {
             description: 'create .env.example',

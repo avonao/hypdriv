@@ -1,13 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hypdriv-sveltekit",
-  // adapter-cloudflare writes its Worker here; the HypDriv adapter wrapper moves it to `_sveltekit_worker.js` and
-  // writes HypDriv's Worker shell (Durable Objects, scheduled/queue/email handlers) in its place.
+  // adapter-cloudflare writes its Worker here; the Hypdriv adapter wrapper moves it to `_sveltekit_worker.js` and
+  // writes Hypdriv's Worker shell (Durable Objects, scheduled/queue/email handlers) in its place.
   "main": ".svelte-kit/cloudflare/_worker.js",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   // The Worker runs first for everything except content-hashed assets, so prerendered pages get the request stages
-  // (rate limiting, bot shield, geo, flags) too; without it they carry HypDriv's `_headers` rules only.
+  // (rate limiting, bot shield, geo, flags) too; without it they carry Hypdriv's `_headers` rules only.
   "assets": {
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare",

@@ -8,13 +8,13 @@ export const Route = createFileRoute('/')({
 function Home() {
   return (
     <main>
-      <h1>HypDriv × TanStack Start</h1>
+      <h1>Hypdriv × TanStack Start</h1>
       <p>
         This page is prerendered. Its security headers and its hash-based Content-Security-Policy come from
         the platform's static configuration (Cloudflare <code>_headers</code>, Vercel Build Output routes).
       </p>
       <p>
-        <Link to="/request">See what HypDriv knows about this request</Link>
+        <Link to="/request">See what Hypdriv knows about this request</Link>
       </p>
     </main>
   );

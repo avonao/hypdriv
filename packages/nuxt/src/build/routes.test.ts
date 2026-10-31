@@ -114,7 +114,7 @@ describe('presets', () => {
     expect(targetOfPreset(undefined)).toBe('node');
   });
 
-  it('knows which presets get HypDriv’s Worker entry and which are static', () => {
+  it('knows which presets get Hypdriv’s Worker entry and which are static', () => {
     expect(supportsWorkerEntry('cloudflare-module')).toBe(true);
     expect(supportsWorkerEntry('cloudflare_module')).toBe(true);
     expect(supportsWorkerEntry('cloudflare-pages')).toBe(false);

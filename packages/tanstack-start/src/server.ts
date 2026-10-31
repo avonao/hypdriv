@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/tanstack-start/server` — HypDriv's request helpers for server code below the HypDriv middleware:
+ * `@hypdriv/tanstack-start/server` — Hypdriv's request helpers for server code below the Hypdriv middleware:
  * server functions (`createServerFn().handler`), server routes (`server.handlers`), request middleware, and SSR
  * code inside `createIsomorphicFn().server()`.
  *

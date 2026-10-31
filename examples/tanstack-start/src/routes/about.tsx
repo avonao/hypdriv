@@ -12,7 +12,7 @@ function About() {
       <h1>About</h1>
       <p>
         Prerendered at <time dateTime={builtAt}>{builtAt}</time>. The inline hydration data above is allowed
-        by its SHA-256 hash, computed by HypDriv from this exact document.
+        by its SHA-256 hash, computed by Hypdriv from this exact document.
       </p>
     </main>
   );

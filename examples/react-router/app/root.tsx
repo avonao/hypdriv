@@ -4,7 +4,7 @@ import type { Route } from './+types/root';
 import './app.css';
 
 // The Drivetrain around every request React Router routes: documents, `.data`, actions and resource routes. Inside
-// HypDriv's Worker entry, Node server or Vercel function it only exposes the request context (they already ran it).
+// Hypdriv's Worker entry, Node server or Vercel function it only exposes the request context (they already ran it).
 export const middleware: Route.MiddlewareFunction[] = [hypdrivMiddleware()];
 
 export function Layout({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/sveltekit` — HypDriv for SvelteKit 3. `hypdriv(adapter())` wraps the SvelteKit adapter in
+ * `@hypdriv/sveltekit` — Hypdriv for SvelteKit 3. `hypdriv(adapter())` wraps the SvelteKit adapter in
  * `vite.config.ts`; `@hypdriv/sveltekit/hooks` is the `handle` hook; `@hypdriv/sveltekit/server` has the request
  * helpers for server code; `@hypdriv/sveltekit/worker` is the Cloudflare Worker shell the build generates an entry
  * for; `@hypdriv/sveltekit/node` serves an adapter-node build with the pipeline in front of every response.

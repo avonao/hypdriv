@@ -51,7 +51,7 @@ function pageLevel(page: FetchedPage): AuditLevel | null {
   return null;
 }
 
-/** `true` when HypDriv's bot shield or rate limiter answered instead of the application. */
+/** `true` when Hypdriv's bot shield or rate limiter answered instead of the application. */
 export function blockedByShield(page: Pick<FetchedPage, 'status' | 'headers'>): boolean {
   return (
     (page.status === 403 && page.headers.has('x-hypdriv-bot')) ||
@@ -380,7 +380,7 @@ export const auditCommand = defineCommand({
         printCss(ui, report, mod.formatAuditReport);
         if (!auth.source && report.pages.some((p) => /^HTTP (403|429)\b/.test(p.error ?? '')))
           ui.warn(
-            `Pages answered 403/429 to headless Chrome — HypDriv's bot shield or rate limiter refused the audit. Set ${auth.secretName} (environment, .dev.vars or .env.local) so the CLI signs its requests.`,
+            `Pages answered 403/429 to headless Chrome — Hypdriv's bot shield or rate limiter refused the audit. Set ${auth.secretName} (environment, .dev.vars or .env.local) so the CLI signs its requests.`,
           );
       } catch (err) {
         const e = err as Error & { code?: string };

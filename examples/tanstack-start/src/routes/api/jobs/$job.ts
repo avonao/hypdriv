@@ -1,7 +1,7 @@
 import { jobHandler } from '@hypdriv/tanstack-start/server';
 import { createFileRoute } from '@tanstack/react-router';
 
-// Only HypDriv's signed job dispatch (Cloudflare `scheduled` / `queue` through the Worker shell, `hypdriv jobs run`)
+// Only Hypdriv's signed job dispatch (Cloudflare `scheduled` / `queue` through the Worker shell, `hypdriv jobs run`)
 // and Vercel Cron get through; everything else is rejected before the handler runs.
 const runJob = jobHandler({}, async ({ job, cron }) => ({
   job,

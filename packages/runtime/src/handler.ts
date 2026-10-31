@@ -62,7 +62,7 @@ export interface CreateHandlerOptions {
   /**
    * The build manifest. Default: `.hypdriv/manifest.json` read from the working directory on Node (Vercel
    * Functions, Node servers); an empty manifest elsewhere. Framework integrations pass the manifest module the
-   * HypDriv Vite plugin generates.
+   * Hypdriv Vite plugin generates.
    */
   manifest?: ManifestSource;
   /** Customise the stage list. */
@@ -263,7 +263,7 @@ export async function platformFor(input: {
 }
 
 /**
- * Creates a request handler that runs the HypDriv Drivetrain around any Web `fetch` handler — the integration
+ * Creates a request handler that runs the Hypdriv Drivetrain around any Web `fetch` handler — the integration
  * point of every non-Next.js host (React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, plain Vite
  * apps). The handler owns the full response, so on every platform it can inject CSP nonces, set Vercel CDN
  * headers that Vercel's cache follows, and answer `/_hypdriv/*`:
@@ -273,7 +273,7 @@ export async function platformFor(input: {
  * const response = await hypdriv(request, { upstream: () => next(), env, waitUntil });
  * ```
  *
- * Inside the HypDriv Cloudflare Worker shell (which already ran the stages around the request) the handler
+ * Inside the Hypdriv Cloudflare Worker shell (which already ran the stages around the request) the handler
  * passes straight through to `upstream`.
  */
 export function createHandler(options: CreateHandlerOptions): HypHandler {

@@ -40,7 +40,7 @@ export interface CreateProxyOptions {
 type StageList = Stage[] | ((defaults: Stage[], platform: Platform) => Stage[]);
 
 /**
- * The recommended matcher: everything except Next internals and common static files, plus HypDriv's
+ * The recommended matcher: everything except Next internals and common static files, plus Hypdriv's
  * internal routes. Next.js parses `proxy.ts`'s `config` statically, so copy this literal into the file
  * (`export const config = { matcher: [...] }`); re-exporting it is rejected by the compiler.
  * `hypdriv init` writes it for you and `hypdriv doctor` checks it.
@@ -61,7 +61,7 @@ async function defaultNext(request: Request): Promise<Response> {
 
 /**
  * Builds the `proxy.ts` handler. Runs the Drivetrain stages on Node (edge-only stages are skipped)
- * and forwards HypDriv headers to the application through `NextResponse.next({ request })`.
+ * and forwards Hypdriv headers to the application through `NextResponse.next({ request })`.
  */
 export function createProxy(
   config: HypDrivConfig | ResolvedConfig,

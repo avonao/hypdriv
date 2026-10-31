@@ -23,7 +23,7 @@ import { silentLogger } from '@hypdriv/core';
 export const PRIVATE_BUILD_FILES = ['.vite', '.hypdriv'];
 
 /**
- * Writes HypDriv's static rules into Cloudflare's `_headers` in the assets directory (merging with the
+ * Writes Hypdriv's static rules into Cloudflare's `_headers` in the assets directory (merging with the
  * framework's and the user's rules) and keeps build metadata out of the upload through `.assetsignore`.
  */
 export function writeCloudflareStatic(input: {
@@ -72,7 +72,7 @@ interface VercelConfigJson {
 }
 
 /**
- * Inserts HypDriv's static rules into `.vercel/output/config.json` (before `handle: filesystem`, so they apply to
+ * Inserts Hypdriv's static rules into `.vercel/output/config.json` (before `handle: filesystem`, so they apply to
  * static files and function responses), removes build metadata from `static/`, and copies the manifest into
  * every Node function so the runtime can read it from its working directory.
  */

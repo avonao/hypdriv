@@ -58,17 +58,17 @@ export interface PurserBuildResultLike {
 }
 
 export interface WithHypDrivOptions {
-  /** Inline HypDriv config; takes precedence over `hypdriv.config.*`. */
+  /** Inline Hypdriv config; takes precedence over `hypdriv.config.*`. */
   config?: HypDrivConfig;
   /** Explicit config file path, or `false` to skip file discovery. */
   configFile?: string | false;
   /** The application's own adapter (path or module specifier). `null` disables chaining; default: existing `adapterPath` / `NEXT_ADAPTER_PATH`. */
   adapter?: string | null;
-  /** Override the HypDriv adapter module path (default: resolved from `@hypdriv/next/adapter`). */
+  /** Override the Hypdriv adapter module path (default: resolved from `@hypdriv/next/adapter`). */
   adapterPath?: string;
   /** Run the Purser bridge (default: when configured/detected). */
   purser?: boolean;
-  /** Apply HypDriv's safe Next.js defaults (default true). */
+  /** Apply Hypdriv's safe Next.js defaults (default true). */
   safeDefaults?: boolean;
   projectDir?: string;
   log?: Logger;
@@ -89,7 +89,7 @@ function watcherRegistry(): WatcherRegistry {
   return g[WATCHERS];
 }
 
-/** Resolves the file path of the HypDriv adapter module for `adapterPath`. */
+/** Resolves the file path of the Hypdriv adapter module for `adapterPath`. */
 export function resolveAdapterPath(): string {
   const url = import.meta.resolve('@hypdriv/next/adapter');
   return url.startsWith('file:') ? fileURLToPath(url) : url;
@@ -110,7 +110,7 @@ export const BUILD_DEPLOYMENT_ID_ENV = '__HYPDRIV_BUILD_DEPLOYMENT_ID';
 
 const DEPLOYMENT_ID_CHARS = /[^a-zA-Z0-9_-]+/g;
 
-/** Next.js accepts letters, digits, `-` and `_` in `deploymentId`; HypDriv caps the length at 64. */
+/** Next.js accepts letters, digits, `-` and `_` in `deploymentId`; Hypdriv caps the length at 64. */
 export function sanitizeDeploymentId(id: string): string {
   return id
     .replace(DEPLOYMENT_ID_CHARS, '-')
@@ -314,7 +314,7 @@ async function runPurser(
 }
 
 /**
- * The deploy target for this build: `platform` from the HypDriv config when set; otherwise Vercel when the
+ * The deploy target for this build: `platform` from the Hypdriv config when set; otherwise Vercel when the
  * build runs on Vercel (`VERCEL=1`, `NEXT_EDGE_RUNTIME_PROVIDER=vercel`) or the project has a Vercel
  * config, Cloudflare when the project has a wrangler config or `@opennextjs/cloudflare`, else a Node host.
  */
@@ -408,7 +408,7 @@ function applySafeDefaults(
 /**
  * On Vercel the CDN caches what the function returns and Routing Middleware cannot set caching headers, so
  * explicit edge-cache policies become `headers()` rules carrying `Vercel-CDN-Cache-Control` and
- * `Vercel-Cache-Tag` (`vercelCdnRouteHeaders`). HypDriv's rules come first: the application's own rules for
+ * `Vercel-Cache-Tag` (`vercelCdnRouteHeaders`). Hypdriv's rules come first: the application's own rules for
  * the same header and path win.
  */
 async function applyVercelCdnHeaders(
@@ -441,7 +441,7 @@ async function applyVercelCdnHeaders(
 }
 
 /**
- * Wraps a Next.js config with HypDriv (ADR 0001/0002). Returns an async config function, so it can run
+ * Wraps a Next.js config with Hypdriv (ADR 0001/0002). Returns an async config function, so it can run
  * the Purser build before the bundler starts and install the adapter chain.
  */
 export function withHypDriv(

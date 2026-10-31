@@ -4,7 +4,7 @@
 
 ## Context
 
-Purser CSS (`@avonao/purser`) is developed in its own repository. HypDriv should make it first-class without creating a bidirectional dependency.
+Purser CSS (`@avonao/purser`) is developed in its own repository. Hypdriv should make it first-class without creating a bidirectional dependency.
 
 ## Decision
 
@@ -12,5 +12,5 @@ Purser CSS (`@avonao/purser`) is developed in its own repository. HypDriv should
 
 ## Consequences
 
-- Purser evolves independently; HypDriv tracks its public API.
+- Purser evolves independently; Hypdriv tracks its public API.
 - Purser needs TypeScript's programmatic API (TS ≤ 6 at the time of writing); the bridge detects TS 7 hosts and points to the `@typescript/typescript6` alias.

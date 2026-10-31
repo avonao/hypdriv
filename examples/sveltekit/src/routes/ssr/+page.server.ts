@@ -1,6 +1,6 @@
 import { flag, hyp, nonce } from '@hypdriv/sveltekit/server';
 
-// Rendered per request inside HypDriv's handle: `hyp()` is the request's HypDriv context.
+// Rendered per request inside Hypdriv's handle: `hyp()` is the request's Hypdriv context.
 export const load = () => {
   const context = hyp();
   const requestNonce = nonce() ?? null;
@@ -12,7 +12,7 @@ export const load = () => {
     cspMode: context?.cspMode ?? null,
     nonce: requestNonce,
     newHero: flag('newHero', false),
-    // A third-party style inline script: it needs the request's nonce to run under HypDriv's policy.
+    // A third-party style inline script: it needs the request's nonce to run under Hypdriv's policy.
     inlineScript: requestNonce
       ? `<script nonce="${requestNonce}">document.documentElement.dataset.hypdriv = 'ok';</script>`
       : '',

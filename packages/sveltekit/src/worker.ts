@@ -9,9 +9,9 @@ import { type SvelteKitCsp, withSvelteKitCsp } from './csp';
 
 export interface SvelteKitWorkerOptions
   extends Omit<CreateWorkerOptions, 'next' | 'app' | 'config' | 'manifest'> {
-  /** The HypDriv config (the same one the `handle` hook uses). */
+  /** The Hypdriv config (the same one the `handle` hook uses). */
   config: HypDrivConfig;
-  /** SvelteKit's `csp` option, folded into HypDriv's policy as in the hook. */
+  /** SvelteKit's `csp` option, folded into Hypdriv's policy as in the hook. */
   csp?: SvelteKitCsp | null;
   /** The final build manifest. */
   manifest: HypManifest | (() => Promise<{ default: HypManifest } | HypManifest>);
@@ -20,8 +20,8 @@ export interface SvelteKitWorkerOptions
 }
 
 /**
- * `@hypdriv/sveltekit/worker` — the Cloudflare Worker entry for a SvelteKit app: HypDriv's Worker shell
- * (`createWorker` from `@hypdriv/cloudflare`) around the Worker adapter-cloudflare generated. The HypDriv adapter
+ * `@hypdriv/sveltekit/worker` — the Cloudflare Worker entry for a SvelteKit app: Hypdriv's Worker shell
+ * (`createWorker` from `@hypdriv/cloudflare`) around the Worker adapter-cloudflare generated. The Hypdriv adapter
  * wrapper generates the entry that calls it; the `handle` hook passes through inside it.
  */
 export function createSvelteKitWorker(options: SvelteKitWorkerOptions): HypDrivWorker {

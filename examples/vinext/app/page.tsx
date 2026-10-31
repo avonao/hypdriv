@@ -4,10 +4,10 @@ import { Counter } from './counter';
 export default function Home() {
   return (
     <>
-      <h1>HypDriv on vinext</h1>
+      <h1>Hypdriv on vinext</h1>
       <p>
         This page is prerendered. Its Content-Security-Policy allows exactly the inline scripts of the built
-        document by hash; the security headers, request id and Server-Timing come from HypDriv.
+        document by hash; the security headers, request id and Server-Timing come from Hypdriv.
       </p>
       <Counter />
       <ul>

@@ -1,6 +1,6 @@
 /**
- * `@hypdriv/nuxt/server` — HypDriv's request context for Nitro server code (API routes, server middleware,
- * server utilities). Every request below the HypDriv hook runs inside its `AsyncLocalStorage` context:
+ * `@hypdriv/nuxt/server` — Hypdriv's request context for Nitro server code (API routes, server middleware,
+ * server utilities). Every request below the Hypdriv hook runs inside its `AsyncLocalStorage` context:
  *
  * ```ts
  * // server/api/whoami.get.ts

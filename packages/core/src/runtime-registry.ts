@@ -3,7 +3,7 @@ import type { ResolvedConfig } from './config/resolved';
 import type { DeployTarget } from './config/types';
 
 /**
- * The process-wide HypDriv runtime: the resolved config and the (platform-augmented) environment. Request
+ * The process-wide Hypdriv runtime: the resolved config and the (platform-augmented) environment. Request
  * code normally reads both from the request context; on hosts where `proxy.ts` and the rendering functions
  * run in different invocations (Vercel, some Node deployments), server helpers such as `enqueue()` fall
  * back to this registration. `createInstrumentation().register()` and `createProxy()` register it.
@@ -27,7 +27,7 @@ export function getRuntime(): HypRuntime | undefined {
 }
 
 /**
- * The env key under which a platform exposes a producer for the HypDriv queue `name` when it has no
+ * The env key under which a platform exposes a producer for the Hypdriv queue `name` when it has no
  * Cloudflare binding name (Vercel Queues through `vercelEnv`). `enqueue()` looks here after the binding.
  */
 export function queueEnvKey(name: string): string {
@@ -35,7 +35,7 @@ export function queueEnvKey(name: string): string {
 }
 
 /**
- * `waitUntil` of the hosting platform outside a HypDriv request context: Vercel's request context
+ * `waitUntil` of the hosting platform outside a Hypdriv request context: Vercel's request context
  * (`@vercel/functions` reads the same slot). `null` when the platform offers none.
  */
 export function platformWaitUntil(): ((promise: Promise<unknown>) => void) | null {

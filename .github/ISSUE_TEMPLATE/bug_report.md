@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in HypDriv does not behave as documented
+about: Something in Hypdriv does not behave as documented
 labels: bug
 ---
 

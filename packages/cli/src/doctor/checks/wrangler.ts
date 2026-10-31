@@ -65,7 +65,7 @@ export const wranglerChecks: Check[] = [
       if (!w.configFile) {
         if (ctx.project.cloudflareConfigFile)
           return skip(
-            `${rel(ctx.root, ctx.project.cloudflareConfigFile)} (cf CLI format) found; HypDriv inspects wrangler.jsonc only.`,
+            `${rel(ctx.root, ctx.project.cloudflareConfigFile)} (cf CLI format) found; Hypdriv inspects wrangler.jsonc only.`,
           );
         return fail(
           'No wrangler.jsonc / wrangler.json / wrangler.toml found; `hypdriv init` creates one for OpenNext Cloudflare.',
@@ -118,7 +118,7 @@ export const wranglerChecks: Check[] = [
       const file = ctx.project.cloudflareConfigFile;
       if (!file) return pass('Not using the cf CLI config format.');
       return info(
-        `${rel(ctx.root, file)} detected (the new \`cf\` CLI). HypDriv reads wrangler.jsonc; keep main, compatibility settings and bindings in sync between the two.`,
+        `${rel(ctx.root, file)} detected (the new \`cf\` CLI). Hypdriv reads wrangler.jsonc; keep main, compatibility settings and bindings in sync between the two.`,
       );
     },
   },
@@ -139,7 +139,7 @@ export const wranglerChecks: Check[] = [
         });
       if (/hypdriv\.worker\.(ts|mts|js|mjs)$/.test(cfg.main)) return pass(`main: ${cfg.main}`);
       return fail(
-        `main is "${cfg.main}"; HypDriv's shell is bypassed until it points at hypdriv.worker.ts (which wraps .open-next/worker.js).`,
+        `main is "${cfg.main}"; Hypdriv's shell is bypassed until it points at hypdriv.worker.ts (which wraps .open-next/worker.js).`,
         {
           fix: jsoncFix(ctx, 'set main to hypdriv.worker.ts', {
             main: 'hypdriv.worker.ts',
@@ -231,7 +231,7 @@ export const wranglerChecks: Check[] = [
       const rwf = cfg.assets?.run_worker_first;
       if (rwf === true)
         return info(
-          'assets.run_worker_first is true: every asset request runs the Worker (HypDriv headers on assets, higher cost). The public/_headers file covers immutable caching without it.',
+          'assets.run_worker_first is true: every asset request runs the Worker (Hypdriv headers on assets, higher cost). The public/_headers file covers immutable caching without it.',
         );
       if (Array.isArray(rwf) && rwf.length) return pass(`run_worker_first for ${rwf.length} pattern(s).`);
       return pass('Assets are served before the Worker runs.');
@@ -276,7 +276,7 @@ export const wranglerChecks: Check[] = [
       if (cfg.observability?.enabled === true || cfg.observability?.logs?.enabled === true)
         return pass('observability enabled (Workers Logs receive the structured logs).');
       return warn(
-        'observability is not enabled; HypDriv logs and console spans are dropped. Add `"observability": { "enabled": true }`.',
+        'observability is not enabled; Hypdriv logs and console spans are dropped. Add `"observability": { "enabled": true }`.',
         {
           fix: jsoncFix(ctx, 'enable observability', {
             main: cfg.main ?? 'hypdriv.worker.ts',
@@ -391,7 +391,7 @@ export const wranglerChecks: Check[] = [
   },
   {
     id: 'wrangler.bindings',
-    title: 'Optional HypDriv bindings',
+    title: 'Optional Hypdriv bindings',
     category: 'wrangler',
     severity: 'info',
     run(ctx) {
@@ -419,7 +419,7 @@ export const wranglerChecks: Check[] = [
       const details = absent.map(([name, kind, unlocks]) => `${name} (${kind}): ${unlocks}`);
       if (!present.length)
         return info(
-          'No optional HypDriv bindings; everything runs on the zero-infrastructure baseline. Available upgrades:',
+          'No optional Hypdriv bindings; everything runs on the zero-infrastructure baseline. Available upgrades:',
           { details },
         );
       return pass(
@@ -437,7 +437,7 @@ export const wranglerChecks: Check[] = [
       if (!cfg) return skip('no wrangler config.');
       if (cfg.placement?.mode === 'smart')
         return info(
-          "Smart Placement moves the whole Worker (including HypDriv's edge stages) near your origin; prefer Hyperdrive for database proximity if edge latency matters.",
+          "Smart Placement moves the whole Worker (including Hypdriv's edge stages) near your origin; prefer Hyperdrive for database proximity if edge latency matters.",
         );
       return pass('Worker runs at the edge.');
     },

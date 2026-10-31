@@ -1,5 +1,5 @@
 /**
- * Types of the virtual module the HypDriv React Router plugin adds (next to `virtual:hypdriv/config` and
+ * Types of the virtual module the Hypdriv React Router plugin adds (next to `virtual:hypdriv/config` and
  * `virtual:hypdriv/manifest` from `@hypdriv/vite/virtual`). Reference them once in the application:
  *
  * ```ts

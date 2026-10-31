@@ -691,7 +691,7 @@ describe('cspStage on runners that own the body', () => {
     expect(ctx.state.get(CSP_MODE_KEY)).toBe('unsafe-inline-fallback');
   });
 
-  it("replaces HypDriv's own static policy instead of deferring to it as the application's", async () => {
+  it("replaces Hypdriv's own static policy instead of deferring to it as the application's", async () => {
     const ctx = makeCtx({ route: staticRoute, manifest, url: 'https://app.test/' });
     const { response } = await runStage(
       cspStage(ctx.config),

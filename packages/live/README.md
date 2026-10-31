@@ -1,6 +1,6 @@
 # @hypdriv/live
 
-Live channels for [HypDriv](https://github.com/avonao/hypdriv) (ADR 0012): pub/sub per channel on a Durable Object with SQLite replay, **WebSocket hibernation** and **SSE**, a server-side `publish()`, the `useLive()` / `useLiveValue()` / `useLiveRefresh()` React hooks, and a **polling fallback** so applications without Durable Objects still build and run.
+Live channels for [Hypdriv](https://github.com/avonao/hypdriv) (ADR 0012): pub/sub per channel on a Durable Object with SQLite replay, **WebSocket hibernation** and **SSE**, a server-side `publish()`, the `useLive()` / `useLiveValue()` / `useLiveRefresh()` React hooks, and a **polling fallback** so applications without Durable Objects still build and run.
 
 ## Install
 

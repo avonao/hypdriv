@@ -8,10 +8,10 @@ import { type ResolvedReactRouterConfigLike, registry, rootState } from './state
 import type { BuildManifestLike } from './vercel';
 
 export interface HypDrivPresetOptions {
-  /** Vercel: HypDriv's Routing Middleware in front of what Vercel serves statically (default true). */
+  /** Vercel: Hypdriv's Routing Middleware in front of what Vercel serves statically (default true). */
   vercelMiddleware?: boolean;
   /**
-   * The HypDriv config when the Vite plugin is not installed (the plugin's `config` option wins otherwise): a file
+   * The Hypdriv config when the Vite plugin is not installed (the plugin's `config` option wins otherwise): a file
    * path or an inline config. Default `hypdriv.config.*` in the root.
    */
   config?: string | HypDrivConfig;
@@ -22,11 +22,11 @@ export interface HypDrivPresetOptions {
 type BuildEndArgs = Parameters<NonNullable<Config['buildEnd']>>[0];
 
 /**
- * The HypDriv preset for `react-router.config.ts`. Its `buildEnd` runs after React Router finished the build
+ * The Hypdriv preset for `react-router.config.ts`. Its `buildEnd` runs after React Router finished the build
  * (prerendering included): it writes `.hypdriv/manifest.json` (routes, resource routes, per-route assets, CSP
  * hashes of prerendered pages, Early Hints), patches the final manifest into the server build, erases the
  * prerender token, and writes the platform's static configuration (Cloudflare `_headers`, or the Vercel Build
- * Output with HypDriv's header routes, functions and Routing Middleware).
+ * Output with Hypdriv's header routes, functions and Routing Middleware).
  *
  * ```ts
  * // react-router.config.ts
@@ -41,7 +41,7 @@ export function hypdrivPreset(options: HypDrivPresetOptions = {}): Preset {
     const log = viteLogger(viteConfig);
     if (!state.api)
       log.warn(
-        'hypdriv: the HypDriv Vite plugin is not installed (add `hypdriv()` from @hypdriv/react-router to vite.config.ts); the server build carries no HypDriv runtime',
+        'hypdriv: the Hypdriv Vite plugin is not installed (add `hypdriv()` from @hypdriv/react-router to vite.config.ts); the server build carries no Hypdriv runtime',
       );
     const config = state.api ? await state.api.config() : await loadHypConfig(root, options.config);
     const target = state.target ?? detectTarget(undefined, viteConfig.plugins);

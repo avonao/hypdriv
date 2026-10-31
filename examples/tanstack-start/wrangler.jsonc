@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hypdriv-tanstack-start",
-  // HypDriv's Worker shell around TanStack Start (scheduled/queue/email handlers, Durable Objects).
+  // Hypdriv's Worker shell around TanStack Start (scheduled/queue/email handlers, Durable Objects).
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],

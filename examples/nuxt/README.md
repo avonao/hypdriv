@@ -1,12 +1,12 @@
-# HypDriv × Nuxt 4
+# Hypdriv × Nuxt 4
 
-Prerendered `/` and `/about` (route rules), a server-rendered `/ssr` with `useHyp()`, and the server routes `GET /api/hello` and `POST /api/echo`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [Nuxt 4 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/nuxt.md).
+Prerendered `/` and `/about` (route rules), a server-rendered `/ssr` with `useHyp()`, and the server routes `GET /api/hello` and `POST /api/echo`. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [Nuxt 4 guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/nuxt.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

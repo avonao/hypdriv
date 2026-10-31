@@ -62,7 +62,7 @@ function pipelineContext(
 }
 
 describe('hyp()', () => {
-  it('reads forwarded HypDriv headers inside the Worker pipeline', async () => {
+  it('reads forwarded Hypdriv headers inside the Worker pipeline', async () => {
     const { ctx, pending } = pipelineContext(
       {
         [HEADER.hypRequestId]: 'req-1',
@@ -294,7 +294,7 @@ describe('jobHandler()', () => {
       env: {},
       target: 'vercel',
     });
-    // No HypDriv request context: a Vercel Function, where only the registered runtime exists and request
+    // No Hypdriv request context: a Vercel Function, where only the registered runtime exists and request
     // headers come from next/headers.
     setContextStore(null);
     vi.doMock('next/headers', () => ({ headers: async () => new Headers() }));

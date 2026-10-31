@@ -1,6 +1,6 @@
 # @hypdriv/cli
 
-The `hypdriv` command for [HypDriv](https://github.com/avonao/hypdriv) — set up, diagnose, measure and audit a Next.js 16+ application on **Cloudflare Workers** (OpenNext) or **Vercel**.
+The `hypdriv` command for [Hypdriv](https://github.com/avonao/hypdriv) — set up, diagnose, measure and audit a Next.js 16+ application on **Cloudflare Workers** (OpenNext) or **Vercel**.
 
 ```sh
 pnpm add hypdriv          # the umbrella package ships the `hypdriv` binary

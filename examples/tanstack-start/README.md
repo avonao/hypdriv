@@ -1,12 +1,12 @@
-# HypDriv × TanStack Start
+# Hypdriv × TanStack Start
 
-Prerendered `/` and `/about`, a per-request `/request` page (server function with `hyp()`), a dynamic `/posts/$slug` route, the server route `/api/time` and a cron job endpoint. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The HypDriv configuration is `hypdriv.config.ts`; the integration is described in the [TanStack Start guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/tanstack-start.md).
+Prerendered `/` and `/about`, a per-request `/request` page (server function with `hyp()`), a dynamic `/posts/$slug` route, the server route `/api/time` and a cron job endpoint. One app, three deploy targets: Cloudflare Workers, Vercel and Node. The Hypdriv configuration is `hypdriv.config.ts`; the integration is described in the [TanStack Start guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/tanstack-start.md).
 
 ## Run it
 
 ```sh
 pnpm install
-pnpm dev                                        # development server with the HypDriv pipeline
+pnpm dev                                        # development server with the Hypdriv pipeline
 ```
 
 | Target | Build | Run locally | Deploy |

@@ -3,7 +3,7 @@ import { getEdgePurger, revalidatePath, revalidateTag } from 'hypdriv/cache';
 import { requireInternal } from '@/lib/internal';
 
 /**
- * Signed: `{ tag }` or `{ path }` → Next's tag cache (Durable Object) plus the HypDriv edge cache. Reports
+ * Signed: `{ tag }` or `{ path }` → Next's tag cache (Durable Object) plus the Hypdriv edge cache. Reports
  * whether the request context and the edge purger are visible inside the Next.js bundle.
  */
 export async function POST(request: Request) {

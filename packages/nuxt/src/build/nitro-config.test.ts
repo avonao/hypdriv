@@ -24,7 +24,7 @@ describe('withExternal', () => {
 });
 
 describe('runtimePackages', () => {
-  it('resolves the HypDriv packages the server runtime imports to files on disk', () => {
+  it('resolves the Hypdriv packages the server runtime imports to files on disk', () => {
     const packages = runtimePackages(import.meta.url);
     expect(Object.keys(packages).sort()).toEqual(['@hypdriv/core', '@hypdriv/flags', '@hypdriv/runtime']);
     for (const file of Object.values(packages)) expect(existsSync(file)).toBe(true);

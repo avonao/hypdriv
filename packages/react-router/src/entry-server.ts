@@ -5,7 +5,7 @@ import { renderToReadableStream } from 'react-dom/server';
 import { type EntryContext, type RouterContextProvider, ServerRouter } from 'react-router';
 
 /**
- * `@hypdriv/react-router/entry.server` — React Router's server entry with HypDriv's CSP nonce: `ServerRouter` and
+ * `@hypdriv/react-router/entry.server` — React Router's server entry with Hypdriv's CSP nonce: `ServerRouter` and
  * React put the request's nonce on every script they render (hydration data, module imports, streamed chunks,
  * `<Scripts>`, `<ScrollRestoration>`). Re-export it from `app/entry.server.tsx`:
  *
@@ -15,7 +15,7 @@ import { type EntryContext, type RouterContextProvider, ServerRouter } from 'rea
  *
  * It renders with Web streams (`renderToReadableStream`) on every platform — Node 22+, Cloudflare Workers and
  * Vercel — like React Router's default entry. Prerendered pages render without a nonce (their scripts are allowed
- * by hash); requests outside a HypDriv runner render without one too.
+ * by hash); requests outside a Hypdriv runner render without one too.
  */
 
 /** Milliseconds React Router waits for deferred data before aborting the stream. */
@@ -31,7 +31,7 @@ export interface HandleRequestOptions {
   waitForAll?: (request: Request, context: EntryContext) => boolean;
   /** Reports errors thrown while streaming after the shell rendered (default `console.error`). */
   onError?: (error: unknown) => void;
-  /** The nonce of the request (default: HypDriv's, `nonce()`). */
+  /** The nonce of the request (default: Hypdriv's, `nonce()`). */
   nonce?: (request: Request) => string | undefined;
 }
 
@@ -52,7 +52,7 @@ function defaultWaitForAll(request: Request, context: EntryContext): boolean {
   );
 }
 
-/** Creates a `handleRequest` (the default export of `entry.server`) with HypDriv's nonce. */
+/** Creates a `handleRequest` (the default export of `entry.server`) with Hypdriv's nonce. */
 export function createHandleRequest(options: HandleRequestOptions = {}): HandleRequestFunction {
   const timeout = options.streamTimeout ?? streamTimeout;
   const waitForAll = options.waitForAll ?? defaultWaitForAll;
@@ -83,6 +83,6 @@ export function createHandleRequest(options: HandleRequestOptions = {}): HandleR
   };
 }
 
-/** React Router's `handleRequest` with HypDriv's CSP nonce. */
+/** React Router's `handleRequest` with Hypdriv's CSP nonce. */
 const handleRequest: HandleRequestFunction = createHandleRequest();
 export default handleRequest;

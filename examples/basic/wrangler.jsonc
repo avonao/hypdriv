@@ -10,7 +10,7 @@
   "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "hypdriv-basic-opennext-cache" }],
   "images": { "binding": "IMAGES" },
   "triggers": { "crons": ["0 9 * * 1"] },
-  // Optional HypDriv upgrades. Each binding unlocks a capability (docs/guides/cloudflare.md):
+  // Optional Hypdriv upgrades. Each binding unlocks a capability (docs/guides/cloudflare.md):
   "kv_namespaces": [
     { "binding": "HYPDRIV_KV", "id": "<create with: wrangler kv namespace create HYPDRIV_KV>" }
   ],

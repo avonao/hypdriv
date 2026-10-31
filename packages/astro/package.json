@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/astro",
   "version": "0.1.0",
-  "description": "HypDriv for Astro: an integration that runs the HypDriv Drivetrain (security headers, CSP, rate limiting, bot shield, flags, observability, /_hypdriv/*) around Astro's middleware and writes the route manifest, CSP hashes and static headers for Cloudflare Workers, Vercel and Node.",
+  "description": "Hypdriv for Astro: an integration that runs the Hypdriv Drivetrain (security headers, CSP, rate limiting, bot shield, flags, observability, /_hypdriv/*) around Astro's middleware and writes the route manifest, CSP hashes and static headers for Cloudflare Workers, Vercel and Node.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

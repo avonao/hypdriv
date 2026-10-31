@@ -4,7 +4,7 @@
 
 ## Context
 
-HypDriv was designed for Cloudflare Workers, where it owns the request in a Worker shell. Applications also deploy to Vercel, where the request is owned by Vercel's routing layer: `proxy.ts` runs as Routing Middleware *before* the CDN cache, functions render pages, and platform services (CDN, Upstash Redis, Global Config, WAF, BotID, Queues) replace Cloudflare bindings. Forking the pipeline per platform would double every stage and its tests.
+Hypdriv was designed for Cloudflare Workers, where it owns the request in a Worker shell. Applications also deploy to Vercel, where the request is owned by Vercel's routing layer: `proxy.ts` runs as Routing Middleware *before* the CDN cache, functions render pages, and platform services (CDN, Upstash Redis, Global Config, WAF, BotID, Queues) replace Cloudflare bindings. Forking the pipeline per platform would double every stage and its tests.
 
 ## Decision
 
@@ -13,7 +13,7 @@ HypDriv was designed for Cloudflare Workers, where it owns the request in a Work
 3. **No Vercel SDK imports.** `@hypdriv/vercel` talks to services over `fetch` or Vercel's request-context global; SDK-only features (`@vercel/firewall`, `botid`, `@vercel/queue`) are registered by the application (`registerVercelSdk`). An uninstalled SDK can never break a build.
 4. **CDN headers where Vercel's cache reads them.** Because middleware cannot set caching headers for Vercel's CDN, `withHypDriv` emits explicit policies as `next.config` `headers()` rules (`Vercel-CDN-Cache-Control`, `Vercel-Cache-Tag`) and `withVercelCdn()` wraps Route Handlers. The proxy stage still plans the decision (`x-hypdriv-cache: CDN`) for clients and downstream CDNs.
 5. **Helpers outside a request context.** On Vercel, `proxy.ts` and functions are separate invocations, so `createInstrumentation().register()` and `createProxy()` register the process runtime (`registerRuntime({ config, env, target })`); `enqueue()` falls back to it, and to a signed consumer-route call when no queue producer is ready.
-6. **CSP honesty.** Without `HTMLRewriter`, cached HTML (ISR, PPR shells) cannot carry a per-request nonce; HypDriv sends its declared `'unsafe-inline'` fallback (`x-hypdriv-csp: unsafe-inline-fallback`) and the audit reports it as a warning rather than pretending otherwise. Static routes keep hash-based policies, dynamic routes nonces.
+6. **CSP honesty.** Without `HTMLRewriter`, cached HTML (ISR, PPR shells) cannot carry a per-request nonce; Hypdriv sends its declared `'unsafe-inline'` fallback (`x-hypdriv-csp: unsafe-inline-fallback`) and the audit reports it as a warning rather than pretending otherwise. Static routes keep hash-based policies, dynamic routes nonces.
 
 ## Consequences
 

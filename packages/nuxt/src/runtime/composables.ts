@@ -8,9 +8,9 @@ function eventFacts(): HypEventContext | undefined {
 }
 
 /**
- * HypDriv's facts about the current request — request id, runner, matched route, country, locale, CSP mode and
+ * Hypdriv's facts about the current request — request id, runner, matched route, country, locale, CSP mode and
  * the public feature flags — rendered on the server and hydrated from Nuxt's payload on the client. `null` when
- * HypDriv did not handle the request (prerendering, or the module's `dev: false` in development).
+ * Hypdriv did not handle the request (prerendering, or the module's `dev: false` in development).
  *
  * ```vue
  * <script setup lang="ts">

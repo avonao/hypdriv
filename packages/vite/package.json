@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/vite",
   "version": "0.1.0",
-  "description": "HypDriv for Vite: the build plugin (route manifest, CSP hashes, static headers for Cloudflare, Vercel and Node) and the integration toolkit behind HypDriv's React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext support.",
+  "description": "Hypdriv for Vite: the build plugin (route manifest, CSP hashes, static headers for Cloudflare, Vercel and Node) and the integration toolkit behind Hypdriv's React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext support.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

@@ -1,7 +1,7 @@
 import type { HypDrivConfig } from '@hypdriv/core';
 
 /**
- * JSON-safe projection of a HypDriv config: RegExp values become `{ "$regex": source, "$flags": flags }`,
+ * JSON-safe projection of a Hypdriv config: RegExp values become `{ "$regex": source, "$flags": flags }`,
  * functions are dropped (they cannot cross the process boundary between next.config and the adapter).
  */
 export function serializeConfig(config: HypDrivConfig): string {

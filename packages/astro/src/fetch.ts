@@ -11,7 +11,7 @@ export interface AstroFetchable {
 }
 
 /**
- * `@hypdriv/astro/fetch` — runs the HypDriv Drivetrain around Astro's whole request pipeline from `src/fetch.ts`
+ * `@hypdriv/astro/fetch` — runs the Hypdriv Drivetrain around Astro's whole request pipeline from `src/fetch.ts`
  * (Astro 7 advanced routing). The middleware the integration registers covers every route Astro renders; wrapping the
  * fetch entry also covers what Astro answers before middleware: unmatched URLs served by a prerendered 404 page,
  * `redirects` from the Astro config, trailing-slash normalisation and invalid-encoding responses. The middleware

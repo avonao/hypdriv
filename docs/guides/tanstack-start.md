@@ -1,6 +1,6 @@
-# HypDriv with TanStack Start
+# Hypdriv with TanStack Start
 
-`@hypdriv/tanstack-start` runs the Drivetrain — security headers, CSP with per-request nonces or build-time hashes, rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, the edge cache, Early Hints, logging, tracing and `Server-Timing`, and the `/_hypdriv/*` internal routes — around a [TanStack Start](https://tanstack.com/start) (React) application on Cloudflare Workers, Vercel and Node. It follows ADR 0019 (Vite hosts): the request runtime is TanStack Start's own global request middleware, the build side is a Vite plugin that finalises the HypDriv manifest once prerendering is done.
+`@hypdriv/tanstack-start` runs the Drivetrain — security headers, CSP with per-request nonces or build-time hashes, rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, the edge cache, Early Hints, logging, tracing and `Server-Timing`, and the `/_hypdriv/*` internal routes — around a [TanStack Start](https://tanstack.com/start) (React) application on Cloudflare Workers, Vercel and Node. It follows ADR 0019 (Vite hosts): the request runtime is TanStack Start's own global request middleware, the build side is a Vite plugin that finalises the Hypdriv manifest once prerendering is done.
 
 Requirements: `@tanstack/react-start` 1.169 or later, Vite 8, Node.js 22.12 or later (Nitro 3 needs 22.22 for Vercel and Node builds).
 
@@ -10,9 +10,9 @@ Requirements: `@tanstack/react-start` 1.169 or later, Vite 8, Node.js 22.12 or l
 | --- | --- | --- | --- |
 | SSR page, server route, server function, 404, Start's redirects | Worker shell (`createStartWorker`) with `HTMLRewriter`; the request middleware passes through | request middleware in the Vercel Function | request middleware (or the server entry) in the Node server |
 | `/_hypdriv/*` | Worker shell | request middleware | request middleware |
-| Prerendered page | the Worker shell (with `assets.run_worker_first`), served as built from the assets binding with its hash CSP; without it Workers Static Assets with its `_headers` rule | Vercel CDN with its Build Output header route (hash CSP …) at its clean URL, behind HypDriv's Routing Middleware (request stages) | rendered per request by Start (nonce CSP) — see *Node and prerendered pages* |
+| Prerendered page | the Worker shell (with `assets.run_worker_first`), served as built from the assets binding with its hash CSP; without it Workers Static Assets with its `_headers` rule | Vercel CDN with its Build Output header route (hash CSP …) at its clean URL, behind Hypdriv's Routing Middleware (request stages) | rendered per request by Start (nonce CSP) — see *Node and prerendered pages* |
 | Hashed assets (`/assets/*`) | Static Assets, `_headers`: immutable caching + security headers | CDN, header route | Nitro, `routeRules`: immutable caching + security headers |
-| Other public files (`robots.txt`) | Static Assets, `_headers` base rule | CDN, header route | Nitro (no HypDriv headers) |
+| Other public files (`robots.txt`) | Static Assets, `_headers` base rule | CDN, header route | Nitro (no Hypdriv headers) |
 | Start's prerender requests (`vite build`) | Start only, no pipeline | Start only | Start only |
 
 Every HTML response the pipeline renders carries a nonce policy: Start puts the nonce on every script, style and preload it renders. Prerendered documents served by the platform carry the hash policy computed from the exact file.
@@ -82,12 +82,12 @@ export const startInstance = createStart(() => ({ requestMiddleware }));
 
 `hypdrivRequestMiddleware()` returns `[hypdriv, csrf]`:
 
-1. **HypDriv first.** Global request middleware runs for SSR documents, server routes, server functions, not-found pages, Start's trailing-slash redirects and HEAD requests. Listed first, HypDriv wraps every response the middleware after it produces — a CSRF rejection gets the request id, the security headers, logging and rate limiting like any other response.
-2. **Start's CSRF protection for server functions.** A custom `src/start.ts` replaces Start's default request middleware, which is where Start installs `createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === 'serverFn' })`; HypDriv adds exactly that back. Adjust it with `hypdrivRequestMiddleware({ csrf: { secFetchSite: ['same-origin', 'same-site'] } })`, or pass `csrf: false` only when you install your own CSRF middleware.
+1. **Hypdriv first.** Global request middleware runs for SSR documents, server routes, server functions, not-found pages, Start's trailing-slash redirects and HEAD requests. Listed first, Hypdriv wraps every response the middleware after it produces — a CSRF rejection gets the request id, the security headers, logging and rate limiting like any other response.
+2. **Start's CSRF protection for server functions.** A custom `src/start.ts` replaces Start's default request middleware, which is where Start installs `createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === 'serverFn' })`; Hypdriv adds exactly that back. Adjust it with `hypdrivRequestMiddleware({ csrf: { secFetchSite: ['same-origin', 'same-site'] } })`, or pass `csrf: false` only when you install your own CSRF middleware.
 
 For a custom order use the pieces: `hypdrivMiddleware()` and Start's `createCsrfMiddleware()`. Create middleware at module scope: Start evaluates the `createStart()` callback per request, and the pipeline's platform (rate-limit counters, caches) must outlive it — `hypdrivMiddleware()` and `hypdrivRequestMiddleware()` without options return shared instances.
 
-`src/start.ts` is also part of the client bundle. In the browser, `@hypdriv/tanstack-start` resolves (export condition `browser`) to inert stand-ins, so neither the runtime nor your HypDriv config nor the build manifest reach the client.
+`src/start.ts` is also part of the client bundle. In the browser, `@hypdriv/tanstack-start` resolves (export condition `browser`) to inert stand-ins, so neither the runtime nor your Hypdriv config nor the build manifest reach the client.
 
 ### `src/router.tsx` — the nonce for Start's own tags
 
@@ -186,7 +186,7 @@ plugins: [tanstackStart(withHypDriv({ ... })), nitro(), viteReact(), hypdriv()]
 
 After the build `.vercel/output` holds:
 
-- `config.json` with HypDriv's header routes before `{ "handle": "filesystem" }` — the security headers for every path, immutable caching for `/assets/*`, and one route per prerendered page with its hash CSP and Early Hints — plus `overrides` that serve `about.html` at `/about` from the CDN;
+- `config.json` with Hypdriv's header routes before `{ "handle": "filesystem" }` — the security headers for every path, immutable caching for `/assets/*`, and one route per prerendered page with its hash CSP and Early Hints — plus `overrides` that serve `about.html` at `/about` from the CDN;
 - the Vercel Function (`functions/__server.func`) with the final manifest patched into its bundle (and a copy at `.hypdriv/manifest.json`); inside it the request middleware runs the pipeline and, as the owner of the response, sets the Vercel CDN cache headers of each route's policy.
 
 `request.waitUntil` (Nitro's Vercel runtime) keeps background work alive; Vercel's request-context `waitUntil` is the fallback. Deploy the prebuilt output (`vercel deploy --prebuilt`) or let Vercel build the project.
@@ -197,7 +197,7 @@ Build with Nitro (`nitro()`, preset `node-server`) and start `node .output/serve
 
 ### Node and prerendered pages
 
-Nitro builds its public-asset table before TanStack Start prerenders, so `.output/public/about.html` exists but Nitro's server never serves it: on Node, prerendered paths are rendered by Start per request. HypDriv accounts for this — whatever reaches Start is answered as a rendered page (`renderedManifest()`): a nonce policy instead of the hashes of a file that is not being sent, and no edge caching of per-request HTML — and the manifest does not count those documents as statically served. Put a CDN in front, or deploy to Vercel or Cloudflare, when prerendering should save rendering work.
+Nitro builds its public-asset table before TanStack Start prerenders, so `.output/public/about.html` exists but Nitro's server never serves it: on Node, prerendered paths are rendered by Start per request. Hypdriv accounts for this — whatever reaches Start is answered as a rendered page (`renderedManifest()`): a nonce policy instead of the hashes of a file that is not being sent, and no edge caching of per-request HTML — and the manifest does not count those documents as statically served. Put a CDN in front, or deploy to Vercel or Cloudflare, when prerendering should save rendering work.
 
 ### Optional: the server entry
 

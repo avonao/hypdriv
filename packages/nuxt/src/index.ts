@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/nuxt` — HypDriv for Nuxt 4. Add the module and HypDriv runs its Drivetrain (security headers, CSP
+ * `@hypdriv/nuxt` — Hypdriv for Nuxt 4. Add the module and Hypdriv runs its Drivetrain (security headers, CSP
  * nonces and hashes, rate limiting, bot shield, geo, flags, i18n, redirects, maintenance, Early Hints, logging,
  * tracing, Server-Timing, `/_hypdriv/*`) around every Nitro response, on Cloudflare Workers, Vercel and Node:
  *

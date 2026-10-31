@@ -39,7 +39,7 @@ function resultJson(result: PurserBuildResultLike) {
 
 export const cssCommand = defineCommand({
   name: 'css',
-  summary: 'Purser CSS build, check or watch through the HypDriv bridge (options from hypdriv.config)',
+  summary: 'Purser CSS build, check or watch through the Hypdriv bridge (options from hypdriv.config)',
   usage: 'hypdriv css <build|check|watch>',
   options: {},
   subcommands: [

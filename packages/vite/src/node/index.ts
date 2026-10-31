@@ -6,7 +6,7 @@ import type { HypDrivConfig, HypManifest, ResolvedConfig } from '@hypdriv/core';
 import { createHandler, type HypHandler } from '@hypdriv/runtime';
 
 /**
- * `@hypdriv/vite/node` — serving a Vite build on Node with the HypDriv pipeline: the Node ↔ Web bridge
+ * `@hypdriv/vite/node` — serving a Vite build on Node with the Hypdriv pipeline: the Node ↔ Web bridge
  * (`toWebRequest`, `sendWebResponse`), a static file handler with content-hash caching, and `serve()`, the
  * production server `hypdriv serve` runs for plain Vite apps.
  */
@@ -213,7 +213,7 @@ function readJson<T>(file: string): T | null {
 }
 
 /**
- * Creates a Node request listener that runs the HypDriv pipeline around static file serving for a Vite build.
+ * Creates a Node request listener that runs the Hypdriv pipeline around static file serving for a Vite build.
  */
 export function createNodeListener(input: {
   handler: HypHandler;

@@ -15,10 +15,10 @@ const target = (process.env.HYPDRIV_TARGET ?? (process.env.VERCEL === '1' ? 'ver
 export default defineConfig({
   plugins: [
     vinext({
-      // Render static pages at build time: HypDriv gives the ones the platform serves as built a hash-based CSP.
+      // Render static pages at build time: Hypdriv gives the ones the platform serves as built a hash-based CSP.
       prerender: true,
       // On Workers, prerendered pages are served from Workers Static Assets. `withHypDrivCache` makes
-      // revalidateTag()/revalidatePath() purge HypDriv's edge cache as well.
+      // revalidateTag()/revalidatePath() purge Hypdriv's edge cache as well.
       cache: withHypDrivCache(target === 'cloudflare' ? { cdn: staticAssetsAdapter() } : {}),
     }),
     ...(target === 'cloudflare'

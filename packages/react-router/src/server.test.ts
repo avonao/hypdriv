@@ -169,7 +169,7 @@ describe('hypdrivMiddleware', () => {
     expect(await data.text()).toContain('https://app.example/new');
   });
 
-  it('passes through inside an outer HypDriv runner (the stages run once)', async () => {
+  it('passes through inside an outer Hypdriv runner (the stages run once)', async () => {
     let inner = 0;
     let outer = 0;
     const counter = (count: () => void) =>

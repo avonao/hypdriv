@@ -75,7 +75,7 @@ export interface VercelEnvOptions {
 }
 
 /**
- * Returns `env` plus the Vercel-backed bindings HypDriv knows how to use, without replacing bindings that
+ * Returns `env` plus the Vercel-backed bindings Hypdriv knows how to use, without replacing bindings that
  * already exist:
  *
  * - the generic KV binding (`cloudflare.bindings.kv`, and the flags/redirects/maintenance KV bindings when they
@@ -122,7 +122,7 @@ export function vercelEnv(
     }
   }
 
-  // Queue producers for `enqueue()`: Vercel Queues per HypDriv queue name (ready once `@vercel/queue` is
+  // Queue producers for `enqueue()`: Vercel Queues per Hypdriv queue name (ready once `@vercel/queue` is
   // registered with `registerVercelSdk`; until then `enqueue()` calls the consumer route inline).
   const queueNames = new Set([
     ...Object.keys(config.jobs.queues),

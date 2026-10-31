@@ -121,7 +121,7 @@ function readDir(dir: string): Dirent[] {
 
 /**
  * Discovers the routes of an App Router directory with Next.js conventions: `page.*` (pages), `route.*`
- * (Route Handlers), dynamic segments (`[id]`, `[...slug]`, `[[...slug]]`, already HypDriv's canonical syntax),
+ * (Route Handlers), dynamic segments (`[id]`, `[...slug]`, `[[...slug]]`, already Hypdriv's canonical syntax),
  * route groups and parallel-route slots (not part of the URL), private folders and intercepting routes (not
  * routable), and the `sitemap` / `robots` / `manifest` metadata routes.
  */
@@ -225,7 +225,7 @@ export function discoverRoutes(root: string, dirs: RouterDirs): DiscoveredRoute[
 }
 
 /**
- * vinext's route patterns (`/blog/:slug`, `/docs/:path+`, `/shop/:path*`) in HypDriv's canonical syntax
+ * vinext's route patterns (`/blog/:slug`, `/docs/:path+`, `/shop/:path*`) in Hypdriv's canonical syntax
  * (`/blog/[slug]`, `/docs/[...path]`, `/shop/[[...path]]`).
  */
 export function fromVinextPattern(pattern: string): string {

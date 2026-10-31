@@ -1,4 +1,4 @@
-/** The deployment platforms HypDriv distinguishes. */
+/** The deployment platforms Hypdriv distinguishes. */
 export type NuxtTarget = 'cloudflare' | 'vercel' | 'node';
 
 /** The platform a Nitro preset deploys to (`cloudflare-module` → `cloudflare`, `vercel` → `vercel`, else `node`). */
@@ -9,7 +9,7 @@ export function targetOfPreset(preset: string | undefined): NuxtTarget {
   return 'node';
 }
 
-/** Presets whose Worker entry HypDriv replaces with its shell (`createWorker` around Nitro). */
+/** Presets whose Worker entry Hypdriv replaces with its shell (`createWorker` around Nitro). */
 export function supportsWorkerEntry(preset: string | undefined): boolean {
   const name = (preset ?? '').replace(/_/g, '-').toLowerCase();
   return name === 'cloudflare-module';

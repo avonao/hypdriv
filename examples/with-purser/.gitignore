@@ -1,7 +1,7 @@
 # dependencies
 node_modules/
 
-# Next.js / OpenNext / HypDriv build output
+# Next.js / OpenNext / Hypdriv build output
 .next/
 .open-next/
 .hypdriv/

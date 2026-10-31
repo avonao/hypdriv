@@ -5,7 +5,7 @@ import { FACTS_KEY, type HypEventContext } from './facts';
 const NONCED_LINK = /(?:^|\s)(?:modulepreload|preload|stylesheet)(?:\s|$)/i;
 
 /**
- * Stamps the request's CSP nonce (HypDriv's, from `event.context.hypdriv`) on every `<script>`, `<style>` and
+ * Stamps the request's CSP nonce (Hypdriv's, from `event.context.hypdriv`) on every `<script>`, `<style>` and
  * script/style `<link>` Nuxt renders through unhead — the import map, the `__NUXT__` config, the payload, the
  * streaming bootstrap and suspense chunks included, in buffered and streaming rendering alike. In development it
  * also renders the `csp-nonce` meta tag Vite's client reads for the `<style>` elements it injects.

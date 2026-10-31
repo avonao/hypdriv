@@ -7,7 +7,7 @@ export const bp = {
 } as const;
 
 /**
- * Design tokens. The `mode` and `contrast` axes are root classes on `<html>`; HypDriv's `theme` stage pins
+ * Design tokens. The `mode` and `contrast` axes are root classes on `<html>`; Hypdriv's `theme` stage pins
  * them at the edge from the `hyp_theme` cookie or the `Sec-CH-Prefers-*` client hints (hypdriv.config.ts).
  */
 export const t = defineTokens({
