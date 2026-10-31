@@ -11,8 +11,9 @@
  * and `<prefix>.e2e.local.env` (source it, then `pnpm e2e`). After the first deploy,
  * `provision --prefix … --tag <tag>` tags the Worker (script settings) for inventory.
  *
- * `--gate` keeps the deployment private: a zone WAF custom rule (every plan) blocks HTTPS requests to the
- * domain without the `x-hypdriv-gate` header or `hypdriv_gate` cookie; the runner and `hypdriv audit` send it
+ * `--gate` keeps the deployment private: a zone WAF custom rule (every plan, one per prefix whatever the number of
+ * hosts) blocks HTTPS requests to the domain without the `x-hypdriv-gate` header or `hypdriv_gate` cookie, and a
+ * Redirect Rule sends plain HTTP to https first; the runner and `hypdriv audit` send it
  * through `HYPDRIV_ACCESS_HEADERS` (written to the env file). With a custom domain, workers.dev stays off.
  *
  * Cache purges need `CACHE_PURGE_API_TOKEN` (a token with Zone → Cache Purge on the zone): add it to the
@@ -22,6 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { gateZoneHosts } from '../../hosts/scripts/zone-gate.ts';
 
 const { values: args } = parseArgs({
   options: {
@@ -195,7 +197,7 @@ writeFileSync(
 log('wrangler config', overlay);
 
 // Private test deployment: a zone WAF custom rule blocks HTTPS requests to the domain that carry neither the
-// gate header nor the gate cookie (plain HTTP still reaches the Worker, which only answers 308 → https).
+// gate header nor the gate cookie, and a Redirect Rule sends plain HTTP to https before anything answers.
 // Available on every plan; the runner and `hypdriv audit` send the header (HYPDRIV_ACCESS_HEADERS).
 const gateFile = join(dir, `${prefix}.gate.secrets.local.json`);
 let gate: string | null = null;
@@ -210,40 +212,10 @@ if (args.gate) {
   gate = stored.HYPDRIV_GATE ?? randomBytes(32).toString('base64url');
   writeFileSync(gateFile, `${JSON.stringify({ HYPDRIV_GATE: gate }, null, 2)}\n`, { mode: 0o600 });
   chmodSync(gateFile, 0o600);
-  const zoneApi = async <T>(method: string, path: string, body?: unknown) => {
-    const res = await fetch(`https://api.cloudflare.com/client/v4/zones/${args.zone}/${path}`, {
-      method,
-      headers: { authorization: `Bearer ${TOKEN}`, ...(body ? { 'content-type': 'application/json' } : {}) },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-    return (await res.json()) as CfResponse<T>;
-  };
-  interface Ruleset {
-    id: string;
-    rules?: Array<{ id: string; expression: string; description?: string }>;
-  }
-  const rule = {
-    description: `${prefix}: private live suite ${args.domain} (gate header or cookie)`,
-    expression: `(http.host eq "${args.domain}" and ssl and not any(http.request.headers["x-hypdriv-gate"][*] eq "${gate}") and not http.cookie contains "hypdriv_gate=${gate}")`,
-    action: 'block',
-    enabled: true,
-  };
-  const entry = await zoneApi<Ruleset>('GET', 'rulesets/phases/http_request_firewall_custom/entrypoint');
-  const existing = entry.success
-    ? entry.result.rules?.find(
-        (r) => r.expression.includes(`"${args.domain}"`) && r.expression.includes(gate!),
-      )
-    : undefined;
-  if (existing) log('WAF gate', `${args.domain} already private (rule ${existing.id})`);
-  else {
-    const r = entry.success
-      ? await zoneApi<Ruleset>('POST', `rulesets/${entry.result.id}/rules`, rule)
-      : await zoneApi<Ruleset>('PUT', 'rulesets/phases/http_request_firewall_custom/entrypoint', {
-          rules: [rule],
-        });
-    if (!r.success) throw new Error(`WAF gate: ${r.errors?.map((e) => `${e.code} ${e.message}`).join('; ')}`);
-    log('WAF gate', `${args.domain} private (zone WAF custom rule)`);
-  }
+  // One WAF gate rule and one https Redirect Rule for every private host of the prefix (shared with e2e/hosts).
+  const gated = await gateZoneHosts({ token: TOKEN, zone: args.zone, prefix, hosts: [args.domain], gate });
+  log('WAF gate', `${gated.hosts.length} private host(s): ${gated.hosts.join(', ')}`);
+  log('https redirect', 'plain HTTP → https before anything answers');
   log('gate secret', `${gateFile} (mode 600)`);
 }
 

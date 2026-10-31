@@ -31,6 +31,7 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { gateZoneHosts } from './zone-gate.ts';
 
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
@@ -90,16 +91,6 @@ interface CfResponse<T> {
   errors?: Array<{ code: number; message: string }>;
 }
 
-interface Rule {
-  id?: string;
-  description?: string;
-  expression: string;
-  action: string;
-  action_parameters?: unknown;
-  enabled?: boolean;
-  [key: string]: unknown;
-}
-
 async function cloudflare(): Promise<void> {
   const account = process.env.CLOUDFLARE_ACCOUNT_ID ?? '';
   const token = process.env.CLOUDFLARE_API_TOKEN ?? '';
@@ -149,52 +140,12 @@ async function cloudflare(): Promise<void> {
   );
   log('wrangler config', local);
 
-  // 2. One gate rule for every host of the prefix (zone WAF custom rules).
-  const zone = args.zone!;
-  const firewall = `zones/${zone}/rulesets/phases/http_request_firewall_custom/entrypoint`;
-  const entry = await api<{ rules?: Rule[] }>('GET', firewall);
-  const rules = entry.success ? (entry.result.rules ?? []) : [];
-  const marker = `${prefix}: private HypDriv test deployments`;
-  const ours = (r: Rule) => r.description === `${marker} (gate header or cookie)`;
-  const hosts = new Set([domain]);
-  for (const r of rules.filter(ours))
-    for (const m of r.expression.matchAll(/"([a-z0-9.-]+)"/g)) if (m[1] !== gate) hosts.add(m[1]!);
-  const list = [...hosts].filter((h) => h.includes('.')).sort();
-  const inList = list.map((h) => `"${h}"`).join(' ');
-  const strip = ({ id, version, last_updated, ref, ...rest }: Rule) => rest as Rule;
-  const gateRule: Rule = {
-    description: `${marker} (gate header or cookie)`,
-    expression: `(http.host in {${inList}} and ssl and not any(http.request.headers["x-hypdriv-gate"][*] eq "${gate}") and not http.cookie contains "hypdriv_gate=${gate}")`,
-    action: 'block',
-    enabled: true,
-  };
-  const put = await api('PUT', firewall, { rules: [...rules.filter((r) => !ours(r)).map(strip), gateRule] });
-  if (!put.success) fail(`gate rule: ${errors(put)}`);
-  log('gate rule', `${list.length} host(s): ${list.join(', ')}`);
-
-  // 3. Plain HTTP → https for the same hosts, before anything answers.
-  const redirectPhase = `zones/${zone}/rulesets/phases/http_request_dynamic_redirect/entrypoint`;
-  const current = await api<{ rules?: Rule[] }>('GET', redirectPhase);
-  const redirects = current.success ? (current.result.rules ?? []) : [];
-  const https = (r: Rule) => r.description === `${marker} (https)`;
-  const redirectRule: Rule = {
-    description: `${marker} (https)`,
-    expression: `(http.host in {${inList}} and not ssl)`,
-    action: 'redirect',
-    action_parameters: {
-      from_value: {
-        status_code: 308,
-        target_url: { expression: 'concat("https://", http.host, http.request.uri.path)' },
-        preserve_query_string: true,
-      },
-    },
-    enabled: true,
-  };
-  const putRedirect = await api('PUT', redirectPhase, {
-    rules: [...redirects.filter((r) => !https(r)).map(strip), redirectRule],
-  });
-  if (!putRedirect.success) fail(`https redirect: ${errors(putRedirect)}`);
-  log('https redirect', `${list.length} host(s)`);
+  // 2–3. One gate rule and one https redirect for every host of the prefix.
+  const gated = await gateZoneHosts({ token, zone: args.zone!, prefix, hosts: [domain], gate }).catch(
+    (err: Error) => fail(err.message),
+  );
+  log('gate rule', `${gated.hosts.length} host(s): ${gated.hosts.join(', ')}`);
+  log('https redirect', `${gated.hosts.length} host(s)`);
 
   // 4. After the first deploy: tags, and workers.dev / preview URLs confirmed off.
   const settings = await api<{ tags?: string[] | null }>(
