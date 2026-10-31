@@ -14,10 +14,15 @@ import { PRIVATE_BUILD_FILES } from './targets';
 const PLATFORM_FILES = new Set(['_headers', '_redirects', '_routes.json', '.assetsignore']);
 
 /** The Node.js runtime of HypDriv's Vercel functions (the build machine's major when Vercel supports it). */
-export function vercelNodeRuntime(): string {
-  const major = Number(process.versions.node.split('.')[0]);
-  return [22, 24, 26].includes(major) ? `nodejs${major}.x` : 'nodejs22.x';
+export function vercelNodeRuntime(version: string = process.versions.node): string {
+  const major = Number(version.split('.')[0]);
+  // The newest Vercel runtime not newer than the building Node (odd releases map to the LTS line below them).
+  const supported = VERCEL_NODE_MAJORS.filter((m) => m <= major);
+  return `nodejs${supported.length ? Math.max(...supported) : VERCEL_NODE_MAJORS[0]}.x`;
 }
+
+/** Node.js majors Vercel Functions run (Build Output API `runtime: nodejs<major>.x`). */
+export const VERCEL_NODE_MAJORS = [22, 24, 26] as const;
 
 /**
  * Bundles HypDriv's Routing Middleware (config + final manifest + runtime) into one ESM file for a Build Output
@@ -145,8 +150,9 @@ export async function writeVercelOutput(input: {
     });
   }
   routes.push({ handle: 'filesystem' });
+  // The SPA shell answers unknown extensionless paths, never `/api/*` (Vercel Functions or a 404).
   if (input.spa && existsSync(join(staticDir, 'index.html')))
-    routes.push({ src: '^/(?!.*\\.[A-Za-z0-9]+$).*$', dest: '/index.html', check: true });
+    routes.push({ src: '^/(?!api(?:/|$))(?!.*\\.[A-Za-z0-9]+$).*$', dest: '/index.html', check: true });
   routes.push({ handle: 'error' });
   if (existsSync(join(staticDir, '404.html'))) routes.push({ status: 404, src: '^.*$', dest: '/404.html' });
 

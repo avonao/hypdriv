@@ -646,5 +646,24 @@ describe('cache audit on Vite hosts', () => {
       second: { status: 200, headers: new Headers({ ...Object.fromEntries(html('HIT')), age: '1' }) },
     });
     expect(cached.findings.some((f) => f.message.includes('rsc'))).toBe(false);
+    const cdn = auditCache({
+      path: '/',
+      hasPolicy: false,
+      servedStatically: true,
+      rscVary: false,
+      first: {
+        status: 200,
+        headers: new Headers({ ...Object.fromEntries(html('HIT')), 'x-hypdriv-cache': '' }),
+      },
+      second: {
+        status: 200,
+        headers: new Headers({
+          'content-type': 'text/html',
+          'cache-control': 'public, max-age=0',
+          'x-vercel-cache': 'HIT',
+        }),
+      },
+    });
+    expect(cdn.status).toBe('pass');
   });
 });

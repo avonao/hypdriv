@@ -9,6 +9,7 @@ import { manifestModuleCode, patchRuntimeManifest, replaceRuntimeManifest, toMod
 import { htmlPathname } from './plugin';
 import { fromColonPath, fromSvelteKitId, fromTanStackPath, fromVueRouterPath, toHypRoute } from './routes';
 import { rulesFor } from './targets';
+import { vercelNodeRuntime } from './vercel-output';
 import { assetsForEntries } from './vite-manifest';
 
 describe('route pattern converters', () => {
@@ -220,5 +221,14 @@ describe('vite manifest assets', () => {
       fonts: [],
       main: ['/assets/main.js'],
     });
+  });
+});
+
+describe('vercelNodeRuntime', () => {
+  it('picks the newest Vercel runtime not newer than the building Node', () => {
+    expect(vercelNodeRuntime('24.11.0')).toBe('nodejs24.x');
+    expect(vercelNodeRuntime('25.2.1')).toBe('nodejs24.x');
+    expect(vercelNodeRuntime('27.0.0')).toBe('nodejs26.x');
+    expect(vercelNodeRuntime('20.19.0')).toBe('nodejs22.x');
   });
 });

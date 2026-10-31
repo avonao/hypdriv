@@ -108,7 +108,14 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
     if (second && SERVED_FROM_CACHE.has(second) && !age)
       findings.push({ level: 'warn', message: 'cached response without an Age header' });
   } else if (second && SERVED_FROM_CACHE.has(second)) {
-    findings.push({ level: 'warn', message: `route without a policy was served from the cache (${second})` });
+    findings.push(
+      input.servedStatically
+        ? {
+            level: 'info',
+            message: `prerendered document served from the platform's static layer cache (${second})`,
+          }
+        : { level: 'warn', message: `route without a policy was served from the cache (${second})` },
+    );
   } else if (input.servedStatically) {
     findings.push({
       level: 'info',

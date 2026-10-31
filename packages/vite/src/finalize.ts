@@ -227,6 +227,8 @@ export async function finalizeManifest(input: FinalizeInput): Promise<FinalizeRe
     if (result.manifest.earlyHints[source.id])
       result.manifest.earlyHints[alias.id] = result.manifest.earlyHints[source.id]!;
     alias.assets = source.assets;
+    // The shell document the alias answers with is the static layer's file as well.
+    if (source.servedStatically) alias.servedStatically = true;
   }
 
   // Prerendered documents with their route ids, for static headers.

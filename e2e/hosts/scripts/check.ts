@@ -302,6 +302,8 @@ if (args.api) {
     const res = await get(args.api!, { headers: { accept: 'application/json' } });
     assert(res.status === 200, `HTTP ${res.status}`);
     assert(res.headers.get('x-request-id'), 'no x-request-id');
+    const type = res.headers.get('content-type') ?? '';
+    assert(!/text\/html/i.test(type), `answered with HTML (${type}): a page or SPA fallback, not the API`);
     return `200 ${res.headers.get('content-type') ?? ''}`;
   });
   const limit = Number(args['rate-limit'] ?? 0);
