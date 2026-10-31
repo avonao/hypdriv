@@ -1,0 +1,36 @@
+{
+  "name": "@hypdriv/example-astro",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare astro build",
+    "build:vercel": "HYPDRIV_TARGET=vercel astro build",
+    "build:node": "HYPDRIV_TARGET=node astro build",
+    "preview": "astro preview",
+    "start": "node dist/server/entry.mjs",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare astro build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:4321",
+    "typecheck": "astro sync && tsc --noEmit",
+    "preview:cloudflare": "wrangler dev -c dist/server/wrangler.json"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "catalog:",
+    "@astrojs/node": "catalog:",
+    "@astrojs/vercel": "catalog:",
+    "@hypdriv/astro": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "astro": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

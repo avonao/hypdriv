@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-astro",
+  // HypDriv's Worker shell (src/worker.ts) wraps Astro's Cloudflare handler: the pipeline runs for every request
+  // except content-hashed assets, prerendered pages included.
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client",
+    "run_worker_first": ["/*", "!/_astro/*"]
+  },
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" },
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }
+  ]
+}

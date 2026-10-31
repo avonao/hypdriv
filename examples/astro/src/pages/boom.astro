@@ -1,0 +1,5 @@
+---
+// A route that throws while rendering: Astro renders 500.astro instead.
+export const prerender = false;
+throw new Error('boom: example render failure');
+---
