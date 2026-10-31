@@ -119,7 +119,7 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Nuxt 4 | `modules: ['@hypdriv/nuxt']`: Nitro plugin around the h3 app (error pages included), Nuxt-stamped nonces, `useHyp()`; Worker entry around Nitro's `cloudflare-module`, Vercel and Node presets | `nuxt` | ✅ |
 | vinext | `hypdriv()` around vinext's App Router entry (every runtime: `vinext start`, Workers, Nitro), `createVinextWorker()`, `withHypDrivCache()` purge bridge, CDN-served prerendered pages on Vercel | `vinext` | ✅ |
 | Prerendered pages on Vercel | HypDriv's Routing Middleware scoped to the prerendered documents (GET/HEAD) so CDN-served pages get rate limiting, the bot shield, maintenance, redirects and geo; on-demand routes run the pipeline once, in the function | `vite` + every integration | ✅ |
-| Private live verification | `e2e/hosts`: `check` (health, CSP coverage, nonces, asset caching, bot shield, API, rate limit, HTTPS) and `provision` for private Cloudflare (one gate rule + HTTPS redirect per prefix) and Vercel (protection + automation bypass) deployments | `e2e/hosts` | ✅ |
+| Private live verification | `e2e/hosts`: `check` (health, CSP coverage, nonces, asset caching, bot shield on rendered and prerendered pages, API, rate limit, HTTPS) and `provision` for private Cloudflare (one gate rule + HTTPS redirect per prefix) and Vercel (protection + automation bypass) deployments | `e2e/hosts` | ✅ |
 | Framework-aware tooling | `doctor` detects the framework (Vite-host checks, Next-only checks skipped), `init` registers the integration in the framework's config and writes the platform files, `routes`/`manifest` show the framework, `audit` knows static-layer documents and endpoints, `serve` | `cli` | ✅ |
 
 ## 7. Purser CSS

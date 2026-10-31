@@ -153,6 +153,13 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 | Nuxt 4 | module (`@hypdriv/nuxt`) | Nitro middleware and render hooks |
 | vinext | Vite plugin (`@hypdriv/vinext`) | `proxy.ts` (`createProxy`) |
 
+**Prerendered pages.** The platform's static layer serves them (`HypRoute.servedStatically`): their posture is the static header rule (security preset, the document's hash CSP, Early Hints), and neither the build nor the runtime infers an edge-cache policy for them. To run the request stages (rate limits, bot shield, maintenance, flags) for them as well:
+
+- **Cloudflare:** `assets.run_worker_first` sends them to the Worker shell, which answers GET/HEAD from the assets binding first, so the page is still served as built, with its hash CSP. `hypdriv init` writes the right patterns per framework (`/*` minus the immutable asset directory).
+- **Vercel:** every integration writes HypDriv's Routing Middleware (`addVercelMiddleware()`) scoped to exactly the prerendered document paths (GET/HEAD; vinext also skips RSC and Server Action requests). On-demand routes run the pipeline once, in the function. A plain Vite SPA runs the middleware for every non-immutable path.
+
+**HTTPS.** `redirects.forceHttps: 'auto'` follows `site.origin`; without one it is on for Cloudflare and Vercel deployments (their edge terminates TLS for every hostname) and off on Node. Workers Static Assets answer before the Worker, so plain-HTTP requests for assets the Worker never sees need the zone's *Always Use HTTPS* (or a Redirect Rule); `hypdriv audit https` probes pages, `/_hypdriv/health` and a hashed asset over `http://` and names the setting when one is served.
+
 ### 3.7 CLI
 
 `hypdriv` is a dependency-light Node CLI (Node's `util.parseArgs`, no interactive-framework dependency) with JSON output on every command. See §10.
@@ -305,7 +312,7 @@ HypDriv consumes only `@avonao/purser/build` and `scripts/strike-count.js`; it n
 | `hypdriv doctor`   | environment, Next version and config, Workers compatibility (compat date/flags, Node APIs, edge runtime exports), worker size and startup risk, env leaks, header posture, Purser setup; `--fix` for safe fixes |
 | `hypdriv analyze`  | Worker weight report from the bundle + source map (per-source attribution), per-route client JS/CSS, largest dependencies, duplicate modules                                                                    |
 | `hypdriv routes`   | the manifest as a table: classification, cache policy, CSP mode, hints, atoms                                                                                                                                   |
-| `hypdriv audit`    | `headers`, `csp`, `cache`, `css`, `all` against a URL or the local preview                                                                                                                                      |
+| `hypdriv audit`    | `headers`, `csp`, `cache`, `https`, `css`, `all` against a URL or the local preview                                                                                                                                      |
 | `hypdriv budget`   | evaluate budgets, store snapshots, diff against the previous build, Markdown for PR comments                                                                                                                    |
 | `hypdriv csp`      | `hashes`, `suggest` (from collected reports), `print`                                                                                                                                                           |
 | `hypdriv css`      | Purser `build` / `check` / `watch` through the bridge                                                                                                                                                           |

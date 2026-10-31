@@ -1,11 +1,11 @@
 ---
 name: hypdriv
-description: Adopt, configure and operate HypDriv (the Hyper-Extension for Next.js 16+ on Cloudflare Workers and Vercel) in a Next.js application — install, wire next.config/proxy/worker entry, tune caching, CSP, rate limits, flags, jobs, Purser CSS and observability, and verify with the hypdriv CLI.
+description: Adopt, configure and operate HypDriv (the Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext — on Cloudflare Workers, Vercel and Node) in an application — install, wire the framework integration/proxy/worker entry, tune caching, CSP, rate limits, flags, jobs, Purser CSS and observability, and verify with the hypdriv CLI.
 ---
 
 # HypDriv for coding agents
 
-Use this skill when a Next.js 16+ project should run with HypDriv on Cloudflare Workers (OpenNext) or Vercel, or when an existing HypDriv setup needs configuration, diagnosis or verification. The deploy target comes from `hypdriv.config.ts#platform` (`auto` detects it); pass `--platform cloudflare|vercel|node` to CLI commands to override.
+Use this skill when a Next.js 16+ project or a Vite-based app (plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext) should run with HypDriv on Cloudflare Workers, Vercel or Node, or when an existing HypDriv setup needs configuration, diagnosis or verification. The deploy target comes from `hypdriv.config.ts#platform` (`auto` detects it; Vite hosts also read `HYPDRIV_TARGET` at build time); pass `--platform cloudflare|vercel|node` to CLI commands to override.
 
 ## 1. Detect the situation
 
@@ -13,7 +13,7 @@ Use this skill when a Next.js 16+ project should run with HypDriv on Cloudflare 
 npx hypdriv doctor --json
 ```
 
-The JSON report tells you: Next.js version and config, whether `@opennextjs/cloudflare` is installed, whether `withHypDriv` wraps `next.config`, whether `hypdriv.worker.ts` is the Worker entry, wrangler compatibility (date/flags/bindings), deprecated features in use (`middleware.ts`, Edge runtime segments), Purser status, bundle sizes against limits, secrets exposure, and header posture. Each check has `id`, `status` (`pass|warn|fail|skip`), `message`, and `fix` (a shell command or a file edit description).
+The JSON report names the framework it detected (Next.js-only checks are skipped for Vite hosts, which get their own: integration registered, Worker entry, wrangler `main`/assets, Build Output) and tells you: Next.js version and config, whether `@opennextjs/cloudflare` is installed, whether `withHypDriv` wraps `next.config`, whether `hypdriv.worker.ts` is the Worker entry, wrangler compatibility (date/flags/bindings), deprecated features in use (`middleware.ts`, Edge runtime segments), Purser status, bundle sizes against limits, secrets exposure, and header posture. Each check has `id`, `status` (`pass|warn|fail|skip`), `message`, and `fix` (a shell command or a file edit description).
 
 ## 2. Install and wire (new projects)
 
@@ -31,6 +31,14 @@ pnpm add hypdriv && npx hypdriv init [--platform vercel]
 4. writes `proxy.ts` with `createProxy()` when none exists (on Vercel it wires `@hypdriv/vercel` automatically) and `instrumentation.ts` with `createInstrumentation()`,
 5. adds scripts: `hypdriv:doctor`, `hypdriv:analyze`, `hypdriv:audit`,
 6. optionally scaffolds the Purser bridge when `@avonao/purser` is installed.
+
+For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
+1. writes `hypdriv.config.ts` and adds the framework package (`@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt` or `@hypdriv/vinext`),
+2. registers the integration in the framework's config (Vite plugin, React Router preset, Astro integration, SvelteKit adapter wrapper, Nuxt module) and wires the request hook the framework owns (root `middleware`, `src/start.ts`, `handle`, `proxy.ts`),
+3. on Cloudflare: writes the Worker entry and wrangler `main`, the assets binding and `run_worker_first` patterns (prerendered pages run the request stages through the Worker shell and are still served as built), plus the Durable Object exports; on Vercel the integration writes the Build Output with HypDriv's Routing Middleware scoped to prerendered pages,
+4. prints the install commands for the framework's own adapter when one is missing.
+
+Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext}.md`.
 
 Never hand-edit `.hypdriv/` — it is build output.
 
@@ -50,16 +58,19 @@ Rules of thumb:
 - Keep CSP in `auto` mode; add sources with `allow.*` rather than replacing `directives`.
 - Do not disable `security.shield` or `security.headers` to fix a symptom; add a route override instead.
 - Prefer `ensureStatic` (Next.js) + inferred edge policies over manual `ttl` for static pages.
+- Prerendered pages of Vite hosts are served by the platform's static layer with a hash CSP; HypDriv infers no edge-cache policy for them (`servedStatically` in `hypdriv routes`).
+- Leave `redirects.forceHttps` at `auto` (on for Cloudflare and Vercel, follows `site.origin`); on Cloudflare also turn on the zone's *Always Use HTTPS*, because Workers Static Assets answer before the Worker — `hypdriv audit https` checks it.
 
 ## 4. Verify
 
 ```sh
-pnpm build                              # next build → .hypdriv/manifest.json
+pnpm build                              # next build / vite build → .hypdriv/manifest.json
 npx hypdriv routes                      # classification, cache policy, CSP mode per route
 npx hypdriv analyze                     # Worker weight (Cloudflare) or function sizes (Vercel, after `vercel build`), per-route JS/CSS, budgets
 pnpm preview &                          # Cloudflare: opennextjs-cloudflare build && preview → :8787
 pnpm start &                            # Vercel / Node: next start → :3000
-npx hypdriv audit all --url http://localhost:8787
+npx vite preview &                      # Vite hosts on Cloudflare (workerd); `npx hypdriv serve` for a plain Vite app on Node
+npx hypdriv audit all --url http://localhost:8787   # headers, csp, cache, https
 npx hypdriv audit css --url http://localhost:8787   # Purser zero-override check (needs Chrome)
 ```
 

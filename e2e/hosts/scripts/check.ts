@@ -7,8 +7,11 @@
  * What it verifies: `/_hypdriv/health` (framework, runner), the security preset and a CSP on a prerendered
  * page and on a dynamic page, that every inline and external script of each page is allowed by its policy
  * (hash or nonce — the nonce must be the policy's and fresh per request on dynamic pages), request ids and
- * Server-Timing, the bot shield (an automation user agent gets 403), rate limiting on the API (a 429 with
- * `Retry-After` within the configured limit), HTTP → HTTPS, and immutable caching of content-hashed assets.
+ * Server-Timing, the bot shield (an automation user agent gets 403) on rendered and on prerendered pages (the
+ * request stages reach documents the platform's static layer serves: the Worker shell with `run_worker_first` on
+ * Cloudflare, HypDriv's prerender Routing Middleware on Vercel; `--no-static-stages` for deployments that serve
+ * them with static headers only), rate limiting on the API (a 429 with `Retry-After` within the configured
+ * limit), HTTP → HTTPS, and immutable caching of content-hashed assets.
  *
  * Gateways in front of private test deployments are passed with the same variables `hypdriv audit` reads:
  * `VERCEL_AUTOMATION_BYPASS_SECRET`, `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET`, `HYPDRIV_ACCESS_HEADERS`
@@ -30,6 +33,7 @@ const { values: args } = parseArgs({
     'expect-runner': { type: 'string' },
     'no-https-check': { type: 'boolean', default: false },
     'no-bot-check': { type: 'boolean', default: false },
+    'no-static-stages': { type: 'boolean', default: false },
     json: { type: 'boolean', default: false },
   },
 });
@@ -292,6 +296,21 @@ if (!args['no-bot-check'] && (args.dynamic?.length || args.static?.length)) {
     const res = await rawGet(path, { 'user-agent': 'curl/8.9.1', accept: 'text/html' });
     assert(res.status === 403, `automation UA got HTTP ${res.status}`);
     return `curl UA → 403 (${res.headers['x-hypdriv-bot'] ?? 'blocked'})`;
+  });
+}
+
+if (!args['no-bot-check'] && !args['no-static-stages'] && args.static?.length) {
+  await step('stages on prerendered pages', async () => {
+    const results: string[] = [];
+    for (const path of args.static!) {
+      const res = await rawGet(path, { 'user-agent': 'curl/8.9.1', accept: 'text/html' });
+      assert(
+        res.status === 403,
+        `${path}: automation UA got HTTP ${res.status} — the static layer answered without the request stages`,
+      );
+      results.push(`${path} 403`);
+    }
+    return `curl UA → ${results.join(', ')}`;
   });
 }
 
