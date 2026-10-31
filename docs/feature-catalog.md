@@ -112,13 +112,15 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Portable nonce injection | Streaming, tokenizer-based nonce injection for HTML on runners without `HTMLRewriter` (framework hooks on Node and Vercel Functions); `modulepreload` links included | `security` | ✅ |
 | Runtime manifest patch | Server bundles embed the manifest as a tagged literal, replaced with the final manifest after prerendering and the adapter ran | `vite` | ✅ |
 | Plain Vite apps | `hypdriv()` plugin; `assetsWorker()` on Cloudflare, Build Output + HypDriv Routing Middleware on Vercel, `hypdriv serve` on Node; dev/preview pipeline | `vite`, `cli` | ✅ |
-| React Router 8 | Preset + Vite plugin, root middleware and outer handler wrapper, `ServerRouter` nonces | `react-router` | ✅ |
-| TanStack Start | Vite plugin, global request middleware, `ssr.nonce`, custom server entry | `tanstack-start` | ✅ |
-| Astro 7 | Integration, `pre` middleware, adapter outputs | `astro` | ✅ |
-| SvelteKit 3 | Adapter wrapper, `handle`, coexistence with `kit.csp` | `sveltekit` | ✅ |
-| Nuxt 4 | Module, Nitro middleware and render hooks, unhead nonces, route-rule headers | `nuxt` | ✅ |
-| vinext | Vite plugin, `proxy.ts` via `createProxy`, CDN cache purge bridge | `vinext` | ✅ |
-| Framework-aware tooling | `doctor` detects the framework (Vite-host checks, Next-only checks skipped), `routes`/`manifest` show the framework, `serve` | `cli` | ✅ |
+| React Router 8 | `hypdriv()` Vite plugin + `hypdrivPreset()` (runs after prerendering), root `middleware`, nonce-aware `entry.server`; `reactRouterWorker()` on Cloudflare, a complete Build Output with traced per-config functions on Vercel, `hypdriv-react-router-serve` on Node; request-gating rules extended to `.data` requests | `react-router` | ✅ |
+| TanStack Start | `tanstackStart(withHypDriv(...))` + `hypdriv()` Vite plugin, global request middleware (`hypdrivRequestMiddleware()`, CSRF kept), `ssr: hypdrivSsr()` nonces; `createStartWorker()` on Cloudflare, Nitro `vercel` / `node-server` presets | `tanstack-start` | ✅ |
+| Astro 7 | Integration (`integrations: [hypdriv()]`) with `pre` middleware, injected `/_hypdriv/*` route, `withHypDriv()` for `src/fetch.ts`; Worker shell on Cloudflare, header routes on Vercel, `_headers.json` for `@astrojs/node`; defers to Astro's `security.csp` | `astro` | ✅ |
+| SvelteKit 3 | `hypdriv(adapter())` wrapper + `sequence(hypdriv(), …)` hook; one policy merged with `kit.csp` (HypDriv's nonce everywhere); Worker shell around adapter-cloudflare, adapter-vercel header routes, `@hypdriv/sveltekit/node` around adapter-node | `sveltekit` | ✅ |
+| Nuxt 4 | `modules: ['@hypdriv/nuxt']`: Nitro plugin around the h3 app (error pages included), Nuxt-stamped nonces, `useHyp()`; Worker entry around Nitro's `cloudflare-module`, Vercel and Node presets | `nuxt` | ✅ |
+| vinext | `hypdriv()` around vinext's App Router entry (every runtime: `vinext start`, Workers, Nitro), `createVinextWorker()`, `withHypDrivCache()` purge bridge, CDN-served prerendered pages on Vercel | `vinext` | ✅ |
+| Prerendered pages on Vercel | HypDriv's Routing Middleware scoped to the prerendered documents (GET/HEAD) so CDN-served pages get rate limiting, the bot shield, maintenance, redirects and geo; on-demand routes run the pipeline once, in the function | `vite` + every integration | ✅ |
+| Private live verification | `e2e/hosts`: `check` (health, CSP coverage, nonces, asset caching, bot shield, API, rate limit, HTTPS) and `provision` for private Cloudflare (one gate rule + HTTPS redirect per prefix) and Vercel (protection + automation bypass) deployments | `e2e/hosts` | ✅ |
+| Framework-aware tooling | `doctor` detects the framework (Vite-host checks, Next-only checks skipped), `init` registers the integration in the framework's config and writes the platform files, `routes`/`manifest` show the framework, `audit` knows static-layer documents and endpoints, `serve` | `cli` | ✅ |
 
 ## 7. Purser CSS
 
@@ -137,7 +139,7 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Feature                  | What it does                                     | Package          | Status |
 | ------------------------ | ------------------------------------------------ | ---------------- | ------ |
 | `hypdriv init`           | Detect, scaffold, wire (Cloudflare, Vercel, Node) | `cli`            | ✅     |
-| `hypdriv doctor`         | 91 platform-aware checks with fixes              | `cli`            | ✅     |
+| `hypdriv doctor`         | 99 platform- and framework-aware checks with fixes | `cli`            | ✅     |
 | `hypdriv analyze`        | Worker weight + route assets                     | `cli`            | ✅     |
 | `hypdriv routes`         | Manifest table                                   | `cli`            | ✅     |
 | `hypdriv audit`          | Headers, CSP, cache, HTTPS enforcement, CSS audits | `cli`            | ✅     |
