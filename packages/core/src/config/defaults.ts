@@ -191,6 +191,8 @@ export const HEADER = {
   internalTimestamp: 'x-hypdriv-timestamp',
   /** Short-lived HMAC token that identifies the owner's own audit/benchmark tooling (`hypdriv audit`). */
   auditToken: 'x-hypdriv-audit',
+  /** Short-lived HMAC token that authorises `POST /_hypdriv/purge` (`hypdriv purge`). */
+  purgeToken: 'x-hypdriv-purge',
   skew: 'x-hypdriv-skew',
   deploymentId: 'x-deployment-id',
   runner: 'x-hypdriv-runner',

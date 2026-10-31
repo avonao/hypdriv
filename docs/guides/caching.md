@@ -97,6 +97,10 @@ How exact a tag purge is depends on the tag index: memory (per isolate), KV (`HY
 
 A purge also records **tombstones** in the tag index: a response that was requested before the purge (or within `purgeGraceMs`, 5 s, after it, while Next.js is still applying the same revalidation) is dropped instead of cached when it arrives. `revalidateTag()` and `revalidatePath()` purge once more two seconds later. Across isolates, other isolates re-read the shared tiers within `memoryTtl`; across colos, the zone purge by tag removes the Cache API copies. See [ADR 0017](../adr/0017-purge-consistency.md).
 
+### Purging a running deployment from outside
+
+`hypdriv purge --url <base> --path /pricing | --tag <tag> | --all` calls the signed endpoint `POST /_hypdriv/purge` of the Worker, which runs the same purge as `purgeEdge()` and therefore clears every tier (memory, Cache API, KV) and the zone copies. Use it instead of a raw Cloudflare tag purge, which cannot reach the KV tier. See [the CLI guide](cli.md#purging-a-deployment).
+
 ## Warming
 
 ```ts

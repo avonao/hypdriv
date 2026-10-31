@@ -13,6 +13,7 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv csp hashes [--route <path>]` / `hypdriv csp suggest [--reports <file>]` / `hypdriv csp print` | Shows static route hashes, proposes allow-list additions from collected violation reports, prints the effective policy. |
 | `hypdriv css build|check|watch` | Purser through the bridge with the config's options. |
 | `hypdriv warm --url <base> [--concurrency 4] [--anonymous] [--header …]` | Fetches the configured warm routes (or all static routes), signed with the audit token. |
+| `hypdriv purge --url <base> (--tag <tag> \| --path </path> \| --all) [--header …]` | Purges the edge cache of a running deployment through its signed `POST /_hypdriv/purge` endpoint: every cache tier, by tag, path or whole build. See [Purging a deployment](#purging-a-deployment). |
 | `hypdriv bench --url <base> [--paths …] [--n 20] [--anonymous] [--header …]` | TTFB p50/p95 and cache status distribution per path, signed with the audit token. |
 | `hypdriv deps [--update safe|major] [--only <name>]` | Dependency freshness across the workspace (npm registry): patch/minor/major classification, optional updates. |
 | `hypdriv manifest [--validate]` | Prints or validates `.hypdriv/manifest.json`. |
@@ -31,7 +32,26 @@ Add to CI:
 
 On Vercel, audit the preview deployment (`--url https://<deployment>.vercel.app`) with `HYPDRIV_INTERNAL_SECRET` in the environment. Locally, `pnpm build && pnpm start` and `--url http://localhost:3000`.
 
-**Private deployments.** `audit`, `bench`, `warm` and `jobs run` get through a gateway in front of the deployment with headers sent to the audited origin only (also from the headless Chrome of the CSS audit), never logged, independent of `--anonymous`:
+## Purging a deployment
+
+`hypdriv purge` is the operator's way to empty the edge cache of a deployment that is already live (a bad page cached, a content fix that must show now, a rollback). A raw Cloudflare purge by tag removes only the Cache API copies; HypDriv also keeps entries in memory and, when `HYPDRIV_KV` is bound, in KV, where they live for days. Only a purge that runs inside the Worker clears all tiers, and this command asks the Worker to do it.
+
+```sh
+hypdriv purge --url https://www.example.com --path /pricing --path /blog     # a page and every variant of it
+hypdriv purge --url https://www.example.com --tag route:/blog/[slug]          # every page of a route
+hypdriv purge --url https://www.example.com --all                              # tag build:<buildId> of the local manifest
+```
+
+- **Authorisation.** The command signs a token with `HYPDRIV_INTERNAL_SECRET` (environment, `.dev.vars`, `.env.local`) that is bound to the host of `--url` and valid for 2 minutes; the Worker rejects a token that claims more than 5 minutes of life. The token has its own payload prefix, so an audit token (`x-hypdriv-audit`) can never purge. Without a valid token, or when the Worker has no `HYPDRIV_INTERNAL_SECRET`, the route answers `404` as if it did not exist.
+- **`--all`** purges the tag `build:<buildId>` from `.hypdriv/manifest.js` (run it from the application directory after the build you deployed). With a Next.js `deploymentId` the build id is constant, so the tag covers every cached page of the application, not only one deploy's.
+- **A gate in front of the Worker** (a site gate, Cloudflare Access, a WAF rule) is passed with `--header "name: value"` / `HYPDRIV_ACCESS_HEADERS` like the other commands.
+- **Fleets.** `/_hypdriv/**` is routed to one area (the router's default area), so the command purges that area's cache only. To purge another area, send the request to a host that reaches it, or redeploy it.
+- **Grace window.** A tag purge records tombstones: pages rendered within 5 seconds after it (`purgeGraceMs`) are served but not cached again. A path purge goes through the page's `path:` tag, so the same window applies.
+- Exit codes: `0` purged, `1` the endpoint refused or was unreachable (the message says which of: wrong or missing secret on the Worker, older HypDriv on the Worker, no edge cache, gateway), `2` usage error.
+
+The endpoint takes `{ "tags": [], "paths": [], "urls": [] }` (at most 200 entries in total, 64 KB) and answers `{ "ok": true, "tags": n, "urls": n, "entriesRemoved": n }`; `409 { "error": "no_edge_cache" }` when the application has no edge cache.
+
+**Private deployments.** `audit`, `bench`, `warm`, `purge` and `jobs run` get through a gateway in front of the deployment with headers sent to the audited origin only (also from the headless Chrome of the CSS audit), never logged, independent of `--anonymous`:
 
 | Gateway | Variables (environment, `.dev.vars`, `.env*`, `vercel pull`'s files) | Header |
 | --- | --- | --- |

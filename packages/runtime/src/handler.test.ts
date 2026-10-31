@@ -1,4 +1,5 @@
 import { emptyManifest, getCurrentContext, type HypManifest, routePatternToRegex } from '@hypdriv/core';
+import { signPurgeToken } from '@hypdriv/security';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHandler, isStaticRequest } from './handler';
 import { hyp, jobHandler, nonce } from './server';
@@ -86,6 +87,99 @@ describe('createHandler', () => {
     expect(upgrade.status).toBe(308);
     expect(upgrade.headers.get('location')).toBe('https://example.com/account');
     expect(upstream).not.toHaveBeenCalled();
+  });
+
+  describe('POST /_hypdriv/purge', () => {
+    const SECRET = 'purge-secret-for-tests-0123456789abcdef';
+    const purge = async (
+      handler: ReturnType<typeof createHandler>,
+      body: unknown,
+      headers: Record<string, string> = {},
+      upstream = async () => html('app'),
+    ) =>
+      handler(
+        new Request('https://example.com/_hypdriv/purge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...headers },
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+        }),
+        { upstream },
+      );
+    const signed = async (host = 'example.com') => ({
+      'x-hypdriv-purge': await signPurgeToken(SECRET, { host }),
+    });
+
+    it('does not exist for requests without a valid purge token', async () => {
+      vi.stubEnv('HYPDRIV_INTERNAL_SECRET', SECRET);
+      const handler = createHandler({ config: {}, manifest, target: 'node' });
+      for (const headers of [
+        {},
+        { 'x-hypdriv-purge': 'v1.9999999999.abc' },
+        await signed('other.example.com'),
+      ]) {
+        const res = await purge(handler, { tags: ['path:/'] }, headers);
+        expect(res.status).toBe(404);
+      }
+      const get = await handler(new Request('https://example.com/_hypdriv/purge'), {
+        upstream: async () => html('app'),
+      });
+      expect(get.status).toBe(404);
+    });
+
+    it('does not exist when the internal secret is not configured', async () => {
+      const handler = createHandler({ config: {}, manifest, target: 'node' });
+      const res = await purge(handler, { tags: ['path:/'] }, await signed());
+      expect(res.status).toBe(404);
+    });
+
+    it('validates the body of a signed request', async () => {
+      vi.stubEnv('HYPDRIV_INTERNAL_SECRET', SECRET);
+      const handler = createHandler({ config: {}, manifest, target: 'node' });
+      const headers = await signed();
+      expect((await purge(handler, 'not json', headers)).status).toBe(400);
+      expect((await purge(handler, {}, headers)).status).toBe(400);
+      expect((await purge(handler, { tags: 'path:/' }, headers)).status).toBe(400);
+      expect((await purge(handler, { paths: ['no-slash'] }, headers)).status).toBe(400);
+      expect((await purge(handler, { tags: [''] }, headers)).status).toBe(400);
+    });
+
+    it('removes a cached page from the edge cache, by tag and by path', async () => {
+      vi.stubEnv('HYPDRIV_INTERNAL_SECRET', SECRET);
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        const handler = createHandler({ config: {}, manifest, target: 'node' });
+        let renders = 0;
+        const upstream = async () => {
+          renders++;
+          return html(`render ${renders}`);
+        };
+        const page = async () =>
+          (await handler(new Request('https://example.com/'), { upstream })).headers.get('x-hypdriv-cache');
+        expect(await page()).toBe('MISS');
+        expect(await page()).toBe('HIT');
+
+        const byTag = await purge(handler, { tags: ['path:/'] }, await signed(), upstream);
+        expect(byTag.status).toBe(200);
+        expect(await byTag.json()).toMatchObject({ ok: true, tags: 1, urls: 0 });
+        expect(await page()).toBe('MISS');
+        // Purge tombstones: a response fetched within purgeGraceMs of a tag purge is not kept (ADR 0017).
+        expect(await page()).toBe('MISS');
+        vi.setSystemTime(Date.now() + 6000);
+        expect(await page()).toBe('MISS');
+        expect(await page()).toBe('HIT');
+
+        // A purge by path removes the URL and every variant of it (through its `path:` tag, so the same window applies).
+        const byPath = await purge(handler, { paths: ['/'] }, await signed(), upstream);
+        expect(byPath.status).toBe(200);
+        expect(await byPath.json()).toMatchObject({ ok: true, tags: 0, urls: 1 });
+        expect(await page()).toBe('MISS');
+        vi.setSystemTime(Date.now() + 6000);
+        expect(await page()).toBe('MISS');
+        expect(await page()).toBe('HIT');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('skips the pipeline for build assets but not for data paths', async () => {

@@ -1,3 +1,4 @@
+import { getEdgePurger } from '@hypdriv/cache';
 import {
   cacheVersion,
   describeCapabilities,
@@ -9,7 +10,7 @@ import {
 } from '@hypdriv/core';
 import { createLiveHandler } from '@hypdriv/live';
 import { analyticsEngineVitalsSink, logVitalsSink, vitalsHandler } from '@hypdriv/observe';
-import { type CspReport, cspReportHandler } from '@hypdriv/security';
+import { type CspReport, cspReportHandler, verifyPurgeToken } from '@hypdriv/security';
 import type { Platform } from './index';
 
 export interface InternalRoutesOptions {
@@ -46,13 +47,119 @@ function cspReportSink(platform: Platform): (report: CspReport) => void {
   };
 }
 
+const PURGE_MAX_ITEMS = 200;
+const PURGE_MAX_BODY = 64 * 1024;
+
+function stringList(value: unknown, what: string): string[] | string {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return `${what} must be an array of strings`;
+  if (value.length > PURGE_MAX_ITEMS) return `${what} accepts at most ${PURGE_MAX_ITEMS} entries`;
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string' || !item || item.length > 2048)
+      return `${what} must hold non-empty strings of at most 2048 characters`;
+    out.push(item);
+  }
+  return out;
+}
+
+/**
+ * `POST /_hypdriv/purge` with an `x-hypdriv-purge` token (`hypdriv purge`): purges cache tags and URLs from
+ * every tier of the edge cache (memory, Cache API, KV), the tag index and the zone. Answers `404` to anything
+ * not signed with the internal secret, so the route does not exist for visitors. A raw Cloudflare tag purge
+ * only clears the Cache API tier; the KV copy would refill it.
+ */
+async function purgeRoute(
+  platform: Platform,
+  request: Request,
+  url: URL,
+  token: string | undefined,
+): Promise<Response> {
+  const noStore = { 'cache-control': 'no-store' };
+  const hidden = () => json({ error: 'not_found' }, { status: 404, headers: noStore });
+  if (request.method !== 'POST') return hidden();
+  const secret = readEnv(
+    platform.env as Record<string, unknown>,
+    platform.config.security.internalAuth.secretEnv,
+  );
+  if (!secret || !token) return hidden();
+  const hosts = new Set([url.hostname.toLowerCase()]);
+  const hostHeader = request.headers.get('host');
+  if (hostHeader)
+    hosts.add(
+      hostHeader
+        .replace(/:\d+$/, '')
+        .replace(/^\[|\]$/g, '')
+        .toLowerCase(),
+    );
+  let ok = false;
+  for (const host of hosts) {
+    if (await verifyPurgeToken(token, secret, { host })) {
+      ok = true;
+      break;
+    }
+  }
+  if (!ok) {
+    platform.log.warn('invalid purge token', { hosts: [...hosts] });
+    return hidden();
+  }
+  const purger = getEdgePurger();
+  if (!purger) return json({ ok: false, error: 'no_edge_cache' }, { status: 409, headers: noStore });
+  const text = await request.text();
+  if (text.length > PURGE_MAX_BODY)
+    return json({ ok: false, error: 'body_too_large' }, { status: 413, headers: noStore });
+  let body: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return json({ ok: false, error: 'invalid_json' }, { status: 400, headers: noStore });
+  }
+  const tags = stringList(body.tags, 'tags');
+  const urls = stringList(body.urls, 'urls');
+  const paths = stringList(body.paths, 'paths');
+  for (const list of [tags, urls, paths])
+    if (typeof list === 'string') return json({ ok: false, error: list }, { status: 400, headers: noStore });
+  const absolute: string[] = [...(urls as string[])];
+  for (const path of paths as string[]) {
+    if (!path.startsWith('/'))
+      return json({ ok: false, error: 'paths must start with /' }, { status: 400, headers: noStore });
+    absolute.push(new URL(path, url.origin).toString());
+  }
+  if (!(tags as string[]).length && !absolute.length)
+    return json({ ok: false, error: 'give tags, urls or paths' }, { status: 400, headers: noStore });
+  const purgedTags = (tags as string[]).length ? await purger.purgeTags(tags as string[]) : 0;
+  const purgedUrls = absolute.length ? await purger.purgeUrls(absolute) : 0;
+  platform.log.info('purge requested', { tags: (tags as string[]).length, urls: absolute.length });
+  return json(
+    {
+      ok: true,
+      tags: (tags as string[]).length,
+      urls: absolute.length,
+      entriesRemoved:
+        (typeof purgedTags === 'number' ? purgedTags : 0) + (typeof purgedUrls === 'number' ? purgedUrls : 0),
+    },
+    { headers: noStore },
+  );
+}
+
 /** Builds the handler for `/_hypdriv/*`. Returns `null` for non-internal paths. */
 export function internalRoutes(
   platform: Platform,
   options: InternalRoutesOptions,
 ): (
   request: Request,
-  info: { ip: string; country?: string; waitUntil(p: Promise<unknown>): void },
+  info: {
+    ip: string;
+    country?: string;
+    /**
+     * The `x-hypdriv-purge` header of the original request. The runners strip client-supplied `x-hypdriv-*` headers
+     * before the stages run, so this route (the only one that reads one) gets it from here.
+     */
+    purgeToken?: string | null;
+    waitUntil(p: Promise<unknown>): void;
+  },
 ) => Promise<Response | null> {
   const prefix = platform.config.cloudflare.internalPathPrefix;
   const vitalsConfig = platform.config.observe.vitals;
@@ -118,6 +225,7 @@ export function internalRoutes(
       if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
       return csp(request);
     }
+    if (path === `${prefix}/purge`) return purgeRoute(platform, request, url, info.purgeToken ?? undefined);
     if (live && (path === livePath || path.startsWith(`${livePath}/`))) {
       return live(request, { waitUntil: info.waitUntil });
     }

@@ -18,6 +18,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Worker weight report          | Attributes bundle bytes to source modules via the source map; flags startup risks                         | ✅                                     | —                                                            | `cli`                  | ✅     |
 | Budgets                       | Per-route JS/CSS budgets and Worker size budget with snapshots and PR-ready diffs                         | ✅                                     | —                                                            | `core`, `cli`          | ✅     |
 | Skew protection assist        | Auto `deploymentId` unique per build and app (ADR 0016), header passthrough, reload instruction for stale RSC clients | ✅                                     | OpenNext skew protection                                     | `next`, `cloudflare`   | ✅     |
+| Operator purge                | `hypdriv purge` / signed `POST /_hypdriv/purge` (host-bound token, 2 min, own payload prefix): purge by tag, path or whole build across every cache tier from outside the application | CLI + Worker route | Edge cache, tag index, zone purge | `cli`, `runtime`, `security`, `cloudflare` | ✅     |
 | Cache warming                 | Post-deploy and scheduled warming of hot routes                                                           | CLI                                    | scheduled handler                                            | `cli`, `cloudflare`    | ✅     |
 | Image loader                  | Cloudflare Images loader for `next/image`, format negotiation, placeholders map                           | `/_next/image` via OpenNext            | Images binding / `/cdn-cgi/image`                            | `image`                | ✅     |
 | ETag / 304 for route handlers | `defineRoute()` computes weak ETags for JSON responses                                                    | ✅                                     | —                                                            | `next`                 | ✅     |
@@ -67,6 +68,11 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Tail handler          | Forwards tail events (exceptions, warn/error lines, CPU/memory/wall-time limits, cancellations) to log sinks | ✅                  | —                                | `cloudflare`         | ✅     |
 | ISR pass-through      | OpenNext's revalidation requests (`x-prerender-revalidate`, verified by hash) bypass the Drivetrain; regenerated pages purge their edge copies | ✅ | DO queue | `cloudflare`, `next` | ✅ |
 | OpenNext cache check  | `hypdriv doctor` verifies the incremental cache, queue, tag cache and purge overrides against bindings and Worker exports | ✅ | — | `cli` | ✅ |
+| Middleware-aware edge cache | `cache.edge.bypass` (cookies, headers, query) makes the edge cache skip requests a `middleware.ts` decides on, because the cache answers before the middleware; `hypdriv doctor` (`cache.middleware`) warns when a middleware sits behind an edge cache that bypasses nothing | ✅ | — | `cache`, `cli` | ✅ |
+| Hash-CSP cache guard | `hypdriv doctor` fails (`opennext.cache`) when routes use a hash CSP and no incremental cache serves their prerendered HTML (the page would never hydrate) | ✅ | — | `cli` | ✅ |
+| Config outside the project | `--wrangler <file>` / `HYPDRIV_WRANGLER_CONFIG` on every CLI command: check a generated or shared Wrangler config (per-Worker `infra/*.wrangler.jsonc`) against the project it deploys | ✅ | — | `cli` | ✅ |
+| Wrangler environments | `--env <name>` / `HYPDRIV_WRANGLER_ENV`: `doctor` and `analyze` check `env.<name>` as Wrangler resolves it (bindings are not inherited); `wrangler.env-bindings` warns when an environment lacks binding kinds the top level declares | ✅ | — | `cli` | ✅ |
+| Production guide | `docs/guides/production-cloudflare.md`: install from a release bundle, OpenNext production cache, policy, resources, secrets, area-Worker fleets, probes, launch checklist, troubleshooting | ✅ | — | docs | ✅ |
 | Live e2e suites       | `e2e/cloudflare` (43 checks) and `e2e/vercel` (41 checks, Hobby plan): an app plus runner that verifies every capability on a real account, with provisioning scripts | — | account | `e2e` | ✅ |
 | Geo context           | Country, region, city, timezone, continent, ASN, colo exposed to the app                          | ✅                  | —                                | `cloudflare`, `next` | ✅     |
 | Locale negotiation    | `Accept-Language` + geo + cookie negotiation, proxy stage                                         | ✅                  | —                                | `next`               | ✅     |
@@ -139,7 +145,7 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Feature                  | What it does                                     | Package          | Status |
 | ------------------------ | ------------------------------------------------ | ---------------- | ------ |
 | `hypdriv init`           | Detect, scaffold, wire (Cloudflare, Vercel, Node) | `cli`            | ✅     |
-| `hypdriv doctor`         | 99 platform- and framework-aware checks with fixes | `cli`            | ✅     |
+| `hypdriv doctor`         | 100+ platform- and framework-aware checks with fixes | `cli`            | ✅     |
 | `hypdriv analyze`        | Worker weight + route assets                     | `cli`            | ✅     |
 | `hypdriv routes`         | Manifest table                                   | `cli`            | ✅     |
 | `hypdriv audit`          | Headers, CSP, cache, HTTPS enforcement, CSS audits | `cli`            | ✅     |

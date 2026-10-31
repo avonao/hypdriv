@@ -27,6 +27,10 @@ export interface SecurityModule {
     secret: string,
     options: { host: string; ttlSeconds?: number; now?: number },
   ) => Promise<string>;
+  signPurgeToken?: (
+    secret: string,
+    options: { host: string; ttlSeconds?: number; now?: number },
+  ) => Promise<string>;
   parseCsp?: (header: string | null | undefined) => CspDirectives;
   serializeCsp?: (directives: CspDirectives) => string;
   buildCspHeader?: (input: {

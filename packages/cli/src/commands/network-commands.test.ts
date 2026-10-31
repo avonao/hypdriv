@@ -1,5 +1,5 @@
 import { writeManifest } from '@hypdriv/core/node';
-import { verifyInternalRequest } from '@hypdriv/security';
+import { verifyInternalRequest, verifyPurgeToken } from '@hypdriv/security';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   cleanupProjects,
@@ -54,6 +54,116 @@ describe('warm', () => {
     expect(code).toBe(1);
     expect(calls.map((c) => c.url)).toEqual(['https://shop.test/', 'https://shop.test/pricing']);
     expect(calls[0]!.headers.get('user-agent')).toContain('Mozilla/5.0');
+  });
+});
+
+describe('purge', () => {
+  const secret = 'p'.repeat(40);
+  const project = () =>
+    tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': 'export default {};\n',
+      '.dev.vars': `HYPDRIV_INTERNAL_SECRET="${secret}"\n`,
+    });
+  const ok = () =>
+    response(JSON.stringify({ ok: true, tags: 1, urls: 1, entriesRemoved: 3 }), {
+      headers: { 'content-type': 'application/json' },
+    });
+
+  it('posts a host-bound signed token with the tags and paths, and never prints the secret', async () => {
+    const p = project();
+    const { fetch, calls } = fakeFetch(ok);
+    const io = memoryIO(p.dir, { fetch });
+    const code = await runCommand(
+      'purge',
+      ['--url', 'https://shop.test', '--tag', 'route:/blog', '--path', '/pricing', '--path', '/pricing'],
+      io,
+    );
+    expect(code).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ url: 'https://shop.test/_hypdriv/purge', method: 'POST' });
+    const token = calls[0]!.headers.get('x-hypdriv-purge');
+    expect(await verifyPurgeToken(token, secret, { host: 'shop.test' })).toBe(true);
+    expect(await verifyPurgeToken(token, secret, { host: 'other.test' })).toBe(false);
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ tags: ['route:/blog'], paths: ['/pricing'] });
+    expect(io.out).toContain('Purged 1 tag(s) and 1 URL(s)');
+    expect(io.out + io.err).not.toContain(secret);
+    expect(io.out + io.err).not.toContain(token!);
+  });
+
+  it('--all purges the build tag of the local manifest; absolute URLs go to urls', async () => {
+    const p = project();
+    const manifest = await fixtureManifest();
+    await writeManifest(p.dir, manifest);
+    const { fetch, calls } = fakeFetch(ok);
+    const io = memoryIO(p.dir, { fetch });
+    const code = await runCommand(
+      'purge',
+      ['--url', 'https://shop.test', '--all', '--path', 'https://shop.test/a', '--json'],
+      io,
+    );
+    expect(code).toBe(0);
+    expect(JSON.parse(calls[0]!.body!)).toEqual({
+      tags: [`build:${manifest.buildId}`],
+      urls: ['https://shop.test/a'],
+    });
+    expect(JSON.parse(io.out)).toMatchObject({ status: 200, ok: true, response: { entriesRemoved: 3 } });
+  });
+
+  it('sends gateway headers (--header) next to the token', async () => {
+    const p = project();
+    const { fetch, calls } = fakeFetch(ok);
+    const io = memoryIO(p.dir, { fetch });
+    expect(
+      await runCommand(
+        'purge',
+        ['--url', 'https://shop.test', '--path', '/', '--header', 'cookie: gate=1'],
+        io,
+      ),
+    ).toBe(0);
+    expect(calls[0]!.headers.get('cookie')).toBe('gate=1');
+    expect(calls[0]!.headers.get('x-hypdriv-purge')).toBeTruthy();
+  });
+
+  it('--all without a local build manifest is a usage error and sends nothing', async () => {
+    const p = project();
+    const { fetch, calls } = fakeFetch(ok);
+    const io = memoryIO(p.dir, { fetch });
+    expect(await runCommand('purge', ['--url', 'https://shop.test', '--all'], io)).toBe(2);
+    expect(io.err).toContain('local build manifest');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('explains a 404 and a gateway answer, and exits 1', async () => {
+    const p = project();
+    const missing = fakeFetch(() => response('{"error":"not_found"}', { status: 404 }));
+    const io = memoryIO(p.dir, { fetch: missing.fetch });
+    expect(await runCommand('purge', ['--url', 'https://shop.test', '--path', '/'], io)).toBe(1);
+    expect(io.out + io.err).toContain('does not exist for this request');
+    const gated = fakeFetch(() => response('', { status: 307, headers: { location: '/gate' } }));
+    const io2 = memoryIO(p.dir, { fetch: gated.fetch });
+    expect(await runCommand('purge', ['--url', 'https://shop.test', '--path', '/', '--json'], io2)).toBe(1);
+    expect(JSON.parse(io2.out)).toMatchObject({ status: 307, ok: false });
+    expect(JSON.parse(io2.out).error).toContain('--header');
+  });
+
+  it('reports a network failure and rejects bad usage', async () => {
+    const p = project();
+    const failing = (async () => {
+      throw Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+    }) as unknown as typeof fetch;
+    const io = memoryIO(p.dir, { fetch: failing });
+    expect(await runCommand('purge', ['--url', 'https://shop.test', '--tag', 'x'], io)).toBe(1);
+    expect(io.out + io.err).toContain('ECONNREFUSED');
+    expect(await runCommand('purge', ['--url', 'https://shop.test'], memoryIO(p.dir))).toBe(2);
+    expect(await runCommand('purge', ['--tag', 'x'], memoryIO(p.dir))).toBe(2);
+    expect(
+      await runCommand('purge', ['--url', 'https://shop.test', '--path', 'no-slash'], memoryIO(p.dir)),
+    ).toBe(2);
+    const bare = tempProject({ 'package.json': '{"name":"x"}', 'hypdriv.config.ts': 'export default {};\n' });
+    const noSecret = memoryIO(bare.dir);
+    expect(await runCommand('purge', ['--url', 'https://shop.test', '--tag', 'x'], noSecret)).toBe(2);
+    expect(noSecret.err).toContain('HYPDRIV_INTERNAL_SECRET is not set');
   });
 });
 

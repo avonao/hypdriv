@@ -153,6 +153,7 @@ export function createProxyHandler(
     const handled = await internal(request, {
       ip,
       ...(country ? { country } : {}),
+      purgeToken: incoming.headers.get(HEADER.purgeToken),
       waitUntil: (p) => event.waitUntil(p),
     });
     if (handled) return handled;

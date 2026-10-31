@@ -380,7 +380,12 @@ export function createHandler(options: CreateHandlerOptions): HypHandler {
       ((p: Promise<unknown>) => {
         void p.catch(() => undefined);
       });
-    const handled = await internal(request, { ip, ...(country ? { country } : {}), waitUntil });
+    const handled = await internal(request, {
+      ip,
+      ...(country ? { country } : {}),
+      purgeToken: incoming.headers.get(HEADER.purgeToken),
+      waitUntil,
+    });
     if (handled) return handled;
 
     const url = new URL(request.url);

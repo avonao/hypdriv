@@ -49,6 +49,7 @@ export {
   scryptJs,
   verify as verifyPassword,
 } from './passwords';
+export * from './purge-token';
 // Rate limiting
 export * from './rate-limit/index';
 export * from './redirect';

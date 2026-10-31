@@ -10,6 +10,7 @@ import { doctorCommand } from './doctor';
 import { initCommand } from './init';
 import { jobsCommand } from './jobs';
 import { manifestCommand } from './manifest';
+import { purgeCommand } from './purge';
 import { routesCommand } from './routes';
 import { serveCommand } from './serve';
 import type { Command } from './types';
@@ -27,6 +28,7 @@ export const commands: Command[] = [
   cspCommand,
   cssCommand,
   warmCommand,
+  purgeCommand,
   benchCommand,
   serveCommand,
   depsCommand,
