@@ -589,3 +589,68 @@ describe('cspStage in proxy.ts', () => {
     expect(apiResult.response.headers.get('content-security-policy')).toBeNull();
   });
 });
+
+describe('cspStage on runners that own the body', () => {
+  it('injects the nonce with the portable tokenizer when HTMLRewriter is absent', async () => {
+    const ctx = makeCtx({ route: isrRoute, manifest, url: 'https://app.test/blog' });
+    const { response } = await runStage(
+      cspStage(ctx.config, { htmlRewriter: null, portableInjection: true }),
+      ctx,
+      () =>
+        new Response(
+          '<html><head><link rel="modulepreload" href="/a.js"></head><script>x()</script></html>',
+          {
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          },
+        ),
+    );
+    const nonce = ctx.state.get(NONCE_KEY)!;
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('nonce');
+    const body = await response.text();
+    expect(body).toContain(`<script nonce="${nonce}">x()</script>`);
+    expect(body).toContain(`<link rel="modulepreload" href="/a.js" nonce="${nonce}">`);
+  });
+
+  it('without portable injection, cached HTML degrades to the unsafe-inline fallback (proxy runners)', async () => {
+    const ctx = makeCtx({ route: isrRoute, manifest, url: 'https://app.test/blog' });
+    await runStage(cspStage(ctx.config, { htmlRewriter: null }), ctx, htmlNext);
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('unsafe-inline-fallback');
+  });
+
+  it("replaces HypDriv's own static policy instead of deferring to it as the application's", async () => {
+    const ctx = makeCtx({ route: staticRoute, manifest, url: 'https://app.test/' });
+    const { response } = await runStage(
+      cspStage(ctx.config),
+      ctx,
+      () =>
+        new Response('<html><script>1</script></html>', {
+          headers: {
+            'content-type': 'text/html',
+            'content-security-policy': "script-src 'self' 'sha256-stale'",
+            'reporting-endpoints': 'hypdriv="/_hypdriv/csp-report"',
+            [HEADER.cspMode]: 'hash',
+          },
+        }),
+    );
+    expect(response.headers.get(HEADER.cspMode)).toBe('hash');
+    expect(response.headers.get('content-security-policy')).toContain(HASH);
+    expect(response.headers.get('content-security-policy')).not.toContain('sha256-stale');
+    expect(response.headers.get('reporting-endpoints')).toBe(
+      'hypdriv="https://app.test/_hypdriv/csp-report"',
+    );
+  });
+
+  it('still defers to a policy the application set itself', async () => {
+    const ctx = makeCtx({ route: staticRoute, manifest, url: 'https://app.test/' });
+    const { response } = await runStage(
+      cspStage(ctx.config),
+      ctx,
+      () =>
+        new Response('<html></html>', {
+          headers: { 'content-type': 'text/html', 'content-security-policy': "default-src 'none'" },
+        }),
+    );
+    expect(response.headers.get(HEADER.cspMode)).toBe('app');
+    expect(response.headers.get('content-security-policy')).toBe("default-src 'none'");
+  });
+});

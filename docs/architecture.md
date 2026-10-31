@@ -1,6 +1,6 @@
 # HypDriv architecture
 
-> **HypDriv** is a Hyper-Extension for Next.js 16+: a sidecar that attaches to a Next.js application through its public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers and on Vercel, without forking Next.js, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
+> **HypDriv** is a Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext: a sidecar that attaches to an application through its framework's public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, on Vercel and on Node, without forking a framework, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
 
 This document is the source of truth for the design. Package READMEs and guides elaborate; they never contradict it.
 
@@ -28,6 +28,7 @@ This document is the source of truth for the design. Package READMEs and guides 
 | Bundler                           | Turbopack (default) and `next build --webpack`                                                                   |
 | TypeScript in host apps           | 5.9, 6.x, 7.x                                                                                                    |
 | Purser CSS                        | 0.1+ (`@avonao/purser/build` API)                                                                                |
+| Vite hosts (ADR 0019)             | Vite 8; React Router 8, TanStack Start 1.169+, Astro 7, SvelteKit 3, Nuxt 4.6, vinext 1.4, plain Vite apps — on Cloudflare (`@cloudflare/vite-plugin` / framework adapters), Vercel (Build Output API) and Node |
 
 Deprecated Next.js features (`middleware.ts`, Edge runtime route segments) are detected by `hypdriv doctor` and reported with the migration path; HypDriv does not add support for them.
 
@@ -138,7 +139,21 @@ Proxy runs on the Node runtime in Next.js 16, so the manifest is read lazily fro
 - `publish()` / `useLive()`: live channels.
 - `<Speculation/>`, `<HypDrivDevTools/>`, `<HypImage/>`: client components.
 
-### 3.6 CLI
+### 3.6 Vite hosts
+
+Frameworks built on Vite attach through their own contracts (ADR 0019). The neutral pieces are shared with Next.js: `@hypdriv/runtime` (stages, platform, runners), `@hypdriv/build` (manifest assembly, static header rules) and `@hypdriv/vite` (the Vite toolkit and the plain-Vite plugin). Each framework package registers a Vite plugin (`hostPlugin`: `virtual:hypdriv/config`, `virtual:hypdriv/manifest`), wraps the framework's request hook with `createHandler()` (`runner: 'host'`, owning the full response), finalises the manifest after the complete build (prerendering and the adapter included), patches it into the built server bundles, and writes the static header rules of the target platform (Cloudflare `_headers`, Vercel Build Output routes, or the framework's native header config). On Cloudflare, frameworks whose Worker entry the application owns use `createWorker({ app })` for `scheduled`/`queue`/Durable Objects; the in-app hook passes through inside it.
+
+| Host | Build integration | Request hook |
+| --- | --- | --- |
+| plain Vite | `hypdriv()` plugin | `assetsWorker()` (Cloudflare), HypDriv Routing Middleware (Vercel), `hypdriv serve` (Node) |
+| React Router 8 | preset + Vite plugin (`@hypdriv/react-router`) | root route `middleware` / outer `createRequestHandler` wrapper |
+| TanStack Start | Vite plugin (`@hypdriv/tanstack-start`) | global request middleware (`src/start.ts`) |
+| Astro 7 | integration (`@hypdriv/astro`) | middleware (`order: 'pre'`) |
+| SvelteKit 3 | adapter wrapper + Vite plugin (`@hypdriv/sveltekit`) | `handle` |
+| Nuxt 4 | module (`@hypdriv/nuxt`) | Nitro middleware and render hooks |
+| vinext | Vite plugin (`@hypdriv/vinext`) | `proxy.ts` (`createProxy`) |
+
+### 3.7 CLI
 
 `hypdriv` is a dependency-light Node CLI (Node's `util.parseArgs`, no interactive-framework dependency) with JSON output on every command. See §10.
 
@@ -314,8 +329,12 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/live`       | Workers + React                                       | core, cloudflare (DO)                               |
 | `@hypdriv/image`      | neutral + React                                       | core                                                |
 | `@hypdriv/purser`     | Node (bridge) + neutral (runtime bits)                | core                                                |
-| `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, cache, security, observe, flags, purser, vercel |
-| `@hypdriv/cloudflare` | Workers                                               | core, cache, security, observe, flags               |
+| `@hypdriv/runtime`    | neutral (stages, platform, `createHandler`, `createProxyHandler`, `hyp()`) | core, cache, security, observe, flags, live, purser, vercel |
+| `@hypdriv/build`      | Node (manifest assembly, static header rules)          | core, runtime, security, purser                     |
+| `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, runtime, build, cache, security, observe, flags, purser, vercel |
+| `@hypdriv/vite`       | Node (plugin, toolkit, `/node` server) + Workers (`/worker`) + Vercel Routing Middleware (`/vercel-middleware`) | core, runtime, build, security, cloudflare |
+| `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` | framework integrations | vite, runtime, cloudflare |
+| `@hypdriv/cloudflare` | Workers                                               | core, runtime, cache, security, observe, flags, live, purser |
 | `@hypdriv/vercel`     | neutral (Vercel Functions, Routing Middleware)        | core, cache, security                               |
 | `@hypdriv/devtools`   | browser + neutral                                     | core                                                |
 | `@hypdriv/testing`    | Node + Workers                                        | core                                                |

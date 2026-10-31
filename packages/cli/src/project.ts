@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
-import type { HypManifest } from '@hypdriv/core';
+import type { FrameworkName, HypManifest } from '@hypdriv/core';
 import {
   detectPackageManager,
   findConfigFile,
@@ -31,6 +31,106 @@ export const PLATFORM_RUNTIME_PACKAGE: Record<DeployPlatform, string | null> = {
   node: null,
   unknown: null,
 };
+
+/** The application framework HypDriv integrates with (`unknown` when none is recognised). */
+export type ProjectFramework = FrameworkName | 'unknown';
+
+/** HypDriv's integration package per framework. */
+export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
+  next: 'hypdriv',
+  vinext: '@hypdriv/vinext',
+  'react-router': '@hypdriv/react-router',
+  'tanstack-start': '@hypdriv/tanstack-start',
+  astro: '@hypdriv/astro',
+  sveltekit: '@hypdriv/sveltekit',
+  nuxt: '@hypdriv/nuxt',
+  vite: '@hypdriv/vite',
+};
+
+/** Display names. */
+export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
+  next: 'Next.js',
+  vinext: 'vinext',
+  'react-router': 'React Router',
+  'tanstack-start': 'TanStack Start',
+  astro: 'Astro',
+  sveltekit: 'SvelteKit',
+  nuxt: 'Nuxt',
+  vite: 'Vite',
+  unknown: 'an unknown framework',
+};
+
+export interface FrameworkInfo {
+  name: ProjectFramework;
+  /** Installed (or declared) framework version. */
+  version: string | null;
+  /** The HypDriv integration package for the framework. */
+  integration: string | null;
+  /** Installed version of the integration package. */
+  integrationInstalled: string | null;
+  /** The framework's config file, when it has one (`vite.config.ts`, `astro.config.mjs`, `nuxt.config.ts`…). */
+  configFile: string | null;
+  /** Whether the config file references the integration (regex based; files are never executed). */
+  registered: boolean | null;
+}
+
+/** Framework detection order: the most specific dependency wins (vinext before next, metaframeworks before vite). */
+const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
+  ['vinext', 'vinext'],
+  ['next', 'next'],
+  ['tanstack-start', '@tanstack/react-start'],
+  ['react-router', '@react-router/dev'],
+  ['astro', 'astro'],
+  ['sveltekit', '@sveltejs/kit'],
+  ['nuxt', 'nuxt'],
+  ['vite', 'vite'],
+];
+
+const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
+  next: ['next.config.ts', 'next.config.mts', 'next.config.mjs', 'next.config.js', 'next.config.cjs'],
+  vinext: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
+  'react-router': ['react-router.config.ts', 'react-router.config.js', 'vite.config.ts', 'vite.config.js'],
+  'tanstack-start': ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
+  astro: ['astro.config.mjs', 'astro.config.ts', 'astro.config.mts', 'astro.config.js'],
+  sveltekit: ['vite.config.ts', 'vite.config.js', 'vite.config.mts', 'vite.config.mjs', 'svelte.config.js'],
+  nuxt: ['nuxt.config.ts', 'nuxt.config.js', 'nuxt.config.mjs'],
+  vite: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
+};
+
+/** Detects the framework from the package's dependencies and its config file. */
+export function detectFramework(root: string, pkg: PackageInfo | null): FrameworkInfo {
+  const deps = { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
+  const found = FRAMEWORK_DEPENDENCIES.find(([, dep]) => dep in deps || installedVersion(root, dep) !== null);
+  if (!found)
+    return {
+      name: 'unknown',
+      version: null,
+      integration: null,
+      integrationInstalled: null,
+      configFile: null,
+      registered: null,
+    };
+  const [name, dep] = found;
+  const integration = FRAMEWORK_INTEGRATION[name];
+  const configFile = firstExisting(root, FRAMEWORK_CONFIG_FILES[name]);
+  const source = configFile ? (readText(configFile) ?? '') : '';
+  const pattern =
+    name === 'next'
+      ? /\bwithHypDriv\b/
+      : new RegExp(
+          `['"](?:${integration.replace(/[/@.-]/g, (c) => `\\${c}`)}|hypdriv\\/${name})(?:\\/[\\w-]+)?['"]`,
+        );
+  return {
+    name,
+    version: installedVersion(root, dep) ?? (deps[dep] as string | undefined) ?? null,
+    integration,
+    integrationInstalled:
+      installedVersion(root, integration) ??
+      (name === 'next' ? installedVersion(root, '@hypdriv/next') : null),
+    configFile,
+    registered: configFile ? pattern.test(source) : null,
+  };
+}
 
 export interface PlatformDetection {
   platform: DeployPlatform;
@@ -118,6 +218,8 @@ export interface ProjectInfo {
   repoRoot: string;
   platform: DeployPlatform;
   platformDetection: PlatformDetection;
+  /** The application framework and its HypDriv integration. */
+  framework: FrameworkInfo;
   vercel: VercelInfo;
   /** `.env*` files (Next.js / Vercel) with their variable names; values are never read into memory beyond parsing. */
   envFiles: EnvFileInfo[];
@@ -442,6 +544,7 @@ interface PlatformInputs {
   vercel: VercelInfo;
   pkg: PackageInfo | null;
   nextInstalled: boolean;
+  frameworkInstalled?: boolean;
 }
 
 /**
@@ -500,7 +603,8 @@ export function detectPlatform(input: PlatformInputs, forced?: DeployPlatform | 
   if (forced) return { platform: forced, explicit: true, signals };
   let platform: DeployPlatform;
   if (vc >= 10) platform = 'vercel';
-  else if (cf === 0 && vc === 0) platform = input.nextInstalled ? 'node' : 'unknown';
+  else if (cf === 0 && vc === 0)
+    platform = input.nextInstalled || input.frameworkInstalled ? 'node' : 'unknown';
   else platform = vc > cf ? 'vercel' : 'cloudflare';
   return { platform, explicit: false, signals };
 }
@@ -536,6 +640,14 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/cli',
     '@hypdriv/security',
     '@hypdriv/purser',
+    '@hypdriv/runtime',
+    '@hypdriv/vite',
+    '@hypdriv/react-router',
+    '@hypdriv/tanstack-start',
+    '@hypdriv/astro',
+    '@hypdriv/sveltekit',
+    '@hypdriv/nuxt',
+    '@hypdriv/vinext',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;
@@ -563,14 +675,20 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
       vercel,
       pkg,
       nextInstalled: next.installed !== null || next.range !== null,
+      // Any recognised server framework runs on a plain Node host when no platform tooling is present.
+      frameworkInstalled: FRAMEWORK_DEPENDENCIES.some(
+        ([, dep]) => pkg?.dependencies[dep] || pkg?.devDependencies[dep],
+      ),
     },
     options.platform ?? null,
   );
+  const framework = detectFramework(root, pkg);
   return {
     root,
     repoRoot,
     platform: platformDetection.platform,
     platformDetection,
+    framework,
     vercel,
     envFiles: readEnvFiles(root, linkDir),
     tsconfigExcludesWorker: tsconfigExcludes(root, 'hypdriv.worker.ts'),
@@ -619,9 +737,14 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
       installed:
         hypdrivPackages.hypdriv ??
         hypdrivPackages['@hypdriv/next'] ??
+        (framework.integration ? hypdrivPackages[framework.integration] : undefined) ??
         hypdrivPackages['@hypdriv/core'] ??
         null,
-      range: declaredRange(pkg, 'hypdriv') ?? declaredRange(pkg, '@hypdriv/next') ?? null,
+      range:
+        declaredRange(pkg, 'hypdriv') ??
+        declaredRange(pkg, '@hypdriv/next') ??
+        (framework.integration ? declaredRange(pkg, framework.integration) : null) ??
+        null,
       packages: hypdrivPackages,
     },
     layoutFile: firstExisting(root, LAYOUT_FILES),

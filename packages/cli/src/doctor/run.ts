@@ -1,3 +1,4 @@
+import { FRAMEWORK_LABEL } from '../project';
 import type { Check, CheckContext, CheckReport, CheckResult, CheckStatus } from './types';
 
 export interface DoctorRunOptions {
@@ -58,6 +59,16 @@ async function runOne(
   ctx: CheckContext,
   timeoutMs: number,
 ): Promise<{ result: CheckResult; durationMs: number }> {
+  if (check.frameworks && !check.frameworks.includes(ctx.project.framework.name)) {
+    const targets = check.frameworks.map((f) => FRAMEWORK_LABEL[f]).join(' / ');
+    return {
+      result: {
+        status: 'skip',
+        message: `applies to ${targets}; detected framework: ${FRAMEWORK_LABEL[ctx.project.framework.name]}.`,
+      },
+      durationMs: 0,
+    };
+  }
   if (check.platforms && !appliesTo(check, ctx.project.platform)) {
     const targets = check.platforms!.map((p) => PLATFORM_LABEL[p] ?? p).join(' / ');
     return {

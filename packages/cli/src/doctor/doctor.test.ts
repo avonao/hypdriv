@@ -98,7 +98,8 @@ describe('hypdriv doctor', () => {
     expect(byId['hypdriv.headers-file']).toMatchObject({ status: 'warn', fixable: true });
     expect(byId['vercel.config']).toMatchObject({ status: 'skip', platforms: ['vercel'] });
     expect(byId['deps.outdated']?.status).toBe('skip');
-    expect(out.summary.total).toBe(allChecks.length);
+    // Checks for other frameworks (the Vite-host group) are left out of a Next.js report.
+    expect(out.summary.total).toBe(allChecks.filter((c) => !c.frameworks || c.frameworks.includes('next')).length);
   });
 
   it('maps per-environment queue consumers and flags orphaned queues and missing producers', async () => {

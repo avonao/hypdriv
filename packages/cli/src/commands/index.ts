@@ -11,6 +11,7 @@ import { initCommand } from './init';
 import { jobsCommand } from './jobs';
 import { manifestCommand } from './manifest';
 import { routesCommand } from './routes';
+import { serveCommand } from './serve';
 import type { Command } from './types';
 import { vitalsCommand } from './vitals';
 import { warmCommand } from './warm';
@@ -27,6 +28,7 @@ export const commands: Command[] = [
   cssCommand,
   warmCommand,
   benchCommand,
+  serveCommand,
   depsCommand,
   manifestCommand,
   jobsCommand,

@@ -3,6 +3,7 @@ import { type CommandContext, createContext } from '../context';
 import { allChecks } from '../doctor/registry';
 import { type DoctorRun, runDoctor } from '../doctor/run';
 import { CATEGORY_TITLES, CHECK_CATEGORIES, type CheckContext } from '../doctor/types';
+import { FRAMEWORK_LABEL } from '../project';
 import type { Ui } from '../ui';
 import { cliVersion } from '../version';
 import { defineCommand } from './types';
@@ -124,8 +125,13 @@ export const doctorCommand = defineCommand({
     }
     const categories = args.list('category');
     const only = args.list('only');
+    // Checks for another framework are left out of the report (`--only` still runs them, reporting a skip).
+    const framework = ctx.project({ scan: false }).framework.name;
     const selected = allChecks.filter(
-      (c) => (!categories.length || categories.includes(c.category)) && (!only.length || only.includes(c.id)),
+      (c) =>
+        (!categories.length || categories.includes(c.category)) &&
+        (!only.length || only.includes(c.id)) &&
+        (only.length > 0 || !c.frameworks || c.frameworks.includes(framework)),
     );
     if (!selected.length) {
       ui.error('no checks match the given --only/--category filters');
@@ -136,7 +142,7 @@ export const doctorCommand = defineCommand({
     const compact = args.boolean('ci');
     if (!args.json) {
       ui.line(
-        `${ui.color.bold('hypdriv doctor')} ${ui.color.dim(`v${cliVersion()} · ${checkCtx.project.root} · platform ${checkCtx.project.platform}${checkCtx.project.platformDetection.explicit ? ' (--platform)' : ''}`)}`,
+        `${ui.color.bold('hypdriv doctor')} ${ui.color.dim(`v${cliVersion()} · ${checkCtx.project.root} · ${FRAMEWORK_LABEL[checkCtx.project.framework.name]} · platform ${checkCtx.project.platform}${checkCtx.project.platformDetection.explicit ? ' (--platform)' : ''}`)}`,
       );
       printDoctorReport(ui, run, { compact });
       printDoctorSummary(ui, run);
@@ -151,6 +157,7 @@ export const doctorCommand = defineCommand({
           name: checkCtx.project.name,
           platform: checkCtx.project.platform,
           platformSignals: checkCtx.project.platformDetection.signals,
+          framework: checkCtx.project.framework,
           packageManager: checkCtx.project.packageManager,
           next: checkCtx.project.next.installed,
           react: checkCtx.project.react.installed,

@@ -1,4 +1,4 @@
-import type { DeployPlatform } from '../project';
+import type { DeployPlatform, ProjectFramework } from '../project';
 import { depsChecks } from './checks/deps';
 import { environmentChecks } from './checks/environment';
 import { hypdrivChecks } from './checks/hypdriv';
@@ -9,6 +9,7 @@ import { purserChecks } from './checks/purser';
 import { securityChecks } from './checks/security';
 import { sizeChecks } from './checks/size';
 import { vercelChecks } from './checks/vercel';
+import { viteChecks } from './checks/vite';
 import { workersCompatChecks } from './checks/workers-compat';
 import { wranglerChecks } from './checks/wrangler';
 import type { Check } from './types';
@@ -18,16 +19,44 @@ function onlyOn(platforms: DeployPlatform[], checks: Check[]): Check[] {
   return checks.map((c) => (c.platforms ? c : { ...c, platforms }));
 }
 
+/** Tags every check of a group with the frameworks it applies to (keeps explicit tags). */
+function onlyFor(frameworks: ProjectFramework[], checks: Check[]): Check[] {
+  return checks.map((c) => (c.frameworks ? c : { ...c, frameworks }));
+}
+
+/** Checks about Next.js, OpenNext and the `hypdriv.worker.ts` shell that do not apply to Vite hosts. */
+const NEXT_ONLY = new Set([
+  'wrangler.main',
+  'wrangler.assets',
+  'wrangler.run-worker-first',
+  'wrangler.self-reference',
+  'vercel.proxy-runtime',
+  'vercel.cron-routes',
+  'hypdriv.manifest-build-id',
+  'hypdriv.worker-entry',
+  'hypdriv.headers-file',
+  'hypdriv.tsconfig-worker',
+  'hypdriv.devtools',
+  'compat.node-apis',
+  'compat.process-exit',
+  'compat.scan-coverage',
+]);
+
+function scoped(checks: Check[]): Check[] {
+  return checks.map((c) => (NEXT_ONLY.has(c.id) && !c.frameworks ? { ...c, frameworks: ['next'] } : c));
+}
+
 /** Every doctor check, in report order. */
 export const allChecks: Check[] = [
   ...environmentChecks,
-  ...nextjsChecks,
-  ...onlyOn(['cloudflare'], opennextChecks),
-  ...onlyOn(['cloudflare'], openNextCacheChecks),
-  ...onlyOn(['cloudflare'], wranglerChecks),
-  ...onlyOn(['vercel'], vercelChecks),
-  ...onlyOn(['cloudflare'], workersCompatChecks),
-  ...hypdrivChecks,
+  ...onlyFor(['next'], nextjsChecks),
+  ...viteChecks,
+  ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
+  ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),
+  ...scoped(onlyOn(['cloudflare'], wranglerChecks)),
+  ...scoped(onlyOn(['vercel'], vercelChecks)),
+  ...scoped(onlyOn(['cloudflare'], workersCompatChecks)),
+  ...scoped(hypdrivChecks),
   ...sizeChecks,
   ...securityChecks,
   ...purserChecks,

@@ -47,3 +47,6 @@ pnpm-debug.log*
 
 # Vercel CLI link and prebuilt output (vercel link / vercel build at the repository root)
 .vercel/
+
+# Agent worktrees
+.claude/worktrees/

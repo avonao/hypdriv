@@ -2,11 +2,12 @@ import type { HypManifest } from '@hypdriv/core';
 import type { AnalyzeSnapshot } from '../analyze/weights';
 import type { LoadedConfig } from '../context';
 import type { IO } from '../io';
-import type { DeployPlatform, ProjectInfo } from '../project';
+import type { DeployPlatform, ProjectFramework, ProjectInfo } from '../project';
 
 export type CheckCategory =
   | 'environment'
   | 'nextjs'
+  | 'vite'
   | 'opennext'
   | 'wrangler'
   | 'vercel'
@@ -20,6 +21,7 @@ export type CheckCategory =
 export const CHECK_CATEGORIES: CheckCategory[] = [
   'environment',
   'nextjs',
+  'vite',
   'opennext',
   'wrangler',
   'vercel',
@@ -34,6 +36,7 @@ export const CHECK_CATEGORIES: CheckCategory[] = [
 export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   environment: 'Environment',
   nextjs: 'Next.js',
+  vite: 'Vite host',
   opennext: 'OpenNext',
   wrangler: 'Wrangler',
   vercel: 'Vercel',
@@ -87,6 +90,8 @@ export interface Check {
   severity: CheckSeverity;
   /** Platforms the check applies to (default: all). Elsewhere it reports `skip`. */
   platforms?: DeployPlatform[];
+  /** Frameworks the check applies to (default: all). Elsewhere it reports `skip`. */
+  frameworks?: ProjectFramework[];
   run(ctx: CheckContext): Promise<CheckResult> | CheckResult;
 }
 

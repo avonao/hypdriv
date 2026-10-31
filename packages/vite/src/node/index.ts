@@ -124,8 +124,8 @@ export interface StaticOptions {
 /** Whether a request is a document navigation (the only requests a SPA fallback answers). */
 export function isNavigation(request: Request): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return false;
-  const mode = request.headers.get('sec-fetch-mode');
-  if (mode) return mode === 'navigate';
+  if (request.headers.get('sec-fetch-mode') === 'navigate') return true;
+  // Clients without Fetch Metadata (and fetch() implementations that fix `sec-fetch-mode`) ask for HTML.
   return (request.headers.get('accept') ?? '').includes('text/html');
 }
 

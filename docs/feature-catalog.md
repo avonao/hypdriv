@@ -1,6 +1,6 @@
 # HypDriv feature catalog
 
-Every capability HypDriv adds to a Next.js 16+ application, grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Section 5 lists how each capability is delivered on Vercel, where platform services take the place of bindings. Package names tell you where the code lives.
+Every capability HypDriv adds to a Next.js 16+ application — and, through the Vite hosts (section 6), to plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt and vinext — grouped by the problem it solves. "Baseline" describes what works on a bare Worker (static assets binding only); "Upgrade" describes what an optional binding adds. Section 5 lists how each capability is delivered on Vercel, where platform services take the place of bindings. Package names tell you where the code lives.
 
 Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end validation in the example apps · 🧭 designed, implementation tracked in `docs/roadmap.md`.
 
@@ -100,7 +100,27 @@ Detected from `VERCEL=1`, `vercel.json` / `.vercel` or `platform: 'vercel'` ([AD
 
 Not available on Vercel (documented fallbacks): HTML transforms and edge nonce injection (HTMLRewriter), Durable Object live channels (polling transport), 103 Early Hints (preload `Link` headers instead), Workers Analytics Engine sinks (logs / OTLP), per-country CDN variants of pages (Route Handlers with `withVercelCdn` only), a dead-letter queue (`retry: 'none'` acknowledges), Skew Protection on Hobby (Pro feature).
 
-## 6. Purser CSS
+## 6. Vite hosts
+
+The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019-vite-hosts.md)). Each integration wraps the framework's own request hook with `createHandler()` (the full response is HypDriv's: CSP nonces are injected on every platform), builds the manifest after prerendering, patches it into the built server and writes static header rules for the platform.
+
+| Feature | What it does | Package | Status |
+| --- | --- | --- | --- |
+| Neutral runtime | Stages, platform assembly per target, `createHandler()` for any Web fetch handler, `createProxyHandler()` for routing middleware, `hyp()` / `nonce()` / `flag()` / `jobHandler()` from the request context | `runtime` | ✅ |
+| Neutral build engine | Manifest assembly (assets, CSP hashes, Early Hints, speculation graph, Purser, secrets, budgets, fingerprint) shared by the Next.js adapter and every Vite host | `build` | ✅ |
+| Static header rules | Security preset, per-document hash CSP, Early Hints and immutable caching for responses the platform serves without code: Cloudflare `_headers` (merged, within limits, SPA-aware), Vercel Build Output routes | `build`, `vite` | ✅ |
+| Portable nonce injection | Streaming, tokenizer-based nonce injection for HTML on runners without `HTMLRewriter` (framework hooks on Node and Vercel Functions); `modulepreload` links included | `security` | ✅ |
+| Runtime manifest patch | Server bundles embed the manifest as a tagged literal, replaced with the final manifest after prerendering and the adapter ran | `vite` | ✅ |
+| Plain Vite apps | `hypdriv()` plugin; `assetsWorker()` on Cloudflare, Build Output + HypDriv Routing Middleware on Vercel, `hypdriv serve` on Node; dev/preview pipeline | `vite`, `cli` | ✅ |
+| React Router 8 | Preset + Vite plugin, root middleware and outer handler wrapper, `ServerRouter` nonces | `react-router` | ✅ |
+| TanStack Start | Vite plugin, global request middleware, `ssr.nonce`, custom server entry | `tanstack-start` | ✅ |
+| Astro 7 | Integration, `pre` middleware, adapter outputs | `astro` | ✅ |
+| SvelteKit 3 | Adapter wrapper, `handle`, coexistence with `kit.csp` | `sveltekit` | ✅ |
+| Nuxt 4 | Module, Nitro middleware and render hooks, unhead nonces, route-rule headers | `nuxt` | ✅ |
+| vinext | Vite plugin, `proxy.ts` via `createProxy`, CDN cache purge bridge | `vinext` | ✅ |
+| Framework-aware tooling | `doctor` detects the framework (Vite-host checks, Next-only checks skipped), `routes`/`manifest` show the framework, `serve` | `cli` | ✅ |
+
+## 7. Purser CSS
 
 | Feature                        | What it does                                                                      | Package                | Status |
 | ------------------------------ | --------------------------------------------------------------------------------- | ---------------------- | ------ |
@@ -112,7 +132,7 @@ Not available on Vercel (documented fallbacks): HTML transforms and edge nonce i
 | Layer coexistence              | Ordered `@layer` statement generation for Tailwind/legacy CSS                     | `purser`               | ✅     |
 | Early Hints for the stylesheet | Purser stylesheet preloaded on every route                                        | `next`                 | ✅     |
 
-## 7. Developer experience
+## 8. Developer experience
 
 | Feature                  | What it does                                     | Package          | Status |
 | ------------------------ | ------------------------------------------------ | ---------------- | ------ |
@@ -132,7 +152,7 @@ Not available on Vercel (documented fallbacks): HTML transforms and edge nonce i
 | Testing kit              | Fake bindings, request builders, vitest presets  | `testing`        | ✅     |
 | Agent skill              | `skills/hypdriv/SKILL.md` and `AGENTS.md`        | repo             | ✅     |
 
-## 8. Deliberately not included
+## 9. Deliberately not included
 
 - A replacement image optimiser (OpenNext + Cloudflare Images and Vercel Image Optimization already cover it).
 - A replacement for Next's Cache Components / ISR storage (OpenNext's incremental cache covers it; HypDriv layers an edge cache on top).

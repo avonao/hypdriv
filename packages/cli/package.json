@@ -60,6 +60,15 @@
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@hypdriv/vite": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hypdriv/vite": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@hypdriv/vite": {
+      "optional": true
+    }
   }
 }
