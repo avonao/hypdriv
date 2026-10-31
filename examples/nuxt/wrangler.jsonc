@@ -6,6 +6,8 @@
   "name": "hypdriv-nuxt",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Prerendered pages live at `about/index.html`: serve them at `/about` (the URL Nuxt links to) without a redirect.
+  "assets": { "html_handling": "drop-trailing-slash" },
   "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [
