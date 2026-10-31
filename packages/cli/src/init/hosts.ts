@@ -756,9 +756,12 @@ export const TANSTACK_START_SPEC: HostSpec = {
       `/// <reference types="@hypdriv/vite/virtual" />\nimport config from 'virtual:hypdriv/config';\nimport { createStartWorker } from '@hypdriv/tanstack-start/cloudflare';\n\n${DO_EXPORTS}\n\nexport default createStartWorker({ config, manifest: () => import('virtual:hypdriv/manifest') });\n`,
       /createStartWorker|createWorker/,
     );
+    // Prerendered pages through the Worker (served from the assets binding as built) get the request stages.
+    const assets = { binding: 'ASSETS', run_worker_first: ['/*', '!/assets/*'] };
     planHostWrangler(ctx, {
       main: configured ? null : main,
       durableObjects: true,
+      assets: JSON.stringify(assets),
       template: () =>
         wranglerJson({
           $schema: 'node_modules/wrangler/config-schema.json',
@@ -766,6 +769,7 @@ export const TANSTACK_START_SPEC: HostSpec = {
           main,
           compatibility_date: defaultCompatibilityDate(ctx.now),
           compatibility_flags: ['nodejs_compat'],
+          assets,
           observability: { enabled: true },
           durable_objects: { bindings: HYPDRIV_DO },
           migrations: HYPDRIV_MIGRATION,
@@ -902,14 +906,14 @@ export const NUXT_SPEC: HostSpec = {
     planHostWrangler(ctx, {
       main: null,
       durableObjects: true,
-      assets: JSON.stringify({ html_handling: 'drop-trailing-slash' }),
+      assets: JSON.stringify({ html_handling: 'drop-trailing-slash', run_worker_first: ['/*', '!/_nuxt/*'] }),
       template: () =>
         wranglerJson({
           $schema: 'node_modules/wrangler/config-schema.json',
           name: ctx.name,
           compatibility_date: defaultCompatibilityDate(ctx.now),
           compatibility_flags: ['nodejs_compat'],
-          assets: { html_handling: 'drop-trailing-slash' },
+          assets: { html_handling: 'drop-trailing-slash', run_worker_first: ['/*', '!/_nuxt/*'] },
           observability: { enabled: true },
           durable_objects: { bindings: HYPDRIV_DO },
           migrations: HYPDRIV_MIGRATION,
