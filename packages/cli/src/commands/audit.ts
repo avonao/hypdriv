@@ -1,4 +1,4 @@
-import { silentLogger } from '@hypdriv/core';
+import { manifestFramework, silentLogger } from '@hypdriv/core';
 import { rawList, UsageError } from '../args';
 import { auditCache, type CacheAuditResult } from '../audit/cache';
 import { type AuditLevel, auditCsp, type CspAuditResult } from '../audit/csp';
@@ -11,6 +11,13 @@ import {
   mapConcurrent,
   normalizeBaseUrl,
 } from '../audit/http';
+import {
+  type HttpsAuditEntry,
+  httpsAuditable,
+  httpsProbes,
+  judgeHttpsProbe,
+  plainHttpUrl,
+} from '../audit/https';
 import { type AuditPath, choosePaths, cspModeFor } from '../audit/paths';
 import { type AuditAuth, auditAuth, describeAuditAuth } from '../audit/token';
 import { CliError, createContext } from '../context';
@@ -18,8 +25,8 @@ import { loadNextAdapter, loadPurserNode } from '../integrations';
 import type { Ui } from '../ui';
 import { defineCommand } from './types';
 
-export type AuditKind = 'headers' | 'csp' | 'cache' | 'css';
-const KINDS: AuditKind[] = ['headers', 'csp', 'cache', 'css'];
+export type AuditKind = 'headers' | 'csp' | 'cache' | 'https' | 'css';
+const KINDS: AuditKind[] = ['headers', 'csp', 'cache', 'https', 'css'];
 
 export interface HeadersAuditEntry {
   path: string;
@@ -96,9 +103,9 @@ export function auditHeadersPages(
 export const auditCommand = defineCommand({
   name: 'audit',
   summary:
-    'Audit a running server: security headers (A+ model), CSP validity, edge-cache behaviour, Purser zero-override check',
+    'Audit a running server: security headers (A+ model), CSP validity, edge-cache behaviour, HTTPS enforcement, Purser zero-override check',
   usage:
-    'hypdriv audit <headers|csp|cache|css|all> --url <base> [--paths a,b] [--limit 20] [--concurrency 4]',
+    'hypdriv audit <headers|csp|cache|https|css|all> --url <base> [--paths a,b] [--limit 20] [--concurrency 4]',
   options: {
     url: {
       type: 'string',
@@ -140,20 +147,28 @@ export const auditCommand = defineCommand({
     { name: 'headers', summary: 'Grade security headers like securityheaders.com' },
     { name: 'csp', summary: 'Validate the policy and nonce/hash coverage of inline scripts' },
     { name: 'cache', summary: 'Request twice; expect MISS then HIT/STALE, Age, Vary rsc' },
+    {
+      name: 'https',
+      summary: 'Pages, internal routes and assets over http:// must redirect to https (https deployments)',
+    },
     { name: 'css', summary: 'Purser zero-override check in headless Chrome (needs @avonao/purser)' },
-    { name: 'all', summary: 'headers + csp + cache (+ css when Purser is active)' },
+    {
+      name: 'all',
+      summary: 'headers + csp + cache (+ https for an https deployment, + css when Purser is active)',
+    },
   ],
   examples: [
     'hypdriv audit all --url http://localhost:8787',
     'hypdriv audit csp --url https://www.example.com --paths /,/pricing',
     'hypdriv audit cache --url http://localhost:8787 --json',
+    'hypdriv audit https --url https://www.example.com',
   ],
   async run(args, io) {
     const ctx = createContext(args, io);
     const { ui } = ctx;
     const kindArg = args.positionals[0];
     if (!kindArg || (kindArg !== 'all' && !KINDS.includes(kindArg as AuditKind)))
-      throw new UsageError('audit needs one of: headers, csp, cache, css, all');
+      throw new UsageError('audit needs one of: headers, csp, cache, https, css, all');
     const base = normalizeBaseUrl(args.string('url'));
     if (!base) throw new UsageError('--url <base> is required (e.g. --url http://localhost:8787)');
     const config = await ctx.loadConfig();
@@ -162,11 +177,19 @@ export const auditCommand = defineCommand({
       config.resolved.purser &&
         (config.resolved.purser.enabled === true || ctx.project({ scan: false }).purser.installed),
     );
+    if (kindArg === 'https' && !httpsAuditable(base))
+      throw new UsageError(
+        'audit https needs the https URL of a deployment (local previews run plain HTTP and are exempt).',
+      );
     const kinds: AuditKind[] =
       kindArg === 'all'
-        ? purserActive
-          ? ['headers', 'csp', 'cache', 'css']
-          : ['headers', 'csp', 'cache']
+        ? [
+            'headers',
+            'csp',
+            'cache',
+            ...(httpsAuditable(base) ? (['https'] as const) : []),
+            ...(purserActive ? (['css'] as const) : []),
+          ]
         : [kindArg as AuditKind];
     const paths = choosePaths(manifest, {
       paths: args.list('paths'),
@@ -175,6 +198,8 @@ export const auditCommand = defineCommand({
     const concurrency = args.number('concurrency', 4, { min: 1, max: 32 });
     const timeoutMs = args.number('timeout', 10_000, { min: 100 });
     const https = base.startsWith('https:');
+    // Cached HTML must vary on `rsc` only where HTML and RSC payloads share URLs (Next.js).
+    const rscVary = ((manifest ? manifestFramework(manifest)?.name : undefined) ?? 'next') === 'next';
     const auth = await auditAuth({
       root: ctx.root,
       io,
@@ -276,6 +301,8 @@ export const auditCommand = defineCommand({
         return auditCache({
           path: p.path,
           hasPolicy: Boolean(p.route?.cachePolicyId),
+          ...(p.route?.servedStatically ? { servedStatically: true } : {}),
+          rscVary,
           first: { status: first.status, headers: first.headers },
           second: { status: second.status, headers: second.headers },
         });
@@ -283,6 +310,25 @@ export const auditCommand = defineCommand({
       results.cache = entries;
       if (entries.some((e) => e.status === 'fail')) exit = 1;
       printCache(ui, entries);
+    }
+    if (kinds.includes('https')) {
+      const fetched = await fetchAll();
+      const probes = httpsProbes(
+        fetched.map((f) => ({ path: f.path.path, page: f.page })),
+        base,
+        config.resolved.cloudflare.internalPathPrefix,
+      );
+      // Anonymous on purpose: gateway headers and the audit token never cross the network in clear text.
+      const entries: HttpsAuditEntry[] = await mapConcurrent(probes, concurrency, async (probe) =>
+        judgeHttpsProbe(
+          probe,
+          base,
+          await fetchPage(plainHttpUrl(base, probe.path), { fetch: io.fetch, timeoutMs }, io.now),
+        ),
+      );
+      results.https = entries;
+      if (entries.some((e) => e.level === 'fail')) exit = 1;
+      printHttps(ui, entries);
     }
     if (kinds.includes('css')) {
       const purser = config.resolved.purser;
@@ -437,6 +483,20 @@ function printCache(ui: Ui, entries: CacheAuditResult[]): void {
         { header: 'findings', maxWidth: 80 },
       ],
     },
+  );
+}
+
+function printHttps(ui: Ui, entries: HttpsAuditEntry[]): void {
+  ui.heading('HTTPS enforcement (plain-HTTP requests)');
+  ui.table(
+    entries.map((e) => [
+      ui.statusIcon(e.level),
+      e.kind,
+      e.path,
+      e.status ? String(e.status) : 'ERR',
+      e.finding,
+    ]),
+    { columns: ['', 'kind', 'path', 'status', { header: 'findings', maxWidth: 100 }] },
   );
 }
 

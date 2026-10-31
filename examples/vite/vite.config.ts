@@ -8,7 +8,10 @@ const target = process.env.HYPDRIV_TARGET ?? (process.env.VERCEL === '1' ? 'verc
 
 export default defineConfig({
   plugins: [
-    ...(target === 'cloudflare' ? [cloudflare()] : []),
+    // WRANGLER_CONFIG points at an account-specific, git-ignored wrangler.<name>.local.jsonc.
+    ...(target === 'cloudflare'
+      ? [cloudflare(process.env.WRANGLER_CONFIG ? { configPath: process.env.WRANGLER_CONFIG } : {})]
+      : []),
     hypdriv({ targets: [target as 'cloudflare'] }),
   ],
 });

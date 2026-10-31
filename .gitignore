@@ -50,3 +50,6 @@ pnpm-debug.log*
 
 # Agent worktrees
 .claude/worktrees/
+
+# Local wrangler configurations for your own accounts (wrangler.<name>.local.jsonc)
+wrangler.*.local.json*

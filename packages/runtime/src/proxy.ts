@@ -140,7 +140,10 @@ export function createProxyHandler(
       middlewareHeaders: false,
     });
     // `forceHttps` also covers the internal routes answered below, before the redirects stage runs.
-    const upgrade = httpsUpgrade(platform.config, request, { development: platform.development });
+    const upgrade = httpsUpgrade(platform.config, request, {
+      development: platform.development,
+      target: platform.target,
+    });
     if (upgrade) return upgrade;
     const ip = clientIp(request.headers, platform.config.security.trustedProxies);
     // `/_hypdriv/*` (health, vitals, CSP reports, live polling fallback, dev endpoints) on every host.

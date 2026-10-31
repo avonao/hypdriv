@@ -71,12 +71,25 @@ function normalizeRules(input: unknown): RedirectRuleResolved[] {
 export interface RedirectsStageOptions {
   kv?: KVNamespaceLike;
   now?: () => number;
+  /** The deploy target the stage runs on; `auto` upgrades on Cloudflare and Vercel without `site.origin`. */
+  target?: string;
 }
 
-/** Whether `redirects.forceHttps` is on (`auto`: when `site.origin` is https). */
-export function forcesHttps(config: ResolvedConfig): boolean {
+/** Deploy targets whose edge always terminates TLS for the application's hostnames. */
+const TLS_EDGE_TARGETS = new Set(['cloudflare', 'vercel']);
+
+/**
+ * Whether `redirects.forceHttps` is on. `auto` follows the scheme of `site.origin`; without an origin it is
+ * on where the platform terminates TLS for every hostname (Cloudflare, Vercel: `target`) and off elsewhere
+ * (a Node server may be reached over plain HTTP on purpose). HSTS is sent by default, so a deployment that
+ * serves pages over plain HTTP contradicts its own policy.
+ */
+export function forcesHttps(config: ResolvedConfig, options: { target?: string } = {}): boolean {
   const r = config.redirects;
-  return r.forceHttps === 'auto' ? config.site.origin?.startsWith('https://') === true : r.forceHttps;
+  if (r.forceHttps !== 'auto') return r.forceHttps;
+  const origin = config.site.origin;
+  if (origin) return origin.startsWith('https://');
+  return options.target !== undefined && TLS_EDGE_TARGETS.has(options.target);
 }
 
 /**
@@ -88,9 +101,9 @@ export function forcesHttps(config: ResolvedConfig): boolean {
 export function httpsUpgrade(
   config: ResolvedConfig,
   request: Request,
-  options: { development?: boolean } = {},
+  options: { development?: boolean; target?: string } = {},
 ): Response | null {
-  if (options.development || !forcesHttps(config)) return null;
+  if (options.development || !forcesHttps(config, options)) return null;
   const url = new URL(request.url);
   const proto = (
     request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? url.protocol.replace(':', '')
@@ -117,7 +130,7 @@ export function redirectsStage(config: ResolvedConfig, options: RedirectsStageOp
         options.now,
       )
     : null;
-  const forceHttps = forcesHttps(config);
+  const forceHttps = forcesHttps(config, options);
 
   return defineStage({
     name: 'redirects',

@@ -64,6 +64,12 @@ export interface FinalizeInput {
    * pathname. The route gets the document's CSP hashes and Early Hints.
    */
   documentAliases?: Record<string, string>;
+  /**
+   * Whether the platform's static layer answers prerendered documents (Workers Static Assets, the Vercel CDN,
+   * `hypdriv serve`; default true). Their routes get `servedStatically` and no inferred edge-cache policy. Pass
+   * false when the application renders those paths itself at request time.
+   */
+  documentsServedStatically?: boolean;
   log?: Logger;
   /** Write `.hypdriv/manifest.json`, `.hypdriv/manifest.js` and `.hypdriv/report.md` (default true). */
   write?: boolean;
@@ -123,6 +129,7 @@ export function assetFileFor(clientDir: string, base: string, publicPath: string
 export async function finalizeManifest(input: FinalizeInput): Promise<FinalizeResult> {
   const log = input.log ?? silentLogger;
   const base = input.base ?? '/';
+  const servedStatically = input.documentsServedStatically ?? true;
   const docsByPath = new Map<string, PrerenderedDocument>();
   for (const d of input.documents) docsByPath.set(normalizePathname(d.pathname), d);
 
@@ -149,6 +156,8 @@ export async function finalizeManifest(input: FinalizeInput): Promise<FinalizeRe
       preliminary[index]!.dynamic ? paths : [],
     );
     const primaryPath = paths.includes(route.pathname) ? route.pathname : paths[0];
+    if (servedStatically && route.kind === 'page' && !route.dynamic && primaryPath === route.pathname)
+      route.servedStatically = true;
     const primary = primaryPath ? docsByPath.get(primaryPath) : undefined;
     const document = primary ? readHtml(primary.file) : null;
     const concrete: Array<{ pathname: string; html: string }> = [];
@@ -172,6 +181,7 @@ export async function finalizeManifest(input: FinalizeInput): Promise<FinalizeRe
   });
   for (const pathname of orphans.sort()) {
     const route = toHypRoute({ pathname, kind: 'page', prerendered: true });
+    if (servedStatically) route.servedStatically = true;
     routes.push({ route, document: readHtml(docsByPath.get(pathname)!.file) });
   }
 

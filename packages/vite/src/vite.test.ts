@@ -185,6 +185,11 @@ describe('finalizeManifest', () => {
       prerender: { paths: ['/blog/a'] },
     });
     expect(byId['page:/legal']!.classification).toBe('static');
+    // Prerendered documents are files the static layer serves: no inferred edge-cache policy.
+    expect(byId['page:/']).toMatchObject({ servedStatically: true });
+    expect(byId['page:/']!.cachePolicyId).toBeUndefined();
+    expect(byId['page:/legal']!.servedStatically).toBe(true);
+    expect(byId['page:/blog/[slug]']!.servedStatically).toBeUndefined();
     expect(byId['endpoint:/api/items']!.classification).toBe('route');
     expect(result.manifest.csp['page:/']!.scriptHashes).toHaveLength(1);
     expect(result.manifest.framework).toEqual({ name: 'vite', version: '8.3.5' });

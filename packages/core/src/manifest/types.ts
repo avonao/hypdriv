@@ -91,6 +91,11 @@ export interface HypRoute {
    * never edge-cached by inference: other handlers may answer under the same pattern.
    */
   fallback?: boolean;
+  /**
+   * The route's prerendered document is a file the platform's static layer serves (Workers Static Assets, the
+   * Vercel CDN, `hypdriv serve`), which caches it: no edge-cache policy is inferred for it.
+   */
+  servedStatically?: boolean;
   /** Route segment config picked up from the build (`revalidate`, `dynamic`, `maxDuration`). */
   segment?: { maxDuration?: number; preferredRegion?: string | string[] };
 }

@@ -73,7 +73,7 @@ Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone �
 ## Request flow
 
 1. Static assets are served by Cloudflare before the Worker runs (unless `run_worker_first` is set).
-2. `createWorker.fetch` creates the request context (geo from `request.cf`, client IP, request id) and matches the route in the manifest. With `redirects.forceHttps` on (the default when `site.origin` is `https`), a plain-HTTP request gets its `308` here, before anything else answers — internal routes and static assets included.
+2. `createWorker.fetch` creates the request context (geo from `request.cf`, client IP, request id) and matches the route in the manifest. With `redirects.forceHttps` on (the default on Cloudflare unless `site.origin` is `http://`), a plain-HTTP request gets its `308` here, before anything else answers — internal routes and the static assets that reach the Worker included. Assets Workers Static Assets serves before the Worker (everything outside `run_worker_first`) never reach it: turn on the zone's **Always Use HTTPS** (SSL/TLS → Edge Certificates) or add a Redirect Rule for the hostname; `hypdriv audit https --url https://…` checks pages, internal routes and a hashed asset over `http://`.
 3. Internal routes under `/_hypdriv/*` are answered immediately: `health`, `vitals`, `csp-report`, `live/*`, `dev/*` (development and preview only).
 4. The pipeline's `pre` stages run; one of them may answer directly (maintenance page, rate limit, redirect, cache HIT, bot block).
 5. OpenNext's worker renders through Next.js with the forwarded request headers (`x-nonce`, `x-hypdriv-geo`, `x-hypdriv-flags`, `x-hypdriv-locale`, `x-hypdriv-theme`, `x-hypdriv-request-id`, `traceparent`).

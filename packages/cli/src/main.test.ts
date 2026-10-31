@@ -17,7 +17,7 @@ describe('main', () => {
     expect(cliVersion()).toMatch(/^\d+\.\d+\.\d+/);
     const h = createMemoryIO();
     expect(await main(['help', 'audit'], h)).toBe(0);
-    expect(h.out).toContain('Usage: hypdriv audit <headers|csp|cache|css|all>');
+    expect(h.out).toContain('Usage: hypdriv audit <headers|csp|cache|https|css|all>');
   });
 
   it('returns 2 for unknown commands and options, with a suggestion', async () => {

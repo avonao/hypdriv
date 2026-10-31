@@ -34,7 +34,7 @@ Every section is optional. Durations accept seconds or `'30s' | '5m' | '2h' | '1
 | Key | Default | Purpose |
 | --- | --- | --- |
 | `name` | `'app'` | Service name in logs, traces and the HUD |
-| `origin` | — | Canonical origin; enables `forceHttps` auto, HSTS preload advice, audits |
+| `origin` | — | Canonical origin; `forceHttps: 'auto'` follows its scheme, HSTS preload advice, audits |
 | `basePath`, `trailingSlash` | from the manifest | Overrides when the manifest is unavailable |
 
 ## `security`
@@ -138,6 +138,6 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 - `devtools`: `{ enabled: 'development' | 'preview' | boolean, hotkey: 'Alt+Shift+H', position: 'bottom-right', endpoint: '/_hypdriv/dev' }`
 - `i18n`: `{ locales, defaultLocale, strategy: 'prefix-except-default', cookie: 'hyp_locale', geoMap?, redirect?, header: 'x-hypdriv-locale' }`
-- `redirects`: `{ rules: [{ from, to, status: 308, preserveQuery: true, host? }], kvBinding?, kvKey: 'redirects', cacheTtl: '60s', canonicalHost?, forceHttps: 'auto' }`
+- `redirects`: `{ rules: [{ from, to, status: 308, preserveQuery: true, host? }], kvBinding?, kvKey: 'redirects', cacheTtl: '60s', canonicalHost?, forceHttps: 'auto' }` (`auto`: on when `site.origin` is https; without an origin, on for Cloudflare and Vercel deployments — their edge terminates TLS for every hostname — and off on Node, which may be reached over plain HTTP on purpose; local hosts and development are always exempt)
 - `maintenance`: `{ enabled: 'env', envVar: 'HYPDRIV_MAINTENANCE', kvBinding?, kvKey: 'maintenance', allowIps: [], bypassCookie?, bypassCookieValue?, bypassPaths: ['/_hypdriv/**', '/api/webhooks/**'], html?, retryAfter: '5m', status: 503 }`
 - `stages`: `{ disable: [], order?: [] }` — stage names: `request-id, maintenance, shield, bots, rate-limit, geo, i18n, flags, redirects, theme, edge-cache, csp, security-headers, early-hints, speculation, html-transforms, skew, observe`

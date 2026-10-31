@@ -245,7 +245,10 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
 
     // `forceHttps` covers every response, not just pages: internal routes and static assets are answered
     // below without the redirects stage. Next.js's own revalidation requests (service binding) are exempt.
-    const upgrade = httpsUpgrade(platform.config, request, { development: runtime.development });
+    const upgrade = httpsUpgrade(platform.config, request, {
+      development: runtime.development,
+      target: platform.target,
+    });
     if (upgrade && !(await isRevalidationRequest(request, platform.manifest))) return upgrade;
 
     const handled = await internal(request, {

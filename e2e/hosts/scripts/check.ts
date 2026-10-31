@@ -15,8 +15,8 @@
  * (sent over HTTPS to the checked host only, never printed).
  */
 import { createHash } from 'node:crypto';
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { parseArgs } from 'node:util';
 
 const { values: args } = parseArgs({
@@ -36,16 +36,20 @@ const { values: args } = parseArgs({
 
 const BASE = (args.url ?? '').replace(/\/+$/, '');
 if (!BASE) {
-  console.error('usage: check --url <base> --framework <name> [--static /] [--dynamic /ssr] [--api /api/x] [--rate-limit n]');
+  console.error(
+    'usage: check --url <base> --framework <name> [--static /] [--dynamic /ssr] [--api /api/x] [--rate-limit n]',
+  );
   process.exit(2);
 }
 const HOST = new URL(BASE).host;
-const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+const UA =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 const env = process.env;
 
 function gateHeaders(): Record<string, string> {
   const out: Record<string, string> = {};
-  if (env.VERCEL_AUTOMATION_BYPASS_SECRET) out['x-vercel-protection-bypass'] = env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (env.VERCEL_AUTOMATION_BYPASS_SECRET)
+    out['x-vercel-protection-bypass'] = env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
     out['cf-access-client-id'] = env.CF_ACCESS_CLIENT_ID;
     out['cf-access-client-secret'] = env.CF_ACCESS_CLIENT_SECRET;
@@ -61,6 +65,13 @@ function gateHeaders(): Record<string, string> {
 }
 const GATE = gateHeaders();
 
+/** `200×60, 429×3` — status counts in first-seen order. */
+function summarize(statuses: number[]): string {
+  const counts = new Map<number, number>();
+  for (const s of statuses) counts.set(s, (counts.get(s) ?? 0) + 1);
+  return [...counts].map(([s, n]) => `${s}×${n}`).join(', ');
+}
+
 async function get(
   path: string,
   init: { ua?: string; headers?: Record<string, string>; redirect?: RequestRedirect; base?: string } = {},
@@ -71,7 +82,8 @@ async function get(
     accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
     ...(init.headers ?? {}),
   };
-  if (url.protocol === 'https:' && url.host === HOST) for (const [k, v] of Object.entries(GATE)) headers[k] ??= v;
+  if (url.protocol === 'https:' && url.host === HOST)
+    for (const [k, v] of Object.entries(GATE)) headers[k] ??= v;
   const res = await fetch(url, { headers, redirect: init.redirect ?? 'manual' });
   return { status: res.status, headers: res.headers, body: await res.text(), url: url.href };
 }
@@ -80,13 +92,17 @@ async function get(
  * A request with exactly the given headers (Node's fetch adds Fetch Metadata such as `sec-fetch-mode: cors`,
  * which a scraper does not send).
  */
-function rawGet(path: string, headers: Record<string, string>): Promise<{ status: number; headers: Record<string, string> }> {
+function rawGet(
+  path: string,
+  headers: Record<string, string>,
+  agent?: HttpAgent,
+): Promise<{ status: number; headers: Record<string, string> }> {
   const url = new URL(path, `${BASE}/`);
   const all: Record<string, string> = { ...headers };
   if (url.protocol === 'https:' && url.host === HOST) for (const [k, v] of Object.entries(GATE)) all[k] ??= v;
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest;
   return new Promise((resolve, reject) => {
-    const req = send(url, { method: 'GET', headers: all }, (res) => {
+    const req = send(url, { method: 'GET', headers: all, ...(agent ? { agent } : {}) }, (res) => {
       res.resume();
       res.on('end', () =>
         resolve({
@@ -146,7 +162,10 @@ function scripts(html: string): ScriptTag[] {
   while ((m = re.exec(html))) {
     const attrs = m[1] ?? '';
     const attr = (name: string) =>
-      new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs)?.slice(1).find((v) => v !== undefined) ?? null;
+      new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
+        .exec(attrs)
+        ?.slice(1)
+        .find((v) => v !== undefined) ?? null;
     out.push({ attrs, content: m[2] ?? '', src: attr('src'), nonce: attr('nonce'), type: attr('type') });
   }
   return out;
@@ -156,17 +175,26 @@ function scripts(html: string): ScriptTag[] {
 function allowed(tag: ScriptTag, scriptSrc: string[]): boolean {
   const type = (tag.type ?? '').toLowerCase();
   // Data blocks are never executed.
-  if (type && !['module', 'text/javascript', 'application/javascript', 'speculationrules', 'importmap'].includes(type))
+  if (
+    type &&
+    !['module', 'text/javascript', 'application/javascript', 'speculationrules', 'importmap'].includes(type)
+  )
     return true;
   const strictDynamic = scriptSrc.includes("'strict-dynamic'");
   if (tag.nonce && scriptSrc.includes(`'nonce-${tag.nonce}'`)) return true;
   if (tag.src) return !strictDynamic && scriptSrc.includes("'self'") && !/^https?:\/\//.test(tag.src);
   const hash = `'sha256-${createHash('sha256').update(tag.content).digest('base64')}'`;
   if (scriptSrc.includes(hash)) return true;
-  return scriptSrc.includes("'unsafe-inline'") && !scriptSrc.some((s) => s.startsWith("'sha") || s.startsWith("'nonce-"));
+  return (
+    scriptSrc.includes("'unsafe-inline'") &&
+    !scriptSrc.some((s) => s.startsWith("'sha") || s.startsWith("'nonce-"))
+  );
 }
 
-function checkPolicy(page: { headers: Headers; body: string }, label: string): { mode: string; nonce: string | null } {
+function checkPolicy(
+  page: { headers: Headers; body: string },
+  label: string,
+): { mode: string; nonce: string | null } {
   const enforced = page.headers.get('content-security-policy');
   const reportOnly = page.headers.get('content-security-policy-report-only');
   const policy = enforced ?? reportOnly;
@@ -184,22 +212,36 @@ function checkPolicy(page: { headers: Headers; body: string }, label: string): {
 }
 
 function checkSecurityHeaders(headers: Headers, label: string): void {
-  const missing = ['x-content-type-options', 'referrer-policy', 'permissions-policy', 'cross-origin-opener-policy'].filter(
-    (h) => !headers.has(h),
-  );
-  if (BASE.startsWith('https://') && !headers.has('strict-transport-security')) missing.push('strict-transport-security');
+  const missing = [
+    'x-content-type-options',
+    'referrer-policy',
+    'permissions-policy',
+    'cross-origin-opener-policy',
+  ].filter((h) => !headers.has(h));
+  if (BASE.startsWith('https://') && !headers.has('strict-transport-security'))
+    missing.push('strict-transport-security');
   assert(!missing.length, `${label}: missing ${missing.join(', ')}`);
 }
 
 const framework = (args.framework ?? '').toLowerCase();
 
 await step('health', async () => {
-  const res = await get('/_hypdriv/health', { headers: { accept: 'application/json'} });
+  const res = await get('/_hypdriv/health', { headers: { accept: 'application/json' } });
   assert(res.status === 200, `HTTP ${res.status}`);
-  const json = JSON.parse(res.body) as { ok?: boolean; framework?: string; runner?: string; target?: string; routes?: number };
+  const json = JSON.parse(res.body) as {
+    ok?: boolean;
+    framework?: string;
+    runner?: string;
+    target?: string;
+    routes?: number;
+  };
   assert(json.ok === true, 'ok !== true');
   const label = (json.framework ?? '').toLowerCase().replace(/\s+/g, '');
-  if (framework) assert(label.includes(framework.replace(/-/g, '')), `framework "${json.framework}" (expected ${framework})`);
+  if (framework)
+    assert(
+      label.includes(framework.replace(/-/g, '')),
+      `framework "${json.framework}" (expected ${framework})`,
+    );
   if (args['expect-runner']) assert(json.runner === args['expect-runner'], `runner ${json.runner}`);
   return `${json.framework} · runner ${json.runner} · target ${json.target} · ${json.routes} routes`;
 });
@@ -237,7 +279,7 @@ for (const path of args.dynamic ?? []) {
         /<link[^>]+rel="?(?:stylesheet|modulepreload)"?[^>]+href="([^"]+)"/i.exec(page.body)?.[1] ??
         /<link[^>]+href="([^"]+)"[^>]+rel="?(?:stylesheet|modulepreload)"?/i.exec(page.body)?.[1];
       assert(src, 'no local script or stylesheet referenced');
-      const res = await get(src, { headers: { accept: '*/*'} });
+      const res = await get(src, { headers: { accept: '*/*' } });
       assert(res.status === 200, `${src}: HTTP ${res.status}`);
       const cc = res.headers.get('cache-control') ?? '';
       assert(/immutable|max-age=31536000/.test(cc), `${src}: cache-control "${cc}"`);
@@ -257,7 +299,7 @@ if (!args['no-bot-check'] && (args.dynamic?.length || args.static?.length)) {
 
 if (args.api) {
   await step(`api ${args.api}`, async () => {
-    const res = await get(args.api!, { headers: { accept: 'application/json'} });
+    const res = await get(args.api!, { headers: { accept: 'application/json' } });
     assert(res.status === 200, `HTTP ${res.status}`);
     assert(res.headers.get('x-request-id'), 'no x-request-id');
     return `200 ${res.headers.get('content-type') ?? ''}`;
@@ -265,19 +307,40 @@ if (args.api) {
   const limit = Number(args['rate-limit'] ?? 0);
   if (limit > 0) {
     await step('rate limit', async () => {
+      // Keyed by client address: one keep-alive connection keeps every request on one address even behind a
+      // NAT pool, and requests go back to back so a token bucket (refilling limit per window) runs dry.
+      const agent = BASE.startsWith('https:')
+        ? new HttpsAgent({ keepAlive: true, maxSockets: 1 })
+        : new HttpAgent({ keepAlive: true, maxSockets: 1 });
+      const budget = limit * 3 + 10;
       const statuses: number[] = [];
-      let retryAfter: string | null = null;
-      for (let i = 0; i < limit + 3; i++) {
-        const res = await get(args.api!, { headers: { accept: 'application/json'} });
-        statuses.push(res.status);
-        if (res.status === 429) {
-          retryAfter = res.headers.get('retry-after');
-          break;
+      const remaining: number[] = [];
+      let retryAfter: string | undefined;
+      try {
+        while (statuses.length < budget) {
+          const res = await rawGet(args.api!, { 'user-agent': UA, accept: 'application/json' }, agent);
+          statuses.push(res.status);
+          const left = Number(
+            res.headers['x-ratelimit-remaining'] ?? res.headers['ratelimit-remaining'] ?? NaN,
+          );
+          if (Number.isFinite(left)) remaining.push(left);
+          if (res.status === 429) {
+            retryAfter = res.headers['retry-after'];
+            break;
+          }
         }
+      } finally {
+        agent.destroy();
       }
-      assert(statuses.includes(429), `no 429 in ${statuses.length} requests (${statuses.join(',')})`);
+      const first = statuses.indexOf(429);
+      const rising = remaining.some((left, i) => i > 0 && left > remaining[i - 1]! + 1);
+      assert(
+        first >= 0,
+        `no 429 in ${statuses.length} requests (${summarize(statuses)})${rising ? '; the remaining count went up between requests — the client address changes per request (NAT pool)' : ''}`,
+      );
+      assert(first >= Math.floor(limit / 2), `429 after only ${first} request(s) (limit ${limit})`);
       assert(retryAfter, '429 without Retry-After');
-      return `429 after ${statuses.length - 1} request(s), Retry-After ${retryAfter}`;
+      return `429 after ${first} request(s), Retry-After ${retryAfter}`;
     });
   }
 }
@@ -286,7 +349,10 @@ if (!args['no-https-check'] && BASE.startsWith('https://')) {
   await step('http → https', async () => {
     const res = await get('/', { base: BASE.replace(/^https:/, 'http:') });
     assert([301, 302, 307, 308].includes(res.status), `HTTP ${res.status}`);
-    assert((res.headers.get('location') ?? '').startsWith('https://'), `location ${res.headers.get('location')}`);
+    assert(
+      (res.headers.get('location') ?? '').startsWith('https://'),
+      `location ${res.headers.get('location')}`,
+    );
     return `${res.status} → ${res.headers.get('location')}`;
   });
 }

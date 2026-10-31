@@ -4,6 +4,13 @@ export interface CacheAuditInput {
   path: string;
   /** Whether the manifest resolved an edge cache policy for the route. */
   hasPolicy: boolean;
+  /** The route's prerendered document is served (and cached) by the platform's static layer. */
+  servedStatically?: boolean;
+  /**
+   * Whether cached HTML must vary on `rsc` (Next.js: HTML and RSC payloads share URLs). Default true; false for
+   * hosts without RSC payloads (Vite frameworks).
+   */
+  rscVary?: boolean;
   first: { status: number; headers: Headers };
   /** The repeat visit (sent with the cookies the first response set, as a browser would). */
   second: { status: number; headers: Headers };
@@ -102,8 +109,13 @@ export function auditCache(input: CacheAuditInput): CacheAuditResult {
       findings.push({ level: 'warn', message: 'cached response without an Age header' });
   } else if (second && SERVED_FROM_CACHE.has(second)) {
     findings.push({ level: 'warn', message: `route without a policy was served from the cache (${second})` });
+  } else if (input.servedStatically) {
+    findings.push({
+      level: 'info',
+      message: "prerendered document served and cached by the platform's static layer (no edge-cache policy)",
+    });
   }
-  if (isHtml && input.hasPolicy) {
+  if (isHtml && input.hasPolicy && input.rscVary !== false) {
     const varyList = (vary ?? '')
       .split(',')
       .map((v) => v.trim().toLowerCase())

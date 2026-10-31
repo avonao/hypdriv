@@ -12,6 +12,8 @@ import { runCommand } from '../main';
 import { auditCache } from './cache';
 import { auditCsp, sha256Base64 } from './csp';
 import { gradeHeaders } from './headers';
+import type { FetchedPage } from './http';
+import { firstAssetPath, httpsAuditable, httpsProbes, judgeHttpsProbe } from './https';
 import { choosePaths, cspModeFor } from './paths';
 
 afterEach(cleanupProjects);
@@ -529,5 +531,120 @@ describe('cache audit on Vercel and with cookies', () => {
     expect(cookiesFrom(headers)).toBe('hyp_uid=abc123; theme=dark');
     expect(cookiesFrom(headers, 'old=x; keep=1')).toBe('keep=1; hyp_uid=abc123; theme=dark');
     expect(cookiesFrom(new Headers())).toBe('');
+  });
+});
+
+describe('HTTPS enforcement audit', () => {
+  const base = 'https://www.x.test';
+  const page = (status: number, location?: string): FetchedPage => ({
+    url: 'http://www.x.test/',
+    status,
+    ok: status < 300,
+    headers: new Headers(location ? { location } : {}),
+    body: '',
+    ttfbMs: 1,
+    totalMs: 1,
+    redirected: location ?? null,
+    error: null,
+  });
+
+  it('only audits https deployments that are not local', () => {
+    expect(httpsAuditable('https://www.x.test')).toBe(true);
+    expect(httpsAuditable('http://www.x.test')).toBe(false);
+    expect(httpsAuditable('https://localhost:8787')).toBe(false);
+    expect(httpsAuditable('https://app.localhost')).toBe(false);
+  });
+
+  it('finds the first same-origin asset a page references', () => {
+    expect(
+      firstAssetPath(
+        '<script src="https://cdn.other.test/a.js"></script><link href="/assets/a.css" rel="stylesheet"><script type="module" src="/assets/i.js"></script>',
+        base,
+      ),
+    ).toBe('/assets/i.js');
+    expect(firstAssetPath('<link rel="modulepreload" href="./assets/m.js">', base)).toBe('/assets/m.js');
+    expect(firstAssetPath('<link rel="icon" href="/favicon.svg">', base)).toBeNull();
+  });
+
+  it('builds probes for pages, the health route and one asset', () => {
+    const fetched = [
+      { path: '/', page: { ...page(200), body: '<script src="/assets/i.js"></script>' } },
+      { path: '/about', page: page(200) },
+    ];
+    expect(httpsProbes(fetched, base, '/_hypdriv')).toEqual([
+      { kind: 'page', path: '/' },
+      { kind: 'page', path: '/about' },
+      { kind: 'internal', path: '/_hypdriv/health' },
+      { kind: 'asset', path: '/assets/i.js' },
+    ]);
+  });
+
+  it('passes permanent redirects to the same URL over https and fails plain-HTTP content', () => {
+    const asset = { kind: 'asset' as const, path: '/assets/i.js' };
+    expect(judgeHttpsProbe(asset, base, page(308, 'https://www.x.test/assets/i.js')).level).toBe('pass');
+    expect(judgeHttpsProbe(asset, base, page(302, 'https://www.x.test/assets/i.js')).level).toBe('warn');
+    expect(judgeHttpsProbe(asset, base, page(301, 'https://www.x.test/')).level).toBe('warn');
+    expect(judgeHttpsProbe(asset, base, page(301, 'http://www.x.test/assets/i.js')).level).toBe('fail');
+    const served = judgeHttpsProbe(asset, base, page(200));
+    expect(served.level).toBe('fail');
+    expect(served.finding).toContain('Always Use HTTPS');
+    expect(judgeHttpsProbe({ kind: 'page', path: '/' }, base, page(403)).level).toBe('warn');
+  });
+
+  it('probes anonymously over http:// as part of audit all', async () => {
+    const p = tempProject({ 'package.json': '{"name":"x"}' });
+    const { fetch, calls } = fakeFetch((url) => {
+      const u = new URL(url);
+      if (u.protocol === 'http:') {
+        if (u.pathname.startsWith('/assets/'))
+          return response('js', { headers: { 'content-type': 'text/javascript' } });
+        return response('', { status: 308, headers: { location: `https://${u.host}${u.pathname}` } });
+      }
+      return response('<html><body><script type="module" src="/assets/i.js"></script></body></html>', {
+        headers: { ...STRONG, 'content-type': 'text/html; charset=utf-8', 'x-hypdriv-cache': 'DYNAMIC' },
+      });
+    });
+    const io = memoryIO(p.dir, { fetch, env: { HYPDRIV_ACCESS_HEADERS: 'x-gate: secret' } });
+    const code = await runCommand('audit', ['all', '--url', base, '--paths', '/', '--json'], io);
+    const out = JSON.parse(io.out);
+    expect(out.https.map((e: { kind: string; level: string }) => `${e.kind}:${e.level}`)).toEqual([
+      'page:pass',
+      'internal:pass',
+      'asset:fail',
+    ]);
+    expect(code).toBe(1);
+    const plain = calls.filter((c) => c.url.startsWith('http:'));
+    expect(plain).toHaveLength(3);
+    expect(plain.every((c) => !c.headers.has('x-gate') && !c.headers.has('x-hypdriv-audit'))).toBe(true);
+    expect(calls.some((c) => c.url.startsWith('https:') && c.headers.get('x-gate') === 'secret')).toBe(true);
+  });
+});
+
+describe('cache audit on Vite hosts', () => {
+  const html = (cache: string) =>
+    new Headers({
+      'content-type': 'text/html',
+      'x-hypdriv-cache': cache,
+      'cache-control': 'public, max-age=0',
+    });
+  it('reports documents served by the static layer as info and skips the rsc Vary check', () => {
+    const r = auditCache({
+      path: '/',
+      hasPolicy: false,
+      servedStatically: true,
+      rscVary: false,
+      first: { status: 200, headers: html('DYNAMIC') },
+      second: { status: 200, headers: html('DYNAMIC') },
+    });
+    expect(r.status).toBe('pass');
+    expect(r.findings).toEqual([expect.objectContaining({ level: 'info' })]);
+    const cached = auditCache({
+      path: '/about',
+      hasPolicy: true,
+      rscVary: false,
+      first: { status: 200, headers: html('MISS') },
+      second: { status: 200, headers: new Headers({ ...Object.fromEntries(html('HIT')), age: '1' }) },
+    });
+    expect(cached.findings.some((f) => f.message.includes('rsc'))).toBe(false);
   });
 });

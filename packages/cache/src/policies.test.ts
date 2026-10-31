@@ -108,6 +108,23 @@ describe('inferPolicies / resolvePolicies', () => {
     expect(shell).toMatchObject({ ttl: 15, swr: 45, staleIfError: 0 });
   });
 
+  it('never infers a policy for fallback documents or documents the static layer serves', () => {
+    const config = resolveConfig({});
+    const flagged = {
+      ...manifest,
+      routes: manifest.routes.map((r) =>
+        r.classification === 'static' ? { ...r, servedStatically: true } : r,
+      ),
+    };
+    const staticIds = manifest.routes
+      .filter((r) => r.classification === 'static')
+      .map((r) => `inferred:${r.id}`);
+    expect(staticIds.length).toBeGreaterThan(0);
+    const ids = inferPolicies(config, flagged).map((p) => p.id);
+    expect(ids.some((id) => staticIds.includes(id))).toBe(false);
+    expect(ids.length).toBeGreaterThan(0);
+  });
+
   it('returns nothing when inference is off or the cache is disabled', () => {
     expect(inferPolicies(resolveConfig({ cache: { edge: { infer: false } } }), manifest)).toEqual([]);
     expect(resolvePolicies(resolveConfig({ cache: { edge: false } }), manifest)).toEqual([]);

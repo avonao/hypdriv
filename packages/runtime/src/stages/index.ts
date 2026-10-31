@@ -286,7 +286,7 @@ export function buildDefaultStages(platform: Platform): Stage[] {
     Object.keys(config.flags.definitions).length || config.flags.provider !== 'static'
       ? flagsStage(config, platform.flagsProvider)
       : null,
-    redirectsStage(config, { kv }),
+    redirectsStage(config, { kv, target: platform.target }),
     config.purser?.theme ? themeStage(config) : null,
     // Runners that own the response body inject nonces even without `HTMLRewriter` (framework hooks on Node
     // and Vercel Functions); `proxy.ts` only sees Next's pass-through marker.

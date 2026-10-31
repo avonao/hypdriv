@@ -229,6 +229,32 @@ describe('redirects', () => {
     expect(httpsUpgrade(on, new Request('http://www.x.test/x'), { development: true })).toBeNull();
     expect(httpsUpgrade(resolveConfig({}), new Request('http://www.x.test/x'))).toBeNull();
   });
+  it('auto without site.origin upgrades where the platform terminates TLS (Cloudflare, Vercel)', async () => {
+    const bare = resolveConfig({});
+    expect(forcesHttps(bare)).toBe(false);
+    expect(forcesHttps(bare, { target: 'node' })).toBe(false);
+    expect(forcesHttps(bare, { target: 'cloudflare' })).toBe(true);
+    expect(forcesHttps(bare, { target: 'vercel' })).toBe(true);
+    // An explicit origin or an explicit setting wins over the target.
+    expect(
+      forcesHttps(resolveConfig({ site: { origin: 'http://www.x.test' } }), { target: 'cloudflare' }),
+    ).toBe(false);
+    expect(forcesHttps(resolveConfig({ redirects: { forceHttps: false } }), { target: 'cloudflare' })).toBe(
+      false,
+    );
+    expect(httpsUpgrade(bare, new Request('http://www.x.test/x'), { target: 'cloudflare' })?.status).toBe(
+      308,
+    );
+    expect(httpsUpgrade(bare, new Request('http://localhost:8787/x'), { target: 'cloudflare' })).toBeNull();
+    const stage = redirectsStage(bare, { target: 'cloudflare' })!;
+    const { response } = await runPipeline({
+      stages: [stage],
+      ctx: ctxFor('http://www.x.test/page', { config: bare }),
+      next: async () => new Response('next'),
+    });
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe('https://www.x.test/page');
+  });
 });
 
 describe('maintenance', () => {

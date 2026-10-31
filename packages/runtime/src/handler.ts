@@ -361,7 +361,10 @@ export function createHandler(options: CreateHandlerOptions): HypHandler {
     const request = sanitizeInboundRequest(incoming, {
       nonceHeader: platform.config.security.csp?.nonceHeader ?? HEADER.nonce,
     });
-    const upgrade = httpsUpgrade(platform.config, request, { development: platform.development });
+    const upgrade = httpsUpgrade(platform.config, request, {
+      development: platform.development,
+      target: platform.target,
+    });
     if (upgrade) return upgrade;
 
     const cf = input.cf ?? getCf(request);

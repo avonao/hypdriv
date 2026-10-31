@@ -354,6 +354,9 @@ export async function assembleManifest(input: AssembleManifestInput): Promise<Bu
     for (const route of manifest.routes) {
       const explicit = config.cache.edge.policies.find((p) => matchesAny(p.match, route.pathname));
       if (explicit) route.cachePolicyId = explicit.id;
+      // Same exclusions as the runtime's inference (@hypdriv/cache): shared fallback documents and documents
+      // the platform's static layer serves are never edge-cached by inference.
+      else if (route.fallback || route.servedStatically) continue;
       else if (
         config.cache.edge.infer &&
         (route.classification === 'static' || route.classification === 'isr')

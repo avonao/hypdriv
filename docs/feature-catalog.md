@@ -72,7 +72,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Locale negotiation    | `Accept-Language` + geo + cookie negotiation, proxy stage                                         | ✅                  | —                                | `next`               | ✅     |
 | Live channels         | Pub/sub with WebSocket hibernation and SSE, `useLive()` hook, server-component refresh on publish | polling transport   | `HypDrivChannel` DO              | `live`, `cloudflare` | ✅     |
 | Edge feature flags    | Deterministic bucketing, geo/cookie/percentage rules, header propagation, QA overrides            | env/static provider | KV, OpenFeature (Flagship)       | `flags`              | ✅     |
-| Edge redirects        | Redirect table evaluated before Next.js; `forceHttps` upgrades every plain-HTTP request (internal routes and static assets included) before anything answers | config              | KV-backed table without redeploy | `cloudflare`, `next` | ✅     |
+| Edge redirects        | Redirect table evaluated before the application; `forceHttps` (default on for Cloudflare and Vercel deployments, otherwise from `site.origin`) upgrades every plain-HTTP request that reaches HypDriv (internal routes and static assets included) before anything answers; `hypdriv audit https` verifies pages, internal routes and hashed assets over `http://` | config              | KV-backed table without redeploy | `runtime`, `cloudflare`, `next` | ✅     |
 | Maintenance mode      | Branded maintenance page toggled by env or KV                                                     | ✅                  | KV                               | `cloudflare`         | ✅     |
 | Typed bindings access | `hyp().env` typed from `CloudflareEnv`, dev fallback via OpenNext                                 | ✅                  | —                                | `cloudflare`, `next` | ✅     |
 | Background work       | `defer()` → `waitUntil`/`after()`, `enqueue()` → Queues, else a signed consumer-route call        | ✅                  | Queues                           | `cloudflare`         | ✅     |
@@ -140,7 +140,7 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | `hypdriv doctor`         | 91 platform-aware checks with fixes              | `cli`            | ✅     |
 | `hypdriv analyze`        | Worker weight + route assets                     | `cli`            | ✅     |
 | `hypdriv routes`         | Manifest table                                   | `cli`            | ✅     |
-| `hypdriv audit`          | Headers, CSP, cache, CSS audits                  | `cli`            | ✅     |
+| `hypdriv audit`          | Headers, CSP, cache, HTTPS enforcement, CSS audits | `cli`            | ✅     |
 | `hypdriv budget`         | Budgets with snapshots and diffs                 | `cli`            | ✅     |
 | `hypdriv csp`            | Hashes, suggestions                              | `cli`            | ✅     |
 | `hypdriv css`            | Purser passthrough                               | `cli`            | ✅     |
