@@ -1,0 +1,12 @@
+import type { HypDrivConfig } from '@hypdriv/core';
+
+// Stands in for `virtual:hypdriv/config` in tests.
+const config: HypDrivConfig = {
+  site: { name: 'fixture' },
+  platform: 'node',
+  flags: {
+    definitions: { newHero: { default: false, rules: [{ when: { country: ['US'] }, value: true }] } },
+  },
+};
+
+export default config;

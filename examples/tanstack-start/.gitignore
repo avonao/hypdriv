@@ -1,0 +1,6 @@
+# Build output (Nitro, TanStack Start)
+.output/
+.nitro/
+.tanstack/
+.vercel/
+src/routeTree.gen.ts
