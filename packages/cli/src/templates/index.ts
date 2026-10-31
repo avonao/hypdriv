@@ -134,8 +134,10 @@ export function headersTemplate(): string {
 /** `.env.example` for Vercel / Node deployments (Vercel env vars mirror these names). */
 export function envExampleTemplate(o: { crons: boolean }): string {
   return `# Copy to .env.local for \`next dev\`; on Vercel set them with \`vercel env add <NAME>\`.
-HYPDRIV_SESSION_SECRET=change-me-32-bytes-minimum-please-really
-HYPDRIV_INTERNAL_SECRET=change-me-too
+# Replace both with throwaway values of 32+ random bytes (openssl rand -base64 32). Production secrets are never in files:
+# wrangler secret put HYPDRIV_SESSION_SECRET / HYPDRIV_INTERNAL_SECRET.
+HYPDRIV_SESSION_SECRET=replace-with-openssl-rand-base64-32-output
+HYPDRIV_INTERNAL_SECRET=replace-with-another-openssl-rand-base64-32
 ${o.crons ? '' : '# '}CRON_SECRET=change-me-16-chars-min
 # CACHE_PURGE_API_TOKEN=
 # TURNSTILE_SECRET_KEY=

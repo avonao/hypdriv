@@ -41,6 +41,8 @@ export interface PlanItem {
   content?: string;
   /** Instructions for `manual` items or hints for skipped ones. */
   hint?: string;
+  /** `false`: append-only edit, no `.hypdriv.bak` copy. */
+  backup?: boolean;
 }
 
 export interface InitPlan {
@@ -206,6 +208,30 @@ export function buildInitPlan(
       reason: 'documents the secrets HypDriv reads',
       content: envExampleTemplate({ crons: platform === 'vercel' && crons.length > 0 }),
     });
+
+  // .gitignore: local secrets, build output and the backups init itself writes must never be committed.
+  const ignored = [join(root, '.gitignore'), join(project.repoRoot, '.gitignore')]
+    .filter((file, i, all) => all.indexOf(file) === i && existsSync(file))
+    .map((file) => read(file))
+    .join('\n');
+  const wantIgnore: Array<[string, RegExp, boolean]> = [
+    ['.dev.vars', /^\s*\/?\.dev\.vars(\*|\.\*)?\s*$/m, platform === 'cloudflare'],
+    ['.hypdriv/', /^\s*\/?\.hypdriv\/?\s*$/m, true],
+    ['*.hypdriv.bak', /^\s*(\*\*\/)?\*\.(hypdriv\.)?bak\s*$/m, true],
+  ];
+  const missingIgnore = wantIgnore.filter(([, pattern, applies]) => applies && !pattern.test(ignored));
+  if (missingIgnore.length) {
+    const file = join(root, '.gitignore');
+    const current = existsSync(file) ? read(file) : '';
+    items.push({
+      path: '.gitignore',
+      action: existsSync(file) ? 'modify' : 'create',
+      reason: 'local secrets, build output and init backups stay out of git',
+      details: missingIgnore.map(([entry]) => `add ${entry}`),
+      content: `${current}${current && !current.endsWith('\n') ? '\n' : ''}${current ? '\n' : ''}# HypDriv\n${missingIgnore.map(([entry]) => entry).join('\n')}\n`,
+      backup: false,
+    });
+  }
 
   // instrumentation.ts
   const instrumentationPath = project.srcDir ? 'src/instrumentation.ts' : 'instrumentation.ts';
@@ -509,7 +535,7 @@ export function applyInitPlan(plan: InitPlan, root: string): ApplyResult {
   for (const item of plan.items) {
     if ((item.action !== 'create' && item.action !== 'modify') || item.content === undefined) continue;
     const file = join(root, item.path);
-    if (item.action === 'modify' && existsSync(file)) {
+    if (item.action === 'modify' && item.backup !== false && existsSync(file)) {
       const backup = `${file}${BACKUP_SUFFIX}`;
       copyFileSync(file, backup);
       backups.push(rel(root, backup));

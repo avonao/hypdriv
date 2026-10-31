@@ -192,6 +192,8 @@ export interface NextConfigAnalysis {
 
 export interface WranglerInfo extends VersionInfo {
   configFile: string | null;
+  /** The environment (`--env`) the config was resolved for, or null for the top level. */
+  environment: string | null;
   format: WranglerFormat | null;
   config: WranglerConfig | null;
   parseError: string | null;
@@ -396,8 +398,13 @@ function readDevVars(root: string): DevVarsInfo {
   return { file, exampleFile, keys, lengths, gitignored };
 }
 
-function readWrangler(root: string, pkg: PackageInfo | null, override?: string | null): WranglerInfo {
-  const base = versionInfo(root, pkg, 'wrangler');
+function readWrangler(
+  root: string,
+  pkg: PackageInfo | null,
+  override?: string | null,
+  environment: string | null = null,
+): WranglerInfo {
+  const base = { ...versionInfo(root, pkg, 'wrangler'), environment };
   if (override) {
     const format: WranglerFormat = override.endsWith('.toml')
       ? 'toml'
@@ -418,7 +425,7 @@ function readWrangler(root: string, pkg: PackageInfo | null, override?: string |
         ...base,
         configFile: override,
         format,
-        config: parseWranglerConfig(source, format),
+        config: parseWranglerConfig(source, format, environment ?? undefined),
         parseError: null,
       };
     } catch (err) {
@@ -446,7 +453,7 @@ function readWrangler(root: string, pkg: PackageInfo | null, override?: string |
         ...base,
         configFile: file,
         format,
-        config: parseWranglerConfig(readFileSync(file, 'utf8'), format),
+        config: parseWranglerConfig(readFileSync(file, 'utf8'), format, environment ?? undefined),
         parseError: null,
       };
     } catch (err) {
@@ -657,6 +664,8 @@ export interface DetectOptions {
   platform?: DeployPlatform | null;
   /** Absolute path of the Wrangler config to read instead of `<root>/wrangler.*` (`--wrangler`). */
   wrangler?: string | null;
+  /** Wrangler environment (`env.<name>`) to resolve the config for (`--env`); null = the top level. */
+  wranglerEnv?: string | null;
   /** Environment used for platform signals (default: `process.env`). */
   env?: Record<string, string | undefined>;
 }
@@ -696,7 +705,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
   }
   const nextConfigFile = firstExisting(root, NEXT_CONFIG_FILES);
   const purserVersion = installedVersion(root, '@avonao/purser');
-  const wrangler = readWrangler(root, pkg, options.wrangler);
+  const wrangler = readWrangler(root, pkg, options.wrangler, options.wranglerEnv ?? null);
   const linkDir = vercelLinkDir(root, repoRoot);
   const vercel = readVercel(root, linkDir);
   const opennext = versionInfo(root, pkg, '@opennextjs/cloudflare');

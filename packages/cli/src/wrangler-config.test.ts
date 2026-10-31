@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WRANGLER_JSONC } from './__tests__/helpers';
 import {
   declaredBindingNames,
+  envBindingGaps,
   parseJsonc,
   parseTomlSubset,
   parseWranglerConfig,
@@ -81,5 +82,65 @@ LIMIT = 10
     expect(cfg.migrations[0]?.new_sqlite_classes).toEqual(['HypDrivLimiter']);
     expect(cfg.analytics_engine_datasets[0]?.dataset).toBe('shop_vitals');
     expect(cfg.vars.LIMIT).toBe(10);
+  });
+});
+
+describe('environments', () => {
+  const text = `{
+    "name": "web", "main": "hypdriv.worker.ts", "compatibility_date": "2026-10-01",
+    "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+    "vars": { "TOP": "1" },
+    "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "web" }],
+    "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "a" }],
+    "durable_objects": { "bindings": [{ "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }] },
+    "migrations": [{ "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel"] }],
+    "env": {
+      "app": {
+        "vars": { "ENV": "app" },
+        "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "web-app" }],
+        "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "b" }],
+        "durable_objects": { "bindings": [{ "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }] }
+      },
+      "bare": {},
+      "named": { "name": "custom-name", "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "c" }] }
+    }
+  }`;
+
+  it('resolves an environment the way Wrangler does: inherited keys stay, bindings do not', () => {
+    const bare = parseWranglerConfig(text, 'jsonc', 'bare');
+    expect(bare.name).toBe('web-bare');
+    expect(bare.main).toBe('hypdriv.worker.ts');
+    expect(bare.compatibility_date).toBe('2026-10-01');
+    expect(bare.assets?.binding).toBe('ASSETS');
+    expect(bare.migrations).toHaveLength(1);
+    expect(bare.services).toEqual([]);
+    expect(bare.kv_namespaces).toEqual([]);
+    expect(bare.durable_objects.bindings).toEqual([]);
+    expect(bare.vars).toEqual({});
+    expect(bare.env).toEqual({});
+  });
+
+  it("uses the environment's own bindings, vars and explicit name", () => {
+    const app = parseWranglerConfig(text, 'jsonc', 'app');
+    expect(app.name).toBe('web-app');
+    expect(app.services[0]).toMatchObject({ service: 'web-app' });
+    expect(app.kv_namespaces[0]).toMatchObject({ id: 'b' });
+    expect(app.vars).toEqual({ ENV: 'app' });
+    expect(parseWranglerConfig(text, 'jsonc', 'named').name).toBe('custom-name');
+  });
+
+  it('throws a readable error for an environment that does not exist', () => {
+    expect(() => parseWranglerConfig(text, 'jsonc', 'nope')).toThrow(
+      /no environment "nope" \(found: app, bare, named\)/,
+    );
+    expect(() => parseWranglerConfig('{"name":"x"}', 'jsonc', 'nope')).toThrow(/defines no environments/);
+  });
+
+  it('reports the binding kinds an environment loses', () => {
+    const top = parseWranglerConfig(text, 'jsonc');
+    expect(envBindingGaps(top)).toEqual([
+      { env: 'bare', missing: ['services', 'kv_namespaces', 'durable_objects'] },
+      { env: 'named', missing: ['services', 'durable_objects'] },
+    ]);
   });
 });

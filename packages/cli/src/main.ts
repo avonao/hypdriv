@@ -104,7 +104,8 @@ export async function main(argv: string[], io: Partial<IO> = {}): Promise<number
     // Global flags before the command (`hypdriv --root apps/web doctor`): move them after it.
     const index = argv.findIndex(
       (a, i) =>
-        !a.startsWith('-') && !(i > 0 && ['--root', '--platform', '--wrangler'].includes(argv[i - 1]!)),
+        !a.startsWith('-') &&
+        !(i > 0 && ['--root', '--platform', '--wrangler', '--env'].includes(argv[i - 1]!)),
     );
     if (index === -1)
       return reportError(fullIo, argv.includes('--json'), new UsageError('missing command'), 2);

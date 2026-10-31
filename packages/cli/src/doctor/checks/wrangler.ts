@@ -5,6 +5,7 @@ import { BACKUP_SUFFIX } from '../../init/plan';
 import { editWranglerJsonc } from '../../init/wrangler';
 import { atLeast, monthsBetween } from '../../semver';
 import { rel } from '../../util/fs';
+import { envBindingGaps } from '../../wrangler-config';
 import { type Check, type CheckContext, type CheckFix, fail, info, pass, skip, warn } from '../types';
 
 export const MIN_COMPAT_DATE = '2024-09-23';
@@ -71,8 +72,41 @@ export const wranglerChecks: Check[] = [
           { fix: { description: 'run `hypdriv init`' } },
         );
       }
-      if (w.parseError) return fail(`${rel(ctx.root, w.configFile)} could not be parsed: ${w.parseError}`);
-      return pass(`${rel(ctx.root, w.configFile)} (${w.format})`);
+      if (w.parseError)
+        return fail(
+          `${rel(ctx.root, w.configFile)}${w.environment ? ` (--env ${w.environment})` : ''} could not be read: ${w.parseError}`,
+        );
+      return pass(
+        `${rel(ctx.root, w.configFile)} (${w.format})${w.environment ? `, checked as environment "${w.environment}" (name ${w.config?.name ?? 'unset'})` : ''}`,
+      );
+    },
+  },
+  {
+    id: 'wrangler.env-bindings',
+    title: 'environments repeat the bindings',
+    category: 'wrangler',
+    severity: 'warn',
+    run(ctx) {
+      const w = ctx.project.wrangler;
+      if (!w.config) return skip('no wrangler config.');
+      if (w.environment)
+        return pass(
+          `Checked as environment "${w.environment}", resolved the way Wrangler does (bindings of the top level are not inherited).`,
+        );
+      const envs = Object.keys(w.config.env);
+      if (envs.length === 0) return pass('The config defines no environments.');
+      const gaps = envBindingGaps(w.config);
+      if (gaps.length === 0)
+        return pass(
+          `${envs.length} environment${envs.length === 1 ? '' : 's'} (${envs.join(', ')}) repeat every binding kind of the top level. Check each one with \`--env <name>\`.`,
+        );
+      return warn(
+        `Wrangler does not inherit bindings into environments, so these deploy cleanly and run without them: ${gaps
+          .map((g) => `env.${g.env} lacks ${g.missing.join(', ')}`)
+          .join(
+            '; ',
+          )}. Repeat them per environment, then run \`hypdriv doctor --env <name>\` for each (doctor otherwise reads the top level only).`,
+      );
     },
   },
   {

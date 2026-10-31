@@ -507,12 +507,128 @@ export function normalizeWranglerConfig(doc: Record<string, JsonValue>): Wrangle
 
 export type WranglerFormat = 'jsonc' | 'json' | 'toml';
 
-/** Parses the text of a wrangler config file in any supported format. Throws on syntax errors. */
-export function parseWranglerConfig(text: string, format: WranglerFormat): WranglerConfig {
+/**
+ * Keys Wrangler does NOT inherit from the top level into `env.<name>`: an environment that does not repeat them runs
+ * without them (Wrangler only warns). Every other key (`main`, `assets`, `compatibility_*`, `triggers`, `migrations`,
+ * `observability`, `placement`, `workers_dev`, ...) is inherited unless the environment sets it.
+ */
+export const NON_INHERITABLE_KEYS = [
+  'vars',
+  'secrets',
+  'define',
+  'durable_objects',
+  'kv_namespaces',
+  'r2_buckets',
+  'd1_databases',
+  'queues',
+  'services',
+  'analytics_engine_datasets',
+  'ratelimits',
+  'ai',
+  'images',
+  'hyperdrive',
+  'vectorize',
+  'browser',
+  'send_email',
+  'mtls_certificates',
+  'tail_consumers',
+  'streaming_tail_consumers',
+  'dispatch_namespaces',
+  'workflows',
+  'containers',
+  'unsafe',
+  'analytics',
+] as const;
+
+function isRecord(value: unknown): value is Record<string, JsonValue> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * The configuration Wrangler uses for `--env <name>`: the top level without its non-inheritable keys, overlaid with the
+ * environment's own keys. The Worker name is the environment's `name`, or `<top-level name>-<env>` like Wrangler.
+ * Returns `null` when the document has no such environment.
+ */
+export function resolveWranglerEnvironment(
+  doc: Record<string, JsonValue>,
+  envName: string,
+): Record<string, JsonValue> | null {
+  const envs = isRecord(doc.env) ? doc.env : {};
+  const own = envs[envName];
+  if (!isRecord(own)) return null;
+  const resolved: Record<string, JsonValue> = {};
+  for (const [key, value] of Object.entries(doc)) {
+    if (key === 'env' || (NON_INHERITABLE_KEYS as readonly string[]).includes(key)) continue;
+    resolved[key] = value;
+  }
+  for (const [key, value] of Object.entries(own)) resolved[key] = value;
+  if (typeof own.name !== 'string' && typeof doc.name === 'string') resolved.name = `${doc.name}-${envName}`;
+  return resolved;
+}
+
+/**
+ * Parses the text of a wrangler config file in any supported format. Throws on syntax errors. With `envName`, returns
+ * the configuration of that environment as Wrangler resolves it (see `resolveWranglerEnvironment`); throws when the
+ * environment does not exist.
+ */
+export function parseWranglerConfig(text: string, format: WranglerFormat, envName?: string): WranglerConfig {
   const doc = format === 'toml' ? parseTomlSubset(text) : parseJsonc(text);
   if (!doc || typeof doc !== 'object' || Array.isArray(doc))
     throw new SyntaxError('wrangler config must be an object');
-  return normalizeWranglerConfig(doc as Record<string, JsonValue>);
+  const top = doc as Record<string, JsonValue>;
+  if (!envName) return normalizeWranglerConfig(top);
+  const resolved = resolveWranglerEnvironment(top, envName);
+  if (!resolved) {
+    const known = isRecord(top.env) ? Object.keys(top.env) : [];
+    throw new Error(
+      `wrangler config has no environment "${envName}"${known.length ? ` (found: ${known.join(', ')})` : ' (it defines no environments)'}`,
+    );
+  }
+  return { ...normalizeWranglerConfig(resolved), env: {} };
+}
+
+export interface EnvBindingGap {
+  env: string;
+  /** Binding kinds the top level declares but this environment does not (they are not inherited). */
+  missing: string[];
+}
+
+/** Binding kinds in `config` (the top level) that an environment would silently lose by not repeating them. */
+function bindingKinds(source: Record<string, unknown>): Record<string, number> {
+  const count = (value: unknown): number => (Array.isArray(value) ? value.length : 0);
+  const durable = isRecord(source.durable_objects as JsonValue)
+    ? (source.durable_objects as Record<string, JsonValue>)
+    : {};
+  const queues = isRecord(source.queues as JsonValue) ? (source.queues as Record<string, JsonValue>) : {};
+  return {
+    services: count(source.services),
+    kv_namespaces: count(source.kv_namespaces),
+    r2_buckets: count(source.r2_buckets),
+    d1_databases: count(source.d1_databases),
+    durable_objects: count(durable.bindings),
+    analytics_engine_datasets: count(source.analytics_engine_datasets),
+    ratelimits: count(source.ratelimits),
+    queues: count(queues.producers) + count(queues.consumers),
+    vars: isRecord(source.vars as JsonValue) ? Object.keys(source.vars as object).length : 0,
+  };
+}
+
+/**
+ * Environments that lose bindings the top level declares. Wrangler does not inherit these keys, so an environment
+ * that omits them deploys cleanly and then runs without the capability (`wrangler deploy` only warns).
+ * `vars` are reported separately by the caller as informational: they are often intentionally top-level only.
+ */
+export function envBindingGaps(top: WranglerConfig): EnvBindingGap[] {
+  const topKinds = bindingKinds(top.raw);
+  const gaps: EnvBindingGap[] = [];
+  for (const [env, value] of Object.entries(top.env)) {
+    const own = bindingKinds(isRecord(value as JsonValue) ? (value as Record<string, unknown>) : {});
+    const missing = Object.entries(topKinds)
+      .filter(([kind, n]) => kind !== 'vars' && n > 0 && own[kind] === 0)
+      .map(([kind]) => kind);
+    if (missing.length) gaps.push({ env, missing });
+  }
+  return gaps;
 }
 
 /** Binding names declared anywhere in the config (what `env` will contain at run time). */

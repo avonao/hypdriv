@@ -59,10 +59,17 @@ export function wranglerOption(args: ParsedArgs, io: IO): string | null {
   return value ? resolve(io.cwd, value) : null;
 }
 
+/** `--env` / `HYPDRIV_WRANGLER_ENV`: the Wrangler environment to check. */
+export function wranglerEnvOption(args: ParsedArgs, io: IO): string | null {
+  const value = args.string('env') ?? io.env.HYPDRIV_WRANGLER_ENV;
+  return value ? value : null;
+}
+
 export function createContext(args: ParsedArgs, io: IO): CommandContext {
   const root = findProjectRoot(resolve(io.cwd, args.root ?? '.'));
   const platform = platformOption(args);
   const wrangler = wranglerOption(args, io);
+  const wranglerEnv = wranglerEnvOption(args, io);
   const ui = createUi(io, { json: args.json, ...(args.color === false ? { color: false } : {}) });
   let projectCache: { scanned: boolean; info: ProjectInfo } | null = null;
   let configPromise: Promise<LoadedConfig> | null = null;
@@ -74,7 +81,7 @@ export function createContext(args: ParsedArgs, io: IO): CommandContext {
     project(options = {}) {
       const wantScan = options.scan !== false;
       if (projectCache && (projectCache.scanned || !wantScan)) return projectCache.info;
-      const info = detectProject(root, { platform, wrangler, env: io.env, ...options });
+      const info = detectProject(root, { platform, wrangler, wranglerEnv, env: io.env, ...options });
       projectCache = { scanned: wantScan, info };
       return info;
     },

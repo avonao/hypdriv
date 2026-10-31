@@ -32,6 +32,12 @@ export const GLOBAL_OPTIONS: OptionSpec = {
     description:
       'Wrangler config to read instead of <root>/wrangler.jsonc (a generated or shared config that lives outside the project; HYPDRIV_WRANGLER_CONFIG does the same)',
   },
+  env: {
+    type: 'string',
+    value: '<name>',
+    description:
+      'Wrangler environment (env.<name>) to check instead of the top level: bindings are not inherited, so an environment is checked as Wrangler resolves it (HYPDRIV_WRANGLER_ENV does the same)',
+  },
   help: { type: 'boolean', short: 'h', description: 'Show help for the command' },
   'no-color': { type: 'boolean', description: 'Disable colours (NO_COLOR=1 does the same)' },
 };

@@ -389,3 +389,41 @@ describe('wrangler.self-reference on sites that never revalidate', () => {
     expect((await doctor(revalidating.dir, only)).byId['wrangler.self-reference']?.status).toBe('warn');
   });
 });
+
+describe('wrangler environments', () => {
+  const wrangler = `{
+    "name": "site", "main": "hypdriv.worker.ts", "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+    "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "site" }],
+    "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "a" }],
+    "env": {
+      "good": { "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "site-good" }], "kv_namespaces": [{ "binding": "HYPDRIV_KV", "id": "b" }] },
+      "bad": {}
+    }
+  }`;
+  const files = {
+    'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+    'wrangler.jsonc': wrangler,
+  };
+
+  it('warns when an environment loses bindings the top level declares', async () => {
+    const p = tempProject(files);
+    const check = (await doctor(p.dir, ['--only', 'wrangler.env-bindings'])).byId['wrangler.env-bindings'];
+    expect(check?.status).toBe('warn');
+    expect(check?.message).toContain('env.bad lacks services, kv_namespaces');
+    expect(check?.message).not.toContain('env.good');
+  });
+
+  it('checks one environment as Wrangler resolves it with --env', async () => {
+    const p = tempProject(files);
+    const ids = ['--only', 'wrangler.config,wrangler.env-bindings,wrangler.self-reference'];
+    const good = await doctor(p.dir, [...ids, '--env', 'good']);
+    expect(good.byId['wrangler.config']?.message).toContain('environment "good" (name site-good)');
+    expect(good.byId['wrangler.env-bindings']?.status).toBe('pass');
+    expect(good.byId['wrangler.self-reference']?.status).not.toBe('fail');
+    const bad = await doctor(p.dir, [...ids, '--env', 'bad']);
+    expect(bad.byId['wrangler.self-reference']?.status).toBe('warn');
+    const missing = await doctor(p.dir, [...ids, '--env', 'nope']);
+    expect(missing.byId['wrangler.config']?.status).toBe('fail');
+    expect(missing.byId['wrangler.config']?.message).toContain('no environment "nope"');
+  });
+});

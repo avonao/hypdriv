@@ -147,11 +147,14 @@ export const analyzeCommand = defineCommand({
               : `No dry-run bundle in ${WORKER_BUILD_DIR} and --no-build was given; Worker report skipped.`,
           );
         } else {
+          // The config the other commands read (`--wrangler`, `--env`) is the one that is measured.
           const cmd = execCommand(project.packageManager, 'wrangler', [
             'deploy',
             '--dry-run',
             '--outdir',
             WORKER_BUILD_DIR,
+            ...(project.wrangler.configFile ? ['--config', project.wrangler.configFile] : []),
+            ...(project.wrangler.environment ? ['--env', project.wrangler.environment] : []),
           ]);
           ui.note(`$ ${cmd.command} ${cmd.args.join(' ')}`);
           // In a monorepo the link (and `vercel build`) lives at the repository root.

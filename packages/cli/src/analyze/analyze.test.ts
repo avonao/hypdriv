@@ -276,7 +276,16 @@ describe('hypdriv analyze', () => {
     expect(calls).toEqual([
       {
         command: 'pnpm',
-        args: ['exec', 'wrangler', 'deploy', '--dry-run', '--outdir', '.hypdriv/worker-build'],
+        args: [
+          'exec',
+          'wrangler',
+          'deploy',
+          '--dry-run',
+          '--outdir',
+          '.hypdriv/worker-build',
+          '--config',
+          join(p.dir, 'wrangler.jsonc'),
+        ],
       },
     ]);
     const out = JSON.parse(io.out);
