@@ -1,0 +1,36 @@
+{
+  "name": "@hypdriv/example-sveltekit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare vite build",
+    "build:vercel": "HYPDRIV_TARGET=vercel vite build",
+    "build:node": "HYPDRIV_TARGET=node vite build",
+    "preview": "vite preview",
+    "start": "node server.js",
+    "start:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare vite build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/sveltekit": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@sveltejs/adapter-cloudflare": "catalog:",
+    "@sveltejs/adapter-node": "catalog:",
+    "@sveltejs/adapter-vercel": "catalog:",
+    "@sveltejs/kit": "catalog:",
+    "@sveltejs/vite-plugin-svelte": "catalog:",
+    "@types/node": "catalog:",
+    "svelte": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}
