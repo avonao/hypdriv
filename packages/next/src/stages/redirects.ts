@@ -73,6 +73,37 @@ export interface RedirectsStageOptions {
   now?: () => number;
 }
 
+/** Whether `redirects.forceHttps` is on (`auto`: when `site.origin` is https). */
+export function forcesHttps(config: ResolvedConfig): boolean {
+  const r = config.redirects;
+  return r.forceHttps === 'auto' ? config.site.origin?.startsWith('https://') === true : r.forceHttps;
+}
+
+/**
+ * The https upgrade for a plain-HTTP request (`308`, any method, query kept), or `null`. Runners call it
+ * before anything else answers — internal routes (`/_hypdriv/health`, vitals, CSP reports, live channels)
+ * and static assets included — so nothing is served over plain HTTP when `forceHttps` is on. Local hosts
+ * and development are exempt.
+ */
+export function httpsUpgrade(
+  config: ResolvedConfig,
+  request: Request,
+  options: { development?: boolean } = {},
+): Response | null {
+  if (options.development || !forcesHttps(config)) return null;
+  const url = new URL(request.url);
+  const proto = (
+    request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? url.protocol.replace(':', '')
+  ).toLowerCase();
+  if (proto !== 'http') return null;
+  const host = url.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost'))
+    return null;
+  const target = new URL(url.href);
+  target.protocol = 'https:';
+  return redirect(target, 308, { 'cache-control': 'public, max-age=300' });
+}
+
 /** Edge redirects: config rules, optional KV-managed rules, canonical host and https enforcement. */
 export function redirectsStage(config: ResolvedConfig, options: RedirectsStageOptions = {}): Stage | null {
   const r: ResolvedRedirects = config.redirects;
@@ -86,8 +117,7 @@ export function redirectsStage(config: ResolvedConfig, options: RedirectsStageOp
         options.now,
       )
     : null;
-  const forceHttps =
-    r.forceHttps === 'auto' ? config.site.origin?.startsWith('https://') === true : r.forceHttps;
+  const forceHttps = forcesHttps(config);
 
   return defineStage({
     name: 'redirects',

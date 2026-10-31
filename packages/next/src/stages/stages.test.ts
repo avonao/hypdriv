@@ -13,7 +13,7 @@ import { earlyHintsStage } from './early-hints';
 import { decodeGeoHeader, GEO_KEY, geoFrom, geoStage } from './geo';
 import { i18nStage, LOCALE_KEY, splitLocale } from './i18n';
 import { maintenanceStage, renderMaintenancePage } from './maintenance';
-import { matchRedirect, redirectsStage } from './redirects';
+import { forcesHttps, httpsUpgrade, matchRedirect, redirectsStage } from './redirects';
 import { skewStage } from './skew';
 
 const manifest: HypManifest = emptyManifest({
@@ -209,6 +209,25 @@ describe('redirects', () => {
   });
   it('returns null when nothing is configured', () => {
     expect(redirectsStage(resolveConfig({ redirects: { forceHttps: false } }))).toBeNull();
+  });
+  it('upgrades any plain-HTTP request with httpsUpgrade (runners call it before internal routes)', () => {
+    const on = resolveConfig({ site: { origin: 'https://www.x.test' } });
+    expect(forcesHttps(on)).toBe(true);
+    expect(forcesHttps(resolveConfig({ site: { origin: 'http://www.x.test' } }))).toBe(false);
+    expect(forcesHttps(resolveConfig({ redirects: { forceHttps: true } }))).toBe(true);
+    const post = httpsUpgrade(on, new Request('http://www.x.test/_hypdriv/vitals?a=1', { method: 'POST' }));
+    expect(post?.status).toBe(308);
+    expect(post?.headers.get('location')).toBe('https://www.x.test/_hypdriv/vitals?a=1');
+    expect(
+      httpsUpgrade(
+        on,
+        new Request('https://www.x.test/x', { headers: { 'x-forwarded-proto': 'http, https' } }),
+      )?.status,
+    ).toBe(308);
+    expect(httpsUpgrade(on, new Request('https://www.x.test/x'))).toBeNull();
+    expect(httpsUpgrade(on, new Request('http://localhost:3000/x'))).toBeNull();
+    expect(httpsUpgrade(on, new Request('http://www.x.test/x'), { development: true })).toBeNull();
+    expect(httpsUpgrade(resolveConfig({}), new Request('http://www.x.test/x'))).toBeNull();
   });
 });
 

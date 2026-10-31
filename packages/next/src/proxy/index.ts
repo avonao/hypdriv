@@ -27,6 +27,7 @@ import {
   buildDefaultStages,
   type CreatePlatformInput,
   createPlatform,
+  httpsUpgrade,
   internalRoutes,
   type Platform,
 } from '../stages/index';
@@ -169,6 +170,9 @@ export function createProxy(
       nonceHeader: platform.config.security.csp?.nonceHeader ?? HEADER.nonce,
       middlewareHeaders: false,
     });
+    // `forceHttps` also covers the internal routes answered below, before the redirects stage runs.
+    const upgrade = httpsUpgrade(platform.config, request, { development: platform.development });
+    if (upgrade) return upgrade;
     const ip = clientIp(request.headers, platform.config.security.trustedProxies);
     // `/_hypdriv/*` (health, vitals, CSP reports, live polling fallback, dev endpoints) on every host.
     // The visitor's country for vitals and reports: Cloudflare's `cf`, else the edge headers Vercel and other

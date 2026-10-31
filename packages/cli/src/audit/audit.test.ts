@@ -386,6 +386,34 @@ describe('owner audit tokens', () => {
     expect(describeAuditAuth(missing)).toContain('OTHER_SECRET is not set');
   });
 
+  it('adds gateway headers: Cloudflare Access service tokens, HYPDRIV_ACCESS_HEADERS and --header', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { auditAuth, accessHeaders, parseHeaderLines } = await import('./token');
+    const root = mkdtempSync(join(tmpdir(), 'hypdriv-access-'));
+    writeFileSync(join(root, '.env.local'), 'HYPDRIV_ACCESS_HEADERS="x-hypdriv-gate: g4te\\nx-team: a,b"\n');
+    const env = { CF_ACCESS_CLIENT_ID: 'id.access', CF_ACCESS_CLIENT_SECRET: 'access-secret' };
+    expect(accessHeaders(root, env, ['X-Extra: 1, 2'])).toEqual({
+      'cf-access-client-id': 'id.access',
+      'cf-access-client-secret': 'access-secret',
+      'x-hypdriv-gate': 'g4te',
+      'x-team': 'a,b',
+      'x-extra': '1, 2',
+    });
+    const auth = await auditAuth({
+      root,
+      io: { env: {}, date: () => new Date(1_800_000_000_000) },
+      base: 'https://gated.example.com',
+      anonymous: true,
+      headers: ['x-more: yes'],
+    });
+    expect(auth.headers).toEqual({ 'x-hypdriv-gate': 'g4te', 'x-team': 'a,b', 'x-more': 'yes' });
+    expect(parseHeaderLines('{"x-a":"1"}')).toEqual({ 'x-a': '1' });
+    expect(() => parseHeaderLines('no colon here')).toThrow(/name: value/);
+    expect(() => parseHeaderLines('{"bad name":"1"}')).toThrow(/invalid header/);
+  });
+
   it('fails pages answered by the bot shield or rate limiter and explains how to sign', async () => {
     const { auditHeadersPages, blockedByShield, shieldHint } = await import('../commands/audit');
     const blocked = {

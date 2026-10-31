@@ -44,18 +44,25 @@ interface Check {
 class Skip extends Error {}
 
 /** The slice of Playwright the Turnstile check uses (resolved at run time, not a dependency). */
+interface PlaywrightPage {
+  goto(url: string, o: { waitUntil: 'domcontentloaded' }): Promise<{ status(): number } | null>;
+  waitForSelector(selector: string, o: { timeout: number }): Promise<unknown>;
+}
+interface PlaywrightRoute {
+  request(): { url(): string; headers(): Record<string, string> };
+  continue(o?: { headers?: Record<string, string> }): Promise<void>;
+}
+interface PlaywrightContext {
+  newPage(): Promise<PlaywrightPage>;
+  cookies(
+    url: string,
+  ): Promise<Array<{ name: string; httpOnly: boolean; secure: boolean; sameSite: string }>>;
+  route(url: string, handler: (route: PlaywrightRoute) => Promise<void> | void): Promise<void>;
+}
 interface PlaywrightLike {
   chromium: {
     launch(): Promise<{
-      newContext(o: { userAgent: string }): Promise<{
-        newPage(): Promise<{
-          goto(url: string, o: { waitUntil: 'domcontentloaded' }): Promise<{ status(): number } | null>;
-          waitForSelector(selector: string, o: { timeout: number }): Promise<unknown>;
-        }>;
-        cookies(
-          url: string,
-        ): Promise<Array<{ name: string; httpOnly: boolean; secure: boolean; sameSite: string }>>;
-      }>;
+      newContext(o: { userAgent: string }): Promise<PlaywrightContext>;
       close(): Promise<void>;
     }>;
   };
@@ -94,6 +101,66 @@ const DOC_HEADERS = {
   'accept-language': 'en-US,en;q=0.9',
 };
 const API_HEADERS = { 'user-agent': BROWSER_UA, accept: 'application/json', 'accept-language': 'en-US' };
+
+const GATE_HOSTS = new Set([
+  HOST,
+  ...(env.E2E_TAIL_PRODUCER_URL ? [new URL(env.E2E_TAIL_PRODUCER_URL).host] : []),
+]);
+
+// -- gateways --------------------------------------------------------------------------------------
+
+/**
+ * Headers that get the runner through a gateway in front of a private test deployment: Vercel Deployment
+ * Protection (`VERCEL_AUTOMATION_BYPASS_SECRET`), Cloudflare Access service tokens (`CF_ACCESS_CLIENT_ID` +
+ * `CF_ACCESS_CLIENT_SECRET`) or any other gate (`HYPDRIV_ACCESS_HEADERS`: `name: value` lines, `\\n`-separated
+ * on one line, or a JSON object) — the same variables `hypdriv audit` reads. They are added to HTTPS requests
+ * to the suite's own hosts only (never over plain HTTP, never to third parties).
+ */
+function gateHeaders(): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (env.VERCEL_AUTOMATION_BYPASS_SECRET)
+    out['x-vercel-protection-bypass'] = env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
+    out['cf-access-client-id'] = env.CF_ACCESS_CLIENT_ID;
+    out['cf-access-client-secret'] = env.CF_ACCESS_CLIENT_SECRET;
+  }
+  const raw = (env.HYPDRIV_ACCESS_HEADERS ?? '').trim();
+  if (raw.startsWith('{')) Object.assign(out, JSON.parse(raw) as Record<string, string>);
+  else
+    for (const line of raw.replace(/\\n/g, '\n').split(/\r?\n/)) {
+      const colon = line.indexOf(':');
+      if (colon > 0) out[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+    }
+  return out;
+}
+
+const GATE = gateHeaders();
+const GATED = Object.keys(GATE).length > 0;
+const nativeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  if (!GATED || url.protocol !== 'https:' || !GATE_HOSTS.has(url.host)) return nativeFetch(input, init);
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  for (const [name, value] of Object.entries(GATE)) if (!headers.has(name)) headers.set(name, value);
+  return input instanceof Request
+    ? nativeFetch(new Request(input, { ...init, headers }))
+    : nativeFetch(input, { ...init, headers });
+}) as typeof fetch;
+
+/** curl arguments carrying the gate headers (HTTPS only). */
+const curlGate = (url: string): string[] =>
+  url.startsWith('https://') ? Object.entries(GATE).flatMap(([n, v]) => ['-H', `${n}: ${v}`]) : [];
+
+/** Lets a Playwright context through the gate for the suite's hosts only. */
+async function gateBrowser(context: PlaywrightContext): Promise<void> {
+  if (!GATED) return;
+  await context.route('**/*', (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.protocol !== 'https:' || !GATE_HOSTS.has(url.host)) return route.continue();
+    return route.continue({ headers: { ...request.headers(), ...GATE } });
+  });
+}
 
 // -- helpers ---------------------------------------------------------------------------------------
 
@@ -560,6 +627,7 @@ check({
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)',
       });
+      await gateBrowser(context);
       const page = await context.newPage();
       await page.goto(`${BASE}/tagged`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('#stamped', { timeout: 30_000 });
@@ -684,9 +752,17 @@ check({
   title: 'revalidateTag(): tag cache (Durable Object) and edge cache purged together',
   slow: true,
   async run() {
-    const before = html((await get('/tagged')).body, 'stamped');
-    const warmed = await get('/tagged');
-    assert(html(warmed.body, 'stamped') === before, 'stable before revalidation');
+    // Settled first: a stale copy may still be regenerating in the background from an earlier check.
+    const before = await poll(
+      'a settled /tagged',
+      async () => {
+        const a = html((await get('/tagged')).body, 'stamped');
+        const b = html((await get('/tagged')).body, 'stamped');
+        return a && a === b ? a : null;
+      },
+      30_000,
+      1000,
+    );
     const r = await signed('/api/revalidate', { tag: 'e2e-tagged' });
     assert(r.status === 200, `revalidate ${r.status}`);
     const after = await poll(
@@ -804,6 +880,7 @@ check({
           'accept: text/html',
           '-H',
           'accept-language: en-US',
+          ...curlGate(`${BASE}/`),
           `${BASE}/`,
         ],
         { encoding: 'utf8', timeout: 20_000 },
@@ -1170,7 +1247,13 @@ check({
     const marker = `ws-${RUN}`;
     const WS = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
     if (!WS) throw new Skip('no global WebSocket in this Node version');
-    const ws = new WS(`${BASE.replace(/^http/, 'ws')}/_hypdriv/live/e2e`);
+    // Node's WebSocket (undici) accepts headers: the gate applies to the upgrade request too.
+    const ws = GATED
+      ? new (WS as unknown as new (url: string, init: { headers: Record<string, string> }) => WebSocket)(
+          `${BASE.replace(/^http/, 'ws')}/_hypdriv/live/e2e`,
+          { headers: GATE },
+        )
+      : new WS(`${BASE.replace(/^http/, 'ws')}/_hypdriv/live/e2e`);
     const received = await new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('no WebSocket message within 20 s')), 20_000);
       ws.addEventListener('open', () => {

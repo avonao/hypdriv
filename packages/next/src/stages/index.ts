@@ -74,7 +74,7 @@ export { decodeGeoHeader, encodeGeoHeader, GEO_KEY, type GeoInfo, geoFrom, geoSt
 export { i18nStage, LOCALE_KEY, negotiateLocale, splitLocale } from './i18n';
 export { type InternalRoutesOptions, internalRoutes } from './internal-routes';
 export { maintenanceStage, renderMaintenancePage } from './maintenance';
-export { expandDestination, matchRedirect, redirectsStage } from './redirects';
+export { expandDestination, forcesHttps, httpsUpgrade, matchRedirect, redirectsStage } from './redirects';
 export { skewStage } from './skew';
 export { SPECULATION_KEY, speculationStage } from './speculation';
 

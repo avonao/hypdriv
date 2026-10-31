@@ -8,12 +8,12 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv doctor [--fix] [--ci]` | 91 checks for the detected platform: Node/pnpm, Next.js version & config, adapter chain, `proxy.ts` vs deprecated `middleware.ts`, Edge runtime segments, wrangler compatibility date/flags/bindings/triggers, Node APIs unsupported on workerd, Worker size vs limits, startup risks; `vercel.json` regions/crons, `CRON_SECRET`, Build Output API freshness and function sizes vs 250 MB; env leaks, secrets, header posture (from the manifest), Purser setup and TS compatibility, dependency freshness. `--fix` applies safe fixes (cron sync, `_headers`, scripts). |
 | `hypdriv analyze [--worker] [--routes]` | Cloudflare: Worker weight report (runs `wrangler deploy --dry-run --outdir` or reads an existing bundle, attributes bytes via the source map and the OpenNext esbuild metafile, lists largest modules/packages/duplicates and top-level `await`s). Vercel: function sizes from `.vercel/output` (after `vercel build`). Both: per-route JS/CSS (gzip) from the manifest and budget evaluation; writes the weights back into `.hypdriv/manifest.json`. |
 | `hypdriv routes [--css] [--cache] [--csp]` | Table of routes with classification, revalidate, cache policy, CSP mode, hints count, JS/CSS weight, Purser atoms. |
-| `hypdriv audit <headers|csp|cache|css|all> --url <base> [--anonymous]` | Fetches routes from the manifest (or `--paths`) against a running server: grades security headers (A+ model), validates CSP syntax and nonce/hash coverage (HypDriv's declared `'unsafe-inline'` fallback for cached HTML on Node/Vercel is a warning), checks cache behaviour like a browser (repeat visits carry the first response's cookies; `x-vercel-cache` and planned Vercel CDN headers on Vercel), and runs Purser's zero-override check in headless Chrome (`css`; pages answered with an error status or without evaluable CSS fail instead of passing vacuously). Requests carry a short-lived `x-hypdriv-audit` token signed with `HYPDRIV_INTERNAL_SECRET`, so your bot shield and rate limits let the audit through; `--anonymous` sends unsigned requests. |
+| `hypdriv audit <headers|csp|cache|css|all> --url <base> [--anonymous] [--header …]` | Fetches routes from the manifest (or `--paths`) against a running server: grades security headers (A+ model), validates CSP syntax and nonce/hash coverage (HypDriv's declared `'unsafe-inline'` fallback for cached HTML on Node/Vercel is a warning), checks cache behaviour like a browser (repeat visits carry the first response's cookies; `x-vercel-cache` and planned Vercel CDN headers on Vercel), and runs Purser's zero-override check in headless Chrome (`css`; pages answered with an error status or without evaluable CSS fail instead of passing vacuously). Requests carry a short-lived `x-hypdriv-audit` token signed with `HYPDRIV_INTERNAL_SECRET`, so your bot shield and rate limits let the audit through; `--anonymous` sends unsigned requests. |
 | `hypdriv budget [--ci] [--snapshot] [--diff]` | Evaluates budgets from the manifest and the worker report, stores snapshots under `.hypdriv/snapshots`, prints Markdown diffs for PR comments. |
 | `hypdriv csp hashes [--route <path>]` / `hypdriv csp suggest [--reports <file>]` / `hypdriv csp print` | Shows static route hashes, proposes allow-list additions from collected violation reports, prints the effective policy. |
 | `hypdriv css build|check|watch` | Purser through the bridge with the config's options. |
-| `hypdriv warm --url <base> [--concurrency 4] [--anonymous]` | Fetches the configured warm routes (or all static routes), signed with the audit token. |
-| `hypdriv bench --url <base> [--paths …] [--n 20] [--anonymous]` | TTFB p50/p95 and cache status distribution per path, signed with the audit token. |
+| `hypdriv warm --url <base> [--concurrency 4] [--anonymous] [--header …]` | Fetches the configured warm routes (or all static routes), signed with the audit token. |
+| `hypdriv bench --url <base> [--paths …] [--n 20] [--anonymous] [--header …]` | TTFB p50/p95 and cache status distribution per path, signed with the audit token. |
 | `hypdriv deps [--update safe|major] [--only <name>]` | Dependency freshness across the workspace (npm registry): patch/minor/major classification, optional updates. |
 | `hypdriv manifest [--validate]` | Prints or validates `.hypdriv/manifest.json`. |
 | `hypdriv jobs run <name> --url <base>` / `hypdriv jobs list` | Sends a signed internal request to a job route (`HYPDRIV_INTERNAL_SECRET`; on Vercel cron jobs as `GET` with `CRON_SECRET`). |
@@ -29,4 +29,14 @@ Add to CI:
 - run: pnpm preview & npx wait-on http://localhost:8787 && npx hypdriv audit all --url http://localhost:8787
 ```
 
-On Vercel, audit the preview deployment (`--url https://<deployment>.vercel.app`) with `HYPDRIV_INTERNAL_SECRET` in the environment; for deployments behind Deployment Protection also set `VERCEL_AUTOMATION_BYPASS_SECRET`, which the CLI sends as `x-vercel-protection-bypass` (also from headless Chrome). Locally, `pnpm build && pnpm start` and `--url http://localhost:3000`.
+On Vercel, audit the preview deployment (`--url https://<deployment>.vercel.app`) with `HYPDRIV_INTERNAL_SECRET` in the environment. Locally, `pnpm build && pnpm start` and `--url http://localhost:3000`.
+
+**Private deployments.** `audit`, `bench`, `warm` and `jobs run` get through a gateway in front of the deployment with headers sent to the audited origin only (also from the headless Chrome of the CSS audit), never logged, independent of `--anonymous`:
+
+| Gateway | Variables (environment, `.dev.vars`, `.env*`, `vercel pull`'s files) | Header |
+| --- | --- | --- |
+| Vercel Deployment Protection | `VERCEL_AUTOMATION_BYPASS_SECRET` | `x-vercel-protection-bypass` |
+| Cloudflare Access (service token) | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | `CF-Access-Client-Id`, `CF-Access-Client-Secret` |
+| Anything else (WAF gate, basic auth, …) | `HYPDRIV_ACCESS_HEADERS` (`name: value` lines — `\n`-separated on one line — or a JSON object) | as given |
+
+`--header 'name: value'` (repeatable) adds more for one run; prefer the variable for secrets, so they stay out of shell history and process lists.

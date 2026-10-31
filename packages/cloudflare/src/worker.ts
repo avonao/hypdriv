@@ -23,7 +23,7 @@ import {
   type Stage,
   sanitizeInboundRequest,
 } from '@hypdriv/core';
-import { buildDefaultStages, createPlatform, type Platform } from '@hypdriv/next/stages';
+import { buildDefaultStages, createPlatform, httpsUpgrade, type Platform } from '@hypdriv/next/stages';
 import { runWithHypContext } from './context';
 import { edgeStages } from './edge-stages';
 import { cloudflareGeo } from './geo';
@@ -222,6 +222,11 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
     const cf = getCf(request);
     const ip = clientIp(request.headers, platform.config.security.trustedProxies);
     const country = typeof cf?.country === 'string' ? cf.country : undefined;
+
+    // `forceHttps` covers every response, not just pages: internal routes and static assets are answered
+    // below without the redirects stage. Next.js's own revalidation requests (service binding) are exempt.
+    const upgrade = httpsUpgrade(platform.config, request, { development: runtime.development });
+    if (upgrade && !(await isRevalidationRequest(request, platform.manifest))) return upgrade;
 
     const handled = await internal(request, {
       ip,

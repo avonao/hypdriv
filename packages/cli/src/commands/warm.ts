@@ -1,5 +1,5 @@
 import type { HypManifest } from '@hypdriv/core';
-import { UsageError } from '../args';
+import { rawList, UsageError } from '../args';
 import { cacheStatus } from '../audit/cache';
 import { fetchPage, joinUrl, mapConcurrent, normalizeBaseUrl } from '../audit/http';
 import { concretePaths, isPageRoute } from '../audit/paths';
@@ -45,6 +45,13 @@ export const warmCommand = defineCommand({
       type: 'boolean',
       description: 'Send unsigned requests (no x-hypdriv-audit token), as an anonymous visitor would',
     },
+    header: {
+      type: 'string',
+      value: '<name: value>',
+      description:
+        'Extra request header for a gateway in front of the deployment (repeatable; also HYPDRIV_ACCESS_HEADERS, CF_ACCESS_CLIENT_ID/SECRET, VERCEL_AUTOMATION_BYPASS_SECRET)',
+      multiple: true,
+    },
   },
   examples: [
     'hypdriv warm --url https://www.example.com',
@@ -69,6 +76,7 @@ export const warmCommand = defineCommand({
       base,
       secretName: config.resolved.security.internalAuth.secretEnv,
       anonymous: args.boolean('anonymous'),
+      headers: rawList(args, 'header'),
     });
     if (!args.json) {
       ui.heading(`Warming ${paths.length} path(s) on ${base} (concurrency ${concurrency})`);

@@ -135,6 +135,49 @@ describe('createWorker fetch', () => {
     expect(String(body.capabilities)).toContain('KV');
   });
 
+  it('upgrades plain HTTP before internal routes and static assets when forceHttps is on', async () => {
+    const next = fakeNext();
+    const worker = createWorker({
+      config: { site: { name: 'shop', origin: 'https://shop.example.com' } },
+      next: next.loader,
+      manifest,
+      development: false,
+    });
+    const http = (path: string, init: RequestInit = {}) =>
+      new Request(`http://shop.example.com${path}`, {
+        ...init,
+        headers: { host: 'shop.example.com', 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605.1.15' },
+      });
+    for (const path of [
+      '/_hypdriv/health',
+      '/_hypdriv/live/news/events',
+      '/_next/static/chunks/a.js',
+      '/logo.png?v=2',
+    ]) {
+      const response = await worker.fetch(http(path), {}, createFakeExecutionContext());
+      expect(response.status).toBe(308);
+      expect(response.headers.get('location')).toBe(`https://shop.example.com${path}`);
+    }
+    const beacon = await worker.fetch(
+      http('/_hypdriv/vitals', { method: 'POST', body: '{}' }),
+      {},
+      createFakeExecutionContext(),
+    );
+    expect(beacon.status).toBe(308);
+    expect(next.received).toHaveLength(0);
+    // HTTPS is served normally; without forceHttps nothing is upgraded.
+    expect((await worker.fetch(request('/_hypdriv/health'), {}, createFakeExecutionContext())).status).toBe(
+      200,
+    );
+    const off = createWorker({
+      config: { site: { origin: 'https://shop.example.com' }, redirects: { forceHttps: false } },
+      next: fakeNext().loader,
+      manifest,
+      development: false,
+    });
+    expect((await off.fetch(http('/_hypdriv/health'), {}, createFakeExecutionContext())).status).toBe(200);
+  });
+
   it('keeps development endpoints closed in production unless a token matches', async () => {
     const worker = createWorker({ config: {}, next: fakeNext().loader, manifest, development: false });
     const closed = await worker.fetch(request('/_hypdriv/dev/state'), {}, createFakeExecutionContext());

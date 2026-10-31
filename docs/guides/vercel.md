@@ -189,7 +189,7 @@ if (process.env.NEXT_RUNTIME === 'nodejs') {
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) | Upstash Redis: exact rate limits, read-write KV |
 | `GLOBAL_CONFIG` (or `EDGE_CONFIG`) | Global Config: flags, redirects, maintenance switch |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | REST purge outside a Vercel request (CI, scripts) |
-| `VERCEL_AUTOMATION_BYPASS_SECRET` | lets `enqueue()`'s fallback reach a protected deployment |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | set by Vercel once a Protection Bypass for Automation exists: lets `enqueue()`'s fallback and your own self-requests reach a protected deployment; the CLI sends it as `x-vercel-protection-bypass` |
 
 `VERCEL`, `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_PROJECT_ID` and `VERCEL_DEPLOYMENT_ID` are system variables Vercel sets.
 
@@ -217,7 +217,9 @@ pnpm exec hypdriv jobs run digest --url https://my-app.vercel.app
 
 **Monorepos.** With the project's root directory set to the app (`apps/web`), `vercel link`, `vercel pull` and `vercel build` run at the repository root (a prebuilt deployment needs the workspace's `node_modules`). `hypdriv doctor`, `analyze` and `audit` find that link: the repository root's `.vercel/project.json` counts for the app it names as root directory, including the env files `vercel pull` wrote there and its `.vercel/output`.
 
-**Live verification.** [`e2e/vercel`](../../e2e/vercel/README.md) deploys an app with every capability on to a Vercel project and verifies them through public behaviour and the runtime-logs stream (41 checks, Hobby plan); see the [report](../testing/vercel-live-2026-10-31.md).
+**Private deployments.** Vercel Authentication can cover every deployment — production, `<project>.vercel.app` and custom domains included — on every plan (project setting *Deployment Protection → Vercel Authentication → All Deployments*, REST `ssoProtection: { deploymentType: 'all' }`). Tooling gets through with a *Protection Bypass for Automation* secret: `hypdriv audit`, `bench`, `warm` and `jobs run` send `VERCEL_AUTOMATION_BYPASS_SECRET` as `x-vercel-protection-bypass`, and Vercel exposes the same variable to the deployment so functions can call their own URL (`enqueue()`'s fallback uses it). Vercel Cron, Vercel Queues deliveries and the runtime logs are unaffected. BotID answers `bypassed` for requests that carry the bypass — by design, so your own automation is never challenged.
+
+**Live verification.** [`e2e/vercel`](../../e2e/vercel/README.md) deploys an app with every capability on to a private Vercel project and verifies them through its behaviour (via the automation bypass) and the runtime-logs stream (41 checks, Hobby plan); see the [report](../testing/vercel-live-2026-10-31.md).
 
 ## Cloudflare and Vercel side by side
 

@@ -73,7 +73,7 @@ Set `CACHE_PURGE_ZONE_ID` and `CACHE_PURGE_API_TOKEN` (a token limited to Zone �
 ## Request flow
 
 1. Static assets are served by Cloudflare before the Worker runs (unless `run_worker_first` is set).
-2. `createWorker.fetch` creates the request context (geo from `request.cf`, client IP, request id) and matches the route in the manifest.
+2. `createWorker.fetch` creates the request context (geo from `request.cf`, client IP, request id) and matches the route in the manifest. With `redirects.forceHttps` on (the default when `site.origin` is `https`), a plain-HTTP request gets its `308` here, before anything else answers — internal routes and static assets included.
 3. Internal routes under `/_hypdriv/*` are answered immediately: `health`, `vitals`, `csp-report`, `live/*`, `dev/*` (development and preview only).
 4. The pipeline's `pre` stages run; one of them may answer directly (maintenance page, rate limit, redirect, cache HIT, bot block).
 5. OpenNext's worker renders through Next.js with the forwarded request headers (`x-nonce`, `x-hypdriv-geo`, `x-hypdriv-flags`, `x-hypdriv-locale`, `x-hypdriv-theme`, `x-hypdriv-request-id`, `traceparent`).
@@ -140,6 +140,16 @@ Every HypDriv Worker exports a `tail` handler. List it in another Worker's `tail
 ## Edge-cache purges across isolates and colos
 
 `purgeEdge()`, `revalidateTag()` and `revalidatePath()` from `hypdriv/cache` delete the indexed entries in the isolate that runs them, purge the zone by tag when `CACHE_PURGE_ZONE_ID` / `CACHE_PURGE_API_TOKEN` are set (Cache API copies are stored with `Cache-Tag`, so every colo drops them), record purge tombstones in the tag index so a response requested before the purge is never stored afterwards, and purge once more two seconds later, after Next.js has applied the revalidation. Other isolates re-read the shared tiers within `cache.edge.memoryTtl` (default `10s`). Details: [ADR 0017](../adr/0017-purge-consistency.md).
+
+## Private test and staging deployments
+
+A custom domain is what unlocks the Cache API, Early Hints, zone purges and image resizing, so test Workers need one — and are then public unless something in front says otherwise:
+
+- **Turn off `workers.dev`** (`"workers_dev": false`, `"preview_urls": false`): with a custom domain it is only a second, public door.
+- **Cloudflare Access** (Zero Trust, free tier) puts a login in front of the hostname; give automation a service token. `hypdriv audit`, `bench`, `warm` and `jobs run` send `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` as `CF-Access-Client-Id` / `CF-Access-Client-Secret`.
+- **A zone WAF custom rule** (every plan, no Zero Trust needed) that blocks HTTPS requests to the hostname unless they carry a secret header or cookie — what `e2e/cloudflare`'s `provision --gate` creates. Leave plain HTTP out of the rule: the Worker answers it only with the `308` to HTTPS, so the secret never travels unencrypted. Tooling sends the header from `HYPDRIV_ACCESS_HEADERS` (`x-hypdriv-gate: …`) or `--header`.
+
+Internal requests are unaffected by both: Cron Triggers, Queues, the tail consumer and OpenNext's revalidation (service binding) never cross the zone's edge, and image resizing's origin fetches pass the rule.
 
 ## Limits that matter
 

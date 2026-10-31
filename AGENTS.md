@@ -75,6 +75,8 @@ skills/hypdriv       agent skill for adopting HypDriv in an application
 - Never `await response.body.cancel()` in code that can run inside Next.js: Next tees `fetch` bodies and the cancel never settles (`void res.body?.cancel().catch(() => undefined)`).
 - On Vercel, Routing Middleware and Functions are separate invocations: anything `createProxy` registers is invisible to Route Handlers and Server Actions unless `createInstrumentation().register()` registers it too.
 - A prerender with explicit cache tags changes after `revalidateTag()`; it is `isr`, never hash-CSP `static` (ADR 0018).
+- Anything a runner answers before the pipeline (internal routes, static assets) must respect `forceHttps` itself — call `httpsUpgrade()` first.
+- Test deployments are private: Vercel Authentication on all deployments + automation bypass; on Cloudflare a gated custom domain (`provision --gate`) with `workers.dev` off. Tooling passes gateways with `VERCEL_AUTOMATION_BYPASS_SECRET`, `CF_ACCESS_CLIENT_ID/_SECRET` or `HYPDRIV_ACCESS_HEADERS`.
 
 ## Dependency freshness
 

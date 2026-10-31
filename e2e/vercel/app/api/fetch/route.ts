@@ -1,10 +1,14 @@
 import { hypFetch } from 'hypdriv';
 
 /**
- * Outbound fetch with timeout, retries and the circuit breaker.
- * - default: a small public endpoint (status, attempts, time to headers);
- * - `?mode=timeout`: an upstream that answers after 8 s with a 1.5 s timeout and one retry → `E_TIMEOUT`.
+ * Requests from the function to its own deployment pass Vercel Deployment Protection with the automation
+ * bypass (Vercel exposes `VERCEL_AUTOMATION_BYPASS_SECRET` to the deployment once a bypass exists).
  */
+function selfHeaders(): Record<string, string> {
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  return bypass ? { 'x-vercel-protection-bypass': bypass } : {};
+}
+
 /**
  * `?mode=signal`: does the runtime's `fetch` honour an abort signal (init vs. Request) against a hanging
  * upstream? Each probe is capped at 8 s by a race, so the route always answers.
@@ -14,10 +18,16 @@ async function signalProbe(origin: string) {
   const probe = async (useRequest: boolean) => {
     const started = Date.now();
     const signal = AbortSignal.timeout(1000);
-    const call = useRequest ? fetch(new Request(target, { signal })) : fetch(target, { signal });
+    const headers = selfHeaders();
+    const call = useRequest
+      ? fetch(new Request(target, { signal, headers }))
+      : fetch(target, { signal, headers });
     const outcome = await Promise.race([
       call.then(
-        (r) => `answered ${r.status}`,
+        (r) => {
+          void r.body?.cancel().catch(() => undefined);
+          return `answered ${r.status}`;
+        },
         (e: Error) => `aborted (${e.name})`,
       ),
       new Promise<string>((resolve) => setTimeout(() => resolve('still pending after 8 s'), 8000)),
@@ -55,7 +65,7 @@ async function netProbe(host: string) {
   const fetchStarted = Date.now();
   const raw = await cap(
     fetch(`https://${host}/`, { signal: AbortSignal.timeout(5000), redirect: 'manual' }).then(
-      async (r) => {
+      (r) => {
         void r.body?.cancel().catch(() => undefined);
         return `${r.status} in ${Date.now() - fetchStarted} ms`;
       },
@@ -70,11 +80,19 @@ async function netProbe(host: string) {
   );
 }
 
+/**
+ * Outbound fetch with timeout, retries and the circuit breaker.
+ * - default: a small public endpoint (status, attempts, time to headers);
+ * - `?mode=timeout`: an upstream (this deployment's `/api/slow`) that answers after 8 s, with a 1.5 s timeout
+ *   and one retry → `E_TIMEOUT`;
+ * - `?mode=signal`, `?mode=net&host=`: platform diagnostics (see above).
+ */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (url.searchParams.get('mode') === 'signal') return signalProbe(url.origin);
-  if (url.searchParams.get('mode') === 'net') return netProbe(url.searchParams.get('host') ?? 'example.com');
-  const timeoutMode = url.searchParams.get('mode') === 'timeout';
+  const mode = url.searchParams.get('mode');
+  if (mode === 'signal') return signalProbe(url.origin);
+  if (mode === 'net') return netProbe(url.searchParams.get('host') ?? 'example.com');
+  const timeoutMode = mode === 'timeout';
   const target = timeoutMode ? `${url.origin}/api/slow?ms=8000` : 'https://www.cloudflare.com/cdn-cgi/trace';
   const attempts: number[] = [];
   const started = Date.now();
@@ -83,6 +101,7 @@ export async function GET(request: Request) {
       timeoutMs: timeoutMode ? 1500 : 5000,
       retries: 1,
       dedupe: false,
+      ...(timeoutMode ? { headers: selfHeaders() } : {}),
       onAttempt: (n) => void attempts.push(n),
     });
     const headersMs = Date.now() - started;

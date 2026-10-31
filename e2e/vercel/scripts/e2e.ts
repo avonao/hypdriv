@@ -54,15 +54,21 @@ interface PlaywrightPage {
   textContent(selector: string): Promise<string | null>;
   on(event: 'console', fn: (m: { type(): string; text(): string }) => void): void;
 }
+interface PlaywrightRoute {
+  request(): { url(): string; headers(): Record<string, string> };
+  continue(o?: { headers?: Record<string, string> }): Promise<void>;
+}
+interface PlaywrightContext {
+  newPage(): Promise<PlaywrightPage>;
+  cookies(
+    url: string,
+  ): Promise<Array<{ name: string; httpOnly: boolean; secure: boolean; sameSite: string }>>;
+  route(url: string, handler: (route: PlaywrightRoute) => Promise<void> | void): Promise<void>;
+}
 interface PlaywrightLike {
   chromium: {
     launch(): Promise<{
-      newContext(o: { userAgent?: string }): Promise<{
-        newPage(): Promise<PlaywrightPage>;
-        cookies(
-          url: string,
-        ): Promise<Array<{ name: string; httpOnly: boolean; secure: boolean; sameSite: string }>>;
-      }>;
+      newContext(o: { userAgent?: string }): Promise<PlaywrightContext>;
       close(): Promise<void>;
     }>;
   };
@@ -106,6 +112,63 @@ const DOC_HEADERS = {
   'accept-language': 'en-US,en;q=0.9',
 };
 const API_HEADERS = { 'user-agent': BROWSER_UA, accept: 'application/json', 'accept-language': 'en-US' };
+
+const GATE_HOSTS = new Set([HOST]);
+
+// -- gateways --------------------------------------------------------------------------------------
+
+/**
+ * Headers that get the runner through a gateway in front of a private test deployment: Vercel Deployment
+ * Protection (`VERCEL_AUTOMATION_BYPASS_SECRET`), Cloudflare Access service tokens (`CF_ACCESS_CLIENT_ID` +
+ * `CF_ACCESS_CLIENT_SECRET`) or any other gate (`HYPDRIV_ACCESS_HEADERS`: `name: value` lines, `\\n`-separated
+ * on one line, or a JSON object) — the same variables `hypdriv audit` reads. They are added to HTTPS requests
+ * to the suite's own hosts only (never over plain HTTP, never to third parties).
+ */
+function gateHeaders(): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (env.VERCEL_AUTOMATION_BYPASS_SECRET)
+    out['x-vercel-protection-bypass'] = env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
+    out['cf-access-client-id'] = env.CF_ACCESS_CLIENT_ID;
+    out['cf-access-client-secret'] = env.CF_ACCESS_CLIENT_SECRET;
+  }
+  const raw = (env.HYPDRIV_ACCESS_HEADERS ?? '').trim();
+  if (raw.startsWith('{')) Object.assign(out, JSON.parse(raw) as Record<string, string>);
+  else
+    for (const line of raw.replace(/\\n/g, '\n').split(/\r?\n/)) {
+      const colon = line.indexOf(':');
+      if (colon > 0) out[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+    }
+  return out;
+}
+
+const GATE = gateHeaders();
+const GATED = Object.keys(GATE).length > 0;
+const nativeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  if (!GATED || url.protocol !== 'https:' || !GATE_HOSTS.has(url.host)) return nativeFetch(input, init);
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  for (const [name, value] of Object.entries(GATE)) if (!headers.has(name)) headers.set(name, value);
+  return input instanceof Request
+    ? nativeFetch(new Request(input, { ...init, headers }))
+    : nativeFetch(input, { ...init, headers });
+}) as typeof fetch;
+
+/** curl arguments carrying the gate headers (HTTPS only). */
+const curlGate = (url: string): string[] =>
+  url.startsWith('https://') ? Object.entries(GATE).flatMap(([n, v]) => ['-H', `${n}: ${v}`]) : [];
+
+/** Lets a Playwright context through the gate for the suite's hosts only. */
+async function gateBrowser(context: PlaywrightContext): Promise<void> {
+  if (!GATED) return;
+  await context.route('**/*', (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.protocol !== 'https:' || !GATE_HOSTS.has(url.host)) return route.continue();
+    return route.continue({ headers: { ...request.headers(), ...GATE } });
+  });
+}
 
 // -- helpers ---------------------------------------------------------------------------------------
 
@@ -353,30 +416,41 @@ function openLogStream(): NonNullable<typeof logStream> {
 }
 
 /**
- * Resolves the deployment behind E2E_URL, opens its runtime-logs stream (Vercel can take 15–20 s to answer)
- * and waits until a probe request shows up in it, so checks start with a live stream. Returns how long the
- * probe took to appear.
+ * Resolves the deployment behind E2E_URL, opens its runtime-logs stream and sends probe requests until one
+ * shows up in it, so checks start with a live stream. Vercel answers the stream request only once there is
+ * a line to send, so the probes are what makes it connect. Returns a status line.
  */
 async function startLogs(): Promise<string> {
-  if (!TOKEN || !TEAM || !PROJECT)
-    return 'runtime logs not used (needs VERCEL_TOKEN, VERCEL_TEAM_ID, E2E_VERCEL_PROJECT)';
+  if (!TOKEN || !TEAM || !PROJECT) return 'not used (needs VERCEL_TOKEN, VERCEL_TEAM_ID, E2E_VERCEL_PROJECT)';
   const r = await vercel<{ id?: string; readyState?: string }>('GET', `/v13/deployments/${HOST}`);
   if (r.status !== 200 || !r.json.id) return `deployment for ${HOST} not found (${r.status})`;
   deploymentId = r.json.id;
   logStream = openLogStream();
-  await Promise.race([logStream.ready, sleep(60_000)]);
-  if (!logStream.connected) return `runtime-logs stream did not connect: ${logStream.error ?? 'timeout'}`;
   const probe = `logprobe-${RUN}`;
   const started = Date.now();
-  for (let i = 0; i < 6; i++) {
-    await api(`/api/echo?n=1&probe=${probe}-${i}`);
-    for (let w = 0; w < 10; w++) {
+  for (let i = 0; Date.now() - started < 90_000; i++) {
+    // A CSP report is logged with its blocked URI by the proxy: a cheap, unique marker.
+    await fetch(`${BASE}/_hypdriv/csp-report`, {
+      method: 'POST',
+      headers: { ...API_HEADERS, 'content-type': 'application/csp-report' },
+      body: JSON.stringify({
+        'csp-report': {
+          'document-uri': `${BASE}/`,
+          'effective-directive': 'script-src-elem',
+          'blocked-uri': `https://probe.invalid/${probe}-${i}.js`,
+          disposition: 'report',
+        },
+      }),
+    }).catch(() => undefined);
+    for (let w = 0; w < 6; w++) {
       if (logLines.some((l) => l.message.includes(probe)))
-        return `stream live after ${Date.now() - started} ms`;
-      await sleep(1000);
+        return `live after ${Math.round((Date.now() - started) / 1000)} s (deployment ${deploymentId})`;
+      await sleep(500);
     }
   }
-  return 'stream connected, probe not seen within 60 s';
+  return logStream.connected
+    ? 'connected, but no probe line within 90 s (log-based checks may retry)'
+    : `did not connect within 90 s${logStream.error ? `: ${logStream.error}` : ''}`;
 }
 
 /**
@@ -712,6 +786,7 @@ check({
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)',
       });
+      await gateBrowser(context);
       const page = await context.newPage();
       await page.goto(`${BASE}/tagged`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('#stamped', { timeout: 30_000 });
@@ -891,9 +966,17 @@ check({
   title: 'revalidateTag(): Vercel ISR cache and CDN copy refreshed together',
   slow: true,
   async run() {
-    const before = html((await get('/tagged')).body, 'stamped');
-    const warmed = await get('/tagged');
-    assert(html(warmed.body, 'stamped') === before, 'stable before revalidation');
+    // Settled first: a stale copy may still be regenerating in the background from an earlier check.
+    const before = await poll(
+      'a settled /tagged',
+      async () => {
+        const a = html((await get('/tagged')).body, 'stamped');
+        const b = html((await get('/tagged')).body, 'stamped');
+        return a && a === b ? a : null;
+      },
+      30_000,
+      1000,
+    );
     const r = await signed('/api/revalidate', { tag: 'e2e-tagged' });
     assert(r.status === 200, `revalidate ${r.status}`);
     const after = await poll(
@@ -987,6 +1070,7 @@ check({
           BROWSER_UA,
           '-H',
           'accept: text/html',
+          ...curlGate(`${BASE}/`),
           `${BASE}/`,
         ],
         { encoding: 'utf8', timeout: 20_000 },
@@ -1078,12 +1162,19 @@ check({
 check({
   id: 'botid',
   area: 'security',
-  title: 'BotID classifies a script without the challenge headers as a bot',
+  title:
+    'BotID classifies a script without the challenge headers as a bot (bypassed behind Deployment Protection)',
   async run() {
     const r = await api('/api/botid', { method: 'POST' });
     assert(r.status === 200, `status ${r.status}`);
-    const j = JSON.parse(r.body) as { verdict: { isBot: boolean; reason?: string } | null };
+    const j = JSON.parse(r.body) as {
+      verdict: { isBot: boolean; bypassed?: boolean; reason?: string } | null;
+    };
     assert(j.verdict, 'verifyBotId() returned null: botid is not registered');
+    // BotID deliberately skips requests that carry Vercel's automation bypass (a private deployment): the
+    // verdict is then `bypassed`, which is the correct answer for the runner's own traffic.
+    if (env.VERCEL_AUTOMATION_BYPASS_SECRET && j.verdict.bypassed)
+      return `bypassed for the automation bypass (private deployment) · reason ${j.verdict.reason}`;
     assert(j.verdict.isBot, `verdict ${JSON.stringify(j.verdict)}`);
     return `isBot ${j.verdict.isBot} · reason ${j.verdict.reason}`;
   },
@@ -1109,6 +1200,7 @@ check({
         userAgent:
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
       });
+      await gateBrowser(context);
       const page = await context.newPage();
       const violations: string[] = [];
       page.on('console', (m) => {
@@ -1451,39 +1543,61 @@ check({
         .filter(job(id))
         .map((l) => Number(l.data?.attempt))
         .sort((a, b) => a - b);
-    let lastError: Error | null = null;
-    // Markers travel through the best-effort runtime-logs stream: a lost line repeats the round with new ids.
-    for (let round = 1; round <= 2; round++) {
+    const enqueue = async (body: Record<string, unknown>) => {
+      const r = await signed('/api/enqueue', body);
+      assert(r.status === 200 && r.json.transport === 'queue', `enqueue ${r.status} ${r.text}`);
+    };
+    // Outcomes travel through the best-effort runtime-logs stream: a part whose line went missing is repeated
+    // with a fresh id (up to three rounds); a part that was observed is never repeated.
+    const done: Partial<Record<'ok' | 'retry' | 'once', string>> = {};
+    for (let round = 1; round <= 3 && Object.keys(done).length < 3; round++) {
       const ids = { ok: `ok-${RUN}-${round}`, retry: `retry-${RUN}-${round}`, once: `once-${RUN}-${round}` };
-      for (const body of [
-        { id: ids.ok },
-        { id: ids.retry, failTimes: 1 },
-        { id: ids.once, queue: 'jobs-once' },
-      ]) {
-        const r = await signed('/api/enqueue', body);
-        assert(r.status === 200 && r.json.transport === 'queue', `enqueue ${r.status} ${r.text}`);
-      }
-      try {
-        const ok = await waitLogs('the ok job', job(ids.ok), 90_000);
-        const done = await waitLogs(
-          'the retried job (attempt 2, done)',
-          (l) => job(ids.retry)(l) && l.data?.status === 'done',
-          120_000,
-        );
-        await waitLogs('the jobs-once delivery', job(ids.once), 60_000);
-        // A redelivery would arrive after the 5 s retry delay: give it time to (not) show up.
-        await sleep(20_000);
-        const retryAttempts = attemptsOf(ids.retry);
-        assert(retryAttempts.join(',') === '1,2', `retry attempts ${retryAttempts.join(',')}`);
-        const onceAttempts = attemptsOf(ids.once);
-        assert(onceAttempts.join(',') === '1', `retry "none" attempts ${onceAttempts.join(',')}`);
-        return `ok in ${String(ok[0]!.data?.latencyMs)} ms · retry attempts ${retryAttempts.join(',')} (done after ${String(done[0]!.data?.latencyMs)} ms) · retry "none" acknowledged after attempt 1 (round ${round})`;
-      } catch (err) {
-        lastError = err as Error;
-        if (!/timed out/.test(lastError.message)) throw lastError;
-      }
+      if (!done.ok) await enqueue({ id: ids.ok });
+      if (!done.retry) await enqueue({ id: ids.retry, failTimes: 1 });
+      if (!done.once) await enqueue({ id: ids.once, queue: 'jobs-once' });
+      await Promise.all([
+        done.ok
+          ? null
+          : waitLogs('the ok job', job(ids.ok), 60_000).then(
+              (l) => (done.ok = `ok in ${String(l[0]!.data?.latencyMs)} ms`),
+              () => undefined,
+            ),
+        done.retry
+          ? null
+          : waitLogs(
+              'the retried job (attempt 2, done)',
+              (l) => job(ids.retry)(l) && l.data?.status === 'done',
+              90_000,
+            ).then(
+              (l) => {
+                const attempts = attemptsOf(ids.retry);
+                // Attempt 1's line may be the lost one; attempt 2 being `done` already proves the redelivery.
+                assert(attempts.includes(2), `retry attempts ${attempts.join(',')}`);
+                done.retry = `retry attempts ${attempts.join(',')} (done after ${String(l[0]!.data?.latencyMs)} ms)`;
+              },
+              (err: Error) => {
+                if (!/timed out/.test(err.message)) throw err;
+              },
+            ),
+        done.once
+          ? null
+          : waitLogs('the jobs-once delivery', job(ids.once), 60_000).then(
+              async () => {
+                // A redelivery would arrive after the 5 s retry delay: give it time to (not) show up.
+                await sleep(20_000);
+                const attempts = attemptsOf(ids.once);
+                assert(attempts.join(',') === '1', `retry "none" attempts ${attempts.join(',')}`);
+                done.once = 'retry "none" acknowledged after attempt 1';
+              },
+              (err: Error) => {
+                if (!/timed out/.test(err.message)) throw err;
+              },
+            ),
+      ]);
     }
-    throw lastError ?? new Error('queue check failed');
+    const missing = (['ok', 'retry', 'once'] as const).filter((k) => !done[k]);
+    assert(!missing.length, `no log line for: ${missing.join(', ')} after 3 rounds`);
+    return `${done.ok} · ${done.retry} · ${done.once}`;
   },
 });
 
@@ -1598,7 +1712,8 @@ async function execute(c: Check): Promise<Result> {
 }
 
 const startedAt = Date.now();
-await startLogs();
+const logStatus = await startLogs();
+if (!args.json) console.log(`runtime logs: ${logStatus}`);
 const results: Result[] = [];
 const print = (r: Result) => {
   if (!args.json)

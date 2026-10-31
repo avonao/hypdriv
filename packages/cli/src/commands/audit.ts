@@ -1,5 +1,5 @@
 import { silentLogger } from '@hypdriv/core';
-import { UsageError } from '../args';
+import { rawList, UsageError } from '../args';
 import { auditCache, type CacheAuditResult } from '../audit/cache';
 import { type AuditLevel, auditCsp, type CspAuditResult } from '../audit/csp';
 import { gradeHeaders, type HeaderGrade } from '../audit/headers';
@@ -118,6 +118,13 @@ export const auditCommand = defineCommand({
       type: 'boolean',
       description: 'Send unsigned requests (no x-hypdriv-audit token), exactly as an anonymous visitor would',
     },
+    header: {
+      type: 'string',
+      value: '<name: value>',
+      description:
+        'Extra request header for a gateway in front of the deployment (repeatable; also HYPDRIV_ACCESS_HEADERS, CF_ACCESS_CLIENT_ID/SECRET, VERCEL_AUTOMATION_BYPASS_SECRET)',
+      multiple: true,
+    },
     widths: {
       type: 'string',
       value: '<a,b>',
@@ -174,6 +181,7 @@ export const auditCommand = defineCommand({
       base,
       secretName: config.resolved.security.internalAuth.secretEnv,
       anonymous: args.boolean('anonymous'),
+      headers: rawList(args, 'header'),
     });
     if (!args.json) ui.note(describeAuditAuth(auth));
     const fetchOpts = { fetch: io.fetch, timeoutMs, headers: auth.headers };

@@ -1,4 +1,4 @@
-import { UsageError } from '../args';
+import { rawList, UsageError } from '../args';
 import { cacheStatus } from '../audit/cache';
 import { fetchTtfb, joinUrl, mapConcurrent, normalizeBaseUrl, percentile } from '../audit/http';
 import { choosePaths } from '../audit/paths';
@@ -80,6 +80,13 @@ export const benchCommand = defineCommand({
       type: 'boolean',
       description: 'Send unsigned requests (no x-hypdriv-audit token), as an anonymous visitor would',
     },
+    header: {
+      type: 'string',
+      value: '<name: value>',
+      description:
+        'Extra request header for a gateway in front of the deployment (repeatable; also HYPDRIV_ACCESS_HEADERS, CF_ACCESS_CLIENT_ID/SECRET, VERCEL_AUTOMATION_BYPASS_SECRET)',
+      multiple: true,
+    },
   },
   examples: [
     'hypdriv bench --url http://localhost:8787',
@@ -110,6 +117,7 @@ export const benchCommand = defineCommand({
       base,
       secretName,
       anonymous: args.boolean('anonymous'),
+      headers: rawList(args, 'header'),
     });
     const opts = { fetch: io.fetch, timeoutMs, headers: auth.headers };
     if (!args.json) {

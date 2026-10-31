@@ -25,8 +25,10 @@ pnpm install && pnpm build                     # from the repository root
 cd e2e/cloudflare
 
 # 1. Resources: KV, R2 (enam), the jobs queue + its DLQ, a Turnstile widget, plus git-ignored config files.
+#    --gate keeps it private: a zone WAF rule blocks HTTPS requests without the gate header/cookie, and with a
+#    custom domain workers.dev stays off.
 CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=… \
-  pnpm provision --prefix acme-hypdriv --domain e2e.acme.dev --zone <zone id> --rate-limit-namespace 9101
+  pnpm provision --prefix acme-hypdriv --domain e2e.acme.dev --zone <zone id> --rate-limit-namespace 9101 --gate
 #    Add CACHE_PURGE_API_TOKEN (Zone → Cache Purge) to acme-hypdriv.secrets.local.json for zone purges.
 
 # 2. Build and deploy (custom domain: the Cache API, regional cache and Early Hints need one).
@@ -64,5 +66,6 @@ Queue names must end in `-e2e-jobs` / `-e2e-jobs-dlq`: the app maps them with wi
 | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | KV writes, R2 listing, Analytics Engine SQL, Workers Observability queries |
 | `E2E_KV_NAMESPACE_ID`, `E2E_WORKER`, `E2E_R2_BUCKET`, `E2E_AE_DATASET`, `E2E_ZONE_ID` | the resources above |
 | `E2E_TAIL_PRODUCER_URL`, `E2E_TURNSTILE`, `E2E_TURNSTILE_SITE_KEY` | optional checks |
+| `HYPDRIV_ACCESS_HEADERS` (or `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET`) | passing the gateway of a private deployment (`provision --gate` writes the first to the env file); sent over HTTPS to the suite's hosts only — also by Chromium and on the WebSocket upgrade |
 
 Checks whose inputs are missing are reported as skipped, never as passed.

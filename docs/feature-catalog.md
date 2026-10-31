@@ -72,7 +72,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Locale negotiation    | `Accept-Language` + geo + cookie negotiation, proxy stage                                         | ✅                  | —                                | `next`               | ✅     |
 | Live channels         | Pub/sub with WebSocket hibernation and SSE, `useLive()` hook, server-component refresh on publish | polling transport   | `HypDrivChannel` DO              | `live`, `cloudflare` | ✅     |
 | Edge feature flags    | Deterministic bucketing, geo/cookie/percentage rules, header propagation, QA overrides            | env/static provider | KV, OpenFeature (Flagship)       | `flags`              | ✅     |
-| Edge redirects        | Redirect table evaluated before Next.js                                                           | config              | KV-backed table without redeploy | `cloudflare`         | ✅     |
+| Edge redirects        | Redirect table evaluated before Next.js; `forceHttps` upgrades every plain-HTTP request (internal routes and static assets included) before anything answers | config              | KV-backed table without redeploy | `cloudflare`, `next` | ✅     |
 | Maintenance mode      | Branded maintenance page toggled by env or KV                                                     | ✅                  | KV                               | `cloudflare`         | ✅     |
 | Typed bindings access | `hyp().env` typed from `CloudflareEnv`, dev fallback via OpenNext                                 | ✅                  | —                                | `cloudflare`, `next` | ✅     |
 | Background work       | `defer()` → `waitUntil`/`after()`, `enqueue()` → Queues, else a signed consumer-route call        | ✅                  | Queues                           | `cloudflare`         | ✅     |
@@ -96,7 +96,7 @@ Detected from `VERCEL=1`, `vercel.json` / `.vercel` or `platform: 'vercel'` ([AD
 | Runtime registry | Config, platform env and the Vercel CDN purger registered by `createInstrumentation()` for helpers outside a proxied request (`enqueue()`, `jobHandler`, `revalidatePath()`) | ✅ | — | `core`, `next` | ✅ |
 | Outbound fetch | `hypFetch` timeouts settle the attempt even when the platform fetch ignores the abort signal; body cancels are never awaited (Next.js tees fetch bodies) | ✅ | — | `core` | ✅ |
 | Observability | Request logs, spans (`tracing.exporter: 'console'`), Web Vitals (with the visitor's country) and CSP reports in the runtime logs / log drains | ✅ | OTLP | `observe`, `next` | ✅ |
-| Tooling | `doctor`/`analyze`/`init --platform vercel`, Build Output API and function-size checks, `x-vercel-cache` in cache audits (platform limits reported as warnings), Deployment Protection bypass, monorepo links at the repository root | ✅ | — | `cli` | ✅ |
+| Tooling | `doctor`/`analyze`/`init --platform vercel`, Build Output API and function-size checks, `x-vercel-cache` in cache audits (platform limits reported as warnings), Deployment Protection bypass (also for `jobs run`), monorepo links at the repository root | ✅ | — | `cli` | ✅ |
 
 Not available on Vercel (documented fallbacks): HTML transforms and edge nonce injection (HTMLRewriter), Durable Object live channels (polling transport), 103 Early Hints (preload `Link` headers instead), Workers Analytics Engine sinks (logs / OTLP), per-country CDN variants of pages (Route Handlers with `withVercelCdn` only), a dead-letter queue (`retry: 'none'` acknowledges), Skew Protection on Hobby (Pro feature).
 
@@ -128,6 +128,7 @@ Not available on Vercel (documented fallbacks): HTML transforms and edge nonce i
 | `hypdriv deps`           | Daily dependency freshness with safe auto-update | `cli`            | ✅     |
 | `create-hypdriv`         | Scaffolder: Cloudflare or Vercel, with or without Purser; templates are the audited example apps; generated local secrets | `create-hypdriv` | ✅     |
 | Owner audit tokens       | `audit`/`bench`/`warm` sign requests so the bot shield and rate limits let them through ([ADR 0015](adr/0015-owner-audit-tokens.md)) | `security`, `cli`, `purser` | ✅ |
+| Gateway access           | `audit`/`bench`/`warm`/`jobs run` pass private deployments: Vercel automation bypass, Cloudflare Access service tokens, `HYPDRIV_ACCESS_HEADERS` / `--header` for any other gate (origin only, never logged) | `cli` | ✅ |
 | Testing kit              | Fake bindings, request builders, vitest presets  | `testing`        | ✅     |
 | Agent skill              | `skills/hypdriv/SKILL.md` and `AGENTS.md`        | repo             | ✅     |
 

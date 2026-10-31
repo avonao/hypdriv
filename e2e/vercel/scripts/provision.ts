@@ -5,11 +5,14 @@
  *   VERCEL_TOKEN=… VERCEL_TEAM_ID=team_… \
  *   pnpm -F @hypdriv/e2e-vercel provision --prefix acme-hypdriv --domain e2e-vercel.acme.dev
  *
- * Resources: the project `<prefix>-vercel-e2e` (Next.js, root directory `e2e/vercel`, functions in `iad1`),
+ * Resources: the project `<prefix>-vercel-e2e` (Next.js, root directory `e2e/vercel`, functions in `iad1`,
+ * Vercel Authentication on every deployment with a Protection Bypass for Automation — test deployments are
+ * private; `--public` limits protection to previews and generated URLs),
  * its environment variables (session, internal and cron secrets, Turnstile keys, the Global Config
  * connection), a Global Config store `<prefix>-vercel-e2e` with a read token for the app, the WAF
  * rate-limit rule behind `vercel.firewall.rateLimitRules.waf` (`@vercel/firewall` id `hypdriv-e2e-waf`,
- * 5 requests / 60 s per key), and optionally a custom domain. Files: `<prefix>.vercel.secrets.local.json`
+ * 5 requests / 60 s per key), and optionally a custom domain (not needed: the suite runs against
+ * `<project>.vercel.app` through the bypass). Files: `<prefix>.vercel.secrets.local.json`
  * (mode 600), `<prefix>.vercel.e2e.local.env` (source it, then `pnpm e2e`) and `.vercel/project.json` at the
  * repository root (so `vercel build` / `vercel deploy --prebuilt` target the project).
  *
@@ -32,6 +35,8 @@ const { values: args } = parseArgs({
     region: { type: 'string', default: 'iad1' },
     dir: { type: 'string' },
     link: { type: 'boolean', default: true },
+    /** Leave production reachable without Vercel Authentication (default: every deployment is private). */
+    public: { type: 'boolean', default: false },
   },
 });
 
@@ -111,6 +116,36 @@ if (!project?.id) {
 }
 log('project', `${project.name} (${project.id}) · root ${args['root-directory']} · ${args.region}`);
 
+// Private by default: Vercel Authentication on every deployment, production and custom domains included
+// (available on Hobby), plus a Protection Bypass for Automation secret for the runner and `hypdriv audit`.
+interface Protected {
+  ssoProtection?: { deploymentType: string } | null;
+  protectionBypass?: Record<string, { scope?: string }> | null;
+}
+const protection = ok(
+  await vercel<Protected>('PATCH', `/v9/projects/${project.id}`, {
+    ssoProtection: args.public ? { deploymentType: 'all_except_custom_domains' } : { deploymentType: 'all' },
+  }),
+  'deployment protection',
+);
+const findBypass = (p: Protected) =>
+  Object.entries(p.protectionBypass ?? {}).find(([, v]) => v?.scope === 'automation-bypass')?.[0];
+let bypass = findBypass(protection);
+if (!bypass)
+  bypass = findBypass(
+    ok(
+      await vercel<Protected>('PATCH', `/v1/projects/${project.id}/protection-bypass`, {
+        generate: { note: 'HypDriv live suite runner and audits' },
+      }),
+      'protection bypass',
+    ),
+  );
+if (!bypass) throw new Error('protection bypass: no automation secret returned');
+log(
+  'protection',
+  `Vercel Authentication on ${args.public ? 'previews and generated URLs' : 'every deployment'} · automation bypass ready`,
+);
+
 // Secrets (kept on disk, mode 600, never printed)
 mkdirSync(dir, { recursive: true });
 const secretsFile = join(dir, `${prefix}.vercel.secrets.local.json`);
@@ -122,6 +157,8 @@ secrets.HYPDRIV_INTERNAL_SECRET ??= randomBytes(48).toString('base64url');
 secrets.CRON_SECRET ??= randomBytes(32).toString('base64url');
 if (args['turnstile-site-key']) secrets.TURNSTILE_SITE_KEY = args['turnstile-site-key'];
 if (args['turnstile-secret-key']) secrets.TURNSTILE_SECRET_KEY = args['turnstile-secret-key'];
+// Not a project variable: Vercel exposes it to the deployment itself; kept here for the runner and audits.
+secrets.VERCEL_AUTOMATION_BYPASS_SECRET = bypass;
 
 // Global Config store + a read token for the app
 interface Store {
@@ -154,12 +191,14 @@ chmodSync(secretsFile, 0o600);
 log('secrets file', `${secretsFile} (mode 600)`);
 
 // Environment variables: sensitive (write-only) for production and preview
-const envBody = Object.entries(secrets).map(([key, value]) => ({
-  key,
-  value,
-  type: key === 'TURNSTILE_SITE_KEY' ? 'plain' : 'sensitive',
-  target: ['production', 'preview'],
-}));
+const envBody = Object.entries(secrets)
+  .filter(([key]) => key !== 'VERCEL_AUTOMATION_BYPASS_SECRET')
+  .map(([key, value]) => ({
+    key,
+    value,
+    type: key === 'TURNSTILE_SITE_KEY' ? 'plain' : 'sensitive',
+    target: ['production', 'preview'],
+  }));
 ok(
   await vercel('POST', `/v10/projects/${project.id}/env?upsert=true`, envBody),
   'upsert environment variables',
@@ -276,6 +315,7 @@ writeFileSync(
     `export VERCEL_TEAM_ID=${TEAM}`,
     ...(secrets.TURNSTILE_SITE_KEY ? [`export E2E_TURNSTILE_SITE_KEY=${secrets.TURNSTILE_SITE_KEY}`] : []),
     `export HYPDRIV_INTERNAL_SECRET=${secretRef('HYPDRIV_INTERNAL_SECRET')}`,
+    `export VERCEL_AUTOMATION_BYPASS_SECRET=${secretRef('VERCEL_AUTOMATION_BYPASS_SECRET')}`,
     `export CRON_SECRET=${secretRef('CRON_SECRET')}`,
     '',
   ].join('\n'),

@@ -1,5 +1,6 @@
-import { UsageError } from '../args';
+import { rawList, UsageError } from '../args';
 import { DESKTOP_UA, joinUrl, normalizeBaseUrl } from '../audit/http';
+import { accessHeaders } from '../audit/token';
 import { CliError, createContext } from '../context';
 import { loadSecurity, missingExport } from '../integrations';
 import { millis } from '../ui';
@@ -21,6 +22,13 @@ export const jobsCommand = defineCommand({
       description: 'Override the method (default: the job config; GET on Vercel, as Vercel Cron calls it)',
     },
     timeout: { type: 'string', value: '<ms>', description: 'Request timeout (default: the job timeout)' },
+    header: {
+      type: 'string',
+      value: '<name: value>',
+      description:
+        'Extra request header for a gateway in front of the deployment (repeatable; also HYPDRIV_ACCESS_HEADERS, CF_ACCESS_CLIENT_ID/SECRET, VERCEL_AUTOMATION_BYPASS_SECRET)',
+      multiple: true,
+    },
   },
   subcommands: [
     { name: 'list', summary: 'List configured cron jobs, queues and the email route' },
@@ -107,6 +115,7 @@ export const jobsCommand = defineCommand({
     const url = new URL(joinUrl(base, path));
     if (method === 'GET') url.searchParams.set('job', name);
     const headers: Record<string, string> = {
+      ...accessHeaders(ctx.root, io.env, rawList(args, 'header')),
       'user-agent': DESKTOP_UA,
       'x-hypdriv-job': name,
       accept: 'application/json',

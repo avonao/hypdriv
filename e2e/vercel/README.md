@@ -26,25 +26,27 @@ Job outcomes, vitals and spans are read from the deployment's **runtime-logs str
 pnpm install && pnpm build                     # from the repository root
 cd e2e/vercel
 
-# 1. Project (root directory e2e/vercel, iad1), secrets, a Global Config store + read token, the WAF
-#    rate-limit rule, optionally a custom domain (DNS: CNAME to the target `vercel domains inspect` shows),
-#    and the link `.vercel/project.json` at the repository root.
-VERCEL_TOKEN=… VERCEL_TEAM_ID=team_… pnpm provision --prefix acme-hypdriv --domain e2e-vercel.acme.dev \
-  [--turnstile-site-key … --turnstile-secret-key …] [--dir <where the git-ignored files go>]
+# 1. Project (root directory e2e/vercel, iad1), Vercel Authentication on every deployment plus a Protection
+#    Bypass for Automation (the deployment stays private), secrets, a Global Config store + read token, the
+#    WAF rate-limit rule, and the link `.vercel/project.json` at the repository root.
+VERCEL_TOKEN=… VERCEL_TEAM_ID=team_… pnpm provision --prefix acme-hypdriv \
+  [--turnstile-site-key … --turnstile-secret-key …] [--dir <where the git-ignored files go>] [--public] [--domain …]
 
 # 2. Build and deploy from the repository root (the project's root directory is e2e/vercel).
 cd ../.. && vercel pull --yes --environment=production && vercel build --prod && vercel deploy --prebuilt --prod
 
-# 3. Verify.
+# 3. Verify (against https://acme-hypdriv-vercel-e2e.vercel.app through the bypass).
 cd e2e/vercel && source acme-hypdriv.vercel.e2e.local.env && VERCEL_TOKEN=… pnpm e2e   # e2e-report.json; exit 1 on failure
 pnpm e2e --only queue,global-config-flags --json                      # a subset, machine-readable
 pnpm e2e --logs runtime-logs.ndjson                                   # also keep every log line the run read
 ```
 
+No custom domain is needed: the suite runs against the project's `.vercel.app` URL. Every request the runner (and its headless Chromium) sends to that host carries `x-vercel-protection-bypass`; requests to other hosts never do. Vercel's own invocations — cron runs, queue deliveries — are not affected by the protection. BotID answers `bypassed` for bypassed requests, which the `botid` check accepts.
+
 ### Optional checks
 
 - **Upstash Redis.** Install Upstash from the Vercel Marketplace and connect it to the project (`KV_REST_API_URL`, `KV_REST_API_TOKEN`): `/api/limited` switches from per-instance to exact global counters and `health` reports it.
-- **Turnstile pass flow.** Set the project's `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` to Cloudflare's always-pass test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`), redeploy, run `E2E_TURNSTILE=test E2E_TURNSTILE_SITE_KEY=1x00000000000000000000AA pnpm e2e --only bots-challenge,turnstile-pass`, then restore the real keys and redeploy (Vercel binds environment variables per deployment).
+- **Turnstile pass flow.** Add the `.vercel.app` hostname to your Turnstile widget for real-key challenges, or set the project's `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` to Cloudflare's always-pass test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`), redeploy, run `E2E_TURNSTILE=test E2E_TURNSTILE_SITE_KEY=1x00000000000000000000AA pnpm e2e --only bots-challenge,turnstile-pass`, then restore the real keys and redeploy (Vercel binds environment variables per deployment).
 
 The browser checks (Turnstile, BotID) use Playwright's Chromium when it is installed (`require('playwright')`).
 
@@ -52,11 +54,12 @@ The browser checks (Turnstile, BotID) use Playwright's Chromium when it is insta
 
 | Variable | Used for |
 | --- | --- |
-| `E2E_URL` | the production deployment (custom domain recommended; the runner resolves its deployment id) |
+| `E2E_URL` | the production deployment (`https://<project>.vercel.app`; the runner resolves its deployment id) |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | passing Vercel Authentication on a private deployment (also `CF_ACCESS_CLIENT_ID` / `_SECRET` and `HYPDRIV_ACCESS_HEADERS` for other gateways) |
 | `HYPDRIV_INTERNAL_SECRET` | signing control requests (`/api/enqueue`, `/api/publish`, `/api/revalidate`) |
 | `CRON_SECRET` | calling the cron route the way Vercel Cron does |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `E2E_VERCEL_PROJECT` | runtime logs, Global Config writes, project and firewall reads |
 | `E2E_GLOBAL_CONFIG_ID` | the Global Config store the app reads (`GLOBAL_CONFIG`) |
 | `E2E_TURNSTILE`, `E2E_TURNSTILE_SITE_KEY` | optional checks |
 
-The Vercel token never reaches the deployment: the app only holds a Global Config **read** token. Checks whose inputs are missing are reported as skipped, never as passed.
+The Vercel token never reaches the deployment: the app only holds a Global Config **read** token, and Vercel provides the bypass secret to the deployment itself. Checks whose inputs are missing are reported as skipped, never as passed.

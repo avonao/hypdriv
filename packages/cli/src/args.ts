@@ -60,6 +60,13 @@ export interface ParsedArgs {
   list(name: string): string[];
 }
 
+/** Every value of a repeatable string option, unsplit (values such as header lines may contain commas). */
+export function rawList(args: Pick<ParsedArgs, 'values'>, name: string): string[] {
+  const v = args.values[name];
+  const items = Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
+  return items.filter((item) => item.trim() !== '');
+}
+
 function toParseArgsOptions(spec: OptionSpec) {
   const out: Record<
     string,

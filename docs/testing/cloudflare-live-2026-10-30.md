@@ -44,3 +44,8 @@ All three Workers deploy with OpenNext's full cache setup (R2 incremental cache 
 ## Not covered
 
 Inbound email needs an Email Routing rule and an external sender; the handler and its route are in place (`jobs.email`). The real (non-test) Turnstile widget cannot be solved headlessly.
+
+## Update 2026-10-31: private, re-verified
+
+The three test Workers are no longer public. `workers.dev` is off (`"workers_dev": false`; with custom domains it was only a second, public door), and a zone WAF custom rule (`hypdriv-dev: private HypDriv test Workers …`, every plan) blocks HTTPS requests to the three custom domains that carry neither the `x-hypdriv-gate` header nor the `hypdriv_gate` cookie; plain HTTP stays outside the rule because the Worker answers it only with `308` to HTTPS (which made a gap visible: internal routes and static assets used to be served over plain HTTP — fixed, see the [Vercel report](vercel-live-2026-10-31.md), defect 12). The runner and `hypdriv audit` send the header from `HYPDRIV_ACCESS_HEADERS`; `provision --gate` sets this up for any account. After the fixes from the Vercel run (tag-revalidated prerenders are `isr`, ADR 0018; never-awaited body cancels; the https upgrade), all three Workers were redeployed: suite 41 passed / 0 failed / 2 skipped through the gate (Turnstile pass flow with test keys: pass), audits on both examples: pass.
+
