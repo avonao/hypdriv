@@ -178,6 +178,8 @@ export interface ResolvedCache {
     infer: boolean;
     inferredStatic: { ttl: number; swr: number; staleIfError: number };
     inferredShell: null | { ttl: number; swr: number };
+    /** Applied to every policy (explicit and inferred); header names are lower-cased. */
+    bypass: { cookies: string[]; headers: string[]; query: string[] };
     store: import('./types').CacheStoreKind;
     /** Seconds; `0` disables the memory tier in front of shared stores. */
     memoryTtl: number;

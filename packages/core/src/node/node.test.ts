@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyManifest } from '../manifest/types';
 import {
+  explainExtensionlessImport,
   findConfigFile,
   findProjectRoot,
   importConfigModule,
@@ -54,6 +55,35 @@ describe('config files', () => {
     const loaded = await loadConfigFile(dir, file);
     expect(loaded.file).toBe(file);
     expect(loaded.resolved.site.name).toBe('named');
+  });
+
+  it('explains a relative import without a file extension (Node ESM does not guess extensions)', () => {
+    mkdirSync(join(dir, 'area'), { recursive: true });
+    writeFileSync(join(dir, 'shared.ts'), 'export const name = 1;\n');
+    const importer = join(dir, 'area', 'hypdriv.config.ts');
+    const err = Object.assign(
+      new Error(`Cannot find module '${join(dir, 'shared')}' imported from ${importer}`),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    );
+    expect(explainExtensionlessImport(err)?.message).toMatch(
+      /hypdriv\.config\.ts imports '\.\.\/shared' without a file extension.*write '\.\.\/shared\.ts'/s,
+    );
+    // A missing package, an import that already has an extension, or an unrelated error is left alone.
+    expect(explainExtensionlessImport(new Error('boom'))).toBeNull();
+    expect(
+      explainExtensionlessImport(
+        Object.assign(new Error(`Cannot find module '${join(dir, 'nope')}' imported from ${importer}`), {
+          code: 'ERR_MODULE_NOT_FOUND',
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      explainExtensionlessImport(
+        Object.assign(new Error(`Cannot find module '${join(dir, 'shared.ts')}' imported from ${importer}`), {
+          code: 'ERR_MODULE_NOT_FOUND',
+        }),
+      ),
+    ).toBeNull();
   });
 
   it('re-imports a changed file', async () => {

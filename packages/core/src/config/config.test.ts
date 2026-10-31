@@ -78,9 +78,35 @@ describe('resolveConfig', () => {
     expect(r.cache.edge!.policies[0]!.vary.headers).toEqual(['accept-language']);
     expect(r.cache.edge!.policies[0]!.bypass.headers).toEqual(['x-preview']);
   });
+
+  it("applies cache.edge.bypass to every explicit policy, merged with the policy's own", () => {
+    const r = resolveConfig({
+      cache: {
+        edge: {
+          bypass: { cookies: ['tv_gate'], headers: ['X-Gate'], query: ['preview'] },
+          policies: [
+            { match: '/a', ttl: 10 },
+            { match: '/b', ttl: 10, bypass: { cookies: ['session', 'tv_gate'] } },
+          ],
+        },
+      },
+    });
+    expect(r.cache.edge!.bypass).toEqual({ cookies: ['tv_gate'], headers: ['x-gate'], query: ['preview'] });
+    expect(r.cache.edge!.policies[0]!.bypass).toMatchObject({
+      cookies: ['tv_gate'],
+      headers: ['x-gate'],
+      query: ['preview'],
+    });
+    expect(r.cache.edge!.policies[1]!.bypass.cookies).toEqual(['session', 'tv_gate']);
+  });
 });
 
 describe('validateConfig', () => {
+  it('validates cache.edge.bypass', () => {
+    const d = validateConfig({ cache: { edge: { bypass: { cookies: 'tv_gate' } } } });
+    expect(d.filter((x) => x.severity === 'error').map((x) => x.path)).toContain('cache.edge.bypass.cookies');
+  });
+
   it('accepts a valid config without errors', () => {
     const d = validateConfig({
       site: { name: 'shop', origin: 'https://shop.example' },

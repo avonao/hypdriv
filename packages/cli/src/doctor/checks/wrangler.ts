@@ -1,4 +1,5 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { queueConsumerFor } from '@hypdriv/core';
 import { BACKUP_SUFFIX } from '../../init/plan';
 import { editWranglerJsonc } from '../../init/wrangler';
@@ -174,7 +175,10 @@ export const wranglerChecks: Check[] = [
           'No `assets` block; OpenNext needs `"assets": { "directory": ".open-next/assets", "binding": "ASSETS" }`.',
         );
       const problems: string[] = [];
-      if (cfg.assets.directory !== '.open-next/assets')
+      // Wrangler resolves `directory` against the config file, which may live outside the project (`--wrangler`).
+      const configDir = ctx.project.wrangler.configFile ? dirname(ctx.project.wrangler.configFile) : ctx.root;
+      const directory = cfg.assets.directory ? resolve(configDir, cfg.assets.directory) : null;
+      if (directory !== resolve(ctx.root, '.open-next/assets'))
         problems.push(`directory is "${cfg.assets.directory ?? ''}" (expected .open-next/assets)`);
       if (cfg.assets.binding !== wanted)
         problems.push(`binding is "${cfg.assets.binding ?? ''}" (expected ${wanted})`);

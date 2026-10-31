@@ -96,6 +96,31 @@ describe('detectProject', () => {
     expect(analyzeNextConfig('x', 'export default { reactStrictMode: true };').defaultExport).toBe('object');
   });
 
+  it('reads the Wrangler config named by `wrangler` instead of the project one (generated configs outside the project)', () => {
+    const area = tempProject({
+      'package.json': '{"name":"area"}',
+      'wrangler.jsonc': '{ "name": "build-only", "main": ".open-next/worker.js" }',
+    });
+    const shared = tempProject({
+      'package.json': '{"name":"infra"}',
+      'web.wrangler.jsonc': '// generated\n{ "name": "web-site", "main": "../area/hypdriv.worker.ts" }',
+      'broken.wrangler.jsonc': '{ "name": ',
+    });
+    const file = join(shared.dir, 'web.wrangler.jsonc');
+    const info = detectProject(area.dir, { env: {}, wrangler: file });
+    expect(info.wrangler).toMatchObject({ configFile: file, format: 'jsonc', parseError: null });
+    expect(info.wrangler.config).toMatchObject({ name: 'web-site', main: '../area/hypdriv.worker.ts' });
+    // Without the option the project's own file is used.
+    expect(detectProject(area.dir, { env: {} }).wrangler.config?.name).toBe('build-only');
+    // A missing or broken file is reported, never silently replaced by the project's.
+    const missing = detectProject(area.dir, { env: {}, wrangler: join(shared.dir, 'nope.jsonc') });
+    expect(missing.wrangler).toMatchObject({ config: null });
+    expect(missing.wrangler.parseError).toContain('could not be read');
+    const broken = detectProject(area.dir, { env: {}, wrangler: join(shared.dir, 'broken.wrangler.jsonc') });
+    expect(broken.wrangler.config).toBeNull();
+    expect(broken.wrangler.parseError).toBeTruthy();
+  });
+
   it('reads wrangler.toml and reports parse errors of broken JSONC', () => {
     const toml = openNextProject({
       'wrangler.jsonc': '',

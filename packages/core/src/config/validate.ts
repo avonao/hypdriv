@@ -423,6 +423,11 @@ const rootCheck = checkObjectShape({
           if (v === undefined || v === false) return;
           checkObjectShape({ ttl: checkDuration, swr: checkDuration })(v, p, o);
         },
+        bypass: checkObjectShape({
+          cookies: checkStringArray,
+          headers: checkStringArray,
+          query: checkStringArray,
+        }),
         store: checkEnum(['auto', 'cache-api', 'memory', 'kv', 'tiered']),
         negativeTtl: checkDuration,
         ignoredQuery: checkStringArray,

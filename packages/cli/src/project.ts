@@ -396,8 +396,35 @@ function readDevVars(root: string): DevVarsInfo {
   return { file, exampleFile, keys, lengths, gitignored };
 }
 
-function readWrangler(root: string, pkg: PackageInfo | null): WranglerInfo {
+function readWrangler(root: string, pkg: PackageInfo | null, override?: string | null): WranglerInfo {
   const base = versionInfo(root, pkg, 'wrangler');
+  if (override) {
+    const format: WranglerFormat = override.endsWith('.toml')
+      ? 'toml'
+      : override.endsWith('.json')
+        ? 'json'
+        : 'jsonc';
+    const source = readText(override);
+    if (source === null)
+      return {
+        ...base,
+        configFile: override,
+        format,
+        config: null,
+        parseError: `${override} could not be read`,
+      };
+    try {
+      return {
+        ...base,
+        configFile: override,
+        format,
+        config: parseWranglerConfig(source, format),
+        parseError: null,
+      };
+    } catch (err) {
+      return { ...base, configFile: override, format, config: null, parseError: (err as Error).message };
+    }
+  }
   const candidates: Array<[string, WranglerFormat]> = [
     ['wrangler.jsonc', 'jsonc'],
     ['wrangler.json', 'json'],
@@ -628,6 +655,8 @@ export interface DetectOptions {
   nodeVersion?: string;
   /** Overrides platform detection (`--platform`). */
   platform?: DeployPlatform | null;
+  /** Absolute path of the Wrangler config to read instead of `<root>/wrangler.*` (`--wrangler`). */
+  wrangler?: string | null;
   /** Environment used for platform signals (default: `process.env`). */
   env?: Record<string, string | undefined>;
 }
@@ -667,7 +696,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
   }
   const nextConfigFile = firstExisting(root, NEXT_CONFIG_FILES);
   const purserVersion = installedVersion(root, '@avonao/purser');
-  const wrangler = readWrangler(root, pkg);
+  const wrangler = readWrangler(root, pkg, options.wrangler);
   const linkDir = vercelLinkDir(root, repoRoot);
   const vercel = readVercel(root, linkDir);
   const opennext = versionInfo(root, pkg, '@opennextjs/cloudflare');

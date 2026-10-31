@@ -43,6 +43,18 @@ A key is the SHA-256 of: method · lowercase host · pathname (trailing slash no
 
 Bypass conditions skip the cache entirely: `bypass.cookies` (e.g. a session cookie), `bypass.headers`, `bypass.query` (e.g. `preview`), `bypass.when(input)`; requests carrying `Cache-Control: no-cache` are also bypassed.
 
+### The edge cache answers before `middleware.ts`
+
+On Cloudflare the pipeline runs in the Worker shell, before OpenNext executes the application's `middleware.ts`. A cache HIT never reaches the middleware, so a cached page skips whatever the middleware decides from the request: a pre-launch site gate that checks a cookie, a session redirect, preview mode, a rewrite by header. Inferred policies (every static and ISR route) would serve the page an unlocked visitor caused to be stored to everyone, gate or no gate.
+
+List the cookies, headers and query parameters the middleware reads in `cache.edge.bypass`. It applies to every policy, inferred ones included; a request carrying any of them reads nothing from the cache and stores nothing in it:
+
+```ts
+cache: { edge: { bypass: { cookies: ['tv_gate'], headers: ['x-preview'], query: ['preview'] } } }
+```
+
+`hypdriv doctor` (`cache.middleware`) warns when the build has a middleware, the edge cache has policies and nothing is listed. A site whose middleware decides on more than a few cookies can turn the HTML cache off (`cache.edge.infer: false`, no policies) and keep OpenNext's incremental cache, which sits behind the middleware.
+
 ## Statuses
 
 Every response carries `x-hypdriv-cache` and a `cache` entry in `Server-Timing`:

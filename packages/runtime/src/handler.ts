@@ -156,8 +156,8 @@ async function readDevState(): Promise<Record<string, unknown>> {
   try {
     const proc = (globalThis as { process?: { versions?: { node?: string }; cwd?: () => string } }).process;
     if (!proc?.versions?.node || typeof proc.cwd !== 'function') return {};
-    const { readFile } = await import('node:fs/promises');
-    const { join } = await import('node:path');
+    const { readFile } = await import(/* webpackIgnore: true */ 'node:fs/promises');
+    const { join } = await import(/* webpackIgnore: true */ 'node:path');
     return {
       purser: JSON.parse(
         await readFile(join(proc.cwd(), '.hypdriv', 'dev', 'purser.json'), 'utf8'),

@@ -15,8 +15,8 @@ export async function readManifestFile(ttlMs = 5000): Promise<HypManifest | null
   try {
     const proc = (globalThis as { process?: { versions?: { node?: string }; cwd?: () => string } }).process;
     if (proc?.versions?.node && typeof proc.cwd === 'function') {
-      const { readFile } = await import('node:fs/promises');
-      const { join } = await import('node:path');
+      const { readFile } = await import(/* webpackIgnore: true */ 'node:fs/promises');
+      const { join } = await import(/* webpackIgnore: true */ 'node:path');
       const parsed = JSON.parse(
         await readFile(join(proc.cwd(), '.hypdriv', 'manifest.json'), 'utf8'),
       ) as HypManifest;

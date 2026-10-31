@@ -1,6 +1,6 @@
 # The `hypdriv` CLI
 
-All commands accept `--root <dir>` (project directory, default: nearest `package.json`), `--json` (machine-readable output) and, where the deploy target matters, `--platform cloudflare|vercel|node` (default: detected from `hypdriv.config.ts#platform`, `wrangler.*` / `@opennextjs/cloudflare`, `vercel.json` / `.vercel`, `VERCEL=1`). Exit codes: `0` ok, `1` findings/failures, `2` usage error.
+All commands accept `--root <dir>` (project directory, default: nearest `package.json`), `--json` (machine-readable output), `--wrangler <file>` (read this Wrangler config instead of `<root>/wrangler.jsonc`: for a generated or shared config that lives outside the project, e.g. one `infra/<worker>.wrangler.jsonc` per area of a multi-Worker build; relative `main`/`assets` paths resolve against that file as Wrangler does; `HYPDRIV_WRANGLER_CONFIG` does the same) and, where the deploy target matters, `--platform cloudflare|vercel|node` (default: detected from `hypdriv.config.ts#platform`, `wrangler.*` / `@opennextjs/cloudflare`, `vercel.json` / `.vercel`, `VERCEL=1`). Exit codes: `0` ok, `1` findings/failures, `2` usage error.
 
 | Command | What it does |
 | --- | --- |

@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { emptyManifest, type HypRoute } from '@hypdriv/core';
+import { emptyManifest, type HypRoute, resolveConfig } from '@hypdriv/core';
 import { describe, expect, it } from 'vitest';
 import { parseWranglerConfig } from '../../wrangler-config';
-import { evaluateOpenNextCache, openNextBindingRequirements, readOpenNextCacheSetup } from './opennext-cache';
+import {
+  evaluateEdgeCacheMiddleware,
+  evaluateOpenNextCache,
+  openNextBindingRequirements,
+  readOpenNextCacheSetup,
+} from './opennext-cache';
 
 const example = (file: string) =>
   readFileSync(fileURLToPath(new URL(`../../../../../examples/basic/${file}`, import.meta.url)), 'utf8');
@@ -114,6 +119,31 @@ describe('evaluateOpenNextCache', () => {
     expect(result.details?.join('\n')).toContain('hypdriv.worker.ts does not export DOShardedTagCache');
   });
 
+  it('fails when hash-CSP routes have no incremental cache to serve their prerendered HTML', () => {
+    const hashManifest = emptyManifest({
+      routes: [{ id: 'app:/', classification: 'static' } as HypRoute],
+      csp: { 'app:/': { scriptHashes: ['sha256-abc'], styleHashes: [] } },
+    });
+    const bare = evaluateOpenNextCache({
+      setup: readOpenNextCacheSetup('export default defineCloudflareConfig({});'),
+      wrangler: WRANGLER,
+      workerSource: WORKER,
+      workerFile: 'hypdriv.worker.ts',
+      manifest: hashManifest,
+    });
+    expect(bare.status).toBe('fail');
+    expect(bare.message).toContain('1 route(s) use a hash CSP');
+    expect(bare.message).toContain("security.csp.mode to 'nonce'");
+    const full = evaluateOpenNextCache({
+      setup: readOpenNextCacheSetup(FULL),
+      wrangler: WRANGLER,
+      workerSource: WORKER,
+      workerFile: 'hypdriv.worker.ts',
+      manifest: hashManifest,
+    });
+    expect(full.status).toBe('pass');
+  });
+
   it('warns that ISR and tag revalidation are no-ops with OpenNext defaults', () => {
     const result = evaluateOpenNextCache({
       setup: readOpenNextCacheSetup('export default defineCloudflareConfig({});'),
@@ -125,5 +155,40 @@ describe('evaluateOpenNextCache', () => {
     expect(result.status).toBe('warn');
     expect(result.message).toContain('1 ISR route(s) but no revalidation queue');
     expect(result.details?.join('\n')).toContain('revalidateTag()/revalidatePath()');
+  });
+});
+
+describe('evaluateEdgeCacheMiddleware', () => {
+  const withMiddleware = emptyManifest({
+    routes: [{ id: 'app:/', classification: 'static' } as HypRoute],
+    proxy: { matchers: [{ source: '/:path*', sourceRegex: '^/(.*)$' }] },
+  });
+  const edgeOf = (cache?: object) => resolveConfig({ cache } as never).cache.edge;
+
+  it('warns when a middleware sits behind an edge cache that bypasses nothing', () => {
+    const r = evaluateEdgeCacheMiddleware({ manifest: withMiddleware, edge: edgeOf() });
+    expect(r.status).toBe('warn');
+    expect(r.message).toContain('a cache HIT never reaches it');
+    expect(r.details?.join('\n')).toContain('cache.edge.bypass');
+  });
+
+  it('passes once the gate cookie is listed', () => {
+    const r = evaluateEdgeCacheMiddleware({
+      manifest: withMiddleware,
+      edge: edgeOf({ edge: { bypass: { cookies: ['tv_gate'] } } }),
+    });
+    expect(r.status).toBe('pass');
+    expect(r.message).toContain('cookies tv_gate');
+  });
+
+  it('passes without middleware, with the edge cache off, or with no policies', () => {
+    expect(evaluateEdgeCacheMiddleware({ manifest: emptyManifest({}), edge: edgeOf() }).status).toBe('pass');
+    expect(
+      evaluateEdgeCacheMiddleware({ manifest: withMiddleware, edge: edgeOf({ edge: false }) }).status,
+    ).toBe('pass');
+    expect(
+      evaluateEdgeCacheMiddleware({ manifest: withMiddleware, edge: edgeOf({ edge: { infer: false } }) })
+        .status,
+    ).toBe('pass');
   });
 });

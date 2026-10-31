@@ -93,6 +93,11 @@ describe('scanSecrets', () => {
     expect(isCandidateEnvValue('X', '123456789012345', o)).toBe(false);
     expect(isCandidateEnvValue('X', 'production-environment', o)).toBe(false);
     expect(isCandidateEnvValue('X', undefined, o)).toBe(false);
+    // The deployment id is public by design (it is in every `?dpl=` asset URL): never a leak.
+    expect(isCandidateEnvValue('NEXT_DEPLOYMENT_ID', 'build-TfctsWXpff2fKS-9f3a1c', o)).toBe(false);
+    expect(isCandidateEnvValue('__HYPDRIV_BUILD_DEPLOYMENT_ID', 'build-TfctsWXpff2fKS-9f3a1c', o)).toBe(
+      false,
+    );
   });
 
   it('formats findings', async () => {

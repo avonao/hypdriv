@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadConfig } from '../config/define';
 import type { ResolvedConfig } from '../config/resolved';
@@ -114,6 +114,29 @@ function isTypeScriptLoadError(err: unknown): boolean {
 }
 
 /**
+ * Node's ES module loader does not guess file extensions: `import './shared'` in a TypeScript config fails with
+ * `ERR_MODULE_NOT_FOUND` even though `shared.ts` sits next to it. Returns an error that names the fix, or null
+ * when `err` is something else.
+ */
+export function explainExtensionlessImport(err: unknown): Error | null {
+  const e = err as { code?: string; message?: string };
+  if (e?.code !== 'ERR_MODULE_NOT_FOUND') return null;
+  const m = /Cannot find module '([^']+)' imported from (\S+)/.exec(e.message ?? '');
+  if (!m?.[1] || !m[2] || extname(m[1])) return null;
+  const [, target, importer] = m;
+  for (const ext of ['.ts', '.mts', '.tsx', '.js', '.mjs']) {
+    if (!existsSync(target + ext)) continue;
+    let spec = relative(dirname(importer), target).split(sep).join('/');
+    if (!spec.startsWith('.')) spec = `./${spec}`;
+    return new Error(
+      `${basename(importer)} imports '${spec}' without a file extension. hypdriv.config is loaded by Node's ES module loader, which needs explicit extensions on relative imports: write '${spec}${ext}'.`,
+      { cause: err },
+    );
+  }
+  return null;
+}
+
+/**
  * Imports a config module. TypeScript files use the runtime's native type stripping (Node 22.18+ /
  * 23.6+); on runtimes without it the file is stripped with `node:module`'s `stripTypeScriptTypes`
  * (Node 22.13+) into a sibling temporary `.mjs` so relative imports keep resolving.
@@ -123,6 +146,8 @@ export async function importConfigModule<T = unknown>(file: string): Promise<T> 
   try {
     return (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ href)) as T;
   } catch (err) {
+    const explained = explainExtensionlessImport(err);
+    if (explained) throw explained;
     if (!TS_EXTENSIONS.has(extname(file)) || !isTypeScriptLoadError(err)) throw err;
     const mod = (await import('node:module')) as {
       stripTypeScriptTypes?: (code: string, options?: { mode?: 'strip' | 'transform' }) => string;

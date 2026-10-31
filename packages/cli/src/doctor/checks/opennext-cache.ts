@@ -1,4 +1,4 @@
-import type { HypManifest } from '@hypdriv/core';
+import type { HypManifest, ResolvedConfig } from '@hypdriv/core';
 import { readText, rel } from '../../util/fs';
 import type { WranglerConfig } from '../../wrangler-config';
 import { type Check, type CheckResult, fail, info, pass, skip, warn } from '../types';
@@ -163,6 +163,12 @@ function snippet(req: BindingRequirement): string {
   }
 }
 
+/** Routes whose CSP is a hash allowlist computed from the prerendered HTML (the manifest's `csp` entries). */
+function hashCspRoutes(manifest: HypManifest | null): number {
+  if (!manifest) return 0;
+  return Object.values(manifest.csp ?? {}).filter((entry) => entry.scriptHashes.length > 0).length;
+}
+
 function isrRoutes(manifest: HypManifest | null): number | null {
   if (!manifest) return null;
   return manifest.routes.filter((r) => r.classification === 'isr').length;
@@ -238,17 +244,75 @@ export function evaluateOpenNextCache(input: OpenNextCacheInput): CheckResult {
     `tag cache ${setup.tagCache ?? 'none'}`,
     `purge ${setup.cachePurge ?? 'none'}`,
   ].join(' · ');
+  // A hash CSP matches the HTML exactly as prerendered. Without an incremental cache OpenNext renders those pages
+  // per request, Next streams the flight data in different chunks, the hashes stop matching, and browsers (which
+  // ignore 'unsafe-inline' next to hashes) block the inline scripts: the page loads but never hydrates.
+  const hashRoutes = hashCspRoutes(input.manifest);
+  const hashProblem =
+    !setup.incrementalCache && hashRoutes > 0
+      ? `${hashRoutes} route(s) use a hash CSP, but no incrementalCache serves their prerendered HTML. OpenNext re-renders them per request, the inline-script hashes stop matching and browsers block the page's scripts. Configure r2IncrementalCache (and populate it on every deploy), or set security.csp.mode to 'nonce'.`
+      : null;
   if (errors.length)
     return fail(`OpenNext cache overrides are missing what they need at run time (${summary}).`, {
-      details: [...errors, ...advice],
+      details: [...errors, ...(hashProblem ? [hashProblem] : []), ...advice],
     });
+  if (hashProblem) return fail(`${hashProblem} (${summary})`, { details: advice });
   if (!setup.queue && isr)
     return warn(`${isr} ISR route(s) but no revalidation queue (${summary}).`, { details: advice });
   if (advice.length) return warn(summary, { details: advice });
   return pass(summary);
 }
 
+export interface EdgeCacheMiddlewareInput {
+  manifest: HypManifest | null;
+  edge: ResolvedConfig['cache']['edge'];
+}
+
+/**
+ * The edge cache answers before OpenNext runs the application's `middleware.ts`, so a cached page skips whatever the
+ * middleware decides from the request (a site gate's cookie, a session check, a preview mode, a rewrite by header).
+ * `cache.edge.bypass` is how those requests skip the cache; this check asks for it whenever both exist.
+ */
+export function evaluateEdgeCacheMiddleware(input: EdgeCacheMiddlewareInput): CheckResult {
+  const { manifest, edge } = input;
+  if (!manifest) return skip('no build manifest yet (run next build).');
+  const matchers = manifest.proxy?.matchers ?? [];
+  if (!matchers.length) return pass('no middleware / proxy: nothing runs behind the edge cache.');
+  if (!edge) return pass('the edge cache is off.');
+  const cacheable = manifest.routes.filter(
+    (r) => r.classification === 'static' || r.classification === 'isr',
+  ).length;
+  if (!edge.infer && edge.policies.length === 0)
+    return pass('no edge-cache policies: every request reaches the middleware.');
+  const { cookies, headers, query } = edge.bypass;
+  const listed = [
+    ...(cookies.length ? [`cookies ${cookies.join(', ')}`] : []),
+    ...(headers.length ? [`headers ${headers.join(', ')}`] : []),
+    ...(query.length ? [`query ${query.join(', ')}`] : []),
+  ];
+  if (listed.length)
+    return pass(`middleware runs behind the edge cache; requests with ${listed.join('; ')} skip the cache.`);
+  return warn(
+    `middleware runs after the edge cache on Cloudflare (${matchers.length} matcher(s), ${cacheable} static/ISR route(s) cached): a cache HIT never reaches it.`,
+    {
+      details: [
+        'If it gates, redirects or rewrites on a cookie or header (a pre-launch site gate, a session check, preview mode), list them in cache.edge.bypass: { cookies: [...], headers: [...] } so those requests skip the cache.',
+        'Or switch the edge cache off for the site: cache.edge.infer: false with no policies.',
+      ],
+    },
+  );
+}
+
 export const openNextCacheChecks: Check[] = [
+  {
+    id: 'cache.middleware',
+    title: 'Edge cache vs. middleware (cached pages skip middleware.ts)',
+    category: 'opennext',
+    severity: 'warn',
+    run(ctx) {
+      return evaluateEdgeCacheMiddleware({ manifest: ctx.manifest, edge: ctx.config.resolved.cache.edge });
+    },
+  },
   {
     id: 'opennext.cache',
     title: 'OpenNext cache setup (incremental cache, queue, tag cache, purge)',

@@ -13,6 +13,7 @@ import {
   resolvePolicies,
   routePatternSpecificity,
 } from './policies';
+import { bypassReason } from './stage';
 
 const manifest = makeManifest([
   makeRoute({ pathname: '/', classification: 'static' }),
@@ -82,6 +83,26 @@ describe('inferPolicies / resolvePolicies', () => {
       match: '/blog/:slug',
     });
     expect(blog.methods).toEqual(['GET', 'HEAD']);
+  });
+
+  it('gives every inferred policy the shared cache.edge.bypass (a gate cookie must skip the cache)', () => {
+    const config = resolveConfig({
+      cache: { edge: { bypass: { cookies: ['tv_gate'], headers: ['X-Gate'] } } },
+    });
+    const inferred = inferPolicies(config, manifest);
+    expect(inferred.length).toBeGreaterThan(0);
+    for (const p of inferred) {
+      expect(p.bypass.cookies).toEqual(['tv_gate']);
+      expect(p.bypass.headers).toEqual(['x-gate']);
+    }
+    const blog = inferred.find((p) => p.id === 'inferred:app:/blog')!;
+    const withCookie = makeCtx(
+      new Request('https://example.com/blog', { headers: { cookie: 'a=1; tv_gate=signed' } }),
+      { config, manifest },
+    );
+    expect(bypassReason(blog, withCookie)).toBe('cookie:tv_gate');
+    const anonymous = makeCtx('https://example.com/blog', { config, manifest });
+    expect(bypassReason(blog, anonymous)).toBeNull();
   });
 
   it('caps ISR TTL at the route revalidate interval', () => {

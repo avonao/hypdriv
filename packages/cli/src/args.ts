@@ -26,6 +26,12 @@ export const GLOBAL_OPTIONS: OptionSpec = {
     value: '<name>',
     description: 'Deployment target: cloudflare | vercel | node (default: detected)',
   },
+  wrangler: {
+    type: 'string',
+    value: '<file>',
+    description:
+      'Wrangler config to read instead of <root>/wrangler.jsonc (a generated or shared config that lives outside the project; HYPDRIV_WRANGLER_CONFIG does the same)',
+  },
   help: { type: 'boolean', short: 'h', description: 'Show help for the command' },
   'no-color': { type: 'boolean', description: 'Disable colours (NO_COLOR=1 does the same)' },
 };

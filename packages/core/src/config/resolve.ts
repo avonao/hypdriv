@@ -268,10 +268,13 @@ function resolveSecurity(input: HypDrivConfig['security']): ResolvedSecurity {
   };
 }
 
+const unique = (...lists: string[][]): string[] => [...new Set(lists.flat())];
+
 export function resolveEdgeCachePolicy(
   p: EdgeCachePolicy,
   index: number,
   source: 'explicit' | 'inferred' = 'explicit',
+  shared?: { cookies: string[]; headers: string[]; query: string[] },
 ): ResolvedEdgeCachePolicy {
   return {
     id: p.id ?? `policy-${index}`,
@@ -290,9 +293,12 @@ export function resolveEdgeCachePolicy(
       device: p.vary?.device ?? false,
     },
     bypass: {
-      cookies: arr(p.bypass?.cookies, []),
-      headers: arr(p.bypass?.headers, []).map((h) => h.toLowerCase()),
-      query: arr(p.bypass?.query, []),
+      cookies: unique(arr(p.bypass?.cookies, []), shared?.cookies ?? []),
+      headers: unique(
+        arr(p.bypass?.headers, []).map((h) => h.toLowerCase()),
+        shared?.headers ?? [],
+      ),
+      query: unique(arr(p.bypass?.query, []), shared?.query ?? []),
       when: p.bypass?.when ?? null,
     },
     respectOrigin: p.respectOrigin ?? true,
@@ -306,10 +312,18 @@ export function resolveEdgeCachePolicy(
 function resolveCache(input: HypDrivConfig['cache']): ResolvedCache {
   const c = input ?? {};
   const edge = c.edge === false ? null : c.edge === true || c.edge === undefined ? {} : c.edge;
+  const sharedBypass = {
+    cookies: arr(edge?.bypass?.cookies, []),
+    headers: arr(edge?.bypass?.headers, []).map((h) => h.toLowerCase()),
+    query: arr(edge?.bypass?.query, []),
+  };
   return {
     edge: edge
       ? {
-          policies: (edge.policies ?? []).map((p, i) => resolveEdgeCachePolicy(p, i)),
+          policies: (edge.policies ?? []).map((p, i) =>
+            resolveEdgeCachePolicy(p, i, 'explicit', sharedBypass),
+          ),
+          bypass: sharedBypass,
           infer: edge.infer ?? true,
           inferredStatic: {
             ttl: parseDuration(edge.inferredStatic?.ttl, 300),

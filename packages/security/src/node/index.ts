@@ -78,6 +78,11 @@ const ENV_SKIP_NAMES = new Set([
   'LS_COLORS',
   'SHLVL',
   '_',
+  // Public by design: the deployment id is part of every asset URL (`?dpl=`) and Next.js inlines it into client
+  // chunks (webpack builds also export it to the build process as `NEXT_DEPLOYMENT_ID`). HypDriv generates the
+  // per-build value itself and hands it to every process of the build through `__HYPDRIV_BUILD_DEPLOYMENT_ID`.
+  'NEXT_DEPLOYMENT_ID',
+  '__HYPDRIV_BUILD_DEPLOYMENT_ID',
 ]);
 
 /** `true` when an env value is worth searching for (not a path, URL, number, flag or obvious non-secret). */

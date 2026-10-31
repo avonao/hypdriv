@@ -57,6 +57,48 @@ describe('check registry', () => {
   });
 });
 
+describe('hypdriv doctor --wrangler', () => {
+  const area = JSON.stringify({ name: 'area', type: 'module', dependencies: { next: '16.4.3' } });
+  const generated = (assets: string) => `// generated
+{
+  "name": "web-site",
+  "main": "../area/hypdriv.worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "${assets}", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "web-site" }],
+}
+`;
+
+  it('checks a generated config that lives outside the project, resolving its paths against the config file', async () => {
+    const p = tempProject({
+      'area/package.json': area,
+      'area/open-next.config.ts': 'export default {};\n',
+      'infra/web.wrangler.jsonc': generated('../area/.open-next/assets'),
+      'infra/other.wrangler.jsonc': generated('../elsewhere/assets'),
+    });
+    const only = [
+      '--only',
+      'wrangler.main,wrangler.assets,wrangler.self-reference',
+      '--root',
+      join(p.dir, 'area'),
+    ];
+    const ok = await doctor(p.dir, [...only, '--wrangler', 'infra/web.wrangler.jsonc']);
+    expect(ok.byId['wrangler.main']?.status).toBe('pass');
+    expect(ok.byId['wrangler.assets']?.status).toBe('pass');
+    expect(ok.byId['wrangler.self-reference']?.status).toBe('pass');
+    const wrong = await doctor(p.dir, [...only, '--wrangler', 'infra/other.wrangler.jsonc']);
+    expect(wrong.byId['wrangler.assets']?.status).toBe('warn');
+    // HYPDRIV_WRANGLER_CONFIG does the same as the flag; without either the project has no config.
+    const viaEnv = await doctor(p.dir, only, {
+      HYPDRIV_WRANGLER_CONFIG: join(p.dir, 'infra/web.wrangler.jsonc'),
+    });
+    expect(viaEnv.byId['wrangler.main']?.status).toBe('pass');
+    const none = await doctor(p.dir, only);
+    expect(none.byId['wrangler.main']?.status).toBe('skip');
+  });
+});
+
 describe('hypdriv doctor', () => {
   it('reports the state of an OpenNext project before init', async () => {
     const p = openNextProject({

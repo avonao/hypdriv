@@ -1,5 +1,7 @@
 # Configuration reference — `hypdriv.config.ts`
 
+> **Loading.** `hypdriv.config.ts` is read by Node's own ES module loader (native type stripping, Node 22.18+ or 24; 22.13+ through `stripTypeScriptTypes`), not by your bundler. Relative imports inside it therefore need the explicit extension (`import { shared } from './shared.ts'`; with `tsc` set `allowImportingTsExtensions`), and only erasable TypeScript syntax is allowed (no `enum`, no `namespace`, no parameter properties). An extensionless import fails with the file to write.
+
 ```ts
 import { defineConfig } from 'hypdriv';
 
@@ -77,6 +79,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 | `policies[]` | `[]` | `{ id?, match, methods?, ttl, swr?, staleIfError?, tags?, vary?, bypass?, respectOrigin?: true, includeRsc?: true, statuses?, keyQuery? }` |
 | `infer` | `true` | Infer policies for static routes from the manifest |
 | `inferredStatic` | `{ ttl: '5m', swr: '1d', staleIfError: '7d' }` | |
+| `bypass` | `{ cookies: [], headers: [], query: [] }` | Applied to every policy, inferred ones too: a request carrying one skips the cache. The cache answers before `middleware.ts`, so list what the middleware gates on (a site gate's cookie). See the [caching guide](caching.md) |
 | `inferredShell` | `false` | Opt in to caching PPR shells |
 | `store` | `'auto'` | tiered → Cache API → memory |
 | `negativeTtl` | `'60s'` | 404/410 |

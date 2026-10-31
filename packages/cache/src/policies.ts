@@ -86,6 +86,7 @@ export function inferPolicies(config: ResolvedConfig, manifest: HypManifest): Re
       },
       index,
       'inferred',
+      edge.bypass,
     );
     out.push({ policy, specificity: routePatternSpecificity(match), index });
   });

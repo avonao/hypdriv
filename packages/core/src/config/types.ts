@@ -339,6 +339,14 @@ export interface CacheConfig {
         inferredStatic?: { ttl?: Duration; swr?: Duration; staleIfError?: Duration };
         /** Cache shell (PPR) HTML responses when inferred (default false). */
         inferredShell?: false | { ttl?: Duration; swr?: Duration };
+        /**
+         * Bypass the edge cache for every policy, explicit and inferred, when the request carries one of these
+         * cookies, headers or query parameters (nothing is read from or stored in the cache for it). The edge cache
+         * answers before the application's `middleware.ts` / `proxy.ts`, so a cached page skips whatever that file
+         * decides from the request: list the cookies and headers it gates, redirects or rewrites on here
+         * (a pre-launch site gate's cookie, for example).
+         */
+        bypass?: { cookies?: string[]; headers?: string[]; query?: string[] };
         store?: CacheStoreKind;
         /**
          * Longest time an isolate's in-memory tier serves an entry before reading the shared tiers again
