@@ -1,6 +1,6 @@
 # create-hypdriv
 
-Scaffold a production-ready application with [Hypdriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK or SolidStart — on **Cloudflare Workers**, **Vercel** or **Node** (RedwoodSDK on Workers only).
+Scaffold a production-ready application with [Hypdriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart or Qwik — on **Cloudflare Workers**, **Vercel** or **Node** (RedwoodSDK on Workers only).
 
 > **Preview install.** The 0.1.0 packages are not on a package registry. Run the scaffolder from a release bundle or a source build with `--no-install` (`node dist/index.js my-app --no-install`), then run the bundle's `install.sh my-app`. The commands below show the registry form that applies once the packages are published.
 
@@ -19,7 +19,7 @@ Without options on a terminal, it asks for the directory, the framework, the pla
 | Option | Default | Description |
 | --- | --- | --- |
 | `[directory]` | `hypdriv-app` | Target directory; must be empty or missing. |
-| `--framework <name>` | `next` | `next`, `vite`, `react-router`, `tanstack-start`, `astro`, `sveltekit`, `nuxt`, `vinext`, `waku`, `rwsdk`, `solid-start` or `hono`. |
+| `--framework <name>` | `next` | `next`, `vite`, `react-router`, `tanstack-start`, `astro`, `sveltekit`, `nuxt`, `vinext`, `waku`, `rwsdk`, `solid-start`, `qwik` or `hono`. |
 | `--platform <cloudflare\|vercel\|node>` | `cloudflare` | Deploy target (`node` for Vite frameworks). |
 | `--purser` | off | Next.js: Purser CSS — zero-override atomic CSS, the unstyled-atom build guard, flashless themes. |
 | `--pm <pnpm\|npm\|yarn\|bun>` | the package manager running it | Used to install and in the printed commands. |
@@ -49,6 +49,7 @@ Every template is one of the repository's example apps, built and audited end to
 | `waku` | `examples/waku` | Waku 1 (React Server Components on Vite): `withHypDriv()`, server-entry adapters for Workers, Vercel and Node, prerendered and dynamic pages, API route |
 | `rwsdk` | `examples/rwsdk` | RedwoodSDK 1 (React Server Components on Vite and Workers): `withHypDriv()` around `defineApp`, the CSP nonce handed to RedwoodSDK, route manifest from the app, Cloudflare Workers only |
 | `solid-start` | `examples/solid-start` | SolidStart 2 (Vite, Nitro or `@cloudflare/vite-plugin`): `hypdriv()` plugin, Nitro runtime plugin or Worker shell, Solid nonce flow, prerendered and dynamic pages, API routes |
+| `qwik` | `examples/qwik` | Qwik v2 with Qwik Router: Vite plugin, Hypdriv adapters and server entries for Workers, Vercel and Node, prerendered and dynamic pages, endpoint |
 
 Vite framework templates build for every platform (`build:cloudflare`, `build:vercel`, `build:node`); `--platform` picks the local secrets file (`.dev.vars` for Workers, `.env.local` otherwise) and the printed next steps. The RedwoodSDK template builds for Workers only (`build:cloudflare`; `--platform vercel|node` is refused).
 

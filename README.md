@@ -67,10 +67,10 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 | **Observability** | Tracing (OTLP/HTTP, console, Analytics Engine) · structured logs with redaction · `Server-Timing` for every stage · Web Vitals with route and cache attribution · `onRequestError` hooks · an in-app DevTools HUD |
 | **Cloudflare-native** | Worker shell around OpenNext with `scheduled`, `queue`, `email` and `tail` handlers dispatched to Route Handlers · geo and locale negotiation · live channels (Durable Objects with SSE and WebSocket, polling fallback) · edge feature flags · KV-managed redirects · maintenance mode · typed bindings in server code |
 | **Vercel-native** | Edge-cache policies expressed as `Vercel-CDN-Cache-Control` and `Vercel-Cache-Tag` (route headers, `withVercelCdn`) with tag purge on Vercel's CDN · Upstash Redis for exact global rate limits · Global Config for flags, redirects and maintenance · Vercel WAF rate-limit rules · BotID guards for Server Actions · Vercel Cron with `CRON_SECRET` · Vercel Queues for `enqueue()` · Vercel geo headers |
-| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku, RedwoodSDK and SolidStart 2 (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
+| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku, RedwoodSDK, SolidStart 2 and Qwik (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
 | **Purser CSS** | In-process build and watch inside `withHypDriv` · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
 | **Operations** | Signed operator purge (`hypdriv purge`, `POST /_hypdriv/purge`) that clears every cache tier · signed audit tokens so audits pass your own bot shield · a production implementation guide for Cloudflare |
-| **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for twelve frameworks · a testing kit · an agent skill |
+| **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for thirteen frameworks · a testing kit · an agent skill |
 
 The full list, with baseline and upgrade behaviour per feature, is in [`docs/feature-catalog.md`](docs/feature-catalog.md).
 
@@ -89,6 +89,7 @@ The full list, with baseline and upgrade behaviour per feature, is in [`docs/fea
 | Waku 1 | `@hypdriv/waku` | Worker shell around Waku's adapter | Routing Middleware | Node server |
 | RedwoodSDK 1 | `@hypdriv/rwsdk` | Worker shell around `defineApp` | — | — |
 | SolidStart 2 | `@hypdriv/solid-start` | Worker shell (`@cloudflare/vite-plugin`) or Nitro | Routing Middleware | Nitro |
+| Qwik 2 (Qwik Router) | `@hypdriv/qwik` | Worker shell around Qwik Router | Routing Middleware | Node server |
 | Hono 4 | `@hypdriv/hono` | Worker (`export default app`) | Function (`export default app`) | `@hono/node-server` |
 
 Cloudflare and Vercel are the two first-class platforms ([ADR 0013](docs/adr/0013-deploy-targets.md)). Node is supported for local development, containers and self-hosting; capabilities that need a platform service report their baseline behaviour there.
@@ -99,7 +100,7 @@ Verification of each combination is recorded in [Preview status](#preview-status
 
 | Component | Requirement |
 | --- | --- |
-| Node.js | 20.9 or later for the core, runtime, Next.js, Cloudflare, Vercel packages and for the CLI. Vite packages need 20.19+, Astro and TanStack Start 22.12+, SvelteKit 22.17+, React Router 22.22+, vinext 22+, Waku 22.15+, RedwoodSDK 22.12+, SolidStart 22.12+ (SolidStart 2 itself declares Node 24). Loading a `hypdriv.config.ts` needs Node 22.13+ (22.18+ recommended); on older versions use `hypdriv.config.js` or `.mjs`. |
+| Node.js | 20.9 or later for the core, runtime, Next.js, Cloudflare, Vercel packages and for the CLI. Vite packages need 20.19+, Astro and TanStack Start 22.12+, SvelteKit 22.17+, React Router 22.22+, vinext 22+, Waku 22.15+, RedwoodSDK 22.12+, SolidStart 22.12+ (SolidStart 2 itself declares Node 24), Qwik 20.19+. Loading a `hypdriv.config.ts` needs Node 22.13+ (22.18+ recommended); on older versions use `hypdriv.config.js` or `.mjs`. |
 | Package manager | pnpm 10+ for this repository. Applications can use npm, pnpm, yarn or bun. |
 | Next.js | 16.0 or later (App Router first, Pages Router supported) with React 19.2+. Verified on 16.4. |
 | OpenNext for Cloudflare | `@opennextjs/cloudflare` 1.15+. Verified on 1.20. |
@@ -132,7 +133,7 @@ The bundle contains one tarball per package (`tarballs/`), `SHA256SUMS`, the ver
 
 `install.sh` verifies the checksums, copies the 16 tarballs a Next.js application needs into `vendor/hypdriv/` and runs `npm install --save` on them. Commit `vendor/hypdriv/` so CI can install the same bytes. Running the script from a newer bundle updates the application.
 
-Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 29 tarballs are not installed together, because `@hypdriv/vinext`, `@hypdriv/waku` and `@hypdriv/solid-start` declare peers on `vinext`, `waku` and `@solidjs/start`.
+Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 29 and 28 tarballs are not installed together, because `@hypdriv/vinext`, `@hypdriv/waku`, `@hypdriv/rwsdk`, `@hypdriv/solid-start` and `@hypdriv/qwik` declare peers on `vinext`, `waku`, `rwsdk`, `@solidjs/start` and `@qwik.dev/router`.
 
 ### From source
 
@@ -195,7 +196,7 @@ npx hypdriv doctor
 pnpm build                       # writes .hypdriv/manifest.json, CSP hashes and static headers for the target
 ```
 
-Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Hono](docs/guides/hono.md).
+Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md).
 
 ## How it attaches
 
@@ -320,7 +321,7 @@ The configuration is validated at build and run time with precise error messages
 
 ## Packages
 
-Twenty-seven packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re-exports the modules a Next.js application needs and ships the CLI.
+Twenty-eight packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re-exports the modules a Next.js application needs and ships the CLI.
 
 | Package | Purpose | Node |
 | --- | --- | --- |
@@ -350,6 +351,7 @@ Twenty-seven packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`@hypdriv/waku`](packages/waku) | Waku | ≥ 22.15 |
 | [`@hypdriv/rwsdk`](packages/rwsdk) | RedwoodSDK | ≥ 22.12 |
 | [`@hypdriv/solid-start`](packages/solid-start) | SolidStart 2 | ≥ 22.12 |
+| [`@hypdriv/qwik`](packages/qwik) | Qwik (Qwik Router, v2) | ≥ 20.19 |
 | [`@hypdriv/hono`](packages/hono) | Hono | ≥ 22.12 |
 | [`@hypdriv/cli`](packages/cli) | The `hypdriv` command | ≥ 20.9 |
 | [`create-hypdriv`](packages/create-hypdriv) | Scaffolder | ≥ 20.9 |
@@ -372,6 +374,7 @@ Twenty-seven packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`examples/waku`](examples/waku) | Waku 1 | Cloudflare, Vercel, Node | Adapter wrapper, `hyp()` in server components, rate-limited `_api` route |
 | [`examples/rwsdk`](examples/rwsdk) | RedwoodSDK 1 | Cloudflare | `withHypDriv(defineApp)`, nonce hand-off, `hyp()` in server components, rate-limited API route |
 | [`examples/solid-start`](examples/solid-start) | SolidStart 2 | Cloudflare, Vercel, Node | Nitro runtime plugin or Worker shell, `hypdrivStart()` nonce, Nitro-prerendered pages, `hyp()` in a server function, rate-limited API route |
+| [`examples/qwik`](examples/qwik) | Qwik 2 | Cloudflare, Vercel, Node | Router adapters and server entries, prerendered and dynamic pages, `onStaticGenerate` paths, endpoint |
 | [`examples/hono`](examples/hono) | Hono 4 | Cloudflare, Vercel, Node | `useHypDriv(app)` middleware, nonce in JSX, Durable Objects |
 
 The end-to-end suites in [`e2e/`](e2e) (`cloudflare`, `vercel`, `hosts`) run every capability against a real account.
@@ -398,7 +401,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | --- | --- |
 | Release | 0.1.0 Preview |
 | Implemented | Every capability in the [feature catalog](docs/feature-catalog.md) |
-| Unit and integration tests | 2,258 tests in 198 files on Node 22 and 24 |
+| Unit and integration tests | 2,405 tests in 213 files on Node 22 and 24 |
 | Live runs | Next.js on Cloudflare Workers and on Vercel; seven Vite hosts on Cloudflare Workers and on Vercel |
 | API stability | Not yet guaranteed. 1.0 will commit to the `defineConfig` schema, the manifest schema and semver |
 | Distribution | Source and release-bundle tarballs |
@@ -432,7 +435,7 @@ Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
 - **Concepts:** [Architecture](docs/architecture.md) · [Ecosystem: Purser CSS and SquawkCode](docs/ecosystem.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md) · [Preview status](docs/preview-status.md) · [Roadmap](docs/roadmap.md)
 - **Start:** [Getting started](docs/guides/getting-started.md) · [Configuration reference](docs/guides/configuration.md) · [CLI](docs/guides/cli.md)
 - **Platforms:** [Cloudflare](docs/guides/cloudflare.md) · [Production on Cloudflare](docs/guides/production-cloudflare.md) · [Vercel](docs/guides/vercel.md)
-- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Hono](docs/guides/hono.md)
+- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md)
 - **Capabilities:** [Caching](docs/guides/caching.md) · [Security](docs/guides/security.md) · [Observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [Flags](docs/guides/flags.md) · [Live channels](docs/guides/live.md) · [Jobs](docs/guides/jobs.md)
 - **Test reports:** [`docs/testing`](docs/testing)
 - **Coding agents:** [`AGENTS.md`](AGENTS.md) and [`skills/hypdriv`](skills/hypdriv/SKILL.md)

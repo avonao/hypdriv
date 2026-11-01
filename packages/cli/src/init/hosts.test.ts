@@ -67,6 +67,52 @@ export default defineConfig({
     expect(importsModule("import x from '@hypdriv/vite'", '@hypdriv/vite')).toBe(true);
     expect(importsModule("import x from '@hypdriv/vite/worker'", '@hypdriv/vite')).toBe(false);
   });
+
+  it('edits the object a function-form config returns', () => {
+    const last = { ...plugin, position: 'last' as const };
+    // The Qwik starter: a block body with a typed return.
+    const block = `import { defineConfig, type UserConfig } from 'vite';
+
+export default defineConfig(({ command, mode }): UserConfig => {
+  const dev = command === 'serve';
+  return {
+    plugins: [qwikRouter(), qwikVite(), tsconfigPaths({ root: '.' })],
+    server: { headers: { 'Cache-Control': 'public, max-age=0' } },
+  };
+});
+`;
+    const edited = addToConfigArray(block, last);
+    expect(edited.changed).toBe(true);
+    expect(edited.content).toContain("tsconfigPaths({ root: '.' }), hypdriv()]");
+    expect(edited.content).toContain("import { hypdriv } from '@hypdriv/vite';");
+
+    // An expression body, an async function expression and a parameter without parentheses.
+    expect(
+      addToConfigArray('export default defineConfig(({ mode }) => ({ plugins: [react()] }));', last).content,
+    ).toContain('plugins: [react(), hypdriv()]');
+    expect(
+      addToConfigArray(
+        'export default defineConfig(async function () {\n  const x = await load();\n  return { plugins: [] };\n});',
+        last,
+      ).content,
+    ).toContain('plugins: [hypdriv()]');
+    expect(addToConfigArray('export default defineConfig(env => ({ base: "/" }));', last).content).toContain(
+      'plugins: [hypdriv()]',
+    );
+
+    // The return of a nested function is not the config.
+    const nested =
+      'export default defineConfig(() => {\n  const f = () => { return { a: 1 }; };\n  return { plugins: [] };\n});';
+    const nestedEdit = addToConfigArray(nested, last).content;
+    expect(nestedEdit).toContain('return { plugins: [hypdriv()] }');
+    expect(nestedEdit).toContain('return { a: 1 }');
+
+    // Nothing to edit when the function does not return an object literal.
+    expect(addToConfigArray('export default defineConfig(() => buildConfig());', last)).toMatchObject({
+      changed: false,
+      reason: 'no exported config object found',
+    });
+  });
 });
 
 describe('hypdriv init (plain Vite)', () => {
@@ -895,5 +941,146 @@ describe('addHypdrivStart', () => {
     expect(addHypdrivStart('export default 1;').reason).toContain('no createHandler()');
     expect(addHypdrivStart('export default createHandler();').reason).toContain('no render function');
     expect(addHypdrivStart('export default createHandler(() => (').reason).toContain('could not parse');
+  });
+});
+
+describe('hypdriv init (Qwik)', () => {
+  async function init(files: Record<string, string>, platform: string) {
+    const p = tempProject(files);
+    const io = memoryIO(p.dir);
+    expect(await runCommand('init', ['--platform', platform, '--skip-doctor', '--json'], io)).toBe(0);
+    return {
+      p,
+      out: JSON.parse(io.out) as {
+        plan: Array<{ path: string; action: string; hint?: string }>;
+        notes: string[];
+      },
+    };
+  }
+
+  const qwik = {
+    'package.json': JSON.stringify({
+      name: 'qk',
+      devDependencies: { '@qwik.dev/core': '2.0.0-rc.4', '@qwik.dev/router': '2.0.0-rc.4', vite: '^8.3.5' },
+    }),
+    ...installed('@qwik.dev/core', '2.0.0-rc.4'),
+    ...installed('@qwik.dev/router', '2.0.0-rc.4'),
+    'vite.config.ts':
+      "import { qwikVite } from '@qwik.dev/core/optimizer';\nimport { qwikRouter } from '@qwik.dev/router/vite';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({\n  plugins: [qwikRouter(), qwikVite()],\n});\n",
+    'src/entry.ssr.tsx': 'export default null;\n',
+  };
+
+  it('Qwik: hypdriv() after qwikVite(), the Cloudflare adapter and entry, and the Worker settings', async () => {
+    const { p, out } = await init(qwik, 'cloudflare');
+    const config = p.read('vite.config.ts');
+    expect(config).toContain("import { hypdriv } from '@hypdriv/qwik';");
+    expect(config).toContain('plugins: [qwikRouter(), qwikVite(), hypdriv()]');
+    expect(p.read('adapters/cloudflare/vite.config.ts')).toContain(
+      "import { cloudflareAdapter } from '@hypdriv/qwik/adapters/cloudflare';",
+    );
+    expect(p.read('adapters/cloudflare/vite.config.ts')).toContain("input: ['src/entry.cloudflare.tsx']");
+    expect(p.read('src/entry.cloudflare.tsx')).toContain(
+      "import { createQwikRouter } from '@hypdriv/qwik/middleware/cloudflare';",
+    );
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler).toMatchObject({
+      main: './dist/_worker.js',
+      assets: { directory: './dist', run_worker_first: ['/*', '!/build/*', '!/assets/*'] },
+    });
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+    // Route loader data is application data that looks like a file: the Cloudflare config runs the pipeline for it.
+    expect(p.read('hypdriv.config.ts')).toContain('skipStaticAssets: false');
+    const pkg = JSON.parse(p.read('package.json')) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies['@hypdriv/qwik']).toBeDefined();
+    expect(pkg.scripts['build:cloudflare']).toBe(
+      'vite build && vite build -c adapters/cloudflare/vite.config.ts',
+    );
+    expect(pkg.scripts['hypdriv:audit']).toContain('8787');
+    expect(out.plan.find((i) => i.path === 'vite.config.ts')?.action).toBe('modify');
+  });
+
+  it('Qwik: the Vercel adapter builds into the Build Output, Node gets a server entry and a start script', async () => {
+    const vercel = await init(qwik, 'vercel');
+    expect(vercel.p.read('adapters/vercel/vite.config.ts')).toContain(
+      "outDir: '.vercel/output/functions/_qwik-router.func'",
+    );
+    expect(vercel.p.read('src/entry.vercel.tsx')).toContain('export default createQwikRouter({ render });');
+    expect(existsSync(join(vercel.p.dir, 'wrangler.jsonc'))).toBe(false);
+    expect(vercel.out.notes.join('\n')).toContain('.vercel/output');
+
+    const node = await init(qwik, 'node');
+    expect(node.p.read('src/entry.node.tsx')).toContain("from '@hypdriv/qwik/middleware/node'");
+    expect(node.p.read('src/entry.node.tsx')).toContain('createServer(listener)');
+    expect(JSON.parse(node.p.read('package.json')).scripts.start).toBe('node server/entry.node.js');
+    expect(node.p.read('hypdriv.config.ts')).toContain('skipStaticAssets: false');
+    expect(node.out.notes.join('\n')).toContain('server/entry.node.js');
+  });
+
+  it('Qwik: files that exist are not overwritten, and Qwik’s own adapters are called out', async () => {
+    const { p, out } = await init(
+      {
+        ...qwik,
+        'vite.config.ts':
+          "import { hypdriv } from '@hypdriv/qwik';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [hypdriv()] });\n",
+        'adapters/node-server/vite.config.ts':
+          "import { nodeServerAdapter } from '@qwik.dev/router/adapters/node-server/vite';\n",
+        'adapters/node/vite.config.ts': 'export default {};\n',
+        'src/entry.node.tsx': "import { createQwikRouter } from '@qwik.dev/router/middleware/node';\n",
+      },
+      'node',
+    );
+    expect(p.read('adapters/node/vite.config.ts')).toBe('export default {};\n');
+    expect(p.read('src/entry.node.tsx')).toContain('@qwik.dev/router/middleware/node');
+    expect(out.plan.find((i) => i.path === 'vite.config.ts')?.action).toBe('skip');
+    expect(out.plan.find((i) => i.path === 'adapters/node/vite.config.ts')?.action).toBe('manual');
+    expect(out.plan.find((i) => i.path === 'src/entry.node.tsx')?.action).toBe('manual');
+    expect(out.notes.join('\n')).toContain("adapters/node-server use Qwik's own adapter");
+  });
+
+  it('Qwik: registers hypdriv() in the starter’s function-form vite.config', async () => {
+    const { p, out } = await init(
+      {
+        ...qwik,
+        'vite.config.ts': `import { qwikVite } from "@qwik.dev/core/optimizer";
+import { qwikRouter } from "@qwik.dev/router/vite";
+import { defineConfig, type UserConfig } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
+
+export default defineConfig(({ command, mode }): UserConfig => {
+  return {
+    plugins: [qwikRouter(), qwikVite(), tsconfigPaths({ root: "." })],
+    optimizeDeps: { exclude: [] },
+  };
+});
+`,
+      },
+      'node',
+    );
+    expect(out.plan.find((i) => i.path === 'vite.config.ts')?.action).toBe('modify');
+    expect(p.read('vite.config.ts')).toContain('tsconfigPaths({ root: "." }), hypdriv()]');
+    expect(p.read('vite.config.ts')).toContain("import { hypdriv } from '@hypdriv/qwik';");
+  });
+
+  it('Qwik: a Qwik v1 project gets no edits, only the move to v2', async () => {
+    const { p, out } = await init(
+      {
+        'package.json': JSON.stringify({
+          name: 'qk1',
+          devDependencies: { '@builder.io/qwik-city': '1.20.3' },
+        }),
+        ...installed('@builder.io/qwik-city', '1.20.3'),
+        'vite.config.ts':
+          "import { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [] });\n",
+      },
+      'node',
+    );
+    const item = out.plan.find((i) => i.path === 'vite.config.ts');
+    expect(item?.action).toBe('manual');
+    expect(p.read('vite.config.ts')).not.toContain('hypdriv');
+    expect(existsSync(join(p.dir, 'adapters'))).toBe(false);
+    expect(JSON.stringify(out.plan)).toContain('qwik migrate-v2');
   });
 });

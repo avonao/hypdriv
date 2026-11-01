@@ -18,6 +18,7 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'waku',
   'rwsdk',
   'solid-start',
+  'qwik',
 ];
 
 /** Where each host registers Hypdriv, for messages. */
@@ -35,6 +36,7 @@ const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
   rwsdk: "hypdriv() after redwood() in vite.config.mts (import { hypdriv } from '@hypdriv/rwsdk')",
   'solid-start':
     "hypdriv() after solidStart() and nitro() in vite.config.ts (import { hypdriv } from '@hypdriv/solid-start/vite')",
+  qwik: "hypdriv() next to qwikVite() in vite.config.ts (import { hypdriv } from '@hypdriv/qwik')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */
@@ -63,6 +65,24 @@ function generatedWorkerEntry(root: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * The source of a Worker entry plus the modules it re-exports (`export * from "../server/entry.cloudflare.js"`, how
+ * a generated stub points at the server bundle), up to three levels deep.
+ */
+function workerSource(file: string, depth = 0): string {
+  let source: string;
+  try {
+    source = readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
+  if (depth >= 3) return source;
+  const targets = new Set<string>();
+  for (const match of source.matchAll(/\bexport\s+(?:\*|\{[^}]*\})\s+from\s+["'](\.{1,2}\/[^"']+)["']/g))
+    targets.add(join(file, '..', match[1] as string));
+  return [source, ...[...targets].map((target) => workerSource(target, depth + 1))].join('\n');
 }
 
 export const viteChecks: Check[] = [
@@ -217,7 +237,7 @@ export const viteChecks: Check[] = [
         return info(
           `main ${main} is generated at build time; make sure it exports ${bound.map((b) => b.class_name).join(', ')}.`,
         );
-      const source = readFileSync(entry, 'utf8');
+      const source = workerSource(entry);
       const missing = bound.filter(
         (b) => !source.includes(b.class_name ?? '') && !/durable-objects/.test(source),
       );

@@ -33,6 +33,9 @@ catalog:
   waku: 1.0.0-rc.4
   # RedwoodSDK host (@hypdriv/rwsdk)
   rwsdk: ^1.7.5
+  # Qwik host (@hypdriv/qwik): Qwik v2 (the `@qwik.dev/*` packages; stable v1 peers Vite < 8)
+  "@qwik.dev/core": 2.0.0-rc.4
+  "@qwik.dev/router": 2.0.0-rc.4
   # Vite hosts
   vite: ^8.3.5
   "@cloudflare/vite-plugin": ^1.66.0

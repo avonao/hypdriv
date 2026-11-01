@@ -1,6 +1,6 @@
 # Hypdriv with plain Vite apps
 
-`@hypdriv/vite` brings Hypdriv to Vite 8 apps without a server framework: single-page apps and multi-page static sites. The pipeline runs in front of the built files — on Cloudflare in a Worker that serves the static assets, on Vercel in Hypdriv's Routing Middleware, on Node in `hypdriv serve` — and every response the platform serves on its own carries Hypdriv's static header rules. Framework apps use their own package (`docs/guides/react-router.md`, `tanstack-start.md`, `astro.md`, `sveltekit.md`, `nuxt.md`, `vinext.md`, `waku.md`, `rwsdk.md`, `solid-start.md`), built on the same toolkit.
+`@hypdriv/vite` brings Hypdriv to Vite 8 apps without a server framework: single-page apps and multi-page static sites. The pipeline runs in front of the built files — on Cloudflare in a Worker that serves the static assets, on Vercel in Hypdriv's Routing Middleware, on Node in `hypdriv serve` — and every response the platform serves on its own carries Hypdriv's static header rules. Framework apps use their own package (`docs/guides/react-router.md`, `tanstack-start.md`, `astro.md`, `sveltekit.md`, `nuxt.md`, `vinext.md`, `waku.md`, `rwsdk.md`, `solid-start.md`, `qwik.md`), built on the same toolkit.
 
 ## Install
 

@@ -52,8 +52,8 @@ export interface HostSpec {
   /** Platform files (Worker entry, wrangler settings, Vercel config). */
   platform?: (ctx: HostContext) => void;
   scripts: (platform: InitPlatform) => Record<string, string>;
-  /** The production build command (default `vite build`). */
-  buildCommand?: string;
+  /** The production build command (default `vite build`), or one per platform. */
+  buildCommand?: string | ((platform: InitPlatform) => string);
   /** How to run the build locally for `hypdriv audit` (default: `vite preview` on Cloudflare, `hypdriv serve` on Node). */
   preview?: (platform: InitPlatform) => { url: string; via: string } | null;
 }
@@ -84,7 +84,14 @@ export default defineConfig({
     earlyHints: true,
     speculation: { prerender: { eagerness: 'moderate', topN: 3 } },
   },
-  observe: { vitals: { sink: 'log' } },
+  observe: { vitals: { sink: 'log' } },${
+    o.framework === 'qwik'
+      ? `
+  // Qwik route loader data (<page>/q-loader-<id>.<hash>.json) looks like a static file: run the pipeline for it on
+  // Cloudflare as well (it does for pages).
+  cloudflare: { skipStaticAssets: false },`
+      : ''
+  }
   // flags: { definitions: { newHero: { description: 'New landing hero', default: false } } },
   budgets: { routes: { '/**': { js: '300kb' } } },
 });
@@ -1712,6 +1719,173 @@ export const SOLID_START_SPEC: HostSpec = {
         : null,
 };
 
+const QWIK_ENTRY_NAMES = {
+  node: 'entry.node',
+  vercel: 'entry.vercel',
+  cloudflare: 'entry.cloudflare',
+} as const;
+
+/** `vite.config.ts` of a Qwik project without one: Qwik Router and Qwik with the Hypdriv plugin. */
+export function qwikViteConfigTemplate(): string {
+  return `import { hypdriv } from '@hypdriv/qwik';
+import { qwikVite } from '@qwik.dev/core/optimizer';
+import { qwikRouter } from '@qwik.dev/router/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [qwikRouter(), qwikVite(), hypdriv()],
+});
+`;
+}
+
+/** `adapters/<platform>/vite.config.ts`: the Hypdriv adapter of the platform's server build. */
+export function qwikAdapterTemplate(platform: InitPlatform): string {
+  const entry = `src/${QWIK_ENTRY_NAMES[platform]}.tsx`;
+  const build =
+    platform === 'vercel'
+      ? `  build: {
+    ssr: true,
+    rolldownOptions: { input: ['${entry}'] },
+    // The server build is the Build Output API function; the client build becomes .vercel/output/static.
+    outDir: '.vercel/output/functions/_qwik-router.func',
+  },`
+      : `  build: { ssr: true, rolldownOptions: { input: ['${entry}'] } },`;
+  return `import { ${platform}Adapter } from '@hypdriv/qwik/adapters/${platform}';
+import { extendConfig } from '@qwik.dev/router/vite';
+import baseConfig from '../../vite.config';
+
+export default extendConfig(baseConfig, () => ({
+${build}
+  // Pages render per request. To prerender them at build time (served as files under a hash-based CSP), opt in:
+  // ${platform}Adapter({ ssg: { include: ['/*'], exclude: ['/api/*'] } })
+  plugins: [${platform}Adapter()],
+}));
+`;
+}
+
+/** `src/entry.<platform>.tsx`: Qwik Router's request handler behind the Hypdriv Drivetrain. */
+export function qwikEntryTemplate(platform: InitPlatform): string {
+  if (platform === 'node')
+    return `import { createServer } from 'node:http';
+import { createQwikRouter } from '@hypdriv/qwik/middleware/node';
+import render from './entry.ssr';
+
+// Static files (the build and prerendered pages) and Qwik Router, behind the Hypdriv Drivetrain.
+const { listener } = createQwikRouter({ render });
+
+const port = Number(process.env.PORT ?? 3000);
+createServer(listener).listen(port, '0.0.0.0', () => {
+  console.log(\`Qwik listening on http://localhost:\${port}\`);
+});
+`;
+  return `import { createQwikRouter } from '@hypdriv/qwik/middleware/${platform}';
+import render from './entry.ssr';
+
+// ${platform === 'vercel' ? 'The Node.js function of the Build Output API: every request the CDN cannot answer from a file.' : "The Worker: the Hypdriv shell around Qwik Router's request handler (jobs, Durable Objects)."}
+export default createQwikRouter({ render });
+`;
+}
+
+export const QWIK_SPEC: HostSpec = {
+  framework: 'qwik',
+  buildCommand: (platform) => `npm run build:${platform}`,
+  packages: () => ['@hypdriv/qwik', '@hypdriv/core'],
+  install: (platform) => (platform === 'cloudflare' ? { devDependencies: ['wrangler'] } : {}),
+  register(ctx) {
+    const version = ctx.project.framework.version;
+    if (version && /^1\./.test(version)) {
+      ctx.items.push({
+        path: ctx.project.framework.configFile
+          ? rel(ctx.project.root, ctx.project.framework.configFile)
+          : 'vite.config.ts',
+        action: 'manual',
+        reason: `Qwik City ${version} (Qwik v1) is not supported; move to Qwik v2 first (\`qwik migrate-v2\`), then run init again`,
+        hint: "import { hypdriv } from '@hypdriv/qwik';\n// plugins: [qwikRouter(), qwikVite(), hypdriv()]",
+      });
+      return;
+    }
+    registerVitePlugins(
+      ctx,
+      [
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/qwik';",
+          from: '@hypdriv/qwik',
+        },
+      ],
+      { path: 'vite.config.ts', content: qwikViteConfigTemplate() },
+    );
+    const platform = ctx.platform;
+    planNewFile(ctx, `adapters/${platform}/vite.config.ts`, qwikAdapterTemplate(platform), {
+      uses: /@hypdriv\/qwik\/adapters\//,
+      reason: `Hypdriv ${platform} adapter: Qwik's static generation plus the ${platform} output`,
+      existing: `adapters/${platform}/vite.config.ts exists; use ${platform}Adapter() from '@hypdriv/qwik/adapters/${platform}'`,
+    });
+    planNewFile(ctx, `src/${QWIK_ENTRY_NAMES[platform]}.tsx`, qwikEntryTemplate(platform), {
+      uses: /@hypdriv\/qwik\/middleware\//,
+      reason: `${platform} server entry: Qwik Router behind the Hypdriv Drivetrain`,
+      existing: `src/${QWIK_ENTRY_NAMES[platform]}.tsx exists; create the router with createQwikRouter() from '@hypdriv/qwik/middleware/${platform}'`,
+    });
+    const own = ['node-server', 'cloudflare-pages', 'vercel-edge'].filter((name) =>
+      existsSync(join(ctx.project.root, 'adapters', name)),
+    );
+    if (own.length)
+      ctx.notes.push(
+        `adapters/${own.join(', adapters/')} use Qwik's own adapter: builds with it run Qwik's handler without the Hypdriv pipeline. Build with the ${platform} adapter above (\`npm run build:${platform}\`) and remove the others once you no longer need them.`,
+      );
+    ctx.notes.push(
+      `Qwik builds in two steps, the client build and then the server build with an adapter: \`npm run build:${platform}\` runs both. Make it the build command of your deployment.`,
+    );
+    if (platform === 'node')
+      ctx.notes.push(
+        'On Node, `node server/entry.node.js` serves the build (the PORT environment variable selects the port, 3000 by default). Behind a reverse proxy set `security.trustedProxies` in hypdriv.config.ts.',
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      // The Cloudflare adapter writes the Worker to dist/_worker.js; the client build in dist is the assets directory.
+      const assets = {
+        binding: 'ASSETS',
+        directory: './dist',
+        run_worker_first: ['/*', '!/build/*', '!/assets/*'],
+      };
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      planHostWrangler(ctx, {
+        main: configured ? null : './dist/_worker.js',
+        durableObjects: true,
+        assets: JSON.stringify(assets),
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main: './dist/_worker.js',
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            assets,
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        'The Hypdriv Vercel adapter writes .vercel/output (the function, the static files, header routes and a Routing Middleware so the request stages run for prerendered pages); `vercel deploy --prebuilt` deploys it, and a Git deployment needs the build command above.',
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    [`build:${platform}`]: `vite build && vite build -c adapters/${platform}/vite.config.ts`,
+    ...(platform === 'node' ? { start: 'node server/entry.node.js' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'node server/entry.node.js' }
+        : null,
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1725,6 +1899,7 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   waku: WAKU_SPEC,
   rwsdk: RWSDK_SPEC,
   'solid-start': SOLID_START_SPEC,
+  qwik: QWIK_SPEC,
 };
 
 /** The init plan for a Vite host. */
@@ -1826,7 +2001,7 @@ export function buildHostPlan(
   if (install.dependencies?.length) ctx.nextSteps.push(`${add} ${install.dependencies.join(' ')}`);
   if (install.devDependencies?.length) ctx.nextSteps.push(`${add} -D ${install.devDependencies.join(' ')}`);
   ctx.nextSteps.push(
-    `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}${spec?.buildCommand ?? 'vite build'} or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
+    `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}${typeof spec?.buildCommand === 'function' ? spec.buildCommand(options.platform) : (spec?.buildCommand ?? 'vite build')} or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
   );
   if (options.platform === 'cloudflare')
     ctx.nextSteps.push(

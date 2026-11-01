@@ -1,0 +1,34 @@
+{
+  "name": "@hypdriv/example-qwik",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode ssr",
+    "build": "node scripts/build.mjs",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare node scripts/build.mjs",
+    "build:vercel": "HYPDRIV_TARGET=vercel node scripts/build.mjs",
+    "build:node": "HYPDRIV_TARGET=node node scripts/build.mjs",
+    "start": "node server/entry.node.js",
+    "build.preview": "vite build --ssr src/entry.preview.tsx",
+    "preview": "pnpm build:node && pnpm build.preview && vite preview",
+    "preview:cloudflare": "wrangler dev --config wrangler.jsonc",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare node scripts/build.mjs && wrangler deploy --config wrangler.jsonc",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/qwik": "workspace:*",
+    "@qwik.dev/core": "catalog:",
+    "@qwik.dev/router": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

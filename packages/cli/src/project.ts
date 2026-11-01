@@ -55,6 +55,7 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   waku: '@hypdriv/waku',
   rwsdk: '@hypdriv/rwsdk',
   'solid-start': '@hypdriv/solid-start',
+  qwik: '@hypdriv/qwik',
 };
 
 /** Display names. */
@@ -71,6 +72,7 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   waku: 'Waku',
   rwsdk: 'RedwoodSDK',
   'solid-start': 'SolidStart',
+  qwik: 'Qwik',
   unknown: 'an unknown framework',
 };
 
@@ -100,6 +102,9 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   // Waku before Hono: Waku's server is a Hono app and its projects often depend on `hono` themselves.
   ['waku', 'waku'],
   ['solid-start', '@solidjs/start'],
+  // Qwik (v2: Qwik Router; v1, which Hypdriv does not support but the doctor names: Qwik City) before Hono and Vite.
+  ['qwik', '@qwik.dev/router'],
+  ['qwik', '@builder.io/qwik-city'],
   ['hono', 'hono'],
   // RedwoodSDK before Vite: its projects depend on `vite` themselves.
   ['rwsdk', 'rwsdk'],
@@ -140,6 +145,7 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
     'app.config.ts',
     'app.config.js',
   ],
+  qwik: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -776,6 +782,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/waku',
     '@hypdriv/rwsdk',
     '@hypdriv/solid-start',
+    '@hypdriv/qwik',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

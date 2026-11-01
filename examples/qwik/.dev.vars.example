@@ -1,0 +1,9 @@
+# Local secrets for the Worker in workerd (copy to .dev.vars); in production: `wrangler secret put <NAME>`.
+# Signs internal requests (jobs, `hypdriv audit` tokens). 32+ random bytes.
+HYPDRIV_INTERNAL_SECRET=
+# Encrypts Hypdriv sessions. 32+ random bytes.
+HYPDRIV_SESSION_SECRET=
+# Optional: zone cache purges (a token with Zone → Cache Purge) and Turnstile challenges.
+# CACHE_PURGE_ZONE_ID=
+# CACHE_PURGE_API_TOKEN=
+# TURNSTILE_SECRET_KEY=

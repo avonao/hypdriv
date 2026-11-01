@@ -24,6 +24,7 @@
 | [0020](0020-hono-host.md)              | Hono: a server-framework host without a build step                               | accepted |
 | [0021](0021-waku-host.md)              | Waku: a server-entry adapter for a Vite RSC framework                            | accepted |
 | [0022](0022-edge-experiments.md)       | Edge A/B experiments are flags with an `experiment` block                       | accepted |
+| [0023](0023-qwik-host.md)              | Qwik: Qwik Router adapters and server entries on Vite                            | accepted |
 | [0024](0024-solid-start-host.md)       | SolidStart 2: a Nitro runtime plugin and a Worker shell behind deployment plugins | accepted |
 | [0025](0025-rwsdk-host.md)             | RedwoodSDK: a Worker-entry wrapper for a Vite RSC framework on Workers           | accepted |
 | [0026](0026-portable-image-engine.md)  | Placeholders have a portable engine: built-in decoders, optional WASM codecs    | accepted |

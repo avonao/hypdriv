@@ -11,6 +11,7 @@ export type CheckCategory =
   | 'waku'
   | 'rwsdk'
   | 'solid-start'
+  | 'qwik'
   | 'hono'
   | 'opennext'
   | 'wrangler'
@@ -29,6 +30,7 @@ export const CHECK_CATEGORIES: CheckCategory[] = [
   'waku',
   'rwsdk',
   'solid-start',
+  'qwik',
   'hono',
   'opennext',
   'wrangler',
@@ -48,6 +50,7 @@ export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   waku: 'Waku host',
   rwsdk: 'RedwoodSDK host',
   'solid-start': 'SolidStart host',
+  qwik: 'Qwik host',
   hono: 'Hono app',
   opennext: 'OpenNext',
   wrangler: 'Wrangler',
