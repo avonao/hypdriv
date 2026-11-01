@@ -94,4 +94,4 @@ skills/hypdriv       agent skill for adopting Hypdriv in an application
 
 ## Dependency freshness
 
-`hypdriv deps` (also run daily by `.github/workflows/dependencies.yml`) reports outdated packages across the workspace. Apply patch/minor updates automatically; report majors with a migration proposal before applying.
+`hypdriv deps` (also run daily by `.github/workflows/dependencies.yml`) reports outdated packages across the workspace. Apply patch/minor updates automatically; report majors with a migration proposal before applying. Open majors and their trial results: `docs/dependency-majors.md`.

@@ -1,14 +1,6 @@
 import { defineConfig } from 'tsdown';
 
-export default defineConfig({
-  entry: {
-    index: 'src/index.ts',
-    hooks: 'src/hooks.ts',
-    server: 'src/server.ts',
-    worker: 'src/worker.ts',
-    'durable-objects': 'src/durable-objects.ts',
-    node: 'src/node/index.ts',
-  },
+const shared = {
   format: ['esm'],
   platform: 'neutral',
   target: 'es2023',
@@ -29,10 +21,32 @@ export default defineConfig({
   },
   dts: true,
   sourcemap: true,
-  clean: true,
   treeshake: true,
-  inputOptions: { optimization: { inlineConst: false } },
-  define: {
-    __HYPDRIV_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+} as const;
+
+export default defineConfig([
+  {
+    ...shared,
+    entry: {
+      index: 'src/index.ts',
+      hooks: 'src/hooks.ts',
+      server: 'src/server.ts',
+      worker: 'src/worker.ts',
+      node: 'src/node/index.ts',
+    },
+    clean: true,
+    inputOptions: { optimization: { inlineConst: false } },
+    define: {
+      __HYPDRIV_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+    },
   },
-});
+  {
+    // The Durable Object re-export is typed against the Workers sources it re-exports, so it is built from its own
+    // program (tsconfig.durable-objects.json adds the Workers types); TypeScript 7 emits declarations only for files
+    // that belong to the tsconfig, which tsconfig.json deliberately keeps this one out of.
+    ...shared,
+    entry: { 'durable-objects': 'src/durable-objects.ts' },
+    tsconfig: 'tsconfig.durable-objects.json',
+    clean: false,
+  },
+]);
