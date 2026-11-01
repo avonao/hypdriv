@@ -25,3 +25,4 @@
 | [0021](0021-waku-host.md)              | Waku: a server-entry adapter for a Vite RSC framework                            | accepted |
 | [0022](0022-edge-experiments.md)       | Edge A/B experiments are flags with an `experiment` block                       | accepted |
 | [0026](0026-portable-image-engine.md)  | Placeholders have a portable engine: built-in decoders, optional WASM codecs    | accepted |
+| [0027](0027-nitro-and-analog-hosts.md) | Nitro and Analog: one shared Nitro layer (Nitro 2 and 3), one Angular host      | accepted |
