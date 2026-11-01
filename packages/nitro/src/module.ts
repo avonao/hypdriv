@@ -52,6 +52,8 @@ import { type NitroRuntimeOptions, VIRTUAL_CLOUDFLARE_EXPORTS, VIRTUAL_OPTIONS }
 
 /** Nitro 3's virtual module with the exports of the Cloudflare development Worker (Vite builder). */
 const DEV_WORKER_EXPORTS = '#nitro/virtual/dev-worker-exports';
+/** The wrapper entry of the Cloudflare development Worker for the CLI builders (Rollup, Rolldown). */
+const VIRTUAL_DEV_ENTRY = '#hypdriv/cloudflare-dev-entry';
 
 /** The parts of a Nitro instance (Nitro 2 or Nitro 3) the module uses. */
 export interface NitroLike {
@@ -426,13 +428,26 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
   }
 
   // Nitro 3 runs the Cloudflare development server in miniflare with the bindings of wrangler.jsonc, whose Durable
-  // Objects the dev entry must export (the builtin dev exports only cover Nitro's own `$DurableObject`).
-  if (dev && major === 3 && nitro.options.builder === 'vite' && targetOfPreset(preset) === 'cloudflare') {
+  // Objects the dev entry must export (Nitro's own exports only cover its `$DurableObject`). With the Vite builder
+  // that is a virtual module the dev Worker re-exports; with the CLI builders the entry itself is wrapped.
+  if (dev && major === 3 && targetOfPreset(preset) === 'cloudflare') {
     nitro.hooks.hook('build:before', async () => {
-      const existing = nitro.options.virtual[DEV_WORKER_EXPORTS];
-      const builtin = typeof existing === 'function' ? await existing() : (existing ?? '');
-      nitro.options.virtual[DEV_WORKER_EXPORTS] =
-        `${builtin}${builtin && !builtin.endsWith('\n') ? '\n' : ''}${cloudflareExportsCode(exportsModule, durableObjectsEntry())}`;
+      if (nitro.options.builder === 'vite') {
+        const existing = nitro.options.virtual[DEV_WORKER_EXPORTS];
+        const builtin = typeof existing === 'function' ? await existing() : (existing ?? '');
+        nitro.options.virtual[DEV_WORKER_EXPORTS] =
+          `${builtin}${builtin && !builtin.endsWith('\n') ? '\n' : ''}${cloudflareExportsCode(exportsModule, durableObjectsEntry())}`;
+        return;
+      }
+      const original = nitro.options.entry;
+      if (!original || original === VIRTUAL_DEV_ENTRY) return;
+      nitro.options.virtual[VIRTUAL_DEV_ENTRY] = [
+        `export * from ${JSON.stringify(original)};`,
+        `export { default } from ${JSON.stringify(original)};`,
+        `export * from ${JSON.stringify(VIRTUAL_CLOUDFLARE_EXPORTS)};`,
+        '',
+      ].join('\n');
+      nitro.options.entry = VIRTUAL_DEV_ENTRY;
     });
   }
 

@@ -314,15 +314,28 @@ describe('the prerenderer and development', () => {
     );
   });
 
-  it('leaves the development Worker alone for Nitro 2, other builders and other platforms', async () => {
+  it('Nitro 3 with a CLI builder wraps the development entry instead', async () => {
+    const fake = fakeNitro({ major: 3, preset: 'cloudflare-dev', dev: true });
+    fake.nitro.options.builder = 'rolldown';
+    fake.nitro.options.entry = '#nitro/virtual/cloudflare-server-entry';
+    const { nitro, fire } = await setup(fake);
+    await fire('build:before');
+    expect(nitro.options.entry).toBe('#hypdriv/cloudflare-dev-entry');
+    const wrapper = await virtual(nitro, '#hypdriv/cloudflare-dev-entry');
+    expect(wrapper).toContain('export * from "#nitro/virtual/cloudflare-server-entry";');
+    expect(wrapper).toContain('export { default } from "#nitro/virtual/cloudflare-server-entry";');
+    expect(wrapper).toContain(`export * from ${JSON.stringify(VIRTUAL_CLOUDFLARE_EXPORTS)};`);
+    // A second build step does not wrap the wrapper.
+    await fire('build:before');
+    expect(await virtual(nitro, '#hypdriv/cloudflare-dev-entry')).toBe(wrapper);
+  });
+
+  it('leaves the development Worker alone for Nitro 2 and other platforms', async () => {
     for (const fake of [
       fakeNitro({ major: 2, preset: 'nitro-dev', dev: true }),
       fakeNitro({ major: 3, preset: 'node-dev', dev: true }),
     ])
       expect(Object.keys((await setup(fake)).hooks)).toEqual([]);
-    const other = fakeNitro({ major: 3, preset: 'cloudflare-dev', dev: true });
-    other.nitro.options.builder = 'rolldown';
-    expect(Object.keys((await setup(other)).hooks)).toEqual([]);
   });
 });
 
