@@ -299,6 +299,31 @@ describe('the prerenderer and development', () => {
     expect(code).toContain('analog');
     expect(existsSync(join(nitro.options.rootDir, '.hypdriv'))).toBe(false);
   });
+
+  it('Nitro 3 on Vite exports the Durable Objects from the Cloudflare development Worker (miniflare)', async () => {
+    const { nitro, hooks, fire } = await setup(fakeNitro({ major: 3, preset: 'cloudflare-dev', dev: true }));
+    expect(Object.keys(hooks)).toEqual(['build:before']);
+    // Nitro's own preset hook ran first and declared its `$DurableObject` export.
+    nitro.options.virtual['#nitro/virtual/dev-worker-exports'] =
+      'export { $DurableObject } from "/nitro/_durable";';
+    await fire('build:before');
+    const exports = await virtual(nitro, '#nitro/virtual/dev-worker-exports');
+    expect(exports).toContain('export { $DurableObject } from "/nitro/_durable";\n');
+    expect(exports).toMatch(
+      /export \{ HypDrivChannel, HypDrivIndex, HypDrivLimiter \} from .*durable-objects/,
+    );
+  });
+
+  it('leaves the development Worker alone for Nitro 2, other builders and other platforms', async () => {
+    for (const fake of [
+      fakeNitro({ major: 2, preset: 'nitro-dev', dev: true }),
+      fakeNitro({ major: 3, preset: 'node-dev', dev: true }),
+    ])
+      expect(Object.keys((await setup(fake)).hooks)).toEqual([]);
+    const other = fakeNitro({ major: 3, preset: 'cloudflare-dev', dev: true });
+    other.nitro.options.builder = 'rolldown';
+    expect(Object.keys((await setup(other)).hooks)).toEqual([]);
+  });
 });
 
 describe('the build', () => {

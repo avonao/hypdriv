@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { emptyManifest, loadConfig } from '@hypdriv/core';
 import { MANIFEST_SENTINEL_VALUE, manifestModuleCode, type ViteManifest } from '@hypdriv/vite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cloudflareEntryCode, cloudflareExportsCode } from './cloudflare';
+import { cloudflareEntryCode, cloudflareExportsCode, durableObjectsEntry } from './cloudflare';
 import {
   assertFinalized,
   completeNitroOutput,
@@ -331,5 +331,13 @@ describe('Worker entry sources', () => {
     expect(cloudflareExportsCode('/app/server/worker-exports.ts')).toContain(
       'export * from "/app/server/worker-exports.ts";',
     );
+  });
+
+  it('re-exports the Durable Objects from a resolved file, so the virtual module needs no dependency of the app', () => {
+    expect(cloudflareExportsCode(null, '/pkg/cloudflare/dist/durable-objects.js')).toBe(
+      'export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from "/pkg/cloudflare/dist/durable-objects.js";\n',
+    );
+    // Resolved from this package (an absolute file; the bare specifier only where it cannot be resolved).
+    expect(durableObjectsEntry()).toMatch(/durable-objects/);
   });
 });

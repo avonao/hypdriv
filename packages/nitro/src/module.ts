@@ -16,7 +16,12 @@ import {
   VIRTUAL_MANIFEST,
   type ViteManifest,
 } from '@hypdriv/vite';
-import { cloudflareEntryCode, cloudflareExportsCode, type NitroMajor } from './build/cloudflare';
+import {
+  cloudflareEntryCode,
+  cloudflareExportsCode,
+  durableObjectsEntry,
+  type NitroMajor,
+} from './build/cloudflare';
 import {
   assertFinalized,
   completeNitroOutput,
@@ -44,6 +49,9 @@ import {
   targetOfPreset,
 } from './build/targets';
 import { type NitroRuntimeOptions, VIRTUAL_CLOUDFLARE_EXPORTS, VIRTUAL_OPTIONS } from './runtime/options';
+
+/** Nitro 3's virtual module with the exports of the Cloudflare development Worker (Vite builder). */
+const DEV_WORKER_EXPORTS = '#nitro/virtual/dev-worker-exports';
 
 /** The parts of a Nitro instance (Nitro 2 or Nitro 3) the module uses. */
 export interface NitroLike {
@@ -350,7 +358,8 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     return manifestModuleCode(manifest as HypManifest);
   };
   nitro.options.virtual[VIRTUAL_OPTIONS] = () => `export default ${JSON.stringify(runtimeOptions())};\n`;
-  nitro.options.virtual[VIRTUAL_CLOUDFLARE_EXPORTS] = () => cloudflareExportsCode(exportsModule);
+  nitro.options.virtual[VIRTUAL_CLOUDFLARE_EXPORTS] = () =>
+    cloudflareExportsCode(exportsModule, durableObjectsEntry());
 
   // The runtime plugin. Nitro 3 runs plugins in order and an async one postpones the rest, so Hypdriv goes first.
   const plugin = runtimeFile(major === 3 ? 'nitro3/plugin' : 'nitro2/plugin');
@@ -414,6 +423,17 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     const entry = join(dir, 'cloudflare-entry.mjs');
     writeFileSync(entry, cloudflareEntryCode(worker, major));
     nitro.options.entry = entry;
+  }
+
+  // Nitro 3 runs the Cloudflare development server in miniflare with the bindings of wrangler.jsonc, whose Durable
+  // Objects the dev entry must export (the builtin dev exports only cover Nitro's own `$DurableObject`).
+  if (dev && major === 3 && nitro.options.builder === 'vite' && targetOfPreset(preset) === 'cloudflare') {
+    nitro.hooks.hook('build:before', async () => {
+      const existing = nitro.options.virtual[DEV_WORKER_EXPORTS];
+      const builtin = typeof existing === 'function' ? await existing() : (existing ?? '');
+      nitro.options.virtual[DEV_WORKER_EXPORTS] =
+        `${builtin}${builtin && !builtin.endsWith('\n') ? '\n' : ''}${cloudflareExportsCode(exportsModule, durableObjectsEntry())}`;
+    });
   }
 
   if (dev) return;
