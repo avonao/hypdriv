@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { escapeRegExp, runtimePackages, withExternal } from './nitro-config';
+import { bundledModules, escapeRegExp, runtimePackages, withExternal } from './nitro-config';
 
 describe('withExternal', () => {
   const cloudflare = /^cloudflare:/;
@@ -20,6 +20,32 @@ describe('withExternal', () => {
     expect(external('cloudflare:workers', undefined, false)).toBe(true);
     expect(external('own', undefined, false)).toBe(true);
     expect(external('other', undefined, false)).toBe(false);
+  });
+});
+
+describe('bundledModules', () => {
+  it('bundles the runtime directory and every @hypdriv package, including the workspace directory that holds them', () => {
+    expect(bundledModules('/repo/packages/nitro/dist')).toEqual([
+      '/repo/packages/nitro/dist',
+      '@hypdriv/',
+      '/repo/packages/',
+    ]);
+    expect(bundledModules('/repo/packages/nitro/src')).toContain('/repo/packages/');
+  });
+
+  it('adds the scope directory of an installed package', () => {
+    expect(bundledModules('/app/node_modules/@hypdriv/nitro/dist')).toEqual([
+      '/app/node_modules/@hypdriv/nitro/dist',
+      '@hypdriv/',
+      '/app/node_modules/@hypdriv/',
+    ]);
+  });
+
+  it('does not widen the match for other layouts', () => {
+    expect(bundledModules('/opt/vendor/hypdriv-nitro/dist')).toEqual([
+      '/opt/vendor/hypdriv-nitro/dist',
+      '@hypdriv/',
+    ]);
   });
 });
 

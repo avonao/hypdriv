@@ -159,7 +159,9 @@ describe('Nitro 3', () => {
     const { nitro } = await setup(fakeNitro({ major: 3 }));
     expect(nitro.options.plugins[0]).toMatch(/nitro3[\\/]plugin/);
     expect(nitro.options.plugins[1]).toBe('/app/plugins/own.ts');
-    expect(nitro.options.noExternals).toEqual(expect.arrayContaining(['@hypdriv/']));
+    expect(nitro.options.noExternals).toEqual(
+      expect.arrayContaining(['@hypdriv/', expect.stringMatching(/[\\/]packages[\\/]$/)]),
+    );
     expect(nitro.options.builtinModules).toEqual(['node:fs', 'cloudflare:workers']);
   });
 

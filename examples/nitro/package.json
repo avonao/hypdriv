@@ -1,0 +1,30 @@
+{
+  "name": "@hypdriv/example-nitro",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nitropack dev",
+    "build": "nitropack build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare nitropack build",
+    "build:vercel": "HYPDRIV_TARGET=vercel nitropack build",
+    "build:node": "HYPDRIV_TARGET=node nitropack build",
+    "start": "node .output/server/index.mjs",
+    "preview:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare nitropack build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/nitro": "workspace:*",
+    "h3": "catalog:",
+    "nitropack": "catalog:"
+  },
+  "devDependencies": {
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -25,6 +25,7 @@ import {
   type PrerenderedRoute,
 } from './build/finalize';
 import {
+  bundledModules,
   escapeRegExp,
   pushUnique,
   type RollupExternal,
@@ -318,8 +319,7 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     if (noExternals !== true) {
       nitro.options.noExternals = [
         ...(Array.isArray(noExternals) ? noExternals : []),
-        runtimeDir,
-        '@hypdriv/',
+        ...bundledModules(runtimeDir),
       ];
     }
     // `@hypdriv/runtime` imports `cloudflare:workers` lazily, only inside workerd.
@@ -331,7 +331,7 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     if (nitro.options.externals !== false) {
       nitro.options.externals ||= {};
       nitro.options.externals.inline ||= [];
-      nitro.options.externals.inline.push(runtimeDir, '@hypdriv/');
+      nitro.options.externals.inline.push(...bundledModules(runtimeDir));
     }
     nitro.options.rollupConfig ||= {};
     nitro.options.rollupConfig.external = withExternal(nitro.options.rollupConfig.external, /^cloudflare:/);

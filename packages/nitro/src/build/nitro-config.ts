@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { basename, dirname } from 'node:path';
 
 /** Rollup's `external` option in the forms Nitro accepts. */
 export type RollupExternal =
@@ -16,6 +17,22 @@ export function withExternal(existing: RollupExternal | undefined, pattern: RegE
   }
   const list = existing === undefined ? [] : Array.isArray(existing) ? existing : [existing];
   return [...list, pattern];
+}
+
+/**
+ * The module patterns Nitro must bundle for Hypdriv: this package's runtime directory, every `@hypdriv/*` package
+ * (matched by name in an installed `node_modules`) and the directory that holds them. The last matters in a
+ * workspace, where pnpm links packages and Nitro resolves them to real paths without `node_modules` in them (the
+ * name no longer matches) — the prerender build would then leave `@hypdriv/runtime` external and unresolvable from
+ * the application.
+ */
+export function bundledModules(runtimeDir: string): string[] {
+  const root = dirname(runtimeDir);
+  const scope = dirname(root);
+  const name = basename(scope);
+  const patterns = [runtimeDir, '@hypdriv/'];
+  if (name === 'packages' || name === '@hypdriv') patterns.push(`${scope}/`);
+  return patterns;
 }
 
 /** The entry files of the Hypdriv packages the server runtime imports, resolved from this module. */
