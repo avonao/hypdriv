@@ -1,6 +1,6 @@
 # Hypdriv — guidance for coding agents
 
-Hypdriv is the Hyper-Extension for Next.js 16+ and Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
+Hypdriv is the Hyper-Extension for Next.js 16+ and Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
 
 ## Posture
 
