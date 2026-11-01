@@ -543,6 +543,23 @@ const rootCheck = checkObjectShape({
         sink: checkEnum(['log', 'analytics-engine', 'none']),
         analyticsEngineBinding: checkString,
         attribution: checkBoolean,
+        dashboard: boolOr(
+          checkObjectShape({
+            tokenEnv: checkString,
+            accountIdEnv: checkString,
+            apiTokenEnv: checkString,
+            dataset: (v, p, o) => {
+              if (v === undefined) return;
+              if (typeof v !== 'string' || !/^[A-Za-z0-9_]+$/.test(v))
+                error(o, p, 'must be an Analytics Engine dataset name (letters, digits and underscores)');
+            },
+            datasetEnv: checkString,
+            days: checkNumber(1, 90),
+            cacheSeconds: checkNumber(0, 3600),
+            sessionMinutes: checkNumber(1, 1440),
+            memoryCapacity: checkNumber(0, 100_000),
+          }),
+        ),
       }),
     ),
     errors: checkObjectShape({ sink: checkEnum(['log', 'otlp', 'none']), includeStack: checkBoolean }),

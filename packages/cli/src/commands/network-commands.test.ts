@@ -350,6 +350,45 @@ describe('vitals', () => {
     });
   });
 
+  it('prints p75 over time with --trend, and the trend SQL with --sql', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'wrangler.jsonc':
+        '{ "analytics_engine_datasets": [{ "binding": "HYPDRIV_ANALYTICS", "dataset": "shop_vitals" }] }',
+    });
+    const { fetch, calls } = fakeFetch(() =>
+      response(
+        JSON.stringify({
+          data: [
+            { bucket: '2026-10-31 06:00:00', metric: 'LCP', p75: 2600, samples: 90 },
+            { bucket: '2026-10-31 00:00:00', metric: 'LCP', p75: 1900, samples: 80 },
+            { bucket: '2026-10-31 00:00:00', metric: 'CLS', p75: 0.31, samples: 70 },
+          ],
+        }),
+      ),
+    );
+    const env = { CF_ACCOUNT_ID: 'acc123', CF_API_TOKEN: 'tok' };
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('vitals', ['--trend', '--days', '3'], io)).toBe(0);
+    expect(calls[0]!.body).toContain("toStartOfInterval(timestamp, INTERVAL '6' HOUR)");
+    expect(io.out).toContain('2026-10-31 00:00');
+    expect(io.out.indexOf('2026-10-31 00:00')).toBeLessThan(io.out.indexOf('2026-10-31 06:00'));
+    expect(io.out).toContain('1900 ms');
+    expect(io.out).toContain('2600 ms');
+    expect(io.out).toContain('0.310');
+    const json = memoryIO(p.dir, { fetch, env });
+    await runCommand('vitals', ['--trend', '--json'], json);
+    expect(JSON.parse(json.out).trend[0]).toEqual({
+      bucket: '2026-10-31T00:00:00.000Z',
+      LCP: 1900,
+      CLS: 0.31,
+      samples: 80,
+    });
+    const sql = memoryIO(p.dir);
+    expect(await runCommand('vitals', ['--trend', '--sql'], sql)).toBe(0);
+    expect(sql.out).toContain('GROUP BY bucket, metric');
+  });
+
   it('degrades clearly without credentials or a dataset', async () => {
     const p = tempProject({
       'package.json': '{"name":"x"}',

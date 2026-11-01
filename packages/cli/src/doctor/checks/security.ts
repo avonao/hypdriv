@@ -108,6 +108,59 @@ export const securityChecks: Check[] = [
     },
   },
   {
+    id: 'security.dashboard-token',
+    title: 'Vitals dashboard access token',
+    category: 'security',
+    severity: 'warn',
+    run(ctx) {
+      const dashboard = ctx.config.resolved.observe.vitals?.dashboard;
+      if (!dashboard) return skip('observe.vitals.dashboard is off.');
+      const name = dashboard.tokenEnv;
+      const where = secretAvailable(ctx, name);
+      if (!where)
+        return warn(
+          `${name} is not set, so /_hypdriv/dash answers 404 to everyone (${setHint(ctx, name)}; \`openssl rand -base64 32\` makes a good one).`,
+        );
+      const length = ctx.project.devVars.lengths[name];
+      if (length !== undefined && length > 0 && length < 24)
+        return warn(
+          `${name} in .dev.vars is ${length} characters; the dashboard needs at least 24 and stays hidden otherwise.`,
+        );
+      return pass(`${name} available (${where}); /_hypdriv/dash is token protected.`);
+    },
+  },
+  {
+    id: 'security.dashboard-source',
+    title: 'Vitals dashboard data source',
+    category: 'security',
+    severity: 'info',
+    run(ctx) {
+      const vitals = ctx.config.resolved.observe.vitals;
+      const dashboard = vitals?.dashboard;
+      if (!vitals || !dashboard) return skip('observe.vitals.dashboard is off.');
+      if (ctx.project.platform !== 'cloudflare')
+        return info(
+          `The dashboard shows the measurements this server instance receives (Analytics Engine is a Cloudflare feature); on ${ctx.project.platform ?? 'this platform'} use Speed Insights or a log drain for site-wide numbers.`,
+        );
+      const missing = [
+        [dashboard.accountIdEnv, secretAvailable(ctx, dashboard.accountIdEnv)],
+        [dashboard.apiTokenEnv, secretAvailable(ctx, dashboard.apiTokenEnv)],
+        ...(dashboard.dataset ? [] : [[dashboard.datasetEnv, secretAvailable(ctx, dashboard.datasetEnv)]]),
+      ]
+        .filter(([, where]) => !where)
+        .map(([name]) => name);
+      if (missing.length)
+        return info(
+          `Set ${missing.join(', ')} for durable, site-wide numbers from Analytics Engine; until then the dashboard shows the measurements one Worker instance holds in memory.`,
+        );
+      if (vitals.sink !== 'analytics-engine')
+        return warn(
+          "The dashboard reads Analytics Engine, but observe.vitals.sink is not 'analytics-engine', so the dataset receives no measurements.",
+        );
+      return pass('The dashboard reads Workers Analytics Engine through its SQL API.');
+    },
+  },
+  {
     id: 'security.secret-strength',
     title: 'Secret length in .dev.vars',
     category: 'security',

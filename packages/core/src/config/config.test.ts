@@ -20,6 +20,29 @@ describe('resolveConfig', () => {
     expect(r.i18n).toBeNull();
   });
 
+  it('keeps the vitals dashboard off unless asked, with defaults when on', () => {
+    expect(resolveConfig({}).observe.vitals?.dashboard).toBeNull();
+    expect(resolveConfig({ observe: { vitals: true } }).observe.vitals?.dashboard).toBeNull();
+    expect(resolveConfig({ observe: { vitals: { dashboard: false } } }).observe.vitals?.dashboard).toBeNull();
+    expect(resolveConfig({ observe: { vitals: false } }).observe.vitals).toBeNull();
+    expect(resolveConfig({ observe: { vitals: { dashboard: true } } }).observe.vitals?.dashboard).toEqual({
+      tokenEnv: 'HYPDRIV_DASH_TOKEN',
+      accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID',
+      apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN',
+      dataset: null,
+      datasetEnv: 'HYPDRIV_ANALYTICS_DATASET',
+      days: 7,
+      cacheSeconds: 60,
+      sessionMinutes: 480,
+      memoryCapacity: 5000,
+    });
+    expect(
+      resolveConfig({
+        observe: { vitals: { dashboard: { dataset: 'shop_vitals', days: 30, memoryCapacity: 0 } } },
+      }).observe.vitals?.dashboard,
+    ).toMatchObject({ dataset: 'shop_vitals', days: 30, memoryCapacity: 0, cacheSeconds: 60 });
+  });
+
   it('parses durations and sizes', () => {
     const r = resolveConfig({
       cache: {
@@ -145,6 +168,36 @@ describe('validateConfig', () => {
     expect(d.some((x) => x.path === 'i18n.defaultLocale')).toBe(true);
     expect(d.some((x) => x.path === 'jobs.cron.bad.cron')).toBe(true);
     expect(d.some((x) => x.path === 'jobs.cron.bad.path')).toBe(true);
+  });
+
+  it('validates observe.vitals.dashboard', () => {
+    expect(
+      validateConfig({
+        observe: { vitals: { dashboard: { dataset: 'shop_vitals', days: 14, sessionMinutes: 60 } } },
+      }).filter((x) => x.severity === 'error'),
+    ).toEqual([]);
+    expect(
+      validateConfig({ observe: { vitals: { dashboard: true } } }).filter((x) => x.severity === 'error'),
+    ).toEqual([]);
+    const d = validateConfig({
+      observe: {
+        vitals: {
+          dashboard: {
+            dataset: 'not a dataset',
+            days: 400,
+            sessionMinutes: 5000,
+            cacheSeconds: -1,
+            tokenEnv: 3,
+          },
+        },
+      },
+    });
+    const paths = d.filter((x) => x.severity === 'error').map((x) => x.path);
+    for (const path of ['dataset', 'days', 'sessionMinutes', 'cacheSeconds', 'tokenEnv'])
+      expect(paths).toContain(`observe.vitals.dashboard.${path}`);
+    expect(
+      validateConfig({ observe: { vitals: { dashboard: 'yes' } } }).some((x) => x.severity === 'error'),
+    ).toBe(true);
   });
 
   it('rejects non-object input', () => {

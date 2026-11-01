@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "@hypdriv/core": "workspace:*",
+    "@hypdriv/observe": "workspace:*",
     "@hypdriv/security": "workspace:*",
     "@hypdriv/purser": "workspace:*",
     "@hypdriv/next": "workspace:*"

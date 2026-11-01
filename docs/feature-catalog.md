@@ -56,6 +56,7 @@ Legend: ✅ implemented in this repository · 🧪 implemented, needs end-to-end
 | Structured logging | Request-scoped JSON logs, redaction, sampling                                      | ✅       | —                                   | `observe`                      | ✅     |
 | Server-Timing      | Per-stage durations and outcomes                                                   | ✅       | —                                   | `core`, `observe`              | ✅     |
 | Web Vitals         | Beacon endpoint with route/cache attribution and p75 reporting                     | logs     | Analytics Engine + `hypdriv vitals` | `observe`, `cloudflare`, `cli` | ✅     |
+| Vitals dashboard   | Token-protected `/_hypdriv/dash`: p75, rating split, trends and per-route table      | memory   | Analytics Engine SQL API            | `observe`, `runtime`, `security` | ✅   |
 | Error hooks        | `instrumentation.ts` / `onRequestError` helpers                                    | ✅       | —                                   | `observe`, `next`              | ✅     |
 | DevTools HUD       | In-app panel showing timings, cache decisions, CSP mode, flags, Purser diagnostics | ✅       | —                                   | `devtools`                     | ✅     |
 

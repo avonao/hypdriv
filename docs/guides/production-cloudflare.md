@@ -455,6 +455,8 @@ A fleet creates its resources through its provisioning script, which reads the p
 | `HYPDRIV_INTERNAL_SECRET` | every Hypdriv Worker | ≥ 32 random bytes; signs Hypdriv's internal requests (HMAC over timestamp, method, path, body hash; 5-minute window) and is the key of the short-lived tokens of `hypdriv audit`, `warm` and `purge`; one per platform |
 | `CACHE_PURGE_ZONE_ID` | every Worker that purges | zone id of the served zone (not a secret in the cryptographic sense, but keep it with the token) |
 | `CACHE_PURGE_API_TOKEN` | same | token limited to Zone → Cache Purge on that one zone |
+| `HYPDRIV_DASH_TOKEN` | only with `observe.vitals.dashboard` | ≥ 24 random characters (`openssl rand -base64 32`); the access token of `/_hypdriv/dash`, which answers 404 without it |
+| `HYPDRIV_ANALYTICS_ACCOUNT_ID`, `HYPDRIV_ANALYTICS_API_TOKEN`, `HYPDRIV_ANALYTICS_DATASET` | only for site-wide numbers on the dashboard | account id, a token limited to Account → Account Analytics: Read, and the dataset behind `HYPDRIV_ANALYTICS`; without them the dashboard shows what one Worker instance holds in memory |
 | `OTLP_HEADERS` | only with the OTLP exporter | exporter auth header |
 | Turnstile secret | only with `bots` challenge actions | per the Turnstile widget |
 

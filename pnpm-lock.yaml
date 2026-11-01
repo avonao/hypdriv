@@ -1092,6 +1092,9 @@ importers:
       '@hypdriv/next':
         specifier: workspace:*
         version: link:../next
+      '@hypdriv/observe':
+        specifier: workspace:*
+        version: link:../observe
       '@hypdriv/purser':
         specifier: workspace:*
         version: link:../purser

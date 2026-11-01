@@ -87,6 +87,8 @@ const handleVitals = vitalsHandler({
 | CORS          | with `allowOrigin` (`*` or a comma-separated list): preflight `204` and `access-control-*` headers                                       |
 | response      | `204` with `cache-control: no-store`; `405` for other methods                                                                           |
 
+Reading vitals back: `vitalsSql`, `vitalsOverallSql`, `vitalsTrendSql` and `vitalsDistributionSql` build the Analytics Engine SQL for the layout `analyticsEngineVitalsSink` writes; `queryAnalyticsEngine()` runs it; `analyticsEngineVitalsSource({ accountId, apiToken, dataset })` and `memoryVitals()` are `VitalsSource`s returning a `VitalsSnapshot` (site-wide and per-route p75, rating split, trend); `cachedVitalsSource()` shares and reuses queries; `renderVitalsDashboard()` renders a snapshot as the script-free HTML page behind `/_hypdriv/dash`.
+
 Sinks: `logVitalsSink(log)` (one `vitals` line per metric, no ip), `analyticsEngineVitalsSink(binding)` (indexes `[route]`, blobs `[name, rating, pathname, navigationType, buildId, cache, country]`, doubles `[value, ts]`), `multiVitalsSink(sinks)`, `functionVitalsSink(fn)`.
 
 Client side (`@hypdriv/observe/client`, 3.5 kB minified, no runtime dependencies):

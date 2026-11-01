@@ -252,6 +252,17 @@ export interface ResolvedObserve {
     sink: 'log' | 'analytics-engine' | 'none';
     analyticsEngineBinding: string;
     attribution: boolean;
+    dashboard: null | {
+      tokenEnv: string;
+      accountIdEnv: string;
+      apiTokenEnv: string;
+      dataset: string | null;
+      datasetEnv: string;
+      days: number;
+      cacheSeconds: number;
+      sessionMinutes: number;
+      memoryCapacity: number;
+    };
   };
   errors: { sink: 'log' | 'otlp' | 'none'; includeStack: boolean };
 }

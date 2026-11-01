@@ -34,12 +34,18 @@ import {
 } from '@hypdriv/flags';
 import {
   analyticsEngineVitalsSink,
+  analyticsEngineVitalsSource,
+  cachedVitalsSource,
   createLogger,
   logVitalsSink,
+  type MemoryVitals,
+  memoryVitals,
+  multiVitalsSink,
   observeStage,
   requestIdStage,
   type Tracer,
   type VitalsSink,
+  type VitalsSource,
 } from '@hypdriv/observe';
 import { themeStage } from '@hypdriv/purser';
 import {
@@ -109,6 +115,10 @@ export interface Platform {
   flagsProvider: FlagProvider;
   tracer: Tracer | null;
   vitalsSink: VitalsSink | null;
+  /** Where the vitals dashboard reads from (`null` when `observe.vitals.dashboard` is off). */
+  vitalsSource: VitalsSource | null;
+  /** Setup hints for the dashboard, shown on its page (what to configure for durable storage). */
+  vitalsSourceNotes: string[];
   turnstileVerify: ((token: string, ip: string) => Promise<boolean>) | null;
   /** Cache engine instance (shared with `purgeEdge`). */
   edgeCache: ReturnType<typeof createEdgeCache> | null;
@@ -136,6 +146,7 @@ export interface CreatePlatformInput {
       | 'flagsProvider'
       | 'tracer'
       | 'vitalsSink'
+      | 'vitalsSource'
       | 'turnstileVerify'
       | 'capabilities'
     >
@@ -148,6 +159,56 @@ function flagsProviderFor(config: ResolvedConfig, env: HypDrivEnv, caps: Capabil
   if (f.provider === 'kv' && caps.kv)
     return kvProvider(env[f.kvBinding] as never, f.kvKey, f.definitions, f.refreshSeconds);
   return staticProvider(f.definitions);
+}
+
+/**
+ * Picks where the vitals dashboard reads from: Workers Analytics Engine through its SQL API when the account
+ * id, a read-only API token and the dataset name are all available, else a ring buffer of the measurements
+ * this instance receives. `notes` says what is missing for the durable option.
+ */
+function createVitalsDashboardSource(
+  config: ResolvedConfig,
+  env: HypDrivEnv,
+  log: Logger,
+  override: VitalsSource | null | undefined,
+): { source: VitalsSource | null; memory: MemoryVitals | null; notes: string[] } {
+  const vitals = config.observe.vitals;
+  const dashboard = vitals?.dashboard;
+  if (override !== undefined) return { source: override, memory: null, notes: [] };
+  if (!vitals || !dashboard) return { source: null, memory: null, notes: [] };
+  const accountId = readEnv(env, dashboard.accountIdEnv);
+  const apiToken = readEnv(env, dashboard.apiTokenEnv);
+  const dataset = dashboard.dataset ?? readEnv(env, dashboard.datasetEnv);
+  if (accountId && apiToken && dataset) {
+    try {
+      const notes =
+        vitals.sink === 'analytics-engine'
+          ? []
+          : [
+              "`observe.vitals.sink` is not 'analytics-engine', so no measurements reach the dataset this page reads. Set it to `analytics-engine` and bind `HYPDRIV_ANALYTICS`.",
+            ];
+      return {
+        source: cachedVitalsSource(analyticsEngineVitalsSource({ accountId, apiToken, dataset }), {
+          ttlSeconds: dashboard.cacheSeconds,
+        }),
+        memory: null,
+        notes,
+      };
+    } catch (err) {
+      log.warn('vitals dashboard: Analytics Engine source unavailable', { error: (err as Error).message });
+    }
+  }
+  const missing = [
+    !accountId ? `\`${dashboard.accountIdEnv}\`` : null,
+    !apiToken ? `\`${dashboard.apiTokenEnv}\` (Account Analytics: Read)` : null,
+    !dataset ? `\`${dashboard.datasetEnv}\` or \`observe.vitals.dashboard.dataset\`` : null,
+  ].filter((m): m is string => m !== null);
+  const notes = [
+    `For durable, site-wide numbers set ${missing.join(', ')}, and use \`observe.vitals.sink: 'analytics-engine'\` so the dataset receives the measurements.`,
+  ];
+  if (dashboard.memoryCapacity <= 0) return { source: null, memory: null, notes };
+  const memory = memoryVitals({ capacity: dashboard.memoryCapacity, sampleRate: vitals.sampleRate });
+  return { source: memory.source, memory, notes };
 }
 
 /** Assembles the platform: capabilities, stores, providers and the route matcher. */
@@ -199,7 +260,7 @@ export function createPlatform(input: CreatePlatformInput): Platform {
       ? input.overrides.tracer
       : createConfiguredTracer(config, env, capabilities);
   const vitals = config.observe.vitals;
-  const vitalsSink =
+  const configuredVitalsSink =
     input.overrides?.vitalsSink !== undefined
       ? input.overrides.vitalsSink
       : vitals
@@ -209,6 +270,7 @@ export function createPlatform(input: CreatePlatformInput): Platform {
             ? null
             : logVitalsSink(log)
         : null;
+  const dashboard = createVitalsDashboardSource(config, env, log, input.overrides?.vitalsSource);
   const turnstile = config.security.bots?.turnstile;
   const turnstileVerify =
     input.overrides?.turnstileVerify ??
@@ -252,7 +314,14 @@ export function createPlatform(input: CreatePlatformInput): Platform {
     rateLimitBinding,
     flagsProvider,
     tracer,
-    vitalsSink,
+    // The dashboard's in-memory fallback is fed next to the configured sink.
+    vitalsSink: dashboard.memory
+      ? multiVitalsSink(
+          configuredVitalsSink ? [configuredVitalsSink, dashboard.memory.sink] : [dashboard.memory.sink],
+        )
+      : configuredVitalsSink,
+    vitalsSource: dashboard.source,
+    vitalsSourceNotes: dashboard.notes,
     turnstileVerify,
     edgeCache,
   };

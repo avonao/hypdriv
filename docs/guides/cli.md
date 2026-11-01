@@ -18,7 +18,7 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv deps [--update safe|major] [--only <name>]` | Dependency freshness across the workspace (npm registry): patch/minor/major classification, optional updates. |
 | `hypdriv manifest [--validate]` | Prints or validates `.hypdriv/manifest.json`. |
 | `hypdriv jobs run <name> --url <base>` / `hypdriv jobs list` | Sends a signed internal request to a job route (`HYPDRIV_INTERNAL_SECRET`; on Vercel cron jobs as `GET` with `CRON_SECRET`). |
-| `hypdriv vitals [--days 7]` | p75 per route from Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`). |
+| `hypdriv vitals [--days 7] [--trend]` | p75 per route (or over time with `--trend`) from Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`). |
 | `hypdriv agent` | Prints agent guidance for this project (what is configured, what to run). |
 
 Add to CI:
@@ -63,7 +63,7 @@ The endpoint takes `{ "tags": [], "paths": [], "urls": [] }` (at most 200 entrie
 
 ## Catching accidental dynamic routes
 
-A single `cookies()`, `headers()` or uncached `fetch` turns a prerendered page into one rendered on every request. `hypdriv routes --diff` compares the build with the manifest of an earlier build (matched by route id) and fails when a route became more dynamic:
+A single `cookies()`, `headers()` or uncached `fetch` turns a prerendered page into one rendered on every request. `hypdriv routes --diff` compares the build with the manifest of an earlier build (matched by route id, or by path when only the route kind changed) and fails when a route became more dynamic:
 
 ```sh
 # on the default branch: keep the manifest of every build
@@ -76,9 +76,9 @@ hypdriv routes --diff main.json --weights --fail-on change --json   # JSON for a
 
 | Severity | Changes |
 | --- | --- |
-| regression | classification moved toward `dynamic` (`static` → `isr` → `shell` → `dynamic`; the note names an `ensureStatic` guard when the route has one); a static route lost its hash CSP; an edge cache policy was dropped; all prerendered paths of a route vanished; with `--weights`, client JS or CSS grew by more than the threshold (`--weight-threshold`, default 10 %, never under 1 KB) |
+| regression | classification moved toward `dynamic` (`static` → `isr` → `shell` → `dynamic`; the note names an `ensureStatic` guard when the route has one); a static route lost its hash CSP; an edge cache policy was dropped; all, or more than half, of a route's prerendered paths vanished; `revalidate` shrank by more than half (or went from never to a timer); with `--weights`, client JS or CSS grew by more than the threshold (`--weight-threshold`, default 10 %, never under 1 KB) |
 | improvement | the reverse of each regression |
-| info | routes added or removed, revalidate or cache policy changes, fewer prerendered paths |
+| info | routes added or removed, a route that changed kind (its other properties are not compared), smaller revalidate or cache policy changes, a few fewer prerendered paths |
 
-`--fail-on` chooses what exits 1: `regress` (default), any `change`, or `never`. The baseline is a `manifest.json` file or a directory holding `.hypdriv/manifest.json`; it works for every framework the manifest describes. `ensureStatic` guards a single route at build time; the diff guards the whole route table against changes nobody annotated.
+`--fail-on` chooses what exits 1: `regress` (default), any `change`, or `never`. The baseline is a `manifest.json` file or a directory holding `.hypdriv/manifest.json`; it works for every framework the manifest describes. A diff that cannot be made exits `2`, so a pipeline can tell it from a regression (`1`): a baseline that is missing, not JSON, not a Hypdriv manifest or cut down (no `csp`, `earlyHints` or `weights`), and a baseline that shares no route with the build (another app or base path; under `--fail-on never` it is a warning, in `--json` a `warnings` entry). `ensureStatic` guards a single route at build time; the diff guards the whole route table against changes nobody annotated.
 

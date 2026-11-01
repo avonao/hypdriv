@@ -4,6 +4,7 @@
  * the pipeline around any Web `fetch` handler on Cloudflare Workers, Vercel and Node.
  */
 
+export { REVALIDATE_HEADER } from '@hypdriv/cache';
 export { INDEX_SHARDS } from './cloudflare/constants';
 export {
   callDurableObject,

@@ -1,58 +1,29 @@
+import {
+  AnalyticsEngineQueryError,
+  parseBucketTime,
+  queryAnalyticsEngine,
+  rateVital as rateKnownVital,
+  trendBucketSeconds,
+  VITAL_NAMES,
+  type VitalName,
+  vitalsSql,
+  vitalsTrendSql,
+} from '@hypdriv/observe';
 import { CliError, createContext } from '../context';
 import { defineCommand } from './types';
 
-/** Web Vitals thresholds (good / poor) from web.dev. */
-export const VITAL_THRESHOLDS: Record<string, { good: number; poor: number; unit: 'ms' | '' }> = {
-  LCP: { good: 2500, poor: 4000, unit: 'ms' },
-  INP: { good: 200, poor: 500, unit: 'ms' },
-  CLS: { good: 0.1, poor: 0.25, unit: '' },
-  FCP: { good: 1800, poor: 3000, unit: 'ms' },
-  TTFB: { good: 800, poor: 1800, unit: 'ms' },
-};
+export { VITAL_NAMES, vitalsSql };
 
-/** The metrics `analyticsEngineVitalsSink` writes (blob1). */
-export const VITAL_NAMES = Object.keys(VITAL_THRESHOLDS);
-
+/** Rates a metric by name; `unknown` for anything the vitals sinks do not record. */
 export function rateVital(metric: string, value: number): 'good' | 'needs-improvement' | 'poor' | 'unknown' {
-  const t = VITAL_THRESHOLDS[metric];
-  if (!t) return 'unknown';
-  return value <= t.good ? 'good' : value <= t.poor ? 'needs-improvement' : 'poor';
+  return (VITAL_NAMES as readonly string[]).includes(metric)
+    ? rateKnownVital(metric as VitalName, value)
+    : 'unknown';
 }
 
-function sqlString(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-}
-
-/**
- * Analytics Engine SQL for p75 per route and metric over the vitals layout written by
- * `analyticsEngineVitalsSink` (index1 = route, blob1 = metric, blob2 = rating, blob3 = pathname,
- * double1 = value). Sampling is honoured through `_sample_interval` weights.
- */
-export function vitalsSql(
-  dataset: string,
-  options: { days: number; route?: string | null; limit?: number },
-): string {
-  if (!/^[A-Za-z0-9_]+$/.test(dataset))
-    throw new CliError(`invalid Analytics Engine dataset name "${dataset}"`);
-  const where = [
-    `timestamp > NOW() - INTERVAL '${Math.max(1, Math.floor(options.days))}' DAY`,
-    // Spans exported with \`tracing.exporter: 'analytics-engine'\` can share the dataset; only vitals rows count.
-    `blob1 IN (${VITAL_NAMES.map((n) => `'${n}'`).join(', ')})`,
-  ];
-  if (options.route)
-    where.push(`(index1 = ${sqlString(options.route)} OR blob3 = ${sqlString(options.route)})`);
-  return [
-    'SELECT index1 AS route, blob1 AS metric,',
-    '  quantileWeighted(0.75, double1, _sample_interval) AS p75,',
-    '  quantileWeighted(0.5, double1, _sample_interval) AS p50,',
-    '  SUM(_sample_interval) AS samples',
-    `FROM ${dataset}`,
-    `WHERE ${where.join(' AND ')}`,
-    'GROUP BY route, metric',
-    'ORDER BY samples DESC',
-    `LIMIT ${options.limit ?? 500}`,
-    'FORMAT JSON',
-  ].join('\n');
+/** Milliseconds for timings, three decimals for CLS (the table stays comparable across rows). */
+function formatMetric(metric: string, v: number): string {
+  return metric === 'CLS' ? v.toFixed(3) : `${Math.round(v)} ms`;
 }
 
 export interface VitalsRow {
@@ -67,7 +38,7 @@ export interface VitalsRow {
 export const vitalsCommand = defineCommand({
   name: 'vitals',
   summary: 'p75 Web Vitals per route and metric from Workers Analytics Engine (CF_ACCOUNT_ID, CF_API_TOKEN)',
-  usage: 'hypdriv vitals [--days 7] [--route <path>] [--dataset <name>]',
+  usage: 'hypdriv vitals [--days 7] [--route <path>] [--dataset <name>] [--trend]',
   options: {
     days: { type: 'string', value: '<n>', description: 'Look-back window in days', default: '7' },
     route: { type: 'string', value: '<path>', description: 'Only this route (route id/pattern or pathname)' },
@@ -76,14 +47,19 @@ export const vitalsCommand = defineCommand({
       value: '<name>',
       description: 'Dataset (default: from wrangler analytics_engine_datasets for HYPDRIV_ANALYTICS)',
     },
+    trend: {
+      type: 'boolean',
+      description: 'p75 over time (hourly, 6-hourly or daily buckets) instead of per route',
+    },
     sql: { type: 'boolean', description: 'Print the SQL and exit' },
   },
   examples: [
     'CF_ACCOUNT_ID=… CF_API_TOKEN=… hypdriv vitals --days 7',
     'hypdriv vitals --route /blog/[slug] --json',
+    'hypdriv vitals --trend --days 14',
   ],
   details:
-    'Needs a token with Account Analytics: Read. On Vercel, use Speed Insights (vitals are logged by the default sink).',
+    'Needs a token with Account Analytics: Read. On Vercel, use Speed Insights (vitals are logged by the default sink). The same numbers are on the token-protected /_hypdriv/dash page when observe.vitals.dashboard is on.',
   async run(args, io) {
     const ctx = createContext(args, io);
     const { ui } = ctx;
@@ -105,7 +81,11 @@ export const vitalsCommand = defineCommand({
           : `No Analytics Engine dataset bound as ${binding} in the wrangler config. Add \`"analytics_engine_datasets": [{ "binding": "${binding}", "dataset": "<name>" }]\`, set observe.vitals.sink: 'analytics-engine', or pass --dataset.`;
       throw new CliError(why);
     }
-    const sql = vitalsSql(dataset, { days, route });
+    const trend = args.boolean('trend');
+    const bucketSeconds = trendBucketSeconds(days);
+    const sql = trend
+      ? vitalsTrendSql(dataset, { days, route, bucketSeconds })
+      : vitalsSql(dataset, { days, route });
     if (args.boolean('sql')) {
       if (args.json) ui.printJson({ dataset, sql });
       else io.stdout.write(`${sql}\n`);
@@ -118,30 +98,20 @@ export const vitalsCommand = defineCommand({
         `Set ${!accountId ? 'CF_ACCOUNT_ID' : ''}${!accountId && !token ? ' and ' : ''}${!token ? 'CF_API_TOKEN (Account Analytics: Read)' : ''} to query Analytics Engine (dataset ${dataset}).`,
       );
     }
-    let res: Response;
-    try {
-      res = await io.fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/analytics_engine/sql`,
-        {
-          method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'text/plain' },
-          body: sql,
-          signal: AbortSignal.timeout(30_000),
-        },
-      );
-    } catch (err) {
-      throw new CliError(`Analytics Engine request failed: ${(err as Error).message}`);
-    }
-    const text = await res.text();
-    if (!res.ok) throw new CliError(`Analytics Engine returned ${res.status}: ${text.slice(0, 500)}`);
     let data: Array<Record<string, unknown>>;
     try {
-      data = ((JSON.parse(text) as { data?: Array<Record<string, unknown>> }).data ?? []) as Array<
-        Record<string, unknown>
-      >;
-    } catch {
-      throw new CliError(`unexpected Analytics Engine response: ${text.slice(0, 200)}`);
+      data = await queryAnalyticsEngine({
+        accountId,
+        apiToken: token,
+        sql,
+        fetch: io.fetch,
+        timeoutMs: 30_000,
+      });
+    } catch (err) {
+      if (err instanceof AnalyticsEngineQueryError) throw new CliError(err.message);
+      throw err;
     }
+    if (trend) return printTrend(ctx, data, { dataset, days, route });
     const rows: VitalsRow[] = data.map((d) => {
       const metric = String(d.metric ?? '');
       const p75 = Number(d.p75 ?? 0);
@@ -165,10 +135,9 @@ export const vitalsCommand = defineCommand({
       );
       return 0;
     }
-    const fmt = (metric: string, v: number) =>
-      VITAL_THRESHOLDS[metric]?.unit === '' ? v.toFixed(3) : `${Math.round(v)} ms`;
+    const fmt = formatMetric;
     const routes = [...new Set(rows.map((r) => r.route))];
-    const metrics = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
+    const metrics: readonly string[] = VITAL_NAMES;
     const cell = (r: VitalsRow | undefined) => {
       if (!r) return '—';
       const text = fmt(r.metric, r.p75);
@@ -200,3 +169,62 @@ export const vitalsCommand = defineCommand({
     return 0;
   },
 });
+
+function printTrend(
+  ctx: ReturnType<typeof createContext>,
+  data: Array<Record<string, unknown>>,
+  where: { dataset: string; days: number; route: string | null },
+): number {
+  const { ui } = ctx;
+  const buckets = new Map<number, Partial<Record<VitalName, number>> & { samples?: number }>();
+  for (const d of data) {
+    const t = parseBucketTime(d.bucket);
+    const metric = String(d.metric ?? '') as VitalName;
+    const p75 = Number(d.p75);
+    if (!Number.isFinite(t) || !Number.isFinite(p75) || !VITAL_NAMES.includes(metric)) continue;
+    const entry = buckets.get(t) ?? {};
+    entry[metric] = p75;
+    entry.samples = Math.max(entry.samples ?? 0, Math.round(Number(d.samples ?? 0)));
+    buckets.set(t, entry);
+  }
+  const points = [...buckets.entries()].sort((a, b) => a[0] - b[0]);
+  if (ctx.args.json) {
+    ui.printJson({
+      ...where,
+      trend: points.map(([t, v]) => ({ bucket: new Date(t).toISOString(), ...v })),
+    });
+    return 0;
+  }
+  ui.heading(
+    `Web Vitals p75 over time — last ${where.days} day(s) · dataset ${where.dataset}${where.route ? ` · ${where.route}` : ''}`,
+  );
+  if (!points.length) {
+    ui.note('No data points (is the vitals sink set to analytics-engine and <VitalsReporter /> rendered?).');
+    return 0;
+  }
+  ui.table(
+    points.map(([t, v]) => [
+      new Date(t).toISOString().slice(0, 16).replace('T', ' '),
+      ...VITAL_NAMES.map((m) => {
+        const value = v[m];
+        if (value === undefined) return '—';
+        const text = formatMetric(m, value);
+        const rating = rateKnownVital(m, value);
+        return rating === 'good'
+          ? ui.color.green(text)
+          : rating === 'poor'
+            ? ui.color.red(text)
+            : ui.color.yellow(text);
+      }),
+      String(v.samples ?? 0),
+    ]),
+    {
+      columns: [
+        'bucket (UTC)',
+        ...VITAL_NAMES.map((m) => ({ header: m, align: 'right' as const })),
+        { header: 'samples', align: 'right' },
+      ],
+    },
+  );
+  return 0;
+}

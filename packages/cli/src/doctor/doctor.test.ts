@@ -486,3 +486,73 @@ describe('wrangler environments', () => {
     expect(missing.byId['wrangler.config']?.message).toContain('no environment "nope"');
   });
 });
+
+describe('vitals dashboard checks', () => {
+  const cloudflare = (dashboard: string, extra: Record<string, string> = {}) =>
+    tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': WRANGLER_JSONC,
+      'hypdriv.config.ts': `export default { observe: { vitals: { ${dashboard} } } };\n`,
+      ...extra,
+    });
+  const ids = ['--only', 'security.dashboard-token,security.dashboard-source'];
+
+  it('stays out of the way while the dashboard is off', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': WRANGLER_JSONC,
+      'hypdriv.config.ts': 'export default { observe: { vitals: true } };\n',
+    });
+    const { byId } = await doctor(p.dir, ids);
+    expect(byId['security.dashboard-token']?.status).toBe('skip');
+    expect(byId['security.dashboard-source']?.status).toBe('skip');
+  });
+
+  it('warns that a missing access token hides the dashboard, and passes once it is set', async () => {
+    const p = cloudflare('dashboard: true');
+    const missing = (await doctor(p.dir, ids)).byId['security.dashboard-token'];
+    expect(missing?.status).toBe('warn');
+    expect(missing?.message).toContain('HYPDRIV_DASH_TOKEN');
+    expect(missing?.message).toContain('wrangler secret put HYPDRIV_DASH_TOKEN');
+    const set = (await doctor(p.dir, ids, { HYPDRIV_DASH_TOKEN: 'x'.repeat(40) })).byId[
+      'security.dashboard-token'
+    ];
+    expect(set?.status).toBe('pass');
+  });
+
+  it('flags a short token kept in .dev.vars', async () => {
+    const p = cloudflare('dashboard: true', {
+      '.dev.vars': 'HYPDRIV_DASH_TOKEN=short-token\n',
+      '.gitignore': '.dev.vars\n',
+    });
+    const check = (await doctor(p.dir, ids)).byId['security.dashboard-token'];
+    expect(check?.status).toBe('warn');
+    expect(check?.message).toContain('at least 24');
+  });
+
+  it('explains what durable numbers need, and catches a sink that never fills the dataset', async () => {
+    const p = cloudflare("dashboard: { dataset: 'shop_vitals' }");
+    const partial = (await doctor(p.dir, ids)).byId['security.dashboard-source'];
+    expect(partial).toMatchObject({ status: 'pass', informational: true });
+    expect(partial?.message).toContain('HYPDRIV_ANALYTICS_ACCOUNT_ID');
+    expect(partial?.message).toContain('HYPDRIV_ANALYTICS_API_TOKEN');
+    expect(partial?.message).not.toContain('HYPDRIV_ANALYTICS_DATASET');
+    const env = { HYPDRIV_ANALYTICS_ACCOUNT_ID: 'acc', HYPDRIV_ANALYTICS_API_TOKEN: 'tok' };
+    const wrongSink = (await doctor(p.dir, ids, env)).byId['security.dashboard-source'];
+    expect(wrongSink?.status).toBe('warn');
+    expect(wrongSink?.message).toContain("sink is not 'analytics-engine'");
+    const good = cloudflare("sink: 'analytics-engine', dashboard: { dataset: 'shop_vitals' }");
+    expect((await doctor(good.dir, ids, env)).byId['security.dashboard-source']?.status).toBe('pass');
+  });
+
+  it('says Analytics Engine is a Cloudflare feature on other platforms', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'vercel.json': '{}',
+      'hypdriv.config.ts': 'export default { observe: { vitals: { dashboard: true } } };\n',
+    });
+    const check = (await doctor(p.dir, ids)).byId['security.dashboard-source'];
+    expect(check).toMatchObject({ status: 'pass', informational: true });
+    expect(check?.message).toContain('Speed Insights');
+  });
+});

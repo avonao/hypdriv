@@ -253,7 +253,10 @@ describe('hypdriv init for framework hosts', () => {
     expect(await runCommand('init', ['--platform', platform, '--skip-doctor', '--json'], io)).toBe(0);
     return {
       p,
-      out: JSON.parse(io.out) as { plan: Array<{ path: string; action: string }>; notes: string[] },
+      out: JSON.parse(io.out) as {
+        plan: Array<{ path: string; action: string; hint?: string }>;
+        notes: string[];
+      },
     };
   }
 

@@ -445,6 +445,9 @@ function resolveObserve(input: HypDrivConfig['observe'], siteName: string): Reso
   const o = input ?? {};
   const tracing = obj<NonNullable<Exclude<typeof o.tracing, boolean>>>(o.tracing, true);
   const vitals = obj<NonNullable<Exclude<typeof o.vitals, boolean>>>(o.vitals, true);
+  const dashboard = vitals
+    ? obj<NonNullable<Exclude<typeof vitals.dashboard, boolean>>>(vitals.dashboard, false)
+    : null;
   return {
     tracing: tracing
       ? {
@@ -483,6 +486,19 @@ function resolveObserve(input: HypDrivConfig['observe'], siteName: string): Reso
           sink: vitals.sink ?? 'log',
           analyticsEngineBinding: vitals.analyticsEngineBinding ?? 'HYPDRIV_ANALYTICS',
           attribution: vitals.attribution ?? true,
+          dashboard: dashboard
+            ? {
+                tokenEnv: dashboard.tokenEnv ?? 'HYPDRIV_DASH_TOKEN',
+                accountIdEnv: dashboard.accountIdEnv ?? 'HYPDRIV_ANALYTICS_ACCOUNT_ID',
+                apiTokenEnv: dashboard.apiTokenEnv ?? 'HYPDRIV_ANALYTICS_API_TOKEN',
+                dataset: dashboard.dataset ?? null,
+                datasetEnv: dashboard.datasetEnv ?? 'HYPDRIV_ANALYTICS_DATASET',
+                days: dashboard.days ?? 7,
+                cacheSeconds: dashboard.cacheSeconds ?? 60,
+                sessionMinutes: dashboard.sessionMinutes ?? 480,
+                memoryCapacity: dashboard.memoryCapacity ?? 5000,
+              }
+            : null,
         }
       : null,
     errors: { sink: o.errors?.sink ?? 'log', includeStack: o.errors?.includeStack ?? true },

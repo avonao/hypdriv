@@ -288,7 +288,7 @@ Hypdriv's **edge cache** sits in front of Next.js and complements, never replace
 - **Tracing**: a minimal span model compatible with OpenTelemetry semantics (trace/span ids, W3C `traceparent` propagation, attributes, events, status). Exporters: console JSON (Workers Logs), OTLP/HTTP JSON (Honeycomb, Grafana, Axiom, Dash0, …), Analytics Engine data points. Spans flush in `waitUntil`; no SDK dependency.
 - **Logging**: structured JSON, request-scoped fields, secret redaction, sampling.
 - **Server-Timing**: every stage reports its duration and outcome (`cache;desc=HIT;dur=1.2`). In development the entries carry extra detail; the DevTools HUD reads them through `PerformanceNavigationTiming.serverTiming`, which needs no endpoint.
-- **Web Vitals**: a tiny client reporter (`useReportWebVitals` from `next/web-vitals`) beacons to `/_hypdriv/vitals` with route, build id and cache status attribution; sinks are Analytics Engine, logs or a custom function. `hypdriv vitals` prints p75 per route from Analytics Engine's SQL API.
+- **Web Vitals**: a tiny client reporter (`useReportWebVitals` from `next/web-vitals`) beacons to `/_hypdriv/vitals` with route, build id and cache status attribution; sinks are Analytics Engine, logs or a custom function. `hypdriv vitals` prints p75 per route from Analytics Engine's SQL API, and `observe.vitals.dashboard` serves the same numbers (plus rating split and trends) at the token-protected `/_hypdriv/dash`, from the SQL API or, without credentials, from a bounded in-memory buffer of the measurements one instance receives.
 - **Next.js hooks**: helpers for `instrumentation.ts` (`register`, `onRequestError`) and `instrumentation-client.ts`.
 
 ## 9. Purser CSS integration

@@ -468,6 +468,33 @@ export interface ObserveConfig {
         analyticsEngineBinding?: string;
         /** Include attribution (LCP element, INP target, CLS sources) (default true). */
         attribution?: boolean;
+        /**
+         * Token-protected dashboard at `/_hypdriv/dash`: p75 per metric and route, rating split and trends.
+         * Off by default. Reads Workers Analytics Engine through its SQL API when the account id, a read-only
+         * API token and the dataset are available, else the recent measurements this instance holds in memory.
+         */
+        dashboard?:
+          | boolean
+          | {
+              /** Env var holding the access token, 24+ characters (default `HYPDRIV_DASH_TOKEN`). */
+              tokenEnv?: string;
+              /** Env var holding the Cloudflare account id (default `HYPDRIV_ANALYTICS_ACCOUNT_ID`). */
+              accountIdEnv?: string;
+              /** Env var holding an API token with Account Analytics: Read (default `HYPDRIV_ANALYTICS_API_TOKEN`). */
+              apiTokenEnv?: string;
+              /** The Analytics Engine dataset behind the binding (`analytics_engine_datasets[].dataset`). */
+              dataset?: string;
+              /** Env var to read the dataset from when `dataset` is not set (default `HYPDRIV_ANALYTICS_DATASET`). */
+              datasetEnv?: string;
+              /** Default look-back window in days (default 7). */
+              days?: number;
+              /** How long a snapshot is reused, in seconds (default 60). */
+              cacheSeconds?: number;
+              /** Lifetime of the sign-in cookie in minutes (default 480, at most 1440). */
+              sessionMinutes?: number;
+              /** Measurements the in-memory fallback keeps (default 5000; 0 turns the fallback off). */
+              memoryCapacity?: number;
+            };
       };
   errors?: { sink?: 'log' | 'otlp' | 'none'; includeStack?: boolean };
 }

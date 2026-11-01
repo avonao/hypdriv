@@ -1,16 +1,34 @@
 import { getEdgePurger } from '@hypdriv/cache';
 import {
+  base64Encode,
   cacheVersion,
   describeCapabilities,
   frameworkLabel,
+  getCookie,
   HYPDRIV_VERSION,
   type HypDrivEnv,
   json,
   readEnv,
+  serializeCookie,
 } from '@hypdriv/core';
 import { createLiveHandler } from '@hypdriv/live';
-import { analyticsEngineVitalsSink, logVitalsSink, vitalsHandler } from '@hypdriv/observe';
-import { type CspReport, cspReportHandler, verifyPurgeToken } from '@hypdriv/security';
+import {
+  analyticsEngineVitalsSink,
+  logVitalsSink,
+  maskIp,
+  renderVitalsDashboard,
+  type VitalsSnapshot,
+  vitalsHandler,
+} from '@hypdriv/observe';
+import {
+  type CspReport,
+  cspReportHandler,
+  DASHBOARD_TOKEN_MIN_LENGTH,
+  signDashboardSession,
+  verifyDashboardSession,
+  verifyDashboardToken,
+  verifyPurgeToken,
+} from '@hypdriv/security';
 import type { Platform } from './index';
 
 export interface InternalRoutesOptions {
@@ -45,6 +63,20 @@ function cspReportSink(platform: Platform): (report: CspReport) => void {
       doubles: [1, report.ts ?? Date.now()],
     });
   };
+}
+
+/** The host names a request can claim: its URL's and the `Host` header's (proxies may rewrite either). */
+function requestHosts(request: Request, url: URL): Set<string> {
+  const hosts = new Set([url.hostname.toLowerCase()]);
+  const hostHeader = request.headers.get('host');
+  if (hostHeader)
+    hosts.add(
+      hostHeader
+        .replace(/:\d+$/, '')
+        .replace(/^\[|\]$/g, '')
+        .toLowerCase(),
+    );
+  return hosts;
 }
 
 const PURGE_MAX_ITEMS = 200;
@@ -83,15 +115,7 @@ async function purgeRoute(
     platform.config.security.internalAuth.secretEnv,
   );
   if (!secret || !token) return hidden();
-  const hosts = new Set([url.hostname.toLowerCase()]);
-  const hostHeader = request.headers.get('host');
-  if (hostHeader)
-    hosts.add(
-      hostHeader
-        .replace(/:\d+$/, '')
-        .replace(/^\[|\]$/g, '')
-        .toLowerCase(),
-    );
+  const hosts = requestHosts(request, url);
   let ok = false;
   for (const host of hosts) {
     if (await verifyPurgeToken(token, secret, { host })) {
@@ -142,6 +166,152 @@ async function purgeRoute(
     },
     { headers: noStore },
   );
+}
+
+const DASH_COOKIE = 'hypdriv-dash';
+const DASH_ROUTE_MAX = 200;
+
+function bearer(request: Request): string | null {
+  const header = request.headers.get('authorization');
+  const match = header ? /^Bearer\s+(\S+)$/i.exec(header) : null;
+  return match ? match[1]! : null;
+}
+
+function dashNonce(): string {
+  return base64Encode(globalThis.crypto.getRandomValues(new Uint8Array(16)));
+}
+
+/**
+ * `GET /_hypdriv/dash`: the vitals dashboard. It does not exist (404) for anyone without the access token
+ * (`HYPDRIV_DASH_TOKEN`, 24+ characters): `?token=` once, which answers with a redirect that strips it and sets
+ * a signed, host-bound, `HttpOnly` session cookie; or `Authorization: Bearer` for scripts. The page runs no
+ * script, carries its own strict CSP and is never cached.
+ */
+async function dashboardRoute(
+  platform: Platform,
+  request: Request,
+  url: URL,
+  info: { ip: string },
+  dashboardPath: string,
+): Promise<Response> {
+  const cfg = platform.config.observe.vitals?.dashboard;
+  const noStore = { 'cache-control': 'private, no-store', 'x-robots-tag': 'noindex, nofollow, noarchive' };
+  const hidden = () => json({ error: 'not_found' }, { status: 404, headers: noStore });
+  if (!cfg) return hidden();
+  const secret = readEnv(platform.env as Record<string, unknown>, cfg.tokenEnv);
+  if (!secret || secret.length < DASHBOARD_TOKEN_MIN_LENGTH) {
+    if (secret)
+      platform.log.warn(
+        `${cfg.tokenEnv} is shorter than ${DASHBOARD_TOKEN_MIN_LENGTH} characters; the vitals dashboard stays hidden`,
+      );
+    return hidden();
+  }
+  const secure = url.protocol === 'https:';
+  const cookieName = secure ? `__Secure-${DASH_COOKIE}` : DASH_COOKIE;
+  const hosts = requestHosts(request, url);
+
+  let authorised = false;
+  let attempted = false;
+  const header = bearer(request);
+  if (header) {
+    attempted = true;
+    authorised = await verifyDashboardToken(header, secret);
+  }
+  if (!authorised) {
+    const session = getCookie(request.headers, cookieName);
+    if (session) {
+      for (const host of hosts) {
+        if (await verifyDashboardSession(session, secret, { host })) {
+          authorised = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!authorised) {
+    const presented = url.searchParams.get('token');
+    if (presented !== null) {
+      attempted = true;
+      if (await verifyDashboardToken(presented, secret)) {
+        // Exchange the token for a session cookie and take it out of the address bar and the history.
+        const session = await signDashboardSession(secret, {
+          host: url.hostname,
+          ttlSeconds: cfg.sessionMinutes * 60,
+        });
+        const rest = new URLSearchParams(url.searchParams);
+        rest.delete('token');
+        const query = rest.toString();
+        const headers = new Headers({
+          ...noStore,
+          location: `${dashboardPath}${query ? `?${query}` : ''}`,
+          'referrer-policy': 'no-referrer',
+        });
+        headers.append(
+          'set-cookie',
+          serializeCookie(cookieName, session, {
+            path: dashboardPath,
+            httpOnly: true,
+            sameSite: 'strict',
+            secure,
+            maxAge: cfg.sessionMinutes * 60,
+          }),
+        );
+        return new Response(null, { status: 303, headers });
+      }
+    }
+  }
+  if (!authorised) {
+    if (attempted) platform.log.warn('invalid vitals dashboard token', { ip: maskIp(info.ip) });
+    return hidden();
+  }
+
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return new Response(null, { status: 405, headers: { ...noStore, allow: 'GET, HEAD' } });
+
+  const daysParam = Number(url.searchParams.get('days'));
+  const days = Number.isInteger(daysParam) && daysParam >= 1 && daysParam <= 90 ? daysParam : cfg.days;
+  const routeParam = url.searchParams.get('route')?.trim() ?? '';
+  const route = routeParam ? routeParam.slice(0, DASH_ROUTE_MAX) : null;
+  const wantsJson =
+    url.searchParams.get('format') === 'json' ||
+    (url.searchParams.get('format') === null &&
+      /\bapplication\/json\b/.test(request.headers.get('accept') ?? '') &&
+      !/\btext\/html\b/.test(request.headers.get('accept') ?? ''));
+
+  let snapshot: VitalsSnapshot | null = null;
+  let error: string | null = null;
+  if (platform.vitalsSource) {
+    try {
+      snapshot = await platform.vitalsSource.query({ days, route, signal: request.signal });
+    } catch (err) {
+      error = (err as Error).message;
+      platform.log.error('vitals dashboard query failed', { error });
+    }
+  }
+  const notes = [...platform.vitalsSourceNotes];
+  if (!platform.vitalsSource && !notes.length) notes.push('No vitals source is configured.');
+
+  if (wantsJson)
+    return json(
+      { ok: error === null && snapshot !== null, snapshot, error, notes },
+      { status: error ? 502 : snapshot ? 200 : 503, headers: noStore },
+    );
+
+  const nonce = dashNonce();
+  const html = renderVitalsDashboard(
+    { snapshot, error, days, route, notes },
+    { nonce, siteName: platform.config.site.name, path: dashboardPath },
+  );
+  return new Response(request.method === 'HEAD' ? null : html, {
+    status: error ? 502 : 200,
+    headers: {
+      ...noStore,
+      'content-type': 'text/html; charset=utf-8',
+      'content-security-policy': `default-src 'none'; style-src 'nonce-${nonce}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+    },
+  });
 }
 
 /** Builds the handler for `/_hypdriv/*`. Returns `null` for non-internal paths. */
@@ -226,6 +396,8 @@ export function internalRoutes(
       return csp(request);
     }
     if (path === `${prefix}/purge`) return purgeRoute(platform, request, url, info.purgeToken ?? undefined);
+    if (path === `${prefix}/dash` && vitalsConfig?.dashboard)
+      return dashboardRoute(platform, request, url, info, `${prefix}/dash`);
     if (live && (path === livePath || path.startsWith(`${livePath}/`))) {
       return live(request, { waitUntil: info.waitUntil });
     }

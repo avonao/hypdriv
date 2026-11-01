@@ -46,16 +46,62 @@ export {
   type TracerOptions,
 } from './trace/tracer';
 export {
+  renderVitalsDashboard,
+  type VitalsDashboardOptions,
+  type VitalsDashboardView,
+} from './vitals/dashboard';
+export {
   normalizeVitalsPayload,
   rateVital,
   VITALS_THRESHOLDS,
   type VitalsHandlerOptions,
   vitalsHandler,
 } from './vitals/handler';
+export { type MemoryVitals, type MemoryVitalsOptions, memoryVitals } from './vitals/memory';
+export {
+  AnalyticsEngineQueryError,
+  type AnalyticsEngineQueryOptions,
+  type AnalyticsEngineVitalsSourceOptions,
+  analyticsEngineVitalsSource,
+  type CachedVitalsSourceOptions,
+  cachedVitalsSource,
+  queryAnalyticsEngine,
+  type VitalsSqlOptions,
+  vitalsDistributionSql,
+  vitalsOverallSql,
+  vitalsSql,
+  vitalsTrendSql,
+} from './vitals/query';
 export {
   analyticsEngineVitalsSink,
   functionVitalsSink,
   logVitalsSink,
   multiVitalsSink,
 } from './vitals/sinks';
-export type { VitalName, VitalRating, VitalsContext, VitalsPayload, VitalsSink } from './vitals/types';
+export {
+  buildVitalsSnapshot,
+  formatVital,
+  parseBucketTime,
+  type SnapshotMeta,
+  trendBucketSeconds,
+  VITAL_LABELS,
+  VITAL_NAMES,
+  type VitalsRows,
+  weightedQuantile,
+} from './vitals/stats';
+export type {
+  VitalName,
+  VitalRating,
+  VitalStat,
+  VitalsContext,
+  VitalsDistribution,
+  VitalsOverall,
+  VitalsPayload,
+  VitalsQuery,
+  VitalsRouteSummary,
+  VitalsSink,
+  VitalsSnapshot,
+  VitalsSource,
+  VitalsSourceKind,
+  VitalsTrendPoint,
+} from './vitals/types';

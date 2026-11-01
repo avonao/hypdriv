@@ -50,7 +50,35 @@ Payloads include the route id, build id, navigation type, the `cache` status rea
 
 ```sh
 CF_ACCOUNT_ID=… CF_API_TOKEN=… npx hypdriv vitals --days 7      # p75 per route and metric
+CF_ACCOUNT_ID=… CF_API_TOKEN=… npx hypdriv vitals --trend        # p75 over time (hourly, 6-hourly or daily)
 ```
+
+### Dashboard
+
+`/_hypdriv/dash` is a server-rendered page with the site-wide p75 of every metric, the share of good / needs-improvement / poor measurements, a trend line per metric with the good and poor limits marked, and a table of p75 per route. Turn it on and set an access token:
+
+```ts
+// hypdriv.config.ts
+export default defineConfig({
+  observe: { vitals: { sink: 'analytics-engine', dashboard: true } },
+});
+```
+
+```sh
+openssl rand -base64 32 | npx wrangler secret put HYPDRIV_DASH_TOKEN
+```
+
+Open `https://example.com/_hypdriv/dash?token=<token>` once. The response redirects without the token in the address and sets a signed session cookie (`HttpOnly`, `SameSite=Strict`, bound to the host, valid for `sessionMinutes`, 8 hours by default); rotating the token signs everyone out. Scripts use `Authorization: Bearer <token>` and `?format=json` (or `Accept: application/json`). Without the token the route answers `404`, like `/_hypdriv/purge`; a token shorter than 24 characters keeps it hidden. `?days=1..90` and `?route=<id or pathname>` narrow the view.
+
+Where the numbers come from:
+
+| Data source | When | Covers |
+| --- | --- | --- |
+| Workers Analytics Engine, through its SQL API | `HYPDRIV_ANALYTICS_ACCOUNT_ID`, `HYPDRIV_ANALYTICS_API_TOKEN` (Account Analytics: Read) and the dataset (`dashboard.dataset` or `HYPDRIV_ANALYTICS_DATASET`) are set, and `sink: 'analytics-engine'` | all traffic, all instances; snapshots are reused for `cacheSeconds` (60) and concurrent viewers share one query |
+| Recent measurements in memory | anything is missing, or on Vercel and Node | the traffic of one server instance (`memoryCapacity` measurements, 5000 by default); the page labels it as partial data. Exact on a single long-lived Node process, a sample on Workers and Vercel |
+| Your own `VitalsSource` | `createHandler({ platform: { vitalsSource } })` in a custom host | whatever you query (Prometheus, a warehouse, a vendor API) |
+
+The page runs no script, has its own strict `Content-Security-Policy` (one `<style>` carrying a per-request nonce), is never cached (`private, no-store`) and is marked `noindex`; the API token never reaches the page or the logs, and a failing query shows a `502` page with the reason (for example a token without the right permission). `hypdriv doctor` checks the token, the secrets and the sink, and `hypdriv vitals --trend` prints the same trend in the terminal.
 
 ## Errors
 

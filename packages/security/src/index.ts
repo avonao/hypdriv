@@ -11,6 +11,7 @@ export * from './crypto';
 // CSP
 export * from './csp/index';
 export * from './csrf';
+export * from './dashboard-session';
 export * from './device';
 // Headers
 export * from './headers';

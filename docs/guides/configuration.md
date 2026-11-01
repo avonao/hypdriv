@@ -106,7 +106,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 - `tracing`: `{ exporter: 'console' | 'otlp' | 'analytics-engine' | 'none', serviceName, sampleRate: 1, otlp: { url, headers?, headersEnv?, timeout: '5s' }, analyticsEngineBinding: 'HYPDRIV_ANALYTICS', propagate: true }`
 - `logging`: `{ level: 'info', format: 'json', redact: [], sampleRate: 1, requests: true }`
 - `serverTiming`: `true` (auto: verbose in dev, compact in prod) | `'compact'` | `'verbose'` | `false`
-- `vitals`: `{ endpoint: '/_hypdriv/vitals', sampleRate: 1, sink: 'log' | 'analytics-engine' | 'none', attribution: true }`
+- `vitals`: `{ endpoint: '/_hypdriv/vitals', sampleRate: 1, sink: 'log' | 'analytics-engine' | 'none', attribution: true, dashboard?: true | { tokenEnv: 'HYPDRIV_DASH_TOKEN', accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID', apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN', dataset?, datasetEnv: 'HYPDRIV_ANALYTICS_DATASET', days: 7, cacheSeconds: 60, sessionMinutes: 480, memoryCapacity: 5000 } }` (the dashboard at `/_hypdriv/dash` is off by default; see the observability guide)
 - `errors`: `{ sink: 'log' | 'otlp' | 'none', includeStack: true }`
 
 ## `purser`
