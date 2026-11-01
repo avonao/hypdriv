@@ -47,6 +47,33 @@ export function withHeaders(
 ): Response {
   const headers = new Headers(response.headers);
   mergeHeaders(headers, extra);
+  return rebuildResponse(response, headers);
+}
+
+/** A protocol switch: status 101, or a Workers response that carries a `webSocket`. It has no body to rewrap. */
+export function isUpgradeResponse(response: Response): boolean {
+  return response.status === 101 || (response as { webSocket?: unknown }).webSocket != null;
+}
+
+/**
+ * A copy of the response with other headers; status, status text and the body stream stay. A WebSocket upgrade keeps
+ * its socket (Workers take it as `webSocket` in the init); where the runtime cannot construct a 101 response
+ * (Node), the original goes through unchanged: headers on a protocol switch are not worth failing the upgrade for.
+ */
+export function rebuildResponse(response: Response, headers: Headers): Response {
+  if (isUpgradeResponse(response)) {
+    const webSocket = (response as { webSocket?: unknown }).webSocket;
+    try {
+      return new Response(null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+        ...(webSocket ? { webSocket } : {}),
+      } as ResponseInit);
+    } catch {
+      return response;
+    }
+  }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -55,7 +82,7 @@ export function withoutHeaders(response: Response, names: string[]): Response {
   if (!names.some((n) => response.headers.has(n))) return response;
   const headers = new Headers(response.headers);
   for (const n of names) headers.delete(n);
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return rebuildResponse(response, headers);
 }
 
 /** Adds values to a comma-separated list header (`Vary`, `Cache-Tag`) without duplicates. */

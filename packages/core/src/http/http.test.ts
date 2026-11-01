@@ -4,12 +4,15 @@ import {
   appendLinkHeader,
   appendListHeader,
   clientIp,
+  isUpgradeResponse,
   mergeHeaders,
   negotiateLanguage,
   parseCacheControl,
   parseLink,
+  rebuildResponse,
   serializeLink,
   withHeaders,
+  withoutHeaders,
 } from './headers';
 import { json, peekText, problem } from './response';
 import { isTrackingParam, normalizeTrailingSlash, normalizeUrl, safeDecodePath, stripBasePath } from './url';
@@ -104,6 +107,40 @@ describe('headers', () => {
     expect(r.status).toBe(201);
     expect(r.headers.get('x-y')).toBe('z');
     expect(await r.text()).toBe('hi');
+  });
+});
+
+describe('upgrade responses', () => {
+  // Node cannot construct a 101 response, so a stand-in carries what a Workers upgrade response has.
+  const upgrade = () =>
+    ({
+      status: 101,
+      statusText: 'Switching Protocols',
+      headers: new Headers({ upgrade: 'websocket' }),
+      body: null,
+    }) as Response;
+
+  it('recognises a protocol switch and a response carrying a webSocket', () => {
+    expect(isUpgradeResponse(upgrade())).toBe(true);
+    expect(isUpgradeResponse(Object.assign(new Response('x'), { webSocket: {} }))).toBe(true);
+    expect(isUpgradeResponse(new Response('x'))).toBe(false);
+  });
+
+  it('hands the upgrade back instead of throwing when the runtime cannot rebuild it', () => {
+    const response = upgrade();
+    expect(withHeaders(response, { 'x-a': '1' })).toBe(response);
+    expect(withoutHeaders(response, ['upgrade'])).toBe(response);
+    expect(rebuildResponse(response, new Headers())).toBe(response);
+  });
+
+  it('still rebuilds ordinary responses with their body and status', async () => {
+    const out = withHeaders(new Response('body', { status: 203, headers: { a: '1' } }), { b: '2' });
+    expect([out.status, out.headers.get('a'), out.headers.get('b'), await out.text()]).toEqual([
+      203,
+      '1',
+      '2',
+      'body',
+    ]);
   });
 });
 

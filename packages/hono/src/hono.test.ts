@@ -476,11 +476,11 @@ describe('honoPattern()', () => {
     ['GET', '/users/:id', '/users/[id]'],
     ['GET', '/posts/:id{[0-9]+}', '/posts/[id]'],
     ['GET', '/:lang?/about', '/[[lang]]/about'],
-    ['GET', '/files/*', '/files/[...splat]'],
+    ['GET', '/files/*', '/files/[[...splat]]'],
     ['GET', '/a/*/b', '/a/[splat]/b'],
     ['POST', '/api/items', '/api/items'],
     ['ALL', '/health', '/health'],
-    ['GET', '*', '/[...splat]'],
+    ['GET', '*', '/[[...splat]]'],
   ])('%s %s → %s', (method, path, expected) => {
     expect(honoPattern(method, path)).toBe(expected);
   });
@@ -494,7 +494,35 @@ describe('honoPattern()', () => {
   });
 });
 
+describe('honoPattern() with the handler', () => {
+  it('lists a catch-all that answers by itself and skips one that passes on', () => {
+    const answers = (_c: unknown) => 'x';
+    const passes = (_c: unknown, _next: unknown) => 'x';
+    expect(honoPattern('ALL', '/proxy/*', answers)).toBe('/proxy/[[...splat]]');
+    expect(honoPattern('ALL', '/proxy/*', passes)).toBeNull();
+    expect(honoPattern('ALL', '/proxy/*')).toBeNull();
+  });
+});
+
 describe('honoManifest()', () => {
+  it('lists catch-all handlers and mounted apps, and matches the bare prefix too', () => {
+    const app = new Hono();
+    app.use('/api/*', async (_c, next) => next());
+    app.all('/proxy/*', (c) => c.text('proxied'));
+    app.get('/files/*', (c) => c.text('file'));
+    const manifest = honoManifest(app, { mounted: ['/legacy', '/docs/*'] });
+    const patterns = manifest.routes.map((r) => r.pathname);
+    expect(patterns).toEqual([
+      '/proxy/[[...splat]]',
+      '/files/[[...splat]]',
+      '/legacy/[[...splat]]',
+      '/docs/[[...splat]]',
+    ]);
+    const files = new RegExp(manifest.routes.find((r) => r.pathname === '/files/[[...splat]]')?.regex ?? '');
+    expect(['/files', '/files/a', '/files/a/b'].map((p) => files.test(p))).toEqual([true, true, true]);
+    expect(files.test('/filesystem')).toBe(false);
+  });
+
   it('lists one dynamic endpoint per path, skipping middleware', () => {
     const app = new Hono();
     app.use('*', async (_c, next) => next());

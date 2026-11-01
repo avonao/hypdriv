@@ -1,4 +1,4 @@
-import { isRscRequest, mergeHeaders, withRequestHeaders } from '../http/headers';
+import { isRscRequest, mergeHeaders, rebuildResponse, withRequestHeaders } from '../http/headers';
 import { isInternalPath } from '../http/url';
 import { toError } from '../util/errors';
 import type { HypContext } from './context';
@@ -112,11 +112,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Pipeline
   if (options.applyResponseHeaders !== false && hasEntries(ctx.responseHeaders)) {
     const headers = new Headers(response.headers);
     mergeHeaders(headers, ctx.responseHeaders);
-    response = new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
+    response = rebuildResponse(response, headers);
   }
 
   return { response, shortCircuitedBy, ran };

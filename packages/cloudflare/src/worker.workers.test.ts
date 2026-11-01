@@ -38,6 +38,22 @@ describe('createWorker in workerd', () => {
     ).toBeTruthy();
   });
 
+  it('passes a WebSocket upgrade through the stages untouched', async () => {
+    const response = await SELF.fetch('https://shop.example.com/ws', {
+      headers: { ...browser, upgrade: 'websocket' },
+    });
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    expect(socket).toBeTruthy();
+    socket!.accept();
+    const reply = new Promise<string>((resolve) =>
+      socket!.addEventListener('message', (event) => resolve(String(event.data))),
+    );
+    socket!.send('hello');
+    expect(await reply).toBe('echo:hello');
+    socket!.close();
+  });
+
   it('rate limits exactly through the HypDrivLimiter Durable Object', async () => {
     const headers = { ...browser, accept: 'application/json', 'cf-connecting-ip': '203.0.113.7' };
     const statuses: number[] = [];
@@ -56,6 +72,24 @@ describe('createWorker in workerd', () => {
     expect(body.ok).toBe(true);
     expect(body.build).toBe('workers-test');
     expect(body.capabilities.join(' ')).toMatch(/Durable Object/i);
+  });
+});
+
+describe('rebuilding a WebSocket upgrade response', () => {
+  it('keeps the socket when headers are added or removed', async () => {
+    const { withHeaders, withoutHeaders } = await import('@hypdriv/core');
+    const [client] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
+    const upgrade = new Response(null, { status: 101, webSocket: client, headers: { 'x-a': '1' } });
+    const added = withHeaders(upgrade, { 'x-b': '2' });
+    expect(added.status).toBe(101);
+    expect(added.webSocket).toBe(client);
+    const [other] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
+    const removed = withoutHeaders(
+      new Response(null, { status: 101, webSocket: other, headers: { 'x-a': '1' } }),
+      ['x-a'],
+    );
+    expect(removed.status).toBe(101);
+    expect(removed.webSocket).toBe(other);
   });
 });
 

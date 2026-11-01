@@ -29,7 +29,7 @@ export default app;
 
 ### Around the whole app
 
-`useHypDriv()` is middleware, so it cannot change the request the app sees. `wrapHono()` wraps the app's `fetch` instead and forwards the pipeline's request (sanitised headers, the stages' `x-hypdriv-*` headers). The result has the app's `fetch` signature:
+Both forms hand the app the pipeline's request (client-sent `x-hypdriv-*` headers removed, the stages' own headers added, the body intact). `useHypDriv()` is middleware: it replaces `c.req.raw` before the routes run. `wrapHono()` wraps the app's `fetch` instead, so it also sees requests no route or middleware answers. The result has the app's `fetch` signature:
 
 ```ts
 import { wrapHono } from '@hypdriv/hono';
@@ -66,7 +66,7 @@ app.get('/', (c) =>
 
 ## The route manifest
 
-Hono has no build step, so there is no build manifest. `useHypDriv()` and `wrapHono()` derive one from `app.routes` when the first request arrives: every route is a dynamic endpoint (`/users/:id` → `/users/[id]`, `/files/*` → `/files/[...splat]`, `:lang?` → `[[lang]]`), middleware registrations are skipped. The manifest gives route ids to rate limits, cache policies, flags and logs; `GET /_hypdriv/health` reports it. Pass `manifest` to use a build-time manifest instead.
+Hono has no build step, so there is no build manifest. `useHypDriv()` and `wrapHono()` derive one from `app.routes` when the first request arrives: every route is a dynamic endpoint (`/users/:id` → `/users/[id]`, `/files/*` → `/files/[[...splat]]`, which like Hono's wildcard also matches `/files` itself, `:lang?` → `[[lang]]`), middleware registrations (`app.use`, and an `app.all('/x/*')` handler that takes a `next`) are skipped. Hono registers `app.mount('/legacy', handler)` like middleware, so name mounted apps with `mounted: ['/legacy']` to list them as endpoints. Call `useHypDriv()` / `wrapHono()` on the root app: a sub-app registered with `app.route('/api', sub)` has paths without the prefix. The manifest gives route ids to rate limits, cache policies, flags and logs; `GET /_hypdriv/health` reports it. Pass `manifest` to use a build-time manifest instead.
 
 Consequences of "everything is rendered per request": the CSP is always in nonce mode (there are no static documents to hash), and edge caching is opt-in through `cache` policies in `hypdriv.config.ts`.
 
@@ -81,7 +81,9 @@ pnpm hypdriv audit all --url http://localhost:3000   # A+ headers, CSP mode, cac
 
 ## Limits
 
-- `useHypDriv()` cannot rewrite the request the app receives (a Hono middleware can only replace the response); use `wrapHono()` when a stage must.
+- `useHypDriv()` sits inside the app, so a request no route or middleware matches (a 404 from Hono's default handler) is answered by the app's `notFound`, still through the pipeline; `wrapHono()` is the form that does not depend on registration order.
+- WebSocket upgrades (`upgradeWebSocket()`, status 101) pass through the stages untouched: header stages never rebuild a protocol switch, and where the runtime cannot rebuild one (Node) the original response goes out as it is.
+- Stale-while-revalidate renders through the app (`useHypDriv(app)` and `wrapHono(app)` know it). A bare `app.use(hypdriv({ config }))` does not, so a stale page keeps being served and the log says why.
 - Static files served by `hono/serve-static` pass through the pipeline like any route; on Workers Static Assets answer before the Worker, so the zone's HTTPS redirect (not Hypdriv's `forceHttps`) covers plain-HTTP asset requests ([ADR 0019](../adr/0019-vite-hosts.md), item 11).
 - Live Cloudflare and Vercel runs of this host are pending (`e2e/hosts`); the Node and workerd runs are in the test suite and the example audit.
 

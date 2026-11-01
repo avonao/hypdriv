@@ -56,6 +56,13 @@ export default createWorker({
       async fetch(request: Request) {
         const url = new URL(request.url);
         if (url.pathname === '/api/ping') return Response.json({ pong: true });
+        if (url.pathname === '/ws') {
+          // A WebSocket endpoint, as a Hono `upgradeWebSocket()` or a Next.js custom route answers it.
+          const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
+          server.accept();
+          server.addEventListener('message', (event) => server.send(`echo:${String(event.data)}`));
+          return new Response(null, { status: 101, webSocket: client });
+        }
         return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
       },
     },

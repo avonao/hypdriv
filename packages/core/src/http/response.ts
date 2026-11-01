@@ -1,4 +1,4 @@
-import { mergeHeaders } from './headers';
+import { mergeHeaders, rebuildResponse } from './headers';
 
 export interface JsonResponseInit extends ResponseInit {
   /** Pretty-print (development). */
@@ -63,11 +63,8 @@ export function cloneResponse(
 ): Response {
   const headers = new Headers(response.headers);
   if (init.headers) mergeHeaders(headers, init.headers);
-  return new Response(response.body, {
-    status: init.status ?? response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  if (init.status === undefined || init.status === response.status) return rebuildResponse(response, headers);
+  return new Response(response.body, { status: init.status, statusText: response.statusText, headers });
 }
 
 /** Reads a response body as text without consuming the original (tees the stream). */

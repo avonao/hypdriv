@@ -5,6 +5,7 @@ import {
   parseDuration,
   type ResolvedConfig,
   type ResolvedSecurityHeaders,
+  rebuildResponse,
   type SecurityHeadersConfig,
   type Stage,
 } from '@hypdriv/core';
@@ -149,7 +150,7 @@ export function applySecurityHeaders(
     changed = true;
   }
   if (!changed) return response;
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return rebuildResponse(response, headers);
 }
 
 /**

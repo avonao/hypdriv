@@ -19,6 +19,7 @@ import {
   type ResolvedEdgeCachePolicy,
   type RouteMatch,
   type RouteMatcher,
+  rebuildResponse,
   SingleFlight,
   type Stage,
   silentLogger,
@@ -310,7 +311,7 @@ export function decorateResponse(response: Response, o: DecorateOptions): Respon
   }
   if (o.vary.length) appendListHeader(headers, 'vary', o.vary);
   if (o.policy && !headers.has('cache-control')) headers.set('cache-control', cacheControlFor(o.policy));
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return rebuildResponse(response, headers);
 }
 
 class EdgeCacheImpl implements EdgeCache {

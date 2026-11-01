@@ -28,11 +28,11 @@ export interface WrappedHonoApp {
  * The manifest is derived from the app's routes unless `options.manifest` says otherwise.
  */
 export function wrapHono(app: HonoAppLike, options: HypDrivHonoOptions): WrappedHonoApp {
-  const { config, manifest, host, app: _ignored, ...rest } = options;
+  const { config, manifest, host, mounted, app: _ignored, ...rest } = options;
   const handler = createHandler({
     ...rest,
     config,
-    manifest: manifest !== undefined ? manifest : () => honoManifest(app),
+    manifest: manifest !== undefined ? manifest : () => honoManifest(app, { mounted }),
     host: host ?? HOST_LABEL,
   });
   return {

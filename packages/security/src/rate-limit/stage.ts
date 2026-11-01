@@ -7,6 +7,7 @@ import {
   mergeHeaders,
   type ResolvedConfig,
   type ResolvedRateLimitPolicy,
+  rebuildResponse,
   type Stage,
   shortHash,
   stateKey,
@@ -143,11 +144,7 @@ export function rateLimitStage(config: ResolvedConfig, limiter: RateLimiter): St
       const headers = new Headers(response.headers);
       const built = rateLimitHeaders(pending.result, pending.policy.id, pending.now);
       for (const [name, value] of Object.entries(built)) if (!headers.has(name)) headers.set(name, value);
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
+      return rebuildResponse(response, headers);
     },
   });
 }

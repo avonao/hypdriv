@@ -33,6 +33,8 @@ export interface HypDrivHonoOptions extends Omit<CreateHandlerOptions, 'config' 
   manifest?: ManifestSource;
   /** The framework label (default `hono`). */
   host?: string;
+  /** Paths of apps mounted with `app.mount()`, listed in the derived manifest as endpoints (see `honoManifest`). */
+  mounted?: readonly string[];
   /**
    * The Hono app behind the middleware (`useHypDriv(app)` sets it). Background revalidation
    * (stale-while-revalidate) renders through `app.fetch`, because the request that served the stale entry is
@@ -148,7 +150,7 @@ function replaceResponse(c: Context, response: Response): void {
  * `wrapHono()` wraps the whole app and needs no such wiring.
  */
 export function hypdriv(options: HypDrivHonoOptions): HypDrivHonoMiddleware {
-  const { config, manifest, host, app, ...rest } = options;
+  const { config, manifest, host, app, mounted: _mounted, ...rest } = options;
   const handler = createHandler({
     ...rest,
     config,
@@ -198,7 +200,7 @@ export function useHypDriv(
   options: HypDrivHonoOptions,
 ): HypDrivHonoMiddleware {
   const middleware = hypdriv({
-    manifest: () => honoManifest(app),
+    manifest: () => honoManifest(app, { mounted: options.mounted }),
     app: app as unknown as AppFetch,
     ...options,
   });
