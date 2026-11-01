@@ -16,6 +16,8 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'nuxt',
   'vinext',
   'waku',
+  'nitro',
+  'analog',
 ];
 
 /** Where each host registers Hypdriv, for messages. */
@@ -30,6 +32,10 @@ const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
   nuxt: "modules: ['@hypdriv/nuxt'] in nuxt.config.ts",
   vinext: "the Hypdriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
   waku: "withHypDriv() around the config in waku.config.ts (import { withHypDriv } from '@hypdriv/waku')",
+  nitro:
+    "hypdrivNitro() in modules of nitro.config.ts (Nitro 2), or hypdriv() from '@hypdriv/nitro/vite' next to nitro() in vite.config.ts (Nitro 3)",
+  analog:
+    "withHypDriv() around the analog() options and hypdriv() in vite.config.ts (import from '@hypdriv/analog' and '@hypdriv/vite')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */
@@ -40,14 +46,19 @@ function builtHeaders(root: string): string[] {
     'dist/_headers',
     'build/client/_headers',
     '.output/public/_headers',
+    'dist/analog/public/_headers',
     '.svelte-kit/cloudflare/_headers',
   ];
   return candidates.map((c) => join(root, c)).filter((f) => existsSync(f));
 }
 
-/** The Worker entry a framework build generated with its own wrangler config (`.output/server/wrangler.json`). */
+/** The Worker entry a framework build generated with its own wrangler config (`.output/server/wrangler.json`, Analog's `dist/analog/server/wrangler.json`). */
 function generatedWorkerEntry(root: string): string | null {
-  for (const config of ['.output/server/wrangler.json', 'dist/server/wrangler.json']) {
+  for (const config of [
+    '.output/server/wrangler.json',
+    'dist/server/wrangler.json',
+    'dist/analog/server/wrangler.json',
+  ]) {
     const file = join(root, config);
     if (!existsSync(file)) continue;
     try {
@@ -184,9 +195,9 @@ export const viteChecks: Check[] = [
         // Frameworks whose build generates the Worker and its config (Nuxt/Nitro `cloudflare-module`).
         const generated = generatedWorkerEntry(ctx.root);
         if (generated) main = rel(ctx.root, generated);
-        else if (ctx.project.framework.name === 'nuxt')
+        else if (['nuxt', 'nitro', 'analog'].includes(ctx.project.framework.name))
           return info(
-            "The Worker entry is generated at build time (@hypdriv/nuxt with Nitro's cloudflare-module preset); build once to check its exports.",
+            `The Worker entry is generated at build time (${ctx.project.framework.integration} with Nitro's cloudflare-module preset); build once to check its exports.`,
           );
         else return warn('Durable Objects are bound but the Worker has no `main` that could export them.');
       }

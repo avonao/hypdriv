@@ -5,7 +5,13 @@ import type { LoadedConfig } from '../context';
 import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
 import { cloudflareConfigHint, defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
-import { addToConfigArray, configObjectStart, wrapCallArgument, wrapPropertyValue } from './config-edit';
+import {
+  addToConfigArray,
+  configObjectStart,
+  matchClose,
+  wrapCallArgument,
+  wrapPropertyValue,
+} from './config-edit';
 import { insertImport } from './next-config';
 import { editPackageJson } from './package-json';
 import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, planVercel } from './plan';
@@ -1290,6 +1296,251 @@ export const WAKU_SPEC: HostSpec = {
         : null,
 };
 
+const VITE_CONFIG_FILES = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'];
+const NITRO_CONFIG_FILES = ['nitro.config.ts', 'nitro.config.mts', 'nitro.config.js', 'nitro.config.mjs'];
+
+/** The `vite.config.*` of a Nitro 3 app on Vite (the one calling `nitro()`), or null. */
+function nitroViteConfig(ctx: HostContext): string | null {
+  for (const file of VITE_CONFIG_FILES) {
+    const path = join(ctx.project.root, file);
+    if (existsSync(path) && /(^|[^\w$.])nitro\s*\(/.test(ctx.read(path))) return file;
+  }
+  return null;
+}
+
+/** Whether a Nitro or Analog config selects Nitro's `cloudflare-module` preset. */
+function selectsCloudflareModule(ctx: HostContext, files: string[]): boolean {
+  return files.some((file) => {
+    const path = join(ctx.project.root, file);
+    return existsSync(path) && /cloudflare[-_]module/.test(ctx.read(path));
+  });
+}
+
+const NITRO_ASSETS = { html_handling: 'drop-trailing-slash', run_worker_first: ['/*', '!/assets/*'] };
+
+/** Cloudflare settings for a host whose Worker Nitro generates (`cloudflare: { deployConfig: true }`). */
+function planNitroWrangler(ctx: HostContext): void {
+  planHostWrangler(ctx, {
+    main: null,
+    durableObjects: true,
+    assets: JSON.stringify(NITRO_ASSETS),
+    template: () =>
+      wranglerJson({
+        $schema: 'node_modules/wrangler/config-schema.json',
+        name: ctx.name,
+        compatibility_date: defaultCompatibilityDate(ctx.now),
+        compatibility_flags: ['nodejs_compat'],
+        assets: NITRO_ASSETS,
+        observability: { enabled: true },
+        durable_objects: { bindings: HYPDRIV_DO },
+        migrations: HYPDRIV_MIGRATION,
+      }),
+  });
+}
+
+export const NITRO_SPEC: HostSpec = {
+  framework: 'nitro',
+  packages: () => ['@hypdriv/nitro', '@hypdriv/core'],
+  install: (platform) => (platform === 'cloudflare' ? { devDependencies: ['wrangler'] } : {}),
+  register(ctx) {
+    const viteConfig = nitroViteConfig(ctx);
+    if (viteConfig)
+      // Nitro 3 on Vite: `nitro()` registers any Vite plugin that carries a `nitro` key as a Nitro module.
+      registerInConfig(
+        ctx,
+        [
+          {
+            element: 'hypdriv()',
+            importLine: "import { hypdriv } from '@hypdriv/nitro/vite';",
+            from: '@hypdriv/nitro/vite',
+            position: 'last',
+          },
+        ],
+        {
+          file: /vite\.config\./,
+          property: 'plugins',
+          fallback: { path: viteConfig, content: '' },
+        },
+      );
+    else {
+      // Nitro 2, or Nitro 3 without Vite: a module in `nitro.config.*`.
+      const deps = { ...ctx.project.packageJson?.dependencies, ...ctx.project.packageJson?.devDependencies };
+      const nitro3 = 'nitro' in deps && !('nitropack' in deps);
+      registerInConfig(
+        ctx,
+        [
+          {
+            element: 'hypdrivNitro()',
+            importLine: "import { hypdrivNitro } from '@hypdriv/nitro';",
+            from: '@hypdriv/nitro',
+            position: 'last',
+          },
+        ],
+        {
+          file: /nitro\.config\./,
+          property: 'modules',
+          fallback: {
+            path: 'nitro.config.ts',
+            content: nitro3
+              ? "import { hypdrivNitro } from '@hypdriv/nitro';\nimport { defineConfig } from 'nitro';\n\nexport default defineConfig({\n  modules: [hypdrivNitro()],\n});\n"
+              : "import { hypdrivNitro } from '@hypdriv/nitro';\nimport { defineNitroConfig } from 'nitropack/config';\n\nexport default defineNitroConfig({\n  modules: [hypdrivNitro()],\n});\n",
+          },
+        },
+      );
+    }
+    if (
+      ctx.platform === 'cloudflare' &&
+      !selectsCloudflareModule(ctx, [...NITRO_CONFIG_FILES, ...VITE_CONFIG_FILES])
+    )
+      ctx.notes.push(
+        "Build for Workers with Nitro's `cloudflare-module` preset and `cloudflare: { deployConfig: true }`: Hypdriv's module then puts its Worker shell (jobs, Durable Objects) around Nitro and Nitro writes the Worker's wrangler config.",
+      );
+    if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "Nitro's `vercel` preset (the default when VERCEL=1) writes .vercel/output; Hypdriv adds its header routes and a Routing Middleware so the request stages run for prerendered pages too.",
+      );
+    if (ctx.platform === 'node')
+      ctx.notes.push(
+        'Behind a reverse proxy set `security.trustedProxies` in hypdriv.config.ts so client addresses (rate limits, geo) come from the proxy header.',
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') planNitroWrangler(ctx);
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node .output/server/index.mjs' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev --config .output/server/wrangler.json' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'node .output/server/index.mjs' }
+        : null,
+};
+
+/** Adds `provideHypDriv()` to the first `providers` array of Angular's server application config. */
+function addAnalogServerProvider(source: string): { changed: boolean; content: string; reason: string } {
+  const providers = /\bproviders\s*:\s*\[/.exec(source);
+  if (!providers) return { changed: false, content: source, reason: 'no providers array found' };
+  const open = providers.index + providers[0].length - 1;
+  const close = matchClose(source, open);
+  if (close === -1) return { changed: false, content: source, reason: 'could not parse the providers array' };
+  const inner = source.slice(open + 1, close);
+  const trimmed = inner.replace(/\s*$/, '');
+  const tail = inner.slice(trimmed.length);
+  const element = 'provideHypDriv()';
+  let out: string;
+  if (!trimmed.trim()) out = `${source.slice(0, open + 1)}${element}${source.slice(close)}`;
+  else {
+    const multiline = trimmed.includes('\n');
+    const indent = multiline ? (/\n([ \t]*)[^\n]*$/.exec(trimmed)?.[1] ?? '') : '';
+    const comma = trimmed.endsWith(',') ? '' : ',';
+    out = `${source.slice(0, open + 1)}${trimmed}${comma}${multiline ? `\n${indent}` : ' '}${element}${tail}${source.slice(close)}`;
+  }
+  return {
+    changed: true,
+    content: insertImport(out, "import { provideHypDriv } from '@hypdriv/analog/angular/server';", 'esm'),
+    reason: 'provide the Hypdriv request context and CSP nonce to Angular',
+  };
+}
+
+/** Merges separate `import { a } from 'm'; import { b } from 'm';` lines (one per edit) into `import { a, b } from 'm';`. */
+function mergeNamedImports(source: string, module: string): string {
+  const escaped = module.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const line = new RegExp(`^import \\{ ([\\w$, ]+) \\} from '${escaped}';\\n`, 'gm');
+  const matches = [...source.matchAll(line)];
+  if (matches.length < 2) return source;
+  const names = [...new Set(matches.flatMap((m) => m[1]!.split(',').map((n) => n.trim())))].sort();
+  let first = true;
+  return source.replace(line, () => {
+    if (!first) return '';
+    first = false;
+    return `import { ${names.join(', ')} } from '${module}';\n`;
+  });
+}
+
+export const ANALOG_SPEC: HostSpec = {
+  framework: 'analog',
+  packages: () => ['@hypdriv/analog', '@hypdriv/core'],
+  install: (platform) => (platform === 'cloudflare' ? { devDependencies: ['wrangler'] } : {}),
+  register(ctx) {
+    registerInConfig(
+      ctx,
+      [
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/analog';",
+          from: '@hypdriv/analog',
+        },
+      ],
+      {
+        file: /vite\.config\./,
+        property: 'plugins',
+        fallback: {
+          path: 'vite.config.ts',
+          content:
+            "import analog from '@analogjs/platform';\nimport { hypdriv, withHypDriv } from '@hypdriv/analog';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({\n  plugins: [analog(withHypDriv({ ssr: true })), hypdriv()],\n});\n",
+        },
+      },
+    );
+    // `analog({...})` options go through withHypDriv(), which adds the Hypdriv Nitro module.
+    const vite = ctx.items.find((i) => /vite\.config\./.test(i.path) && i.action !== 'manual');
+    const viteFile = ctx.project.framework.configFile;
+    if (vite && viteFile) {
+      const source = vite.content ?? ctx.read(viteFile);
+      const r = wrapCallArgument(source, {
+        callee: 'analog',
+        wrapper: 'withHypDriv',
+        importLine: "import { withHypDriv } from '@hypdriv/analog';",
+        importFrom: '@hypdriv/analog',
+      });
+      if (r.changed) {
+        vite.reason = vite.action === 'modify' ? `${vite.reason}; ${r.reason}` : r.reason;
+        vite.action = 'modify';
+        vite.content = mergeNamedImports(r.content, '@hypdriv/analog');
+      } else if (!/already wrapped/.test(r.reason))
+        ctx.notes.push(
+          `vite.config: ${r.reason}; pass the options of analog() through withHypDriv() so the Hypdriv Nitro module is registered.`,
+        );
+    }
+    planFileEdit(ctx, 'src/app/app.config.server.ts', addAnalogServerProvider, {
+      done: /provideHypDriv\s*\(/,
+      hint: "import { provideHypDriv } from '@hypdriv/analog/angular/server';\n// providers: [provideServerRendering(), provideHypDriv()]",
+    });
+    ctx.notes.push(
+      "Components read the request with `injectHyp()` from '@hypdriv/analog/angular'; hand what they render to the browser with TransferState so hydration finds the same markup.",
+    );
+    if (ctx.platform === 'cloudflare' && !selectsCloudflareModule(ctx, VITE_CONFIG_FILES))
+      ctx.notes.push(
+        "Build for Workers with `nitro: { preset: 'cloudflare-module', cloudflare: { deployConfig: true } }` in the analog() options: Hypdriv's module then puts its Worker shell (jobs, Durable Objects) around Nitro and Nitro writes dist/analog/server/wrangler.json.",
+      );
+    if (ctx.platform === 'node')
+      ctx.notes.push(
+        'Behind a reverse proxy set `security.trustedProxies` in hypdriv.config.ts so client addresses (rate limits, geo) come from the proxy header.',
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') planNitroWrangler(ctx);
+    else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "Analog's `vercel` Nitro preset (the default when VERCEL=1) writes .vercel/output; Hypdriv adds its header routes and a Routing Middleware so the request stages run for prerendered pages too.",
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node dist/analog/server/index.mjs' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev --config dist/analog/server/wrangler.json' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'node dist/analog/server/index.mjs' }
+        : null,
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1301,6 +1552,8 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vinext: VINEXT_SPEC,
   hono: HONO_SPEC,
   waku: WAKU_SPEC,
+  nitro: NITRO_SPEC,
+  analog: ANALOG_SPEC,
 };
 
 /** The init plan for a Vite host. */

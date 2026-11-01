@@ -5,6 +5,7 @@ import { experimentChecks } from './checks/experiments';
 import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
 import { nextjsChecks } from './checks/nextjs';
+import { nitroChecks } from './checks/nitro';
 import { opennextChecks } from './checks/opennext';
 import { openNextCacheChecks } from './checks/opennext-cache';
 import { purserChecks } from './checks/purser';
@@ -55,6 +56,7 @@ export const allChecks: Check[] = [
   ...onlyFor(['next'], nextjsChecks),
   ...viteChecks,
   ...wakuChecks,
+  ...nitroChecks,
   ...honoChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),
