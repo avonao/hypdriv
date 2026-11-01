@@ -19,15 +19,38 @@ export function isGif(bytes: Uint8Array): boolean {
 
 const u16 = (b: Uint8Array, at: number) => b[at]! | (b[at + 1]! << 8);
 
-/** Reads the logical screen size. */
+/**
+ * Reads the logical screen size. A screen of 0×0 (some writers do that) is the extent of the first frame
+ * instead, as in browsers.
+ */
 export function probeGif(bytes: Uint8Array): GifInfo {
   if (!isGif(bytes)) throw new Error('not a GIF file');
-  return { width: u16(bytes, 6), height: u16(bytes, 8) };
+  const width = u16(bytes, 6);
+  const height = u16(bytes, 8);
+  if (width > 0 && height > 0) return { width, height };
+  const flags = bytes[10]!;
+  let at = 13 + (flags & 0x80 ? 3 * (1 << ((flags & 7) + 1)) : 0);
+  while (at < bytes.length) {
+    const block = bytes[at++]!;
+    if (block === 0x21) {
+      at = skipSubBlocks(bytes, at + 1);
+    } else if (block === 0x2c) {
+      if (at + 8 > bytes.length) break;
+      return { width: u16(bytes, at) + u16(bytes, at + 4), height: u16(bytes, at + 2) + u16(bytes, at + 6) };
+    } else {
+      break;
+    }
+  }
+  return { width, height };
 }
 
 /** Variable-width LZW decoding of one GIF image into palette indices. */
-function lzwDecode(minCodeSize: number, data: Uint8Array, pixelCount: number): Uint8Array {
-  if (minCodeSize < 2 || minCodeSize > 8) throw new Error(`invalid GIF LZW code size ${minCodeSize}`);
+function lzwDecode(
+  minCodeSize: number,
+  data: Uint8Array,
+  pixelCount: number,
+): { indices: Uint8Array; produced: number } {
+  if (!(minCodeSize >= 2 && minCodeSize <= 8)) throw new Error(`invalid GIF LZW code size ${minCodeSize}`);
   const clear = 1 << minCodeSize;
   const end = clear + 1;
   const prefix = new Int16Array(4096);
@@ -47,7 +70,7 @@ function lzwDecode(minCodeSize: number, data: Uint8Array, pixelCount: number): U
 
   while (produced < pixelCount) {
     while (have < codeSize) {
-      if (at >= data.length) return out; // ran out of data: the remainder stays index 0
+      if (at >= data.length) return { indices: out, produced }; // ran out of data: the rest stays index 0
       bits |= data[at++]! << have;
       have += 8;
     }
@@ -91,7 +114,7 @@ function lzwDecode(minCodeSize: number, data: Uint8Array, pixelCount: number): U
     }
     prev = code;
   }
-  return out;
+  return { indices: out, produced };
 }
 
 function skipSubBlocks(bytes: Uint8Array, at: number): number {
@@ -132,7 +155,8 @@ function readSubBlocks(bytes: Uint8Array, at: number): { data: Uint8Array; next:
 export function decodeGif(bytes: Uint8Array, sink: RowSink, options: { maxPixels?: number } = {}): GifInfo {
   const info = probeGif(bytes);
   const { width, height } = info;
-  assertDimensions(width, height, options.maxPixels ?? DEFAULT_MAX_PIXELS);
+  const maxPixels = options.maxPixels ?? DEFAULT_MAX_PIXELS;
+  assertDimensions(width, height, maxPixels);
 
   const screenFlags = bytes[10]!;
   let at = 13;
@@ -167,10 +191,12 @@ export function decodeGif(bytes: Uint8Array, sink: RowSink, options: { maxPixels
         at += length;
       }
       if (!palette) throw new Error('GIF frame has no color table');
-      assertDimensions(frameWidth, frameHeight, options.maxPixels ?? DEFAULT_MAX_PIXELS);
+      assertDimensions(frameWidth, frameHeight, maxPixels);
+      if (at >= bytes.length) throw new Error('GIF image data is truncated');
       const minCodeSize = bytes[at++]!;
       const { data } = readSubBlocks(bytes, at);
-      const indices = lzwDecode(minCodeSize, data, frameWidth * frameHeight);
+      const { indices, produced } = lzwDecode(minCodeSize, data, frameWidth * frameHeight);
+      if (produced === 0) throw new Error('GIF image data is empty or truncated');
 
       const interlaced = (flags & 0x40) !== 0;
       // output row (in frame coordinates) of every decoded row

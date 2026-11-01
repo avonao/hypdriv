@@ -13,6 +13,7 @@ import {
   type WasmCodecs,
 } from './index';
 import { decodePng, probePng } from './png';
+import { renderPortable } from './portable';
 import { Downscaler } from './raster';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), '__fixtures__');
@@ -243,7 +244,7 @@ describe('generatePlaceholders without sharp (portable engine)', () => {
     expect(probePng(Buffer.from(file.placeholders['/hero.jpg']!.split(',')[1]!, 'base64')).colorType).toBe(2);
     // and it decodes back to the picture's colours: the JPEG's top-left corner is dark red/green → gradient start
     const scaler = new Downscaler(16, 10);
-    decodePng(Buffer.from(file.placeholders['/hero.jpg']!.split(',')[1]!, 'base64'), scaler);
+    await decodePng(Buffer.from(file.placeholders['/hero.jpg']!.split(',')[1]!, 'base64'), scaler);
     const pixels = scaler.finish().data;
     expect(pixels[0]!).toBeLessThan(pixels[15 * 4]!); // red channel rises left to right
   });
@@ -294,13 +295,98 @@ describe('generatePlaceholders without sharp (portable engine)', () => {
     ).toContain('/img/logo.png');
   });
 
-  it('reuses entries only for the same engine, format, quality and size', async () => {
+  it('reuses entries only while the settings that shape them are unchanged', async () => {
     const base = { projectDir: root, sharp: null, wasm: null } as const;
     expect((await generatePlaceholders(base)).generated).toBe(4);
     expect(await generatePlaceholders(base)).toMatchObject({ generated: 0, reused: 4 });
+    // a PNG does not depend on the WebP quality
+    expect(await generatePlaceholders({ ...base, quality: 80 })).toMatchObject({ generated: 0, reused: 4 });
+    // the size does, and so does how big JPEGs are decoded
+    expect((await generatePlaceholders({ ...base, size: 24 })).generated).toBe(4);
+    expect(await generatePlaceholders({ ...base, size: 24 })).toMatchObject({ generated: 0, reused: 4 });
+    const exact = await generatePlaceholders({ ...base, size: 24, accuracy: 'exact' });
+    expect(exact.generated).toBe(4);
+    expect((await readPlaceholdersFile(exact.file))!.accuracy).toBe('exact');
+    expect(await generatePlaceholders({ ...base, size: 24, accuracy: 'exact' })).toMatchObject({ reused: 4 });
+    expect((await generatePlaceholders({ ...base, size: 24 })).generated).toBe(4); // back to fast
+  });
+
+  it('regenerates WebP entries when the quality changes', async () => {
+    const encodeWebp = async (_image: unknown, quality: number) => new TextEncoder().encode(`q${quality}`);
+    const base = { projectDir: root, sharp: null, wasm: { ...NO_CODECS, encodeWebp } } as const;
+    const first = await generatePlaceholders({ ...base, quality: 55 });
+    expect(first).toMatchObject({ generated: 4, format: 'webp' });
+    expect(await generatePlaceholders({ ...base, quality: 55 })).toMatchObject({ generated: 0, reused: 4 });
     expect((await generatePlaceholders({ ...base, quality: 80 })).generated).toBe(4);
-    expect((await generatePlaceholders({ ...base, quality: 80, size: 24 })).generated).toBe(4);
-    expect(await generatePlaceholders({ ...base, quality: 80, size: 24 })).toMatchObject({ reused: 4 });
+  });
+
+  it('keeps entries another engine made unless this run pins the engine or the format', async () => {
+    const calls: string[] = [];
+    const sharp = await generatePlaceholders({ projectDir: root, sharp: fakeSharp(calls), wasm: null });
+    expect(sharp).toMatchObject({ engine: 'sharp', format: 'webp', generated: 4 });
+    const before = await readFile(sharp.file, 'utf8');
+
+    // CI without sharp (engine auto): the committed file is still right, --check agrees, nothing is rewritten
+    const ci = { projectDir: root, sharp: null, wasm: null } as const;
+    expect(await generatePlaceholders({ ...ci, dryRun: true })).toMatchObject({
+      generated: 0,
+      reused: 4,
+      removed: 0,
+      engine: 'sharp',
+      format: 'webp',
+    });
+    expect(await generatePlaceholders(ci)).toMatchObject({ generated: 0, reused: 4, engine: 'sharp' });
+    expect(await readFile(sharp.file, 'utf8')).toBe(before);
+
+    // pinning the engine or the format asks for different pictures
+    expect((await generatePlaceholders({ ...ci, engine: 'portable' })).generated).toBe(4);
+    expect((await generatePlaceholders({ ...ci, engine: 'portable', format: 'png' })).reused).toBe(4);
+    const pinnedFormat = await generatePlaceholders({
+      projectDir: root,
+      sharp: fakeSharp(calls),
+      wasm: null,
+      format: 'webp',
+    });
+    expect(pinnedFormat).toMatchObject({ engine: 'sharp', generated: 4 }); // the PNG entries are replaced
+  });
+
+  it('recognises unchanged pictures by content after a checkout resets every mtime', async () => {
+    const base = { projectDir: root, sharp: null, wasm: null } as const;
+    const first = await generatePlaceholders(base);
+    const written = await readFile(first.file, 'utf8');
+    const later = new Date(Date.now() + 3_600_000);
+    for (const rel of ['hero.jpg', 'img/logo.png', 'img/anim.gif', 'img/looks-like-png.PNG']) {
+      await utimes(join(root, 'public', rel), later, later);
+    }
+    expect(await generatePlaceholders({ ...base, dryRun: true })).toMatchObject({ generated: 0, reused: 4 });
+    expect(await generatePlaceholders(base)).toMatchObject({ generated: 0, reused: 4 });
+    expect(await readFile(first.file, 'utf8')).toBe(written); // not rewritten: no churn in git
+
+    // same size, other bytes: regenerated even though nothing but the content moved
+    const logo = join(root, 'public', 'img', 'logo.png');
+    const bytes = await readFile(logo);
+    bytes[bytes.length - 20] = bytes[bytes.length - 20]! ^ 0xff;
+    await writeFile(logo, bytes);
+    await utimes(logo, later, later);
+    expect(await generatePlaceholders({ ...base, dryRun: true })).toMatchObject({ generated: 1, reused: 3 });
+  });
+
+  it('does not rewrite the file or its timestamp when nothing changed', async () => {
+    const base = { projectDir: root, sharp: null, wasm: null } as const;
+    const first = await generatePlaceholders(base);
+    const written = JSON.parse(await readFile(first.file, 'utf8')) as PlaceholdersFile;
+    await new Promise((r) => setTimeout(r, 15));
+    await generatePlaceholders(base);
+    expect((JSON.parse(await readFile(first.file, 'utf8')) as PlaceholdersFile).generatedAt).toBe(
+      written.generatedAt,
+    );
+    // a real change does rewrite it
+    await rm(join(root, 'public', 'img', 'anim.gif'));
+    const removed = await generatePlaceholders(base);
+    expect(removed.removed).toBe(1);
+    expect((JSON.parse(await readFile(first.file, 'utf8')) as PlaceholdersFile).generatedAt).not.toBe(
+      written.generatedAt,
+    );
   });
 
   it('reports WebP and AVIF as unsupported (not errors) when no codec is installed, and keeps the rest', async () => {
@@ -497,6 +583,46 @@ describe('@jsquash WebAssembly codecs', () => {
     const avif = await codecs.decodeAvif!(new Uint8Array(await readFile(join(fixtures, 'avif-lossy.avif'))));
     expect([avif.width, avif.height]).toEqual([128, 80]);
     await expect(codecs.decodeWebp!(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow();
+  });
+
+  it('renders every WebP and AVIF flavour like the reference decoders, animations by their first frame', async () => {
+    const codecs = await loadWasmCodecs(root);
+    const references = JSON.parse(await readFile(join(fixtures, 'reference.json'), 'utf8')) as Record<
+      string,
+      Record<string, { width: number; height: number; target: [number, number]; rgba: string }>
+    >;
+    for (const file of [
+      'webp-lossy.webp',
+      'webp-lossless.webp',
+      'webp-lossy-alpha.webp',
+      'webp-lossless-alpha.webp',
+      'webp-animated.webp',
+      'avif-lossy.avif',
+    ]) {
+      const reference = references[file]!['16']!;
+      const out = await renderPortable(new Uint8Array(await readFile(join(fixtures, file))), {
+        size: 16,
+        codecs,
+      });
+      expect([out.width, out.height], file).toEqual([reference.width, reference.height]);
+      expect([out.bitmap.width, out.bitmap.height], file).toEqual(reference.target);
+      const expected = Buffer.from(reference.rgba, 'base64');
+      let worst = 0;
+      for (let i = 0; i < expected.length; i++) {
+        worst = Math.max(worst, Math.abs(out.bitmap.data[i]! - expected[i]!));
+      }
+      expect(worst, file).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('refuses a WebP or AVIF by its header limits before the codec allocates anything', async () => {
+    const codecs = await loadWasmCodecs(root);
+    for (const file of ['webp-lossy.webp', 'avif-lossy.avif']) {
+      const bytes = new Uint8Array(await readFile(join(fixtures, file)));
+      await expect(renderPortable(bytes, { size: 16, maxPixels: 100, codecs })).rejects.toThrow(
+        /above the limit/,
+      );
+    }
   });
 
   it('generates WebP placeholders from JPEG, PNG, GIF, WebP and AVIF without any native module', async () => {

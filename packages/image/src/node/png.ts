@@ -1,4 +1,4 @@
-import { constants, deflateSync, inflateSync } from 'node:zlib';
+import { constants, createInflate, deflateSync } from 'node:zlib';
 import { assertDimensions, DEFAULT_MAX_PIXELS, type RowSink } from './raster';
 
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -237,90 +237,108 @@ function makeConverter(
 
 /**
  * Decodes a PNG (every color type and bit depth, Adam7 interlacing, `tRNS` transparency; APNG shows its
- * default image) and streams the rows into `sink`.
+ * default image) and streams it into `sink`. The image data is inflated as it is read, one scanline at a time,
+ * so the working set is a couple of rows however big the picture is; interlaced pictures arrive pass by pass
+ * through `sink.pushSparse`. A truncated file keeps the rows that are there (a non-interlaced picture repeats its
+ * last row to the bottom); corrupt data throws.
  */
-export function decodePng(bytes: Uint8Array, sink: RowSink, options: { maxPixels?: number } = {}): PngInfo {
+export async function decodePng(
+  bytes: Uint8Array,
+  sink: RowSink,
+  options: { maxPixels?: number } = {},
+): Promise<PngInfo> {
   const { info, palette, transparency, idat } = readChunks(bytes, false);
   const { width, height, bitDepth, colorType, interlaced } = info;
   assertDimensions(width, height, options.maxPixels ?? DEFAULT_MAX_PIXELS);
   if (idat.length === 0) throw new Error('PNG has no image data');
+  if (interlaced && !sink.pushSparse) throw new Error('this row sink cannot receive interlaced pictures');
 
   const bitsPerPixel = CHANNELS[colorType]! * bitDepth;
-  const bpp = Math.max(1, bitsPerPixel >> 3);
-  const rowBytes = (w: number) => (w * bitsPerPixel + 7) >> 3;
+  const bpp = Math.max(1, Math.floor(bitsPerPixel / 8));
+  const rowBytes = (w: number) => Math.ceil((w * bitsPerPixel) / 8);
 
-  const passes = interlaced
-    ? ADAM7.map(([xs, ys, dx, dy]) => ({
-        xs,
-        ys,
-        dx,
-        dy,
-        w: Math.ceil((width - xs) / dx),
-        h: Math.ceil((height - ys) / dy),
-      })).filter((p) => p.w > 0 && p.h > 0)
-    : [{ xs: 0, ys: 0, dx: 1, dy: 1, w: width, h: height }];
-  const expected = passes.reduce((sum, p) => sum + p.h * (1 + rowBytes(p.w)), 0);
-
-  const compressed = idat.length === 1 ? idat[0]! : Buffer.concat(idat);
-  let raw: Uint8Array;
-  try {
-    raw = inflateSync(compressed, { maxOutputLength: expected + 1024, finishFlush: constants.Z_SYNC_FLUSH });
-  } catch (error) {
-    throw new Error(`corrupt PNG image data: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const passes = (
+    interlaced
+      ? ADAM7.map(([xs, ys, dx, dy]) => ({
+          xs,
+          ys,
+          dx,
+          dy,
+          w: Math.ceil((width - xs) / dx),
+          h: Math.ceil((height - ys) / dy),
+        }))
+      : [{ xs: 0, ys: 0, dx: 1, dy: 1, w: width, h: height }]
+  )
+    .filter((p) => p.w > 0 && p.h > 0)
+    .map((p) => ({ ...p, bytesPerRow: rowBytes(p.w) }));
 
   const convert = makeConverter(info, palette, transparency);
   sink.begin(width, height);
-  const canvas = interlaced ? new Uint8Array(width * height * 4) : null;
-  const out = new Uint8Array(width * 4);
 
-  let at = 0;
-  for (const pass of passes) {
-    const bytesPerRow = rowBytes(pass.w);
-    let prior: Uint8Array = new Uint8Array(bytesPerRow);
-    const passRow = interlaced ? new Uint8Array(pass.w * 4) : out;
-    for (let r = 0; r < pass.h; r++) {
-      if (at + 1 + bytesPerRow > raw.length) {
-        // truncated stream: repeat the last good row so the rest of the picture is not black
-        if (r === 0) throw new Error('PNG image data is truncated');
-        for (let rest = r; rest < pass.h; rest++) emit(pass, rest, passRow, canvas, sink, width);
-        break;
+  // the scanline being assembled (filter byte + row), the previous unfiltered one, and the converted RGBA row
+  let passIndex = 0;
+  let rowInPass = 0;
+  let rowsDone = 0;
+  let filled = 0;
+  let current = new Uint8Array(1 + passes[0]!.bytesPerRow);
+  let prior = new Uint8Array(1 + passes[0]!.bytesPerRow);
+  let rgba = new Uint8Array((interlaced ? passes[0]!.w : width) * 4);
+
+  const finishRow = (): void => {
+    const pass = passes[passIndex]!;
+    unfilter(current[0]!, current.subarray(1), prior.subarray(1), bpp);
+    convert(current.subarray(1), pass.w, rgba);
+    const y = pass.ys + rowInPass * pass.dy;
+    if (interlaced) sink.pushSparse!(y, pass.xs, pass.dx, pass.w, rgba);
+    else sink.push(y, rgba);
+    [current, prior] = [prior, current];
+    rowsDone++;
+    if (++rowInPass === pass.h) {
+      passIndex++;
+      rowInPass = 0;
+      const next = passes[passIndex];
+      if (next) {
+        current = new Uint8Array(1 + next.bytesPerRow);
+        prior = new Uint8Array(1 + next.bytesPerRow);
+        if (interlaced) rgba = new Uint8Array(next.w * 4);
       }
-      const filter = raw[at]!;
-      const row = raw.subarray(at + 1, at + 1 + bytesPerRow);
-      unfilter(filter, row, prior, bpp);
-      convert(row, pass.w, passRow);
-      emit(pass, r, passRow, canvas, sink, width);
-      prior = row;
-      at += 1 + bytesPerRow;
     }
+  };
+
+  const consume = (chunk: Uint8Array): void => {
+    let at = 0;
+    while (at < chunk.length && passIndex < passes.length) {
+      const take = Math.min(chunk.length - at, current.length - filled);
+      current.set(chunk.subarray(at, at + take), filled);
+      filled += take;
+      at += take;
+      if (filled === current.length) {
+        filled = 0;
+        finishRow();
+      }
+    }
+  };
+
+  // Z_SYNC_FLUSH: a stream cut short ends quietly instead of failing
+  const inflate = createInflate({ finishFlush: constants.Z_SYNC_FLUSH, chunkSize: 64 * 1024 });
+  for (const part of idat) inflate.write(part);
+  inflate.end();
+  try {
+    for await (const chunk of inflate) {
+      consume(chunk as Uint8Array);
+      if (passIndex >= passes.length) break; // the picture is complete; anything after it is ignored
+    }
+  } catch (error) {
+    inflate.destroy();
+    throw new Error(`corrupt PNG image data: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (canvas) {
-    for (let y = 0; y < height; y++) sink.push(y, canvas.subarray(y * width * 4, (y + 1) * width * 4));
+
+  if (passIndex < passes.length) {
+    if (rowsDone === 0) throw new Error('PNG image data is truncated');
+    // non-interlaced: repeat the last good row so the rest of the picture is not black
+    if (!interlaced) for (let y = rowsDone; y < height; y++) sink.push(y, rgba);
   }
   return info;
-}
-
-function emit(
-  pass: { xs: number; ys: number; dx: number; dy: number; w: number },
-  r: number,
-  passRow: Uint8Array,
-  canvas: Uint8Array | null,
-  sink: RowSink,
-  width: number,
-): void {
-  const y = pass.ys + r * pass.dy;
-  if (!canvas) {
-    sink.push(y, passRow);
-    return;
-  }
-  for (let i = 0; i < pass.w; i++) {
-    const o = (y * width + pass.xs + i * pass.dx) * 4;
-    canvas[o] = passRow[i * 4]!;
-    canvas[o + 1] = passRow[i * 4 + 1]!;
-    canvas[o + 2] = passRow[i * 4 + 2]!;
-    canvas[o + 3] = passRow[i * 4 + 3]!;
-  }
 }
 
 let crcTable: Int32Array | null = null;

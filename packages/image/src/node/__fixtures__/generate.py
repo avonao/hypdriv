@@ -161,6 +161,10 @@ frames[0].save("gif-animated.gif", save_all=True, append_images=frames[1:], dura
 scene(160, 100).save("webp-lossy.webp", quality=85)
 with_alpha(scene(96, 60)).save("webp-lossless-alpha.webp", lossless=True)
 scene(128, 80).save("avif-lossy.avif", quality=75)
+with_alpha(scene(96, 60)).save("webp-lossy-alpha.webp", quality=80)  # VP8X + ALPH + VP8
+scene(64, 40).save("webp-lossless.webp", lossless=True)  # bare VP8L
+anim = [scene(96, 60), scene(96, 60).transpose(Image.FLIP_LEFT_RIGHT), scene(96, 60).transpose(Image.FLIP_TOP_BOTTOM)]
+anim[0].save("webp-animated.webp", save_all=True, append_images=anim[1:], duration=100, loop=0, quality=80)
 
 
 # ---- Reference downscale ------------------------------------------------------------------------------------

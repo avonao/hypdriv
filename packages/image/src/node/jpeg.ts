@@ -1,4 +1,10 @@
-import { assertDimensions, DEFAULT_MAX_PIXELS, type RowSink } from './raster';
+import {
+  assertDimensions,
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_PIXELS,
+  ImageLimitError,
+  type RowSink,
+} from './raster';
 
 /**
  * Pure TypeScript JPEG decoder for placeholder generation: baseline, extended-sequential and progressive
@@ -66,16 +72,28 @@ function buildHuffman(counts: Uint8Array, symbols: Uint8Array): HuffmanTable {
   return { lookup, mincode, maxcode, valptr, symbols };
 }
 
+/** Zero bytes the reader may pad in after the data ran out before a scan gives up (a few MCUs of slack). */
+const STARVED_AFTER = 16;
+
+/** More scans than any real progressive file has (libjpeg-turbo's own script has ten). */
+const MAX_SCANS = 256;
+
 class BitReader {
   pos: number;
   private buffer = 0;
   private count = 0;
+  private padded = 0;
 
   constructor(
     private readonly data: Uint8Array,
     start: number,
   ) {
     this.pos = start;
+  }
+
+  /** The entropy-coded data is used up: what is read now is padding. A scan stops there. */
+  get starved(): boolean {
+    return this.padded > STARVED_AFTER;
   }
 
   /** Makes at least 25 bits available (zero padded when the segment ended at a marker). */
@@ -90,10 +108,13 @@ class BitReader {
             this.pos += 2;
           } else {
             byte = 0; // marker or fill: do not consume, pad with zeros
+            this.padded++;
           }
         } else {
           this.pos++;
         }
+      } else {
+        this.padded++;
       }
       this.buffer = (this.buffer << 8) | byte;
       this.count += 8;
@@ -145,6 +166,7 @@ class BitReader {
         const marker = this.data[this.pos + 1]!;
         if (marker >= 0xd0 && marker <= 0xd7) {
           this.pos += 2;
+          this.padded = 0;
           return;
         }
         if (marker !== 0x00 && marker !== 0xff) return; // some other marker: stop in front of it
@@ -290,6 +312,7 @@ function scan(data: Uint8Array, context: DecodeContext | null): Header {
   let frame: Frame | null = null;
   let adobeTransform: number | null = null;
   let jfif = false;
+  let scans = 0;
   let at = 2;
 
   while (at < data.length) {
@@ -366,6 +389,7 @@ function scan(data: Uint8Array, context: DecodeContext | null): Header {
       context.restartInterval = u16(data, body);
     } else if (context && marker === 0xda) {
       if (!frame) throw new Error('corrupt JPEG: scan before frame header');
+      if (++scans > MAX_SCANS) throw new Error(`unsupported JPEG: more than ${MAX_SCANS} scans`);
       at = context.onScan!(frame, at);
       continue;
     }
@@ -533,7 +557,13 @@ function decodeScan(data: Uint8Array, frame: Frame, context: DecodeContext, scan
   while (mcu < totalMcus) {
     for (const c of comps) c.pred = 0;
     eobrun = 0;
-    for (let n = 0; n < interval && mcu < totalMcus; n++, mcu++) {
+    const intervalEnd = Math.min(totalMcus, mcu + interval);
+    while (mcu < intervalEnd) {
+      // the data is used up: the rest of the interval stays zero, like libjpeg does after "premature end of data"
+      if (reader.starved) {
+        mcu = intervalEnd;
+        break;
+      }
       if (single) {
         const row = Math.floor(mcu / first.blocksPerLine);
         const col = mcu % first.blocksPerLine;
@@ -551,6 +581,7 @@ function decodeScan(data: Uint8Array, frame: Frame, context: DecodeContext, scan
           }
         }
       }
+      mcu++;
     }
     if (mcu < totalMcus) reader.restart();
   }
@@ -591,6 +622,20 @@ function buildPlane(c: Component, dcOnly: boolean): { data: Uint8Array; stride: 
   for (let by = 0; by < blocksY; by++) {
     for (let bx = 0; bx < blocksX; bx++) {
       const base = (by * blocksX + bx) * 64;
+      let flat = true;
+      for (let i = 1; i < 64; i++) {
+        if (coefficients[base + i] !== 0) {
+          flat = false;
+          break;
+        }
+      }
+      if (flat) {
+        // only a DC coefficient: the block is one value (exactly what the transform would produce)
+        const value = clamp8((coefficients[base]! * quant[0]!) / 8 + 128);
+        for (let y = 0; y < 8; y++)
+          data.fill(value, (by * 8 + y) * stride + bx * 8, (by * 8 + y) * stride + bx * 8 + 8);
+        continue;
+      }
       for (let i = 0; i < 64; i++) block[i] = coefficients[base + i]! * quant[i]!;
       // rows: temp[v][x] = Σu COS[x][u] · block[v][u]
       for (let v = 0; v < 8; v++) {
@@ -614,15 +659,37 @@ function buildPlane(c: Component, dcOnly: boolean): { data: Uint8Array; stride: 
   return { data, stride };
 }
 
+/** libjpeg's rules: JFIF means YCbCr, then the Adobe marker, then the component ids. */
 function colourTransform(header: Header): 'gray' | 'ycbcr' | 'rgb' | 'cmyk' | 'ycck' {
   const { frame, adobeTransform, jfif } = header;
   const n = frame.components.length;
   if (n === 1) return 'gray';
-  if (n === 4) return adobeTransform === 2 ? 'ycck' : 'cmyk';
-  if (adobeTransform !== null) return adobeTransform === 0 ? 'rgb' : 'ycbcr';
+  if (n === 4) {
+    if (adobeTransform === null) return 'cmyk';
+    return adobeTransform === 0 ? 'cmyk' : 'ycck';
+  }
   if (jfif) return 'ycbcr';
+  if (adobeTransform !== null) return adobeTransform === 0 ? 'rgb' : 'ycbcr';
   const ids = frame.components.map((c) => c.id);
   return ids[0] === 0x52 && ids[1] === 0x47 && ids[2] === 0x42 ? 'rgb' : 'ycbcr';
+}
+
+/** The decode reads only DC coefficients when the picture is at least 8× the target in both directions. */
+export function jpegUsesDcOnly(
+  info: Pick<JpegInfo, 'width' | 'height'>,
+  target: { width: number; height: number },
+  exact: boolean,
+): boolean {
+  return !exact && Math.ceil(info.width / 8) >= target.width && Math.ceil(info.height / 8) >= target.height;
+}
+
+/** Upper bound of the memory a decode holds: per component the coefficients (2 bytes) and the plane (1 byte). */
+export function estimateJpegBytes(info: JpegInfo, dcOnly: boolean): number {
+  const padded = (n: number) => n + 32;
+  const samples = dcOnly
+    ? padded(Math.ceil(info.width / 8)) * padded(Math.ceil(info.height / 8))
+    : padded(info.width) * padded(info.height);
+  return samples * 3 * info.components + (1 << 20);
 }
 
 /**
@@ -633,14 +700,29 @@ function colourTransform(header: Header): 'gray' | 'ycbcr' | 'rgb' | 'cmyk' | 'y
 export function decodeJpeg(
   data: Uint8Array,
   sink: RowSink,
-  options: { targetWidth: number; targetHeight: number; maxPixels?: number; exact?: boolean },
+  options: {
+    targetWidth: number;
+    targetHeight: number;
+    maxPixels?: number;
+    /** Largest working set in bytes (default 1 GiB). */
+    maxBytes?: number;
+    exact?: boolean;
+  },
 ): JpegInfo & { scale: 1 | 8 } {
   const probed = probeJpeg(data);
   assertDimensions(probed.width, probed.height, options.maxPixels ?? DEFAULT_MAX_PIXELS);
-  const dcOnly =
-    !options.exact &&
-    Math.ceil(probed.width / 8) >= options.targetWidth &&
-    Math.ceil(probed.height / 8) >= options.targetHeight;
+  const dcOnly = jpegUsesDcOnly(
+    probed,
+    { width: options.targetWidth, height: options.targetHeight },
+    options.exact === true,
+  );
+  const needed = estimateJpegBytes(probed, dcOnly);
+  const budget = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  if (needed > budget) {
+    throw new ImageLimitError(
+      `decoding this ${probed.width}×${probed.height} picture ${dcOnly ? '' : 'completely '}needs about ${Math.round(needed / (1 << 20))} MB, above the limit of ${Math.round(budget / (1 << 20))} MB${dcOnly ? '' : " (accuracy 'fast' reads big pictures from their DC coefficients and needs far less)"}`,
+    );
+  }
 
   const context: DecodeContext = {
     dcOnly,
@@ -653,8 +735,10 @@ export function decodeJpeg(
   context.onScan = (frame, at) => decodeScan(data, frame, context, at);
   const header = scan(data, context);
   const { frame } = header;
+  if (!frame.components.some((c) => c.coefficients)) throw new Error('JPEG has no image data');
   for (const c of frame.components) {
-    if (!c.coefficients) throw new Error('JPEG has no image data');
+    // a component whose scans are missing decodes as all zero (neutral chroma), like libjpeg
+    c.coefficients ??= new Int16Array(c.blocksPerLineForMcu * c.blocksPerColumnForMcu * (dcOnly ? 1 : 64));
     c.quant ??= context.quantTables[c.tq] ?? null;
   }
 
@@ -673,12 +757,12 @@ export function decodeJpeg(
     i1: Int32Array;
     w: Float64Array;
   }
-  const taps = (count: number, factor: number, max: number, valid: number): Taps => {
+  const taps = (count: number, factor: number, max: number, valid: number, interpolate: boolean): Taps => {
     const i0 = new Int32Array(count);
     const i1 = new Int32Array(count);
     const w = new Float64Array(count);
     for (let i = 0; i < count; i++) {
-      if (factor === max || dcOnly) {
+      if (!interpolate) {
         i0[i] = i1[i] = Math.min(Math.floor((i * factor) / max), valid - 1);
         continue;
       }
@@ -690,16 +774,25 @@ export function decodeJpeg(
     }
     return { i0, i1, w };
   };
-  const columns = planes.map(({ c }) =>
-    taps(outWidth, c.h, frame.hMax, dcOnly ? c.blocksPerLine : Math.ceil((frame.width * c.h) / frame.hMax)),
+  // libjpeg-turbo interpolates ("fancy upsampling") only the 2:1 layouts h2v1, h2v2 and h1v2 (the first two only
+  // when the chroma plane is wider than two samples) and replicates every other ratio.
+  const layout = planes.map(({ c }) => {
+    const hr = frame.hMax / c.h;
+    const vr = frame.vMax / c.v;
+    const validX = dcOnly ? c.blocksPerLine : Math.ceil((frame.width * c.h) / frame.hMax);
+    const validY = dcOnly ? c.blocksPerColumn : Math.ceil((frame.height * c.v) / frame.vMax);
+    const fancy =
+      !dcOnly &&
+      ((hr === 2 && vr === 1 && validX > 2) ||
+        (hr === 2 && vr === 2 && validX > 2) ||
+        (hr === 1 && vr === 2));
+    return { hr, vr, validX, validY, fancy };
+  });
+  const columns = planes.map(({ c }, i) =>
+    taps(outWidth, c.h, frame.hMax, layout[i]!.validX, layout[i]!.fancy && layout[i]!.hr === 2),
   );
-  const lines = planes.map(({ c }) =>
-    taps(
-      outHeight,
-      c.v,
-      frame.vMax,
-      dcOnly ? c.blocksPerColumn : Math.ceil((frame.height * c.v) / frame.vMax),
-    ),
+  const lines = planes.map(({ c }, i) =>
+    taps(outHeight, c.v, frame.vMax, layout[i]!.validY, layout[i]!.fancy && layout[i]!.vr === 2),
   );
 
   sink.begin(outWidth, outHeight, { cell: scale, width: frame.width, height: frame.height });

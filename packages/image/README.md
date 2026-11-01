@@ -61,7 +61,7 @@ const result = await generatePlaceholders({ sources: ['public'], size: 16 });
 // { generated, reused, removed, total, file, engine, format, errors, unsupported }
 ```
 
-`generatePlaceholders({ projectDir, sources, size, file, concurrency, quality, engine, format, accuracy, dryRun })` walks the source directories for `png/jpg/jpeg/webp/avif/gif`, resizes each to `size` px wide (never enlarging, aspect ratio kept) and writes `.hypdriv/placeholders.json`:
+`generatePlaceholders({ projectDir, sources, size, file, concurrency, quality, engine, format, accuracy, maxPixels, maxMemory, dryRun })` walks the source directories for `png/jpg/jpeg/webp/avif/gif`, resizes each to `size` px wide (never enlarging, aspect ratio kept) and writes `.hypdriv/placeholders.json`:
 
 ```json
 {
@@ -71,12 +71,15 @@ const result = await generatePlaceholders({ sources: ['public'], size: 16 });
   "engine": "portable",
   "format": "png",
   "quality": 40,
+  "accuracy": "fast",
   "placeholders": { "/hero.jpg": "data:image/png;base64,iVBORw0..." },
-  "meta": { "/hero.jpg": { "mtimeMs": 1761825600000, "bytes": 184233, "width": 2400, "height": 1200 } }
+  "meta": {
+    "/hero.jpg": { "mtimeMs": 1761825600000, "bytes": 184233, "hash": "q3W1…", "width": 2400, "height": 1200 }
+  }
 }
 ```
 
-Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs are incremental: entries whose size and mtime match are reused (when engine, format, quality and size are unchanged), vanished sources are removed.
+Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs are incremental: entries whose size and mtime match, or whose content hash matches when only the mtime moved (a git checkout resets every mtime), are reused when the format, size and, for WebP, quality are unchanged; vanished sources are removed, and a run that changes nothing leaves the file untouched. Under `engine: 'auto'` entries made by the other engine are kept (set `engine` or `format` explicitly to regenerate them).
 
 ### Two engines
 
@@ -88,7 +91,9 @@ Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs a
 
 `engine: 'auto'` (the default) uses sharp when it is installed and the portable engine otherwise, so a CI image without native modules still produces placeholders instead of skipping them. `engine: 'sharp'` insists on sharp and returns `{ generated: 0, skipped: 'sharp-missing', message }` without it; `engine: 'portable'` never loads native code. The function never throws for a missing optional engine, and `format: 'webp'` without an encoder returns `skipped: 'engine-missing'`.
 
-The portable engine recognises images by their bytes, not their extension, streams PNG rows and area-averages them straight into the 16-pixel result (a 24-megapixel PNG needs about 250 MB and half a second), and refuses images above `maxPixels` (134 million) before allocating. For big JPEGs it decodes only the DC coefficients, which are the exact means of the 8×8 blocks, so a 24-megapixel photo takes about 0.1 s and 80 MB; this is what libjpeg's reduced-size decoding, and so sharp's shrink-on-load, does too. Near sharp colour edges of chroma-subsampled pictures that is an approximation; `accuracy: 'exact'` decodes every JPEG completely (about 2.5 s per 24 megapixels). Pictures smaller than eight times the placeholder are always decoded completely.
+The portable engine recognises images by their bytes, not their extension, streams PNG rows (inflated one scanline at a time, so a 24-megapixel PNG holds a few megabytes) and area-averages them straight into the 16-pixel result. For big JPEGs it decodes only the DC coefficients, which are the exact means of the 8×8 blocks, so a 24-megapixel photo takes about 0.1 s and 80 MB; this is what libjpeg's reduced-size decoding, and so sharp's shrink-on-load, does too. Near sharp colour edges of chroma-subsampled pictures that is an approximation; `accuracy: 'exact'` decodes every JPEG completely (about 2.5 s per 24 megapixels, and about 9 bytes per pixel (12 for CMYK), which `maxMemory` bounds). Pictures smaller than eight times the placeholder are always decoded completely. Animated GIF and WebP use their first frame.
+
+Damaged and hostile files are bounded before anything is allocated: the header of every format is read first, and a picture above `maxPixels` (134 million), above 2²⁰ pixels per side, or whose decode would need more than `maxMemory` (1 GiB) fails with an `ImageLimitError` that names the limit; parallel decodes wait for each other instead of adding up past `maxMemory`. A file that ends early decodes as far as it goes.
 
 `hypdriv doctor` (`images.placeholders`) reports whether the file is current, which engine and format the next run would use, and fixes a missing or stale file with `--fix`; a `prebuild` script (`hypdriv placeholders`) keeps it current in CI.
 
