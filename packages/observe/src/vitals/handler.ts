@@ -108,6 +108,18 @@ export interface VitalsHandlerOptions {
    * visitor's variants (`experiments`: `|checkout:b|`), whatever the beacon body claims.
    */
   experimentCookie?: string;
+  /**
+   * Called once for a beacon from a page the browser prerendered and the visitor then opened (`navigationType:
+   * 'prerender'`), before sampling. Such a page sent no request when it was opened, so this beacon is the only trace
+   * of the visit; the `flags` stage uses it to count experiment exposures. Returns a `Set-Cookie` value to add to the
+   * response, or nothing. A failure is logged and never fails the beacon.
+   */
+  onPrerenderActivation?: (activation: {
+    request: Request;
+    /** The page that was opened (`location.pathname`, bounded and untrusted). */
+    pathname: string;
+    country?: string;
+  }) => string | null | undefined | Promise<string | null | undefined>;
   log?: Logger;
   random?: () => number;
   now?: () => number;
@@ -217,12 +229,28 @@ export function vitalsHandler(
       }
     }
 
+    const vctx: VitalsContext = {
+      ip: ctx?.ip ?? clientIp(request.headers),
+      country: ctx?.country ?? request.headers.get('cf-ipcountry') ?? undefined,
+      ua: ctx?.ua ?? request.headers.get('user-agent') ?? undefined,
+    };
+    let setCookie: string | null | undefined;
+    const activated = options.onPrerenderActivation
+      ? payloads.find((payload) => payload.navigationType === 'prerender')
+      : undefined;
+    if (activated) {
+      try {
+        setCookie = await options.onPrerenderActivation?.({
+          request,
+          pathname: activated.pathname,
+          ...(vctx.country ? { country: vctx.country } : {}),
+        });
+      } catch (err) {
+        options.log?.warn('vitals: prerender activation failed', { error: toError(err).message });
+      }
+    }
+
     if (sampleRate > 0 && (sampleRate >= 1 || random() < sampleRate)) {
-      const vctx: VitalsContext = {
-        ip: ctx?.ip ?? clientIp(request.headers),
-        country: ctx?.country ?? request.headers.get('cf-ipcountry') ?? undefined,
-        ua: ctx?.ua ?? request.headers.get('user-agent') ?? undefined,
-      };
       for (const payload of payloads) {
         try {
           await options.sink.write(payload, vctx);
@@ -231,6 +259,6 @@ export function vitalsHandler(
         }
       }
     }
-    return respond(204, cors);
+    return respond(204, { ...cors, ...(setCookie ? { 'set-cookie': setCookie } : {}) });
   };
 }

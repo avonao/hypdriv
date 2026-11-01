@@ -21,12 +21,42 @@ function checked(dataset: string, experiment: string): void {
     throw new HypDrivError('E_VALIDATION', `invalid experiment name "${experiment}"`);
 }
 
-const days = (n: number) => Math.min(90, Math.max(1, Math.floor(n)));
+/** The look-back window in days: 1–90, `14` for anything that is not a finite number (never `INTERVAL 'NaN' DAY`). */
+const days = (n: number) => (Number.isFinite(n) ? Math.min(90, Math.max(1, Math.floor(n))) : 14);
+
+/** The window of an experiment query: the last `days` days, or everything since an explicit moment. */
+export interface ExperimentWindow {
+  days: number;
+  /**
+   * Start of the window (a `Date`, epoch milliseconds or an ISO timestamp), UTC. Use it after the weights, `traffic` or
+   * variants changed: the sample ratio check compares the visitors of the window with the *current* weights, so a
+   * window that spans a ramp is not comparable.
+   */
+  since?: Date | number | string;
+}
+
+/** A window start as a `Date`; anything that is not a valid moment is an error (never reaches a query). */
+function windowStart(value: Date | number | string): Date {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime()))
+    throw new HypDrivError('E_VALIDATION', `invalid window start "${String(value)}"`);
+  return date;
+}
+
+/** `YYYY-MM-DD HH:MM:SS` (UTC), the literal Analytics Engine's `toDateTime` reads. */
+export function sqlTimestamp(value: Date | number | string): string {
+  return windowStart(value).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+const windowCondition = (window: ExperimentWindow) =>
+  window.since === undefined
+    ? `timestamp > NOW() - INTERVAL '${days(window.days)}' DAY`
+    : `timestamp >= toDateTime('${sqlTimestamp(window.since)}')`;
 
 /** Visitors exposed per experiment and variant (`SUM(_sample_interval)` counts one row per visitor). */
 export function experimentExposuresSql(
   dataset: string,
-  options: { days: number; experiment?: string },
+  options: ExperimentWindow & { experiment?: string },
 ): string {
   if (!DATASET_RE.test(dataset))
     throw new HypDrivError('E_VALIDATION', `invalid Analytics Engine dataset name "${dataset}"`);
@@ -36,7 +66,7 @@ export function experimentExposuresSql(
     'SELECT blob2 AS experiment, blob3 AS variant, SUM(_sample_interval) AS visitors,',
     '  MIN(timestamp) AS first_seen, MAX(timestamp) AS last_seen',
     `FROM ${dataset}`,
-    `WHERE timestamp > NOW() - INTERVAL '${days(options.days)}' DAY AND blob1 = '${EXPOSURE_METRIC}'${
+    `WHERE ${windowCondition(options)} AND blob1 = '${EXPOSURE_METRIC}'${
       options.experiment ? ` AND blob2 = '${options.experiment}'` : ''
     }`,
     'GROUP BY experiment, variant',
@@ -49,7 +79,7 @@ export function experimentExposuresSql(
 /** p75 per metric for the visitors of one variant (their beacons carry `|experiment:variant|` in blob8). */
 export function experimentVitalsSql(
   dataset: string,
-  options: { days: number; experiment: string; variant: string },
+  options: ExperimentWindow & { experiment: string; variant: string },
 ): string {
   checked(dataset, options.experiment);
   if (!TOKEN_RE.test(options.variant))
@@ -60,7 +90,7 @@ export function experimentVitalsSql(
     '  quantileWeighted(0.75, double1, _sample_interval) AS p75,',
     '  SUM(_sample_interval) AS samples',
     `FROM ${dataset}`,
-    `WHERE timestamp > NOW() - INTERVAL '${days(options.days)}' DAY AND blob1 IN (${metrics})`,
+    `WHERE ${windowCondition(options)} AND blob1 IN (${metrics})`,
     `  AND position('|${options.experiment}:${options.variant}|' IN blob8) > 0`,
     'GROUP BY metric',
     'FORMAT JSON',
@@ -129,18 +159,54 @@ export function chiSquareSurvival(x: number, df: number): number {
   return Math.min(1, Math.max(0, gammaQ(df / 2, x / 2)));
 }
 
+/** The most visitors an exact test enumerates (one pass over the outcomes); beyond it every expected count is large anyway. */
+const EXACT_LIMIT = 5_000_000;
+
+/**
+ * Two-sided exact binomial test: the probability, if each of `n` visitors independently landed in the variant with
+ * probability `p`, of any outcome at most as likely as `x` (the method of R's `binom.test`). Exact where the χ²
+ * approximation is not: a variant that is expected to get only a handful of visitors.
+ */
+export function binomialTwoSidedP(x: number, n: number, p: number): number {
+  if (!(p > 0 && p < 1) || !Number.isInteger(n) || n < 0 || !Number.isInteger(x) || x < 0 || x > n)
+    return Number.NaN;
+  const logRatio = Math.log(p / (1 - p));
+  // ln P(k = 0), then ln P(k + 1) = ln P(k) + ln((n - k) / (k + 1)) + ln(p / (1 - p)).
+  const start = n * Math.log1p(-p);
+  let log = start;
+  for (let k = 0; k < x; k++) log += Math.log((n - k) / (k + 1)) + logRatio;
+  const threshold = log + 1e-7;
+  let sum = 0;
+  log = start;
+  for (let k = 0; k <= n; k++) {
+    if (log <= threshold) sum += Math.exp(log);
+    log += Math.log((n - k) / (k + 1)) + logRatio;
+  }
+  return Math.min(1, sum);
+}
+
 export interface SampleRatioCheck {
   /** `ok`, `mismatch` (the split differs from the weights by more than chance explains) or `insufficient` (too few visitors to tell). */
   status: 'ok' | 'mismatch' | 'insufficient';
+  /** The test behind `p`: `chi-square`, or `exact` (binomial) when a variant is expected to get fewer than 5 visitors. */
+  method: 'chi-square' | 'exact' | null;
+  /** The χ² statistic (`chi-square` only). */
   chiSquare: number | null;
   /** Probability of a split at least this uneven if assignment followed the weights. */
   p: number | null;
 }
 
 /**
- * Sample ratio mismatch: a χ² test of the observed visitors per variant against the configured weights. A
- * mismatch (p < 0.001) means the assignment or the counting is broken — a redirect that drops one variant, a cache
- * serving one variant to everyone, bots — and the comparison below it cannot be trusted.
+ * Sample ratio mismatch: tests the observed visitors per variant against the configured weights. A mismatch
+ * (p < 0.001) means the assignment or the counting is broken — a redirect that drops one variant, a cache serving
+ * one variant to everyone, bots — and the comparison below it cannot be trusted.
+ *
+ * The test is Pearson's χ² while every expected count is at least 5. Below that the χ² approximation over-flags
+ * (95 of 100 visitors against a 99/1 split gives p = 0.00006 by χ², but 0.0034 exactly), so a two-sided exact
+ * binomial test decides instead; with more than two variants it is the smallest per-variant p times the number of
+ * variants (Bonferroni, conservative).
+ *
+ * `observed` must come from one stretch of time in which the weights did not change (see `ExperimentWindow.since`).
  */
 export function sampleRatioCheck(
   observed: Record<string, number>,
@@ -148,17 +214,25 @@ export function sampleRatioCheck(
   options: { threshold?: number; minVisitors?: number } = {},
 ): SampleRatioCheck {
   const variants = Object.keys(weights).filter((v) => (weights[v] ?? 0) > 0);
-  const total = variants.reduce((sum, v) => sum + (observed[v] ?? 0), 0);
+  const counts = variants.map((v) => Math.max(0, Math.round(observed[v] ?? 0)));
+  const total = counts.reduce((sum, n) => sum + n, 0);
   const weightSum = variants.reduce((sum, v) => sum + (weights[v] ?? 0), 0);
   if (variants.length < 2 || total < (options.minVisitors ?? 100) || weightSum <= 0)
-    return { status: 'insufficient', chiSquare: null, p: null };
-  let chi = 0;
-  for (const v of variants) {
-    const expected = (total * (weights[v] ?? 0)) / weightSum;
-    chi += ((observed[v] ?? 0) - expected) ** 2 / expected;
+    return { status: 'insufficient', method: null, chiSquare: null, p: null };
+  const threshold = options.threshold ?? 0.001;
+  const shares = variants.map((v) => (weights[v] ?? 0) / weightSum);
+  if (total <= EXACT_LIMIT && shares.some((share) => total * share < 5)) {
+    const ps = counts.map((count, i) => binomialTwoSidedP(count, total, shares[i]!));
+    const p = variants.length === 2 ? ps[0]! : Math.min(1, variants.length * Math.min(...ps));
+    return { status: p < threshold ? 'mismatch' : 'ok', method: 'exact', chiSquare: null, p };
   }
+  let chi = 0;
+  counts.forEach((count, i) => {
+    const expected = total * shares[i]!;
+    chi += (count - expected) ** 2 / expected;
+  });
   const p = chiSquareSurvival(chi, variants.length - 1);
-  return { status: p < (options.threshold ?? 0.001) ? 'mismatch' : 'ok', chiSquare: chi, p };
+  return { status: p < threshold ? 'mismatch' : 'ok', method: 'chi-square', chiSquare: chi, p };
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +276,8 @@ export interface ExperimentReport {
   winner?: string;
   control: string;
   days: number;
+  /** Start of the window when one was given (ISO timestamp, UTC); the window is then `since` .. now, not `days`. */
+  since?: string;
   visitors: number;
   variants: ExperimentVariantResult[];
   sampleRatio: SampleRatioCheck;
@@ -232,7 +308,7 @@ const toTime = (v: unknown): number | null => {
 export function buildExperimentReport(
   description: ExperimentDescription,
   rows: ExperimentRows,
-  options: { days: number },
+  options: { days: number; since?: Date | number | string },
 ): ExperimentReport {
   const mine = rows.exposures.filter((r) => String(r.experiment ?? '') === description.name);
   const observed: Record<string, number> = {};
@@ -289,6 +365,7 @@ export function buildExperimentReport(
     ...(description.winner ? { winner: description.winner } : {}),
     control: description.control,
     days: options.days,
+    ...(options.since !== undefined ? { since: windowStart(options.since).toISOString() } : {}),
     visitors: total,
     variants,
     sampleRatio: sampleRatioCheck(definedObserved, description.weights),

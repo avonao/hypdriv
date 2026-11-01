@@ -285,6 +285,14 @@ describe('vercelCdnStage', () => {
     expect(flags.ctx.state.get(CDN_DECISION_KEY)?.reason).toBe('uncacheable:set-cookie');
   });
 
+  it('drops the CDN headers when the flags stage may set the experiment cookie', async () => {
+    const experiment = ctxFor('https://shop.example.com/products/1');
+    experiment.ctx.state.set(stateKey<boolean>('flags.experimentCookie'), true);
+    const { response } = await runStage(vercelCdnStage(experiment.ctx.config)!, experiment.ctx);
+    expect(response.headers.get('vercel-cdn-cache-control')).toBeNull();
+    expect(experiment.ctx.state.get(CDN_DECISION_KEY)?.reason).toBe('uncacheable:set-cookie');
+  });
+
   it('applies the negative TTL to 404 and 410 responses', async () => {
     const notFound = await run('https://shop.example.com/products/404', {
       response: () => new Response('no', { status: 404 }),

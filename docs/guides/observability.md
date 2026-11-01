@@ -87,9 +87,9 @@ When edge experiments run (`flags.definitions.<name>.experiment`, see [Flags](fl
 | Row | `blob1` | Other blobs | Doubles |
 | --- | --- | --- | --- |
 | Web Vital | `LCP`, `INP`, `CLS`, `FCP`, `TTFB` | rating, pathname, navigation type, build id, cache, country, experiment tag | value, timestamp |
-| Exposure | `experiment.exposure` | experiment, variant, pathname, route, country, build id | timestamp |
+| Exposure | `experiment.exposure` | experiment, variant, pathname (the matched route pattern such as `/blog/[slug]`, or `(unmatched)`; never the raw URL), route, country, build id | timestamp |
 
-`hypdriv experiments --results` runs both queries; `hypdriv vitals` is unaffected (its queries select vitals by `blob1`).
+`hypdriv experiments --results` runs both queries (over the last `--days`, or from `--since`, which reads `timestamp >= toDateTime('YYYY-MM-DD HH:MM:SS')`); `hypdriv vitals` is unaffected (its queries select vitals by `blob1`).
 
 ## Errors
 

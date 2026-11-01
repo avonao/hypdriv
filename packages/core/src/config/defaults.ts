@@ -198,6 +198,8 @@ export const HEADER = {
   runner: 'x-hypdriv-runner',
   theme: 'x-hypdriv-theme',
   bot: 'x-hypdriv-bot',
+  /** Marks a cache warm-up request (the Worker's cron warmer, `hypdriv warm`): not a visitor, never counted. */
+  warm: 'x-hypdriv-warm',
   userId: 'x-user-id',
 } as const;
 

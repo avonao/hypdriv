@@ -43,6 +43,7 @@ import type {
   Purger,
   TagIndex,
 } from './types';
+import { enumerateVariantInputs, type VariantInput } from './variants';
 
 type EdgeConfig = NonNullable<ResolvedConfig['cache']['edge']>;
 
@@ -856,19 +857,38 @@ class EdgeCacheImpl implements EdgeCache {
         const route: RouteMatch | null = matcher.match(url.pathname);
         const policy = matchPolicyFor(policies, url, route, context.manifest.basePath);
         if (!policy) continue;
-        const { key } = await buildCacheKey({
-          request: new Request(url, { method: 'GET' }),
-          url,
-          policy,
-          buildId: cacheVersion(context.manifest),
-          trailingSlash: context.config.site.trailingSlash ?? context.manifest.trailingSlash,
-          ignoredQuery: edge.ignoredQuery,
-        });
+        const keyOf = (input: VariantInput = {}) =>
+          buildCacheKey({
+            request: new Request(url, { method: 'GET' }),
+            url,
+            policy,
+            buildId: cacheVersion(context.manifest),
+            ...(input.flags ? { flags: input.flags } : {}),
+            ...(input.locale !== undefined ? { locale: input.locale } : {}),
+            ...(input.device !== undefined ? { device: input.device } : {}),
+            trailingSlash: context.config.site.trailingSlash ?? context.manifest.trailingSlash,
+            ignoredQuery: edge.ignoredQuery,
+          }).then((built) => built.key);
+        const base = await keyOf();
         try {
-          await this.store.delete(key);
-          if (!variant) deleted.add(key);
+          await this.store.delete(base);
+          if (!variant) deleted.add(base);
         } catch (err) {
-          this.log.warn('edge-cache: delete failed', { key: key.slice(0, 16), error: toError(err).message });
+          this.log.warn('edge-cache: delete failed', { key: base.slice(0, 16), error: toError(err).message });
+        }
+        // Copies per experiment variant, locale and device class: their keys are known without any index, so
+        // they are deleted by key (the path tag below only reaches what a shared tag index knows about).
+        for (const input of enumerateVariantInputs(policy, context.config)) {
+          const key = await keyOf(input);
+          try {
+            if (!variant && (await this.holds(key))) deleted.add(key);
+            await this.store.delete(key);
+          } catch (err) {
+            this.log.warn('edge-cache: delete failed', {
+              key: key.slice(0, 16),
+              error: toError(err).message,
+            });
+          }
         }
       }
     }
@@ -887,6 +907,13 @@ class EdgeCacheImpl implements EdgeCache {
   }
 
   // -- helpers -----------------------------------------------------------------------------------
+
+  /** Whether the store holds an entry for the key (the body is released, not read). */
+  private async holds(key: string): Promise<boolean> {
+    const entry = await this.store.get(key);
+    void entry?.response.body?.cancel().catch(() => undefined);
+    return entry !== null;
+  }
 
   private decide(ctx: HypContext, decision: CacheDecision): undefined {
     ctx.state.set(CACHE_DECISION_KEY, decision);

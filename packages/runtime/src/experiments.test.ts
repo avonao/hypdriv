@@ -55,7 +55,12 @@ describe('edge experiments through the handler', () => {
     expect(['control', 'b']).toContain(memberships.checkout?.variant);
     const exposures = points.filter((p) => p.blobs?.[0] === 'experiment.exposure');
     expect(exposures).toHaveLength(1);
-    expect(exposures[0]?.blobs?.slice(1, 4)).toEqual(['checkout', memberships.checkout?.variant, '/pricing']);
+    // The exposure names the route pattern; with no route in the manifest, `(unmatched)` — never the visited URL.
+    expect(exposures[0]?.blobs?.slice(1, 4)).toEqual([
+      'checkout',
+      memberships.checkout?.variant,
+      '(unmatched)',
+    ]);
     expect(exposures[0]?.indexes).toEqual(['checkout']);
 
     // The same visitor again: same variant, no second exposure.
@@ -104,6 +109,102 @@ describe('edge experiments through the handler', () => {
     expect(res.status).toBeLessThan(300);
     const vital = points.find((p) => p.blobs?.[0] === 'LCP');
     expect(vital?.blobs?.[7]).toBe(`|checkout:${variant}|`);
+  });
+
+  it('counts the visit of a prerendered page when its beacon reports the activation', async () => {
+    const { points, binding } = recordingBinding();
+    const handler = createHandler({
+      config: {
+        flags: {
+          definitions: {
+            checkout: {
+              default: 'control',
+              experiment: { variants: { control: 1, b: 1 }, expose: ['/orders/*'] },
+            },
+          },
+        },
+        observe: { vitals: { sink: 'analytics-engine' } },
+      } as never,
+      manifest: emptyManifest({
+        buildId: 'b1',
+        routes: [
+          { id: 'app:/orders/[id]', kind: 'app-page', pathname: '/orders/[id]', dynamic: true } as never,
+        ],
+      }),
+      target: 'node',
+    });
+    const env = { HYPDRIV_ANALYTICS: binding };
+    const exposures = () => points.filter((p) => p.blobs?.[0] === 'experiment.exposure');
+    // The browser prerenders the page: assigned, remembered, but not counted (the visitor may never open it).
+    const prerender = await handler(
+      new Request('https://example.com/orders/8f2a-secret-token', {
+        headers: { 'sec-purpose': 'prefetch;prerender' },
+      }),
+      { upstream: page, env },
+    );
+    const cookies = cookiesOf(prerender);
+    expect(parseExperimentCookie(decodeURIComponent(cookies.hyp_exp ?? '')).checkout?.exposed).toBe(false);
+    expect(exposures()).toHaveLength(0);
+    // The visitor opens it: no request, only the page's beacon says so.
+    const beacon = await handler(
+      new Request('https://example.com/_hypdriv/vitals', {
+        method: 'POST',
+        headers: {
+          'content-type': 'text/plain',
+          'cf-connecting-ip': '203.0.113.20',
+          cookie: cookieHeader(cookies),
+        },
+        body: JSON.stringify({
+          name: 'TTFB',
+          value: 0,
+          id: 'v9',
+          pathname: '/orders/8f2a-secret-token',
+          navigationType: 'prerender',
+        }),
+      }),
+      { upstream: page, env },
+    );
+    expect(beacon.status).toBe(204);
+    expect(exposures()).toHaveLength(1);
+    // The row names the route pattern, never the visited URL.
+    expect(exposures()[0]?.blobs?.slice(1, 5)).toEqual([
+      'checkout',
+      parseExperimentCookie(decodeURIComponent(cookies.hyp_exp ?? '')).checkout?.variant,
+      '/orders/[id]',
+      'app:/orders/[id]',
+    ]);
+    // (The vitals row of the same beacon keeps the pathname the page reported: hot-page warming learns from it.)
+    expect(JSON.stringify(exposures())).not.toContain('secret-token');
+    // The cookie now carries the mark, so the next real request does not count the visitor again.
+    const marked = cookiesOf(beacon);
+    expect(parseExperimentCookie(decodeURIComponent(marked.hyp_exp ?? '')).checkout?.exposed).toBe(true);
+    await handler(
+      new Request('https://example.com/orders/8f2a-secret-token', {
+        headers: { cookie: cookieHeader(marked) },
+      }),
+      { upstream: page, env },
+    );
+    expect(exposures()).toHaveLength(1);
+    // The same beacon again (a replay) is not a second exposure.
+    await handler(
+      new Request('https://example.com/_hypdriv/vitals', {
+        method: 'POST',
+        headers: {
+          'content-type': 'text/plain',
+          'cf-connecting-ip': '203.0.113.20',
+          cookie: cookieHeader(marked),
+        },
+        body: JSON.stringify({
+          name: 'TTFB',
+          value: 0,
+          id: 'v10',
+          pathname: '/orders/1',
+          navigationType: 'prerender',
+        }),
+      }),
+      { upstream: page, env },
+    );
+    expect(exposures()).toHaveLength(1);
   });
 
   it('ignores a forged tag in the beacon body and clears it without a cookie', async () => {

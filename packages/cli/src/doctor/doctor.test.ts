@@ -254,6 +254,22 @@ describe('hypdriv doctor', () => {
     expect(p.read('wrangler.jsonc')).toContain('"0 9 * * 1"');
   });
 
+  it('wants cache.warm.cron declared in triggers.crons too, and adds it with --fix', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': WRANGLER_JSONC,
+      'hypdriv.config.ts': "export default { cache: { warm: { cron: '*/30  * * * *' } } };\n",
+    });
+    const before = await doctor(p.dir, ['--only', 'wrangler.crons']);
+    expect(before.byId['wrangler.crons']).toMatchObject({ status: 'fail', fixable: true });
+    expect(before.byId['wrangler.crons']?.message).toContain('cache warm-up (cache.warm.cron)');
+    const fixed = await doctor(p.dir, ['--fix', '--only', 'wrangler.crons']);
+    expect(fixed.byId['wrangler.crons']).toMatchObject({ status: 'pass', fixed: true });
+    expect(p.read('wrangler.jsonc')).toContain('"*/30 * * * *"');
+    // Whitespace differences are not a drift: the Worker normalises both sides.
+    expect((await doctor(p.dir, ['--only', 'wrangler.crons'])).byId['wrangler.crons']?.status).toBe('pass');
+  });
+
   it('fails a re-exported proxy config and an Edge proxy runtime', async () => {
     const p = openNextProject({
       'proxy.ts':
@@ -597,6 +613,73 @@ describe('experiment checks', () => {
     expect((await doctor(off.dir, ids)).byId['experiments.cache']?.message).toContain('Edge cache is off');
   });
 
+  it('counts the copies per policy, not for the whole site', async () => {
+    const three = ['a', 'b', 'c'].map((n) => experiment(n, '{ control: 1, x: 1, y: 1 }')).join(', ');
+    const scoped = project(
+      `{ flags: { definitions: { ${three} } }, cache: { edge: { policies: [{ match: '/**', ttl: 60, vary: { experiments: false, flags: ['a'] } }] } } }`,
+    );
+    const check = (await doctor(scoped.dir, ids)).byId['experiments.cache'];
+    expect(check?.status).toBe('pass');
+    expect(check?.message).toContain('up to 3 cached copies');
+  });
+
+  it('tells Vercel which pages the CDN cannot cache while an experiment runs', async () => {
+    const vercel = (policies: string) =>
+      tempProject({
+        'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+        'vercel.json': '{}',
+        'hypdriv.config.ts': `export default { flags: { definitions: { ${experiment('checkout')} } }, cache: { edge: { policies: [${policies}] } } };\n`,
+      });
+    const varied = vercel(
+      "{ id: 'pricing', match: '/pricing', ttl: 60 }, { id: 'docs', match: '/docs/**', ttl: 60, vary: { experiments: false } }",
+    );
+    const warned = (await doctor(varied.dir, ids)).byId['experiments.cache'];
+    expect(warned?.status).toBe('warn');
+    expect(warned?.message).toContain('Vercel CDN');
+    expect(warned?.message).toContain('the policy pricing');
+    expect(warned?.message).not.toContain('docs');
+    expect(warned?.message).toContain('vary.experiments: false');
+    const optedOut = vercel("{ id: 'pricing', match: '/pricing', ttl: 60, vary: { experiments: false } }");
+    const passed = (await doctor(optedOut.dir, ids)).byId['experiments.cache'];
+    expect(passed?.status).toBe('pass');
+    expect(passed?.message).toContain('keeps caching as configured');
+  });
+
+  it('warns about experiments on pages the static layer answers before Hypdriv runs', async () => {
+    const manifest = JSON.stringify(
+      emptyManifest({
+        routes: [
+          {
+            id: 'page:/pricing',
+            kind: 'page',
+            pathname: '/pricing',
+            classification: 'static',
+            servedStatically: true,
+          } as HypRoute,
+          { id: 'page:/cart', kind: 'page', pathname: '/cart', classification: 'dynamic' } as HypRoute,
+        ],
+      }),
+    );
+    const staticIds = ['--only', 'experiments.static-pages'];
+    const onPricing = project(
+      `{ flags: { definitions: { ${experiment('checkout', '{ control: 1, b: 1 }', ", expose: ['/pricing']")} } } }`,
+      { '.hypdriv/manifest.json': manifest },
+    );
+    const warned = (await doctor(onPricing.dir, staticIds)).byId['experiments.static-pages'];
+    expect(warned?.status).toBe('warn');
+    expect(warned?.message).toContain('checkout (/pricing)');
+    expect(warned?.message).toContain('before Hypdriv runs');
+    const onCart = project(
+      `{ flags: { definitions: { ${experiment('checkout', '{ control: 1, b: 1 }', ", expose: ['/cart']")} } } }`,
+      { '.hypdriv/manifest.json': manifest },
+    );
+    const noted = (await doctor(onCart.dir, staticIds)).byId['experiments.static-pages'];
+    expect(noted).toMatchObject({ status: 'pass', informational: true });
+    expect(noted?.message).toContain('1 prerendered page(s)');
+    const none = project(`{ flags: { definitions: { ${experiment('checkout')} } } }`);
+    expect((await doctor(none.dir, staticIds)).byId['experiments.static-pages']?.status).toBe('skip');
+  });
+
   it('says where exposures go and what counting them needs', async () => {
     const config = `{ flags: { definitions: { ${experiment('checkout')} } } }`;
     const unbound = (await doctor(project(config).dir, ids)).byId['experiments.exposures'];
@@ -685,14 +768,32 @@ describe('hot warming checks', () => {
     expect(check?.message).toContain('cache.warm.cron is not set');
   });
 
-  it('passes once the sink, the secrets and the schedule are in place', async () => {
+  const triggers = WRANGLER_JSONC.replace(/\}\n$/, '  "triggers": { "crons": ["*/30 * * * *"] },\n}\n');
+
+  it('passes once the sink, the secrets, the trigger and the host are in place', async () => {
     const p = project(
-      "{ cache: { warm: { cron: '*/30 * * * *', hot: { limit: 10, days: 3 } } }, observe: { vitals: { sink: 'analytics-engine' } } }",
+      "{ site: { origin: 'https://shop.example.com' }, cache: { warm: { cron: '*/30 * * * *', hot: { limit: 10, days: 3 } } }, observe: { vitals: { sink: 'analytics-engine' } } }",
+      { 'wrangler.jsonc': triggers },
     );
     const check = (await doctor(p.dir, ids, env)).byId['security.warm-hot'];
     expect(check?.status).toBe('pass');
     expect(check?.message).toContain('10 busiest cacheable pages');
     expect(check?.message).toContain('3 day(s)');
+  });
+
+  it('warns when the Worker is never triggered or has no host to warm', async () => {
+    const base =
+      "cache: { warm: { cron: '*/30 * * * *', hot: true } }, observe: { vitals: { sink: 'analytics-engine' } }";
+    const noTrigger = project(`{ site: { origin: 'https://shop.example.com' }, ${base} }`);
+    const a = (await doctor(noTrigger.dir, ids, env)).byId['security.warm-hot'];
+    expect(a?.status).toBe('warn');
+    expect(a?.message).toContain('triggers.crons does not declare "*/30 * * * *"');
+    expect(a?.message).not.toContain('site.origin');
+    const noOrigin = project(`{ ${base} }`, { 'wrangler.jsonc': triggers });
+    const b = (await doctor(noOrigin.dir, ids, env)).byId['security.warm-hot'];
+    expect(b?.status).toBe('warn');
+    expect(b?.message).toContain('site.origin is not set');
+    expect(b?.message).not.toContain('triggers.crons');
   });
 
   it('warns when the edge cache is off and explains Vercel', async () => {

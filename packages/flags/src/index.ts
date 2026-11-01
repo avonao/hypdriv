@@ -11,6 +11,7 @@
  *   server helpers (`@hypdriv/next`) and DevTools use.
  */
 
+export { type ActivatedPrerender, exposeActivatedPrerender } from './activation';
 export {
   decodeFlagsHeader,
   encodeFlagsHeader,
@@ -33,6 +34,7 @@ export {
   publicFlags,
 } from './evaluate';
 export {
+  EXPERIMENT_COOKIE_SECONDS,
   type ExperimentInput,
   type ExperimentOutcome,
   type ExperimentReason,

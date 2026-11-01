@@ -90,6 +90,64 @@ describe('dispatchScheduled', () => {
     expect(urls).toContain('GET /pricing (warm)');
   });
 
+  describe('warming and experiments', () => {
+    const experimentConfig = loadConfig({
+      site: { origin: 'https://shop.example.com' },
+      flags: {
+        definitions: {
+          checkout: { default: 'control', experiment: { variants: { control: 1, b: 1, c: 1 } } },
+        },
+      },
+      cache: { warm: { cron: '*/15 * * * *', routes: ['/pricing', '/about'], concurrency: 2 } },
+    });
+
+    it('warms every variant copy of a page with warm-up requests that name the variant', async () => {
+      const seen: Array<{ path: string; cookie: string | null; warm: string | null }> = [];
+      const variants: Record<string, Array<Record<string, string>>> = {
+        '/pricing': [{ checkout: 'control' }, { checkout: 'b' }, { checkout: 'c' }],
+      };
+      const result = await dispatchScheduled(
+        { cron: '*/15 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(experimentConfig, async (request) => {
+            seen.push({
+              path: new URL(request.url).pathname,
+              cookie: request.headers.get('cookie'),
+              warm: request.headers.get('x-hypdriv-warm'),
+            });
+            return new Response('ok');
+          }),
+          warmVariants: (path) => variants[path] ?? [{}],
+        },
+      );
+      expect(result.ran).toEqual(['warm']);
+      const pricing = seen
+        .filter((r) => r.path === '/pricing')
+        .map((r) => decodeURIComponent(r.cookie ?? ''));
+      expect(pricing.sort()).toEqual([
+        'hyp_exp=checkout:b',
+        'hyp_exp=checkout:c',
+        'hyp_exp=checkout:control',
+      ]);
+      expect(seen.filter((r) => r.path === '/about')).toEqual([{ path: '/about', cookie: null, warm: '1' }]);
+      expect(seen.every((r) => r.warm === '1')).toBe(true);
+    });
+
+    it('says so when site.origin is not set, because the placeholder host gets the edge cache copies', async () => {
+      const { log, lines } = recordingLogger();
+      const invoke = vi.fn(async () => new Response('ok'));
+      const unset = loadConfig({ cache: { warm: { cron: '*/15 * * * *', routes: ['/'] } } });
+      const result = await dispatchScheduled(
+        { cron: '*/15 * * * *', scheduledTime: 0 },
+        dispatchContext(unset, invoke, undefined, log),
+      );
+      // The application's own caches are still filled, so the warm-up runs.
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(result.ran).toEqual(['warm']);
+      expect(lines.find((l) => l.level === 'warn')?.message).toContain('site.origin');
+    });
+  });
+
   describe('hot warming', () => {
     const hotConfig = loadConfig({
       site: { origin: 'https://shop.example.com' },
@@ -160,6 +218,7 @@ describe('dispatchScheduled', () => {
             { pathname: '/_hypdriv/purge', views: 996 },
             { pathname: '/ok', views: 50 },
           ]) as never,
+          cacheable: () => true,
         },
       );
       expect(warmed.sort()).toEqual(['https://shop.example.com/', 'https://shop.example.com/ok']);
@@ -185,6 +244,7 @@ describe('dispatchScheduled', () => {
               log,
             ),
             fetch: fetchImpl as never,
+            cacheable: () => true,
           },
         );
         expect(result.ran).toEqual(['warm']);
@@ -194,6 +254,54 @@ describe('dispatchScheduled', () => {
         );
         if (expected === 'missing') expect(fetchImpl).not.toHaveBeenCalled();
       }
+    });
+
+    it('fails closed without a cacheability test: only the configured routes are warmed', async () => {
+      const { log, lines } = recordingLogger();
+      const warmed: string[] = [];
+      const fetchSpy = rows([{ pathname: '/blog/hello', views: 900 }]);
+      await dispatchScheduled(
+        { cron: '*/30 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(
+            hotConfig,
+            async (request) => {
+              warmed.push(new URL(request.url).pathname);
+              return new Response('ok');
+            },
+            creds,
+            log,
+          ),
+          fetch: fetchSpy as never,
+        },
+      );
+      expect(warmed).toEqual(['/']);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(lines.find((l) => l.level === 'warn')?.message).toContain('hot warming skipped');
+    });
+
+    it('never requests an encoded alias of a dot segment or an internal path', async () => {
+      const warmed: string[] = [];
+      await dispatchScheduled(
+        { cron: '*/30 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(
+            hotConfig,
+            async (request) => {
+              warmed.push(new URL(request.url).pathname);
+              return new Response('ok');
+            },
+            creds,
+          ),
+          fetch: rows([
+            { pathname: '/blog/%2e%2e/%2e%2e/_hypdriv/live/x', views: 999 },
+            { pathname: '/%5Fhypdriv/purge', views: 998 },
+            { pathname: '/ok', views: 50 },
+          ]) as never,
+          cacheable: () => true,
+        },
+      );
+      expect(warmed.sort()).toEqual(['/', '/ok']);
     });
 
     it('does nothing for hot pages when warm.hot is off', async () => {

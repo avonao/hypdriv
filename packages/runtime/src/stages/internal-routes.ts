@@ -2,6 +2,7 @@ import { getEdgePurger } from '@hypdriv/cache';
 import {
   base64Encode,
   cacheVersion,
+  createRouteMatcher,
   describeCapabilities,
   frameworkLabel,
   getCookie,
@@ -11,6 +12,7 @@ import {
   readEnv,
   serializeCookie,
 } from '@hypdriv/core';
+import { exposeActivatedPrerender } from '@hypdriv/flags';
 import { createLiveHandler } from '@hypdriv/live';
 import {
   analyticsEngineVitalsSink,
@@ -333,6 +335,8 @@ export function internalRoutes(
 ) => Promise<Response | null> {
   const prefix = platform.config.cloudflare.internalPathPrefix;
   const vitalsConfig = platform.config.observe.vitals;
+  const exposureSink = platform.exposureSink;
+  const routes = createRouteMatcher(platform.manifest);
   const vitals = vitalsConfig
     ? vitalsHandler({
         sink:
@@ -342,6 +346,28 @@ export function internalRoutes(
             : logVitalsSink(platform.log)),
         sampleRate: vitalsConfig.sampleRate,
         experimentCookie: platform.config.flags.experimentCookie,
+        // A prerendered page that the visitor opens sends no request; its beacon is the exposure the fetch could not be.
+        ...(exposureSink
+          ? {
+              onPrerenderActivation: async ({ request, pathname, country }) => {
+                const definitions = await platform.flagsProvider.load();
+                if (!Object.values(definitions).some((def) => def.experiment)) return null;
+                const route = routes.match(new URL(pathname, 'https://hypdriv.internal').pathname)?.route;
+                return exposeActivatedPrerender({
+                  cookieHeader: request.headers.get('cookie'),
+                  pathname,
+                  definitions,
+                  cookieName: platform.config.flags.experimentCookie,
+                  ...(route ? { route: { id: route.id, pathname: route.pathname } } : {}),
+                  ...(country ? { country } : {}),
+                  ...(platform.manifest.buildId ? { buildId: platform.manifest.buildId } : {}),
+                  secure: new URL(request.url).protocol === 'https:',
+                  onExposure: exposureSink,
+                  log: platform.log,
+                });
+              },
+            }
+          : {}),
         ...(platform.config.site.origin ? { allowOrigin: platform.config.site.origin } : {}),
       })
     : null;

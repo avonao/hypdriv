@@ -266,7 +266,7 @@ describe('flagsStage() with experiments', () => {
     expect(first.experimentCookie).toMatch(/HttpOnly/);
     expect(first.experimentCookie).toMatch(/SameSite=Lax/);
     expect(first.exposures).toEqual([
-      expect.objectContaining({ experiment: 'checkout', variant, pathname: '/cart' }),
+      expect.objectContaining({ experiment: 'checkout', variant, pathname: '(unmatched)' }),
     ]);
 
     const second = await visit({ cookie: `${fresh}; hyp_exp=checkout:${variant}*` });
@@ -413,9 +413,7 @@ describe('flagsStage() with experiments', () => {
       },
     });
     expect(forwarded?.headers.get(config.flags.header)).toBeTruthy();
-    expect(parseExperimentCookie(parseCookies(getSetCookies(new Headers()).join(';'))['hyp_exp'])).toEqual(
-      {},
-    );
+    expect(parseExperimentCookie(parseCookies(getSetCookies(new Headers()).join(';')).hyp_exp)).toEqual({});
   });
 });
 

@@ -51,6 +51,7 @@ export {
   type VitalsDashboardView,
 } from './vitals/dashboard';
 export {
+  binomialTwoSidedP,
   buildExperimentReport,
   chiSquareSurvival,
   type ExperimentDescription,
@@ -58,10 +59,12 @@ export {
   type ExperimentReport,
   type ExperimentRows,
   type ExperimentVariantResult,
+  type ExperimentWindow,
   experimentExposuresSql,
   experimentVitalsSql,
   type SampleRatioCheck,
   sampleRatioCheck,
+  sqlTimestamp,
 } from './vitals/experiments';
 export {
   normalizeVitalsPayload,

@@ -1,4 +1,10 @@
-import { createCacheableTest, createKvTagIndex, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
+import {
+  createCacheableTest,
+  createKvTagIndex,
+  createWarmVariantPlanner,
+  registerEdgePurger,
+  UPSTREAM_KEY,
+} from '@hypdriv/cache';
 import {
   assertManifest,
   cacheVersion,
@@ -352,6 +358,7 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
   ): DispatchContext => {
     // Built on first use: only warming needs it, and queue or email events never do.
     let cacheable: ((pathname: string) => boolean) | undefined;
+    let warmVariants: ReturnType<typeof createWarmVariantPlanner> | undefined;
     return {
       config: runtime.platform.config,
       env,
@@ -360,6 +367,10 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
       cacheable: (pathname) => {
         cacheable ??= createCacheableTest(runtime.platform.config, runtime.platform.manifest);
         return cacheable(pathname);
+      },
+      warmVariants: (pathname) => {
+        warmVariants ??= createWarmVariantPlanner(runtime.platform.config, runtime.platform.manifest);
+        return warmVariants(pathname);
       },
       invoke: async (request) => {
         const self = env.WORKER_SELF_REFERENCE as { fetch(request: Request): Promise<Response> } | undefined;

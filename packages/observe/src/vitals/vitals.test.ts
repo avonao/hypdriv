@@ -293,6 +293,53 @@ describe('vitalsHandler with experiments', () => {
     expect(writes[2]?.payload.experiments).toBeUndefined();
   });
 
+  it('reports the page of a prerender activation once, before sampling, and adds the cookie it returns', async () => {
+    const { writes, sink } = recordingSink();
+    const activations: Array<{ pathname: string; cookie: string | null }> = [];
+    const handler = vitalsHandler({
+      sink,
+      now: () => NOW,
+      sampleRate: 0,
+      experimentCookie: 'hyp_exp',
+      onPrerenderActivation: ({ request, pathname }) => {
+        activations.push({ pathname, cookie: request.headers.get('cookie') });
+        return 'hyp_exp=checkout%3Ab*; Path=/; HttpOnly';
+      },
+    });
+    const res = await handler(
+      post('hyp_exp=checkout%3Ab', [
+        metric({ name: 'TTFB', navigationType: 'prerender', pathname: '/checkout/pay' }),
+        metric({ name: 'LCP', navigationType: 'prerender', pathname: '/checkout/pay' }),
+      ]),
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('set-cookie')).toBe('hyp_exp=checkout%3Ab*; Path=/; HttpOnly');
+    expect(activations).toEqual([{ pathname: '/checkout/pay', cookie: 'hyp_exp=checkout%3Ab' }]);
+    // The sample rate is 0: no vitals are stored, but the activation was still seen.
+    expect(writes).toHaveLength(0);
+    const plain = await handler(post(undefined, [metric({ navigationType: 'navigate' })]));
+    expect(plain.headers.get('set-cookie')).toBeNull();
+    expect(activations).toHaveLength(1);
+  });
+
+  it('survives a failing activation hook', async () => {
+    const { writes, sink } = recordingSink();
+    const warnings: string[] = [];
+    const handler = vitalsHandler({
+      sink,
+      now: () => NOW,
+      onPrerenderActivation: () => {
+        throw new Error('provider down');
+      },
+      log: { warn: (message: string) => warnings.push(message) } as never,
+    });
+    const res = await handler(post(undefined, [metric({ navigationType: 'prerender' })]));
+    expect(res.status).toBe(204);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(writes).toHaveLength(1);
+    expect(warnings).toEqual(['vitals: prerender activation failed']);
+  });
+
   it('leaves the payload alone without a configured cookie', async () => {
     const { writes, sink } = recordingSink();
     await vitalsHandler({ sink, now: () => NOW })(post('hyp_exp=checkout%3Ab', [metric()]));

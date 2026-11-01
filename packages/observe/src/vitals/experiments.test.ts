@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  binomialTwoSidedP,
   buildExperimentReport,
   chiSquareSurvival,
   experimentExposuresSql,
   experimentVitalsSql,
   sampleRatioCheck,
+  sqlTimestamp,
 } from './experiments';
 
 describe('experiment SQL', () => {
@@ -24,6 +26,30 @@ describe('experiment SQL', () => {
     expect(sql).toContain("position('|hero:b|' IN blob8) > 0");
     expect(sql).toContain("blob1 IN ('LCP', 'INP', 'CLS')");
     expect(sql).toContain('quantileWeighted(0.75, double1, _sample_interval)');
+  });
+
+  it('never writes NaN or Infinity into the window', () => {
+    for (const odd of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const exposures = experimentExposuresSql('d', { days: odd });
+      expect(exposures).toContain("INTERVAL '14' DAY");
+      expect(exposures).not.toMatch(/NaN|Infinity/);
+      const vitals = experimentVitalsSql('d', { days: odd, experiment: 'x', variant: 'b' });
+      expect(vitals).toContain("INTERVAL '14' DAY");
+      expect(vitals).not.toMatch(/NaN|Infinity/);
+    }
+  });
+
+  it('reads from an explicit moment when the window starts after a change', () => {
+    const since = new Date('2026-10-30T12:34:56.789Z');
+    expect(sqlTimestamp(since)).toBe('2026-10-30 12:34:56');
+    expect(sqlTimestamp('2026-10-30')).toBe('2026-10-30 00:00:00');
+    const exposures = experimentExposuresSql('d', { days: 14, since });
+    expect(exposures).toContain("timestamp >= toDateTime('2026-10-30 12:34:56')");
+    expect(exposures).not.toContain('INTERVAL');
+    const vitals = experimentVitalsSql('d', { days: 14, since, experiment: 'x', variant: 'b' });
+    expect(vitals).toContain("timestamp >= toDateTime('2026-10-30 12:34:56')");
+    expect(() => experimentExposuresSql('d', { days: 14, since: "2026-10-30' OR 1=1" })).toThrow(/window/);
+    expect(() => experimentExposuresSql('d', { days: 14, since: Number.NaN })).toThrow(/window/);
   });
 
   it('clamps the window and refuses anything that is not an identifier', () => {
@@ -51,8 +77,54 @@ describe('chiSquareSurvival', () => {
   });
 });
 
+describe('binomialTwoSidedP', () => {
+  it('matches known exact values', () => {
+    // 95 of 100 against 99 %: P(X <= 95) + P(X = 100), as R's binom.test(95, 100, 0.99) gives.
+    expect(binomialTwoSidedP(95, 100, 0.99)).toBeCloseTo(0.0034, 3);
+    // The mode is as likely as any outcome: nothing to be surprised about.
+    expect(binomialTwoSidedP(50, 100, 0.5)).toBeCloseTo(1, 10);
+    // 60 of 100 heads of a fair coin.
+    expect(binomialTwoSidedP(60, 100, 0.5)).toBeCloseTo(0.0568, 3);
+    expect(binomialTwoSidedP(0, 10, 0.5)).toBeCloseTo(2 / 1024, 12);
+  });
+
+  it('is symmetric for a fair split and NaN for nonsense', () => {
+    expect(binomialTwoSidedP(13, 100, 0.5)).toBeCloseTo(binomialTwoSidedP(87, 100, 0.5), 12);
+    expect(binomialTwoSidedP(1, 10, 0)).toBeNaN();
+    expect(binomialTwoSidedP(11, 10, 0.5)).toBeNaN();
+    expect(binomialTwoSidedP(1.5, 10, 0.5)).toBeNaN();
+  });
+});
+
 describe('sampleRatioCheck', () => {
   const weights = { control: 50, b: 50 };
+
+  it('uses the exact test where the expected count is below 5 (finding 8)', () => {
+    // 95 / 5 against 99 / 1: chi-square says p = 6e-5 and flags it; the exact probability is 0.34 %.
+    const r = sampleRatioCheck({ control: 95, b: 5 }, { control: 99, b: 1 });
+    expect(r.method).toBe('exact');
+    expect(r.status).toBe('ok');
+    expect(r.chiSquare).toBeNull();
+    expect(r.p).toBeCloseTo(0.0034, 3);
+    // A split that is wrong even by the exact test is still flagged.
+    const bad = sampleRatioCheck({ control: 80, b: 20 }, { control: 99, b: 1 });
+    expect(bad.method).toBe('exact');
+    expect(bad.status).toBe('mismatch');
+    // Plenty of visitors for every variant: the usual test.
+    expect(sampleRatioCheck({ control: 5040, b: 4960 }, weights).method).toBe('chi-square');
+    expect(sampleRatioCheck({ control: 5040, b: 4960 }, weights).chiSquare).toBeGreaterThan(0);
+  });
+
+  it('corrects for the number of variants when one of several is expected to be rare', () => {
+    const weights3 = { control: 98, b: 1, c: 1 };
+    const fine = sampleRatioCheck({ control: 195, b: 3, c: 2 }, weights3);
+    expect(fine.method).toBe('exact');
+    expect(fine.status).toBe('ok');
+    const off = sampleRatioCheck({ control: 150, b: 25, c: 25 }, weights3);
+    expect(off.status).toBe('mismatch');
+    expect(off.p).toBeLessThan(0.001);
+    expect(sampleRatioCheck({ control: 195, b: 3, c: 2 }, weights3).p).toBeLessThanOrEqual(1);
+  });
 
   it('accepts a split chance explains', () => {
     const r = sampleRatioCheck({ control: 5040, b: 4960 }, weights);
@@ -181,6 +253,18 @@ describe('buildExperimentReport', () => {
       ['control', 0, 0],
       ['b', 0, 0],
     ]);
+  });
+
+  it('names the start of an explicit window', () => {
+    const report = buildExperimentReport(
+      description,
+      { exposures: [], vitals: {} },
+      { days: 3, since: '2026-10-30T12:00:00Z' },
+    );
+    expect(report.since).toBe('2026-10-30T12:00:00.000Z');
+    expect(
+      buildExperimentReport(description, { exposures: [], vitals: {} }, { days: 3 }).since,
+    ).toBeUndefined();
   });
 
   it('carries the winner of a concluded experiment', () => {

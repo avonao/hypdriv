@@ -81,6 +81,9 @@ export function serializeCacheKey(input: CacheKeyInput): CacheKeyMaterial {
   }
 
   if (policy.vary.flags.length) {
+    // Flag values (and experiment variants) are decided from the visitor's cookies, so a shared cache in front of
+    // the Worker must not hand one visitor's copy to another: `Vary: Cookie` tells it so.
+    vary.add('cookie');
     for (const name of sortedUnique(policy.vary.flags)) {
       const value = input.flags?.[name];
       lines.push(`f ${name}=${value === undefined ? '' : String(value)}`);

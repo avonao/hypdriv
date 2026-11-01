@@ -282,11 +282,18 @@ export function isRscRequest(headers: Headers): boolean {
   return headers.get('rsc') === '1' || headers.has('next-router-state-tree');
 }
 
+/**
+ * `true` for requests a browser or Next.js makes speculatively, before the visitor asks for the page: Next.js
+ * route prefetches, `Purpose: prefetch`, `Sec-Purpose: prefetch[;prerender]` (speculation rules), Firefox's
+ * `X-moz: prefetch` and Safari/Chrome's `X-Purpose: preview`.
+ */
 export function isPrefetchRequest(headers: Headers): boolean {
   return (
     headers.get('next-router-prefetch') === '1' ||
-    headers.get('purpose') === 'prefetch' ||
-    headers.get('sec-purpose')?.includes('prefetch') === true
+    headers.get('purpose')?.toLowerCase() === 'prefetch' ||
+    headers.get('x-moz')?.toLowerCase() === 'prefetch' ||
+    headers.get('x-purpose')?.toLowerCase() === 'preview' ||
+    headers.get('sec-purpose')?.toLowerCase().includes('prefetch') === true
   );
 }
 
