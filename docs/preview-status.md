@@ -14,6 +14,7 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 | Vercel (CDN cache and purge, Upstash, Global Config, WAF, BotID, Queues) | `@hypdriv/vercel` | Preview |
 | Hono (a plain server framework, no build step) | `@hypdriv/hono` | Preview (verified locally on Node and workerd; live Cloudflare and Vercel runs pending) |
 | Waku (React Server Components on Vite; 1.0 release candidates) | `@hypdriv/waku` | Preview (verified locally on Node, workerd and a real `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
+| SolidStart 2 (Vite 8 and Nitro 3 deployment plugins) | `@hypdriv/solid-start` | Preview (verified locally on Node, workerd for the `@cloudflare/vite-plugin` and Nitro `cloudflare_module` builds, and a real offline `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
 | Vite hosts: plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext | `@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` | Preview |
 | Edge cache, security, observability | `@hypdriv/cache`, `@hypdriv/security`, `@hypdriv/observe` | Preview |
 | Flags, live channels, images, DevTools HUD, testing kit | `@hypdriv/flags`, `@hypdriv/live`, `@hypdriv/image`, `@hypdriv/devtools`, `@hypdriv/testing` | Preview |
