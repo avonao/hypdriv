@@ -10,6 +10,10 @@ export const EXPOSURE_METRIC = 'experiment.exposure';
 export interface ExposureEvent {
   experiment: string;
   variant: string;
+  /**
+   * The route pattern the visit matched (`/blog/[slug]`), or `(unmatched)`: never the visited URL, because paths
+   * carry tokens and ids (`/reset/<token>`) that must not reach a log or a dataset.
+   */
   pathname: string;
   route?: string;
   country?: string;

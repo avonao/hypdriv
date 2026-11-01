@@ -8,7 +8,12 @@ import {
   matchesAny,
 } from '@hypdriv/core';
 import { isFlagValue } from './encoding';
-import { type ExperimentOutcome, evaluateExperiment, hasVariant } from './experiments';
+import {
+  type ExperimentOutcome,
+  type ExperimentRequester,
+  evaluateExperiment,
+  hasVariant,
+} from './experiments';
 
 /** Device class used by `when.device` rules. */
 export type FlagDevice = 'mobile' | 'desktop' | 'bot';
@@ -29,6 +34,8 @@ export interface FlagEvalInput {
   overrides?: Record<string, FlagValue>;
   /** The visitor's experiment memberships (the experiment cookie): assignments that stay put. */
   memberships?: Record<string, ExperimentMembership>;
+  /** Who is asking (default `visitor`): bots and warm-ups are never assigned to an experiment variant. */
+  requester?: ExperimentRequester;
 }
 
 export interface FlagEvalResult {
@@ -100,7 +107,7 @@ export function parseQueryOverrides(
   for (const [key, value] of url.searchParams) {
     if (!key.startsWith(prefix)) continue;
     const name = key.slice(prefix.length);
-    if (name in definitions) out[name] = value;
+    if (Object.hasOwn(definitions, name)) out[name] = value;
   }
   return out;
 }
@@ -170,6 +177,7 @@ export function evaluateFlags(input: FlagEvalInput): FlagEvalResult {
       const outcome = evaluateExperiment(name, def, spec, {
         stableId: input.stableId,
         ...(input.memberships ? { memberships: input.memberships } : {}),
+        ...(input.requester ? { requester: input.requester } : {}),
         inAudience,
       });
       experiments[name] = outcome;
@@ -203,7 +211,7 @@ export function evaluateFlag(
   name: string,
   input: FlagEvalInput,
 ): { value: FlagValue; reason: string } | null {
-  if (!(name in input.definitions)) return null;
+  if (!Object.hasOwn(input.definitions, name)) return null;
   const result = evaluateFlags(input);
   const value = result.values[name];
   if (value === undefined) return null;

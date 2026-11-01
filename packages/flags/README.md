@@ -112,7 +112,7 @@ Hooks are SSR-safe (no `window` access) and return the fallback outside a provid
 
 ## Experiments
 
-A flag with an `experiment` block is an A/B test: weighted variants, deterministic and sticky assignment (the `hyp_exp` cookie), an audience (`when`), a traffic share, `status: 'running' | 'paused' | 'concluded'` with a `winner`, and exposures reported once per visitor.
+A flag with an `experiment` block is an A/B test: weighted variants, deterministic and sticky assignment (the `hyp_exp` cookie; a new `salt` restarts the test), an audience (`when`, checked before the stored assignment and validated), a traffic share, `status: 'running' | 'paused' | 'concluded'` with a `winner`, and exposures reported once per visitor (never for crawlers, previews, audit tooling or cache warm-ups).
 
 ```ts
 definitions: {
@@ -123,7 +123,8 @@ definitions: {
 }
 ```
 
-- `evaluateExperiment(name, def, spec, { stableId, memberships, inAudience })` is the pure assignment (`{ variant, reason, member }`); `pickVariant(variants, bucket)` and `hasVariant(spec, v)` are its parts.
+- `evaluateExperiment(name, def, spec, { stableId, memberships, inAudience, requester })` is the pure assignment (`{ variant, reason, member }`); `pickVariant(variants, bucket)` and `hasVariant(spec, v)` are its parts.
+- `exposeActivatedPrerender(…)` counts the visit of a prerendered page from its web-vitals beacon (the runtime wires it into the vitals route); exposure rows carry the route pattern, never the visited URL.
 - `flagsStage(config, provider, { onExposure })` reports exposures to an `ExposureSink`: `analyticsEngineExposureSink(binding)`, `logExposureSink(log)`, `multiExposureSink(sinks)`; `createHandler()` picks one from `flags.exposures`.
 - `EXPERIMENTS_KEY` holds the per-request outcomes in `ctx.state` for other stages.
 - `?hyp_flag_<name>=<variant>` forces one of the experiment's own variants for QA, uncounted and unstored.

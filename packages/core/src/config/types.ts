@@ -611,9 +611,17 @@ export interface ExperimentSpec {
   variants: Record<string, number>;
   /** Share of the audience (0–100, default 100) that takes part; the rest see the control and are not counted. */
   traffic?: number;
-  /** Audience: only visitors matching these conditions take part (same conditions as a flag rule). */
+  /**
+   * Audience: only visitors matching these conditions take part (same conditions as a flag rule; an unknown condition
+   * is a configuration error). It is checked on every request, before a stored assignment: a visitor who stops
+   * matching (consent withdrawn, left the country) gets the control, is not counted and loses the cookie entry.
+   */
   when?: FlagRule['when'];
-  /** Changes every assignment without renaming the experiment (a restart). */
+  /**
+   * Restarts the experiment. A new `salt` voids every stored assignment: each visitor is assigned again (by
+   * `hash(stableId, name, salt)`) and counted again, while changing `variants`, weights or `traffic` only moves
+   * visitors who have no assignment yet.
+   */
   salt?: string;
   /**
    * `running` (default): assign and expose. `paused`: visitors who already have a variant keep it, new visitors get

@@ -1,4 +1,5 @@
 import {
+  EXPERIMENT_TOKEN_RE,
   type ExperimentSpec,
   type FlagDefinition,
   type FlagRule,
@@ -39,10 +40,39 @@ export function parseFlagDefinitions(
   const out: Record<string, FlagDefinition> = {};
   for (const [name, raw] of Object.entries(input as Record<string, unknown>)) {
     const def = normalizeDefinition(raw);
-    if (def) out[name] = def;
-    else onInvalid?.(name, 'definition must be an object with a boolean, string or number `default`');
+    if (!def) {
+      onInvalid?.(
+        name,
+        'ignored: the definition must be an object with a boolean, string or number `default`',
+      );
+      continue;
+    }
+    // Experiment names are stored in a cookie: one that cannot be would be counted again on every page view.
+    if (def.experiment && !EXPERIMENT_TOKEN_RE.test(name)) {
+      delete def.experiment;
+      onInvalid?.(
+        name,
+        'its experiment block is ignored (the flag serves its default): experiment names must be 1–48 letters, digits, "_" or "-"',
+      );
+    } else if (isExperimentBlock(raw) && !def.experiment) {
+      onInvalid?.(
+        name,
+        'its experiment block is ignored (the flag serves its default): it needs two or more variants named with letters, digits, "_" or "-" and a default that is one of them',
+      );
+    }
+    out[name] = def;
   }
   return out;
+}
+
+function isExperimentBlock(raw: unknown): boolean {
+  return (
+    !!raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    !!(raw as { experiment?: unknown }).experiment &&
+    typeof (raw as { experiment?: unknown }).experiment === 'object'
+  );
 }
 
 function normalizeDefinition(raw: unknown): FlagDefinition | null {
@@ -79,13 +109,14 @@ function normalizeExperiment(raw: unknown, control: FlagValue): ExperimentSpec |
   const variants: Record<string, number> = {};
   for (const [variant, weight] of Object.entries(r.variants as Record<string, unknown>))
     if (
-      /^[A-Za-z0-9_-]{1,48}$/.test(variant) &&
+      EXPERIMENT_TOKEN_RE.test(variant) &&
+      variant !== '__proto__' &&
       typeof weight === 'number' &&
       Number.isFinite(weight) &&
       weight > 0
     )
       variants[variant] = weight;
-  if (Object.keys(variants).length < 2 || typeof control !== 'string' || !(control in variants))
+  if (Object.keys(variants).length < 2 || typeof control !== 'string' || !Object.hasOwn(variants, control))
     return undefined;
   const spec: ExperimentSpec = { variants };
   if (typeof r.traffic === 'number' && Number.isFinite(r.traffic))
@@ -93,7 +124,7 @@ function normalizeExperiment(raw: unknown, control: FlagValue): ExperimentSpec |
   if (r.when && typeof r.when === 'object' && !Array.isArray(r.when)) spec.when = r.when as FlagRule['when'];
   if (typeof r.salt === 'string') spec.salt = r.salt.slice(0, 64);
   if (r.status === 'running' || r.status === 'paused' || r.status === 'concluded') spec.status = r.status;
-  if (typeof r.winner === 'string' && r.winner in variants) spec.winner = r.winner;
+  if (typeof r.winner === 'string' && Object.hasOwn(variants, r.winner)) spec.winner = r.winner;
   if (Array.isArray(r.expose))
     spec.expose = r.expose.filter((p): p is string => typeof p === 'string').slice(0, 32);
   return spec;
@@ -149,7 +180,7 @@ export function envProvider(
       }
       try {
         const parsed = parseFlagDefinitions(JSON.parse(raw), (name, reason) =>
-          warn(`Ignoring flag "${name}" from ${envVar}: ${reason}`),
+          warn(`Flag "${name}" from ${envVar}: ${reason}`),
         );
         if (!parsed) throw new TypeError('expected a JSON object of flag definitions');
         cached = { ...fallback, ...parsed };
@@ -191,7 +222,7 @@ export function kvProvider(
           return fallback;
         }
         const parsed = parseFlagDefinitions(raw, (name, reason) =>
-          options.log?.warn(`Ignoring flag "${name}" from KV ${key}: ${reason}`),
+          options.log?.warn(`Flag "${name}" from KV ${key}: ${reason}`),
         );
         if (!parsed) {
           options.log?.warn(`KV key ${key} is not a JSON object of flag definitions`);

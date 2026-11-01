@@ -1,3 +1,4 @@
+import { MAX_COOKIE_EXPERIMENTS, runningExperiments } from '../util/experiments';
 import { parseDuration, parseSize } from '../util/units';
 import type { HypDrivConfig } from './types';
 
@@ -101,14 +102,20 @@ const checkRoutePattern: Check = (v, path, out) => {
   }
 };
 
-function checkObjectShape(shape: Record<string, Check>, options: { allowUnknown?: boolean } = {}): Check {
+function checkObjectShape(
+  shape: Record<string, Check>,
+  options: { allowUnknown?: boolean; unknown?: { severity: 'error'; message: string } } = {},
+): Check {
   return (v, path, out) => {
     if (v === undefined) return;
     if (!isObject(v)) return error(out, path, 'must be an object');
     for (const [key, check] of Object.entries(shape)) check(v[key], `${path}.${key}`, out);
     if (!options.allowUnknown) {
-      for (const key of Object.keys(v))
-        if (!(key in shape)) warning(out, `${path}.${key}`, 'unknown option (ignored)');
+      for (const key of Object.keys(v)) {
+        if (Object.hasOwn(shape, key)) continue;
+        if (options.unknown) error(out, `${path}.${key}`, options.unknown.message);
+        else warning(out, `${path}.${key}`, 'unknown option (ignored)');
+      }
     }
   };
 }
@@ -135,6 +142,48 @@ function recordOf(valueCheck: Check): Check {
     for (const [k, item] of Object.entries(v)) valueCheck(item, `${path}.${k}`, out);
   };
 }
+
+/** `cookie` / `header`: name → expected value (or a list of accepted values). */
+const checkConditionMap: Check = (v, path, out) => {
+  if (v === undefined) return;
+  if (!isObject(v)) return error(out, path, 'must be an object of name → value (or list of values)');
+  for (const [name, expected] of Object.entries(v)) {
+    const ok =
+      typeof expected === 'string' ||
+      (Array.isArray(expected) && expected.every((item) => typeof item === 'string'));
+    if (!ok) error(out, `${path}.${name}`, 'must be a string or an array of strings');
+  }
+};
+
+/**
+ * The conditions of a flag rule and of an experiment audience (`experiment.when`). Both go through this one check,
+ * so a typo (`cookies`, `contry`) is reported the same way in either place.
+ */
+const FLAG_WHEN_SHAPE: Record<string, Check> = {
+  country: checkStringArray,
+  continent: checkStringArray,
+  path: checkStringArray,
+  cookie: checkConditionMap,
+  header: checkConditionMap,
+  device: checkEnum(['mobile', 'desktop', 'bot']),
+  from: checkString,
+  until: checkString,
+  flag: (v, path, out) => {
+    if (v === undefined) return;
+    if (!isObject(v)) return error(out, path, 'must be an object of flag name → value');
+    for (const [name, expected] of Object.entries(v))
+      if (!['boolean', 'string', 'number'].includes(typeof expected))
+        error(out, `${path}.${name}`, 'must be a boolean, string or number');
+  },
+};
+const checkFlagWhen: Check = checkObjectShape(FLAG_WHEN_SHAPE);
+/** An experiment audience with an unknown condition would silently enrol everyone (consent gates included). */
+const checkAudience: Check = checkObjectShape(FLAG_WHEN_SHAPE, {
+  unknown: {
+    severity: 'error',
+    message: 'unknown audience condition: it would be ignored and the experiment would enrol everyone',
+  },
+});
 
 const checkCspDirectives: Check = (v, path, out) => {
   if (v === undefined) return;
@@ -637,17 +686,7 @@ const rootCheck = checkObjectShape({
         },
         rules: arrayOf(
           checkObjectShape({
-            when: checkObjectShape({
-              country: checkStringArray,
-              continent: checkStringArray,
-              path: checkStringArray,
-              cookie: () => {},
-              header: () => {},
-              device: checkEnum(['mobile', 'desktop', 'bot']),
-              from: checkString,
-              until: checkString,
-              flag: () => {},
-            }),
+            when: checkFlagWhen,
             percentage: checkNumber(0, 100),
             value: (v, p, o) => {
               if (!['boolean', 'string', 'number'].includes(typeof v))
@@ -661,7 +700,7 @@ const rootCheck = checkObjectShape({
               error(o, p, 'is required (an object of variant name → weight)');
           },
           traffic: checkNumber(0, 100),
-          when: () => {},
+          when: checkAudience,
           salt: checkString,
           status: checkEnum(['running', 'paused', 'concluded']),
           winner: checkString,
@@ -923,6 +962,13 @@ function semanticChecks(config: HypDrivConfig, out: ConfigDiagnostic[]) {
       }
     }
   }
+  const running = runningExperiments(config.flags?.definitions ?? {}).length;
+  if (running > MAX_COOKIE_EXPERIMENTS)
+    warning(
+      out,
+      'config.flags.definitions',
+      `${running} experiments are running, but the experiment cookie remembers ${MAX_COOKIE_EXPERIMENTS} per visitor: the others are assigned on every request and never counted. Conclude finished experiments.`,
+    );
 }
 
 /** Experiment names and variants travel in a cookie, so they stay URL-safe. */
@@ -954,13 +1000,17 @@ function validateExperiment(
     if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
       error(out, `${path}.experiment.variants.${variant}`, 'the weight must be a positive number');
   }
-  if (typeof def.default !== 'string' || !(def.default in (spec.variants ?? {})))
+  if (typeof def.default !== 'string' || !Object.hasOwn(spec.variants ?? {}, def.default))
     error(
       out,
       `${path}.default`,
       `must be the control variant, one of: ${variants.map(([v]) => v).join(', ')}`,
     );
-  if (spec.status === 'concluded' && spec.winner !== undefined && !(spec.winner in (spec.variants ?? {})))
+  if (
+    spec.status === 'concluded' &&
+    spec.winner !== undefined &&
+    !Object.hasOwn(spec.variants ?? {}, spec.winner)
+  )
     error(out, `${path}.experiment.winner`, 'must be one of the variants');
   if (spec.status === 'concluded' && spec.winner === undefined)
     warning(

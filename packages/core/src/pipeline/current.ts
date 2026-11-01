@@ -51,15 +51,22 @@ export function runWithContext<T>(ctx: HypContext, fn: () => T): T {
 }
 
 /**
+ * `true` when a proxy runner (`proxy.ts`), which only sees Next's pass-through marker (`x-middleware-next`) and
+ * not the rendered body, is handling a request for a page: the matched route is a page, or no route matched a
+ * path outside `/api/`. The marker response is always `200`, so a page that later 404s is not told apart.
+ */
+export function isProxyPageMarker(ctx: HypContext, response: Response): boolean {
+  if (ctx.runner !== 'proxy' || !response.headers.has('x-middleware-next')) return false;
+  const kind = ctx.route?.route.kind;
+  return kind === 'app-page' || kind === 'page' || (!ctx.route && !ctx.url.pathname.startsWith('/api/'));
+}
+
+/**
  * Whether a response should be treated as an HTML document. Proxy runners only see a marker response
  * (`x-middleware-next`), so they fall back to the matched route's kind.
  */
 export function isHtmlLike(ctx: HypContext, response: Response): boolean {
   const type = response.headers.get('content-type');
   if (type) return type.toLowerCase().includes('text/html');
-  if (ctx.runner === 'proxy' && response.headers.has('x-middleware-next')) {
-    const kind = ctx.route?.route.kind;
-    return kind === 'app-page' || kind === 'page' || (!ctx.route && !ctx.url.pathname.startsWith('/api/'));
-  }
-  return false;
+  return isProxyPageMarker(ctx, response);
 }
