@@ -22,6 +22,7 @@ export {
   cleanRoutePathname,
   createRouteMatcher,
   type RouteMatcher,
+  type RouteMatcherOptions,
   routeId,
   routePatternToRegex,
 } from './manifest/matcher';

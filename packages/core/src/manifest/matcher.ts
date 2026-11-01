@@ -23,18 +23,27 @@ export function cleanRoutePathname(pathname: string): string {
 
 export function routePatternToRegex(pathname: string): string {
   const cleaned = cleanRoutePathname(pathname);
+  // A regular expression cannot repeat a group name: `/a/[x]/b/[x]` or `[a-b]` + `[a_b]` (both `a_b`) get `_2`, `_3`…
+  const used = new Set<string>();
+  const groupName = (raw: string): string => {
+    const base = safeName(raw);
+    let name = base;
+    for (let n = 2; used.has(name); n++) name = `${base}_${n}`;
+    used.add(name);
+    return name;
+  };
   const source = cleaned
     .split('/')
     .map((seg) => {
       let m = /^\[\[\.\.\.([^\]]+)\]\]$/.exec(seg);
-      if (m) return `(?:/(?<${safeName(m[1]!)}>.+?))?`;
+      if (m) return `(?:/(?<${groupName(m[1]!)}>.+?))?`;
       m = /^\[\.\.\.([^\]]+)\]$/.exec(seg);
-      if (m) return `/(?<${safeName(m[1]!)}>.+?)`;
+      if (m) return `/(?<${groupName(m[1]!)}>.+?)`;
       // Optional single segment (SvelteKit `[[lang]]`, React Router `:lang?`).
       m = /^\[\[([^\].]+)\]\]$/.exec(seg);
-      if (m) return `(?:/(?<${safeName(m[1]!)}>[^/]+?))?`;
+      if (m) return `(?:/(?<${groupName(m[1]!)}>[^/]+?))?`;
       m = /^\[([^\]]+)\]$/.exec(seg);
-      if (m) return `/(?<${safeName(m[1]!)}>[^/]+?)`;
+      if (m) return `/(?<${groupName(m[1]!)}>[^/]+?)`;
       return seg === '' ? '' : `/${seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
     })
     .join('');
@@ -42,12 +51,25 @@ export function routePatternToRegex(pathname: string): string {
 }
 
 function safeName(name: string): string {
-  return name.replace(/[^A-Za-z0-9_]/g, '_');
+  const safe = name.replace(/[^A-Za-z0-9_]/g, '_');
+  // A group name must not start with a digit.
+  return /^[0-9]/.test(safe) ? `_${safe}` : safe || '_';
+}
+
+/** Options of `createRouteMatcher`. */
+export interface RouteMatcherOptions {
+  /**
+   * Called for a route whose expression cannot be compiled (its own `regex` and the one derived from its pattern
+   * both throw). The route is left out of the matcher instead of failing every request; the callback is the place
+   * to log it.
+   */
+  onInvalidRoute?: (route: HypRoute, error: Error) => void;
 }
 
 /** Builds the route matcher: exact map for static paths, ordered regex list for dynamic ones. */
 export function createRouteMatcher(
   manifest: Pick<HypManifest, 'routes' | 'basePath' | 'trailingSlash'>,
+  options: RouteMatcherOptions = {},
 ): RouteMatcher {
   const exact = new Map<string, HypRoute>();
   const dynamic: Array<{ route: HypRoute; regex: RegExp }> = [];
@@ -66,7 +88,12 @@ export function createRouteMatcher(
     try {
       dynamic.push({ route, regex: new RegExp(route.regex || routePatternToRegex(route.pathname)) });
     } catch {
-      dynamic.push({ route, regex: new RegExp(routePatternToRegex(route.pathname)) });
+      try {
+        dynamic.push({ route, regex: new RegExp(routePatternToRegex(route.pathname)) });
+      } catch (error) {
+        // One route nobody can compile must not take every other route down with it.
+        options.onInvalidRoute?.(route, error instanceof Error ? error : new Error(String(error)));
+      }
     }
   }
   // More specific first: fewer dynamic segments, longer literal prefix.

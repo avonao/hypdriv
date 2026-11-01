@@ -324,7 +324,14 @@ export function createPlatform(input: CreatePlatformInput): Platform {
   return {
     config,
     manifest,
-    matcher: createRouteMatcher(manifest),
+    matcher: createRouteMatcher(manifest, {
+      onInvalidRoute: (route, error) =>
+        log.error('route skipped: its pattern cannot be compiled to a matcher', {
+          route: route.id,
+          pathname: route.pathname,
+          error: error.message,
+        }),
+    }),
     capabilities,
     env,
     runner,

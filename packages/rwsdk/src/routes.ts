@@ -18,18 +18,33 @@ const METHOD_VERBS = ['delete', 'get', 'head', 'patch', 'post', 'put'] as const;
  * slash (`/about/`) and matches `:name` against one segment and `*` against anything (`(.*)`, also across slashes):
  *
  * `/users/:id/` → `/users/[id]`, `/files/*` → `/files/[...splat]`; a wildcard before the last segment becomes
- * `[splat]` (`[splat1]` for the second one).
+ * `[splat]`, and every further wildcard `[splat1]`, `[splat2]`… (a trailing one `[...splat1]`). Parameter names are
+ * unique in a pattern (a wildcard never takes the name of a `:splat` parameter), so the compiled expression has no
+ * duplicate capture group.
  */
 export function rwsdkPattern(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  const taken = new Set<string>();
+  for (const segment of segments) {
+    const name = /:([A-Za-z0-9_]+)/.exec(segment)?.[1];
+    if (name) taken.add(name);
+  }
   let wildcards = 0;
+  const splatName = (): string => {
+    for (;;) {
+      const position = wildcards++;
+      const name = `splat${position ? position : ''}`;
+      if (!taken.has(name)) {
+        taken.add(name);
+        return name;
+      }
+    }
+  };
   const converted = segments.map((segment, index) => {
     const name = /:([A-Za-z0-9_]+)/.exec(segment)?.[1];
     if (segment.includes('*') && !name) {
-      const position = wildcards++;
-      return segment === '*' && index === segments.length - 1
-        ? '[...splat]'
-        : `[splat${position ? position : ''}]`;
+      const splat = splatName();
+      return segment === '*' && index === segments.length - 1 ? `[...${splat}]` : `[${splat}]`;
     }
     return name ? `[${name}]` : segment;
   });

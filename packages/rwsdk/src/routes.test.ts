@@ -1,4 +1,4 @@
-import { createRouteMatcher, emptyManifest, type HypManifest } from '@hypdriv/core';
+import { createRouteMatcher, emptyManifest, type HypManifest, routePatternToRegex } from '@hypdriv/core';
 import { except, index, layout, prefix, render, route } from 'rwsdk/router';
 import { describe, expect, it } from 'vitest';
 import { appManifest, appRoutes, handlerKind, manifestRoutes, rwsdkPattern } from './routes';
@@ -28,6 +28,11 @@ describe('rwsdkPattern', () => {
     ['/*', '/[...splat]'],
     ['/api/*/download/', '/api/[splat]/download'],
     ['/a/*/b/*/c/', '/a/[splat]/b/[splat1]/c'],
+    // The trailing catch-all never reuses the name of an earlier wildcard or of a `:splat` parameter.
+    ['/a/*/b/*', '/a/[splat]/b/[...splat1]'],
+    ['/*/x/*', '/[splat]/x/[...splat1]'],
+    ['/:splat/*', '/[splat]/[...splat1]'],
+    ['/:splat/:splat1/*/y/*', '/[splat]/[splat1]/[splat2]/y/[...splat3]'],
     // A parameter inside a segment (`v:version`, `:name.pdf`) matches the whole segment in Hypdriv's syntax.
     ['/v:version/', '/[version]'],
     ['/reports/:name.pdf/', '/reports/[name]'],
@@ -35,6 +40,13 @@ describe('rwsdkPattern', () => {
   ])('%s → %s', (path, pattern) => {
     expect(rwsdkPattern(path)).toBe(pattern);
   });
+
+  it.each(['/a/*/b/*', '/*/x/*', '/:splat/*', '/:id/*/:name/*/*'])(
+    'compiles %s to a route expression (no duplicate capture group)',
+    (path) => {
+      expect(() => new RegExp(routePatternToRegex(rwsdkPattern(path)))).not.toThrow();
+    },
+  );
 });
 
 describe('handlerKind', () => {
