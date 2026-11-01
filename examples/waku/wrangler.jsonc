@@ -1,0 +1,28 @@
+{
+  // Read by @cloudflare/vite-plugin (HYPDRIV_TARGET=cloudflare only). Waku's Cloudflare build writes the deployable
+  // configuration to dist/server/wrangler.json and points .wrangler/deploy/config.json at it.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-waku",
+  "main": "./src/waku.server",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The Worker runs first for everything except Waku's content-hashed assets, so every page, RSC payload, server
+  // function and public file gets the full pipeline; the Worker serves prerendered pages from ASSETS itself.
+  "assets": {
+    "directory": "./dist/public",
+    "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
+    "run_worker_first": ["/*", "!/assets/*"]
+  },
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" },
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }
+  ]
+}
