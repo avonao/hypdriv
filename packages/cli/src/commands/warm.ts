@@ -1,5 +1,5 @@
-import { createCacheableTest } from '@hypdriv/cache';
-import type { HypManifest } from '@hypdriv/core';
+import { createCacheableTest, createWarmVariantPlanner } from '@hypdriv/cache';
+import { emptyManifest, experimentWarmCookie, HEADER, type HypManifest } from '@hypdriv/core';
 import {
   AnalyticsEngineQueryError,
   type HotPath,
@@ -28,6 +28,21 @@ export function warmPaths(manifest: HypManifest | null, configured: string[], ex
     for (const p of concretePaths(route, manifest.basePath)) out.add(p);
   }
   return out.size ? [...out] : ['/'];
+}
+
+/** `headers` with a warm-up marker and, when the page has experiment variants, the cookie that asks for one of them. */
+export function warmHeaders(
+  headers: Record<string, string>,
+  cookieName: string,
+  assignment: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...headers, [HEADER.warm]: '1' };
+  const cookie = experimentWarmCookie(cookieName, assignment);
+  if (!cookie) return out;
+  const existing = Object.keys(out).find((name) => name.toLowerCase() === 'cookie');
+  if (existing) out[existing] = `${out[existing]}; ${cookie}`;
+  else out.cookie = cookie;
+  return out;
 }
 
 export const warmCommand = defineCommand({
@@ -102,6 +117,8 @@ export const warmCommand = defineCommand({
     const config = await ctx.loadConfig();
     const manifest = ctx.manifest();
     const wantHot = args.boolean('hot');
+    // Without a build manifest only explicit cache policies can be matched: inferred (static/ISR) ones need the routes.
+    const policyManifest = manifest ?? emptyManifest();
     const hotConfig = config.resolved.cache.warm.hot;
     let hot: HotPath[] = [];
     if (wantHot) {
@@ -152,20 +169,26 @@ export const warmCommand = defineCommand({
         if (err instanceof AnalyticsEngineQueryError) throw new CliError(err.message);
         throw err;
       }
-      const cacheable = manifest ? createCacheableTest(config.resolved, manifest) : undefined;
-      hot = hotPaths(rows, { limit, minViews, ...(cacheable ? { accept: cacheable } : {}) });
+      // Fail closed: a page is only warmed when a cache policy would keep it, whether or not a manifest exists.
+      hot = hotPaths(rows, { limit, minViews, accept: createCacheableTest(config.resolved, policyManifest) });
+      if (!args.json) {
+        if (!manifest)
+          ui.note(
+            'No .hypdriv/manifest.json: only pages that match an explicit cache policy can be warmed from the hot list (run `next build` to include static and ISR routes).',
+          );
+        if (!hot.length)
+          ui.note('No hot pages yet (is the vitals sink analytics-engine and <VitalsReporter /> rendered?).');
+      }
     }
     const explicit = args.list('paths');
     const configured = config.resolved.cache.warm.routes;
-    const paths = wantHot
-      ? [...new Set([...(explicit.length ? explicit : configured), ...hot.map((h) => h.path)])]
-      : warmPaths(manifest, configured, explicit);
-    if (wantHot && !paths.length) {
-      if (args.json) ui.printJson({ url: base, hot, results: [], failed: 0 });
-      else
-        ui.note('No hot pages yet (is the vitals sink analytics-engine and <VitalsReporter /> rendered?).');
-      return 0;
-    }
+    // `--hot` adds to what the plain command warms (explicit paths, else configured routes, else static/ISR routes).
+    const paths = [
+      ...new Set([...warmPaths(manifest, configured, explicit), ...(wantHot ? hot.map((h) => h.path) : [])]),
+    ];
+    // One request per page and per combination of the experiment variants its cached copies depend on.
+    const variantsOf = createWarmVariantPlanner(config.resolved, policyManifest);
+    const requests = paths.flatMap((path) => variantsOf(path).map((assignment) => ({ path, assignment })));
     const concurrency = args.number('concurrency', config.resolved.cache.warm.concurrency, {
       min: 1,
       max: 64,
@@ -181,18 +204,28 @@ export const warmCommand = defineCommand({
     });
     if (!args.json) {
       ui.heading(
-        `Warming ${paths.length} path(s) on ${base} (concurrency ${concurrency})${wantHot ? `, ${hot.length} from the busiest pages` : ''}`,
+        `Warming ${paths.length} path(s) on ${base} (concurrency ${concurrency})${wantHot ? `, ${hot.length} from the busiest pages` : ''}${requests.length > paths.length ? `, ${requests.length} requests for experiment variants` : ''}`,
       );
       ui.note(describeAuditAuth(auth));
     }
-    const results = await mapConcurrent(paths, concurrency, async (path) => {
+    const experimentCookie = config.resolved.flags.experimentCookie;
+    const results = await mapConcurrent(requests, concurrency, async ({ path, assignment }) => {
       const page = await fetchPage(
         joinUrl(base, path),
-        { fetch: io.fetch, timeoutMs, follow: false, headers: auth.headers },
+        {
+          fetch: io.fetch,
+          timeoutMs,
+          follow: false,
+          headers: warmHeaders(auth.headers, experimentCookie, assignment),
+        },
         io.now,
       );
+      const variant = Object.entries(assignment)
+        .map(([name, value]) => `${name}=${value}`)
+        .join(',');
       const row = {
         path,
+        ...(variant ? { variant: assignment } : {}),
         status: page.status,
         cache: cacheStatus(page.headers),
         ms: Math.round(page.totalMs),
@@ -203,7 +236,7 @@ export const warmCommand = defineCommand({
         const level = page.error || page.status >= 500 ? 'fail' : page.status >= 400 ? 'warn' : 'pass';
         ui.status(
           level,
-          `${path}`,
+          variant ? `${path} [${variant}]` : path,
           page.error ?? `${page.status} · ${row.cache ?? 'no cache header'} · ${millis(page.totalMs)}`,
         );
       }

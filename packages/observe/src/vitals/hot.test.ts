@@ -15,14 +15,46 @@ describe('hotPathsSql', () => {
     expect(hotPathsSql('d', { days: 900, limit: 9999 })).toContain("INTERVAL '90' DAY");
     expect(hotPathsSql('d', { days: 900, limit: 9999 })).toContain('LIMIT 1000');
     expect(hotPathsSql('d', { days: 0, limit: 0 })).toContain("INTERVAL '1' DAY");
+    // NaN and Infinity never reach the query text.
+    const odd = hotPathsSql('d', { days: Number.NaN, limit: Number.POSITIVE_INFINITY });
+    expect(odd).toContain("INTERVAL '7' DAY");
+    expect(odd).not.toMatch(/NaN|Infinity/);
     expect(() => hotPathsSql('d; DROP', { days: 7, limit: 5 })).toThrow(/dataset/);
   });
 });
 
 describe('sanitizeHotPath', () => {
   it('accepts plain absolute paths', () => {
-    for (const ok of ['/', '/blog/hello-world', '/docs/a%20b', '/a.b/c_d', '/ünï'])
+    for (const ok of ['/', '/blog/hello-world', '/docs/a%20b', '/a.b/c_d', '/pricing/', '/a,b', '/%C3%BCn'])
       expect(sanitizeHotPath(ok)).toBe(ok);
+  });
+
+  it('writes equal paths alike: unreserved escapes decoded, other escapes upper-cased, raw non-ASCII escaped', () => {
+    expect(sanitizeHotPath('/%70ricing')).toBe('/pricing');
+    expect(sanitizeHotPath('/docs/a%2db')).toBe('/docs/a-b');
+    expect(sanitizeHotPath('/caf%c3%a9')).toBe('/caf%C3%A9');
+    expect(sanitizeHotPath('/ünï')).toBe('/%C3%BCn%C3%AF');
+    expect(sanitizeHotPath('/ünï')).toBe(sanitizeHotPath('/%c3%bcn%c3%af'));
+  });
+
+  it('sees through percent-encoded dot segments, separators and internal paths', () => {
+    for (const bad of [
+      '/blog/%2e%2e/%2e%2e/_hypdriv/live/x',
+      '/blog/%2E%2E/x',
+      '/%2e/pricing',
+      '/a/.%2e/b',
+      '/a%2Fb',
+      '/a%5Cb',
+      '/%5Fhypdriv/purge',
+      '/%5f%5fnextjs',
+      '/a%00b',
+      '/a%0Ab',
+      '/a%20%20b%0d',
+      '/a%252e%252e/b',
+      '/100%',
+      '/a%zz',
+    ])
+      expect(sanitizeHotPath(bad), bad).toBeNull();
   });
 
   it('rejects everything that could leave the site or smuggle a request', () => {
@@ -67,6 +99,21 @@ describe('hotPaths', () => {
       { path: '/a', views: 120 },
       { path: '/b', views: 90 },
       { path: '/e', views: 40 },
+    ]);
+  });
+
+  it('counts the aliases of one page together, in one slot', () => {
+    // 25 spellings of two pages: `%70` is `p`, `%50` is `P` (a different page).
+    const spellings = ['/%70ricing', '/pricing', '/%50ricing'];
+    const forged = Array.from({ length: 25 }, (_, i) => ({ pathname: spellings[i % 3], views: 30 }));
+    const result = hotPaths(
+      [...forged, { pathname: '/about', views: 25 }, { pathname: '/%2e%2e/%2e%2e/_hypdriv/x', views: 900 }],
+      { limit: 25, minViews: 20 },
+    );
+    expect(result).toEqual([
+      { path: '/pricing', views: 17 * 30 },
+      { path: '/Pricing', views: 8 * 30 },
+      { path: '/about', views: 25 },
     ]);
   });
 

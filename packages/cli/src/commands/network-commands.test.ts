@@ -11,7 +11,7 @@ import {
 } from '../__tests__/helpers';
 import { runCommand } from '../main';
 import { summarizeSamples } from './bench';
-import { configuredExperiments } from './experiments';
+import { configuredExperiments, parseSince } from './experiments';
 import { rateVital, vitalsSql } from './vitals';
 import { warmPaths } from './warm';
 
@@ -55,6 +55,48 @@ describe('warm', () => {
     expect(code).toBe(1);
     expect(calls.map((c) => c.url)).toEqual(['https://shop.test/', 'https://shop.test/pricing']);
     expect(calls[0]!.headers.get('user-agent')).toContain('Mozilla/5.0');
+  });
+
+  it('marks every request as a warm-up, so it is neither assigned to an experiment nor counted', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': "export default { cache: { warm: { routes: ['/'] } } };\n",
+    });
+    const { fetch, calls } = fakeFetch(() => response('<html></html>'));
+    const io = memoryIO(p.dir, { fetch });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--anonymous', '--json'], io)).toBe(0);
+    expect(calls.map((c) => c.headers.get('x-hypdriv-warm'))).toEqual(['1']);
+    expect(calls[0]!.headers.get('cookie')).toBeNull();
+  });
+
+  it('requests each experiment variant of a page the cache keeps apart', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': `export default {
+        flags: { definitions: {
+          checkout: { default: 'control', experiment: { variants: { control: 1, b: 1 } } },
+        } },
+        cache: { warm: { routes: ['/', '/dashboard'] }, edge: { policies: [{ match: '/', ttl: 60 }] } },
+      };\n`,
+    });
+    const { fetch, calls } = fakeFetch(() =>
+      response('<html></html>', { headers: { 'x-hypdriv-cache': 'MISS' } }),
+    );
+    const io = memoryIO(p.dir, { fetch });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--anonymous', '--json'], io)).toBe(0);
+    const out = JSON.parse(io.out);
+    // `/` has a policy that varies on the experiment: two copies. `/dashboard` has none: one plain request.
+    expect(calls.map((c) => [new URL(c.url).pathname, c.headers.get('cookie')])).toEqual([
+      ['/', 'hyp_exp=checkout%3Acontrol'],
+      ['/', 'hyp_exp=checkout%3Ab'],
+      ['/dashboard', null],
+    ]);
+    expect(calls.every((c) => c.headers.get('x-hypdriv-warm') === '1')).toBe(true);
+    expect(out.results.map((r: { path: string; variant?: unknown }) => [r.path, r.variant ?? null])).toEqual([
+      ['/', { checkout: 'control' }],
+      ['/', { checkout: 'b' }],
+      ['/dashboard', null],
+    ]);
   });
 });
 
@@ -142,16 +184,84 @@ describe('warm --hot', () => {
     expect(noDataset.err).toContain('No Analytics Engine dataset');
   });
 
-  it('says so when nothing is hot yet and nothing is configured', async () => {
+  it('says so when nothing is hot yet, and still warms the default routes', async () => {
     const p = tempProject({
       'package.json': '{"name":"x"}',
       'hypdriv.config.ts': 'export default {};\n',
       'wrangler.jsonc': wrangler,
     });
-    const { fetch } = fakeFetch(() => response(JSON.stringify({ data: [] })));
+    const { fetch, calls } = fakeFetch((url) =>
+      url.startsWith('https://api.cloudflare.com/')
+        ? response(JSON.stringify({ data: [] }))
+        : response('<html></html>'),
+    );
     const io = memoryIO(p.dir, { fetch, env });
     expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot'], io)).toBe(0);
     expect(io.out).toContain('No hot pages yet');
+    expect(calls.filter((c) => !c.url.startsWith('https://api.cloudflare.com/')).map((c) => c.url)).toEqual([
+      'https://shop.test/',
+    ]);
+  });
+
+  it('keeps the default static/ISR routes when nothing is configured', async () => {
+    const p = await project('export default {};\n');
+    const { fetch, calls } = fakeFetch(handler);
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], io)).toBe(0);
+    const warmed = JSON.parse(io.out).results.map((r: { path: string }) => r.path);
+    expect(warmed).toEqual(expect.arrayContaining(['/', '/blog', '/pricing', '/blog/hello-world']));
+    expect(warmed).not.toContain('/dashboard');
+    expect(new Set(warmed).size).toBe(warmed.length);
+    expect(calls.some((c) => c.url.endsWith('/dashboard'))).toBe(false);
+  });
+
+  it('fails closed without a manifest: only pages an explicit policy keeps are warmed', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': "export default { cache: { warm: { routes: ['/'] } } };\n",
+      'wrangler.jsonc': wrangler,
+    });
+    const { fetch, calls } = fakeFetch(handler);
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], io)).toBe(0);
+    expect(JSON.parse(io.out).hot).toEqual([]);
+    expect(calls.filter((c) => !c.url.startsWith('https://api.cloudflare.com/')).map((c) => c.url)).toEqual([
+      'https://shop.test/',
+    ]);
+
+    const policy = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts':
+        "export default { cache: { warm: { routes: ['/'] }, edge: { policies: [{ match: '/blog/**', ttl: 60 }] } } };\n",
+      'wrangler.jsonc': wrangler,
+    });
+    const second = memoryIO(policy.dir, { fetch, env });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], second)).toBe(0);
+    expect(JSON.parse(second.out).hot).toEqual([{ path: '/blog/hello-world', views: 900 }]);
+  });
+
+  it('never requests an encoded alias of a dot segment or an internal path', async () => {
+    const forged = {
+      data: [
+        { pathname: '/blog/%2e%2e/%2e%2e/_hypdriv/live/x', views: 5000 },
+        { pathname: '/%5Fhypdriv/purge', views: 4000 },
+        { pathname: '/%70ricing', views: 300 },
+        { pathname: '/pricing', views: 200 },
+      ],
+    };
+    const p = await project();
+    const { fetch, calls } = fakeFetch((url) =>
+      url.startsWith('https://api.cloudflare.com/')
+        ? response(JSON.stringify(forged))
+        : response('<html></html>'),
+    );
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], io)).toBe(0);
+    expect(JSON.parse(io.out).hot).toEqual([{ path: '/pricing', views: 500 }]);
+    expect(calls.filter((c) => !c.url.startsWith('https://api.cloudflare.com/')).map((c) => c.url)).toEqual([
+      'https://shop.test/',
+      'https://shop.test/pricing',
+    ]);
   });
 });
 
@@ -635,11 +745,101 @@ describe('experiments', () => {
     expect(io.out).toContain('Sample ratio mismatch');
 
     const json = memoryIO(p.dir, { fetch, env });
-    await runCommand('experiments', ['--results', '--json', '--name', 'checkout'], json);
+    // The exit code does not depend on the output format: a pipeline reads it (ADR 0022).
+    expect(await runCommand('experiments', ['--results', '--json', '--name', 'checkout'], json)).toBe(1);
     const report = JSON.parse(json.out).experiments[0];
     expect(report.visitors).toBe(10_000);
     expect(report.sampleRatio.status).toBe('mismatch');
     expect(report.variants[1].metrics.LCP.deltaVsControl).toBeCloseTo(-0.1);
+  });
+
+  it('does not flag a split chance explains, as JSON or text, and exits 0', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    const { fetch } = fakeFetch((_url, init) =>
+      String(init?.body ?? '').includes('experiment.exposure')
+        ? response(
+            JSON.stringify({
+              data: [
+                { experiment: 'checkout', variant: 'control', visitors: 5040 },
+                { experiment: 'checkout', variant: 'b', visitors: 4960 },
+              ],
+            }),
+          )
+        : response(JSON.stringify({ data: [] })),
+    );
+    const env = { CF_ACCOUNT_ID: 'acc123', CF_API_TOKEN: 'tok' };
+    const json = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('experiments', ['--results', '--json', '--name', 'checkout'], json)).toBe(0);
+    expect(JSON.parse(json.out).experiments[0].sampleRatio).toMatchObject({
+      status: 'ok',
+      method: 'chi-square',
+    });
+    const text = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('experiments', ['--results', '--name', 'checkout'], text)).toBe(0);
+    expect(text.out).toContain('Sample ratio ok');
+  });
+
+  it('judges a rare variant with the exact test, not chi-square (finding 8)', async () => {
+    const rare = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts':
+        "export default { flags: { definitions: { rare: { default: 'control', experiment: { variants: { control: 99, b: 1 } } } } } };\n",
+      'wrangler.jsonc': wrangler,
+    });
+    const { fetch } = fakeFetch((_url, init) =>
+      String(init?.body ?? '').includes('experiment.exposure')
+        ? response(
+            JSON.stringify({
+              data: [
+                { experiment: 'rare', variant: 'control', visitors: 95 },
+                { experiment: 'rare', variant: 'b', visitors: 5 },
+              ],
+            }),
+          )
+        : response(JSON.stringify({ data: [] })),
+    );
+    const io = memoryIO(rare.dir, { fetch, env: { CF_ACCOUNT_ID: 'acc123', CF_API_TOKEN: 'tok' } });
+    expect(await runCommand('experiments', ['--results', '--json'], io)).toBe(0);
+    const sampleRatio = JSON.parse(io.out).experiments[0].sampleRatio;
+    expect(sampleRatio).toMatchObject({ status: 'ok', method: 'exact' });
+    expect(sampleRatio.p).toBeCloseTo(0.0034, 3);
+  });
+
+  it('starts the window at --since, for a ramp (finding 8)', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    const io = memoryIO(p.dir, { date: () => new Date('2026-11-01T12:00:00Z') });
+    expect(
+      await runCommand('experiments', ['--sql', '--name', 'checkout', '--since', '2026-10-30T14:00:00Z'], io),
+    ).toBe(0);
+    expect(io.out).toContain("timestamp >= toDateTime('2026-10-30 14:00:00')");
+    expect(io.out).not.toContain('INTERVAL');
+    const relative = memoryIO(p.dir, { date: () => new Date('2026-11-01T12:00:00Z') });
+    await runCommand('experiments', ['--sql', '--name', 'checkout', '--since', '36h'], relative);
+    expect(relative.out).toContain("timestamp >= toDateTime('2026-10-31 00:00:00')");
+    const bad = memoryIO(p.dir);
+    expect(await runCommand('experiments', ['--sql', '--since', 'yesterday'], bad)).toBe(2);
+    expect(bad.err).toContain('--since');
+  });
+
+  it('reads --since as UTC, a duration or a date, and refuses the future and the far past', () => {
+    const now = new Date('2026-11-01T12:00:00Z');
+    expect(parseSince('2026-10-30', now).toISOString()).toBe('2026-10-30T00:00:00.000Z');
+    expect(parseSince('2026-10-30T14:00', now).toISOString()).toBe('2026-10-30T14:00:00.000Z');
+    expect(parseSince('2026-10-30 14:00:00', now).toISOString()).toBe('2026-10-30T14:00:00.000Z');
+    expect(parseSince('2026-10-30T14:00:00+02:00', now).toISOString()).toBe('2026-10-30T12:00:00.000Z');
+    expect(parseSince('3d', now).toISOString()).toBe('2026-10-29T12:00:00.000Z');
+    expect(() => parseSince('2026-11-02', now)).toThrow(/future/);
+    expect(() => parseSince('2026-06-01', now)).toThrow(/90 days/);
+    expect(() => parseSince("2026-10-30'; DROP", now)).toThrow(/neither/);
+    expect(() => parseSince('2026-13-45', now)).toThrow(/not a valid date/);
   });
 
   it('degrades clearly without credentials, a dataset or on Vercel', async () => {

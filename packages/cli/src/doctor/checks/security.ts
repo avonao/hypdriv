@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { loadSecurityNode } from '../../integrations';
+import { normalizeCron } from '../../util/cron';
 import { exists, rel } from '../../util/fs';
 import { type Check, type CheckContext, fail, info, pass, skip, warn } from '../types';
 import { variableSource } from './vercel';
@@ -198,6 +199,18 @@ export const securityChecks: Check[] = [
         problems.push(
           'cache.warm.cron is not set, so only `hypdriv warm --hot` warms hot pages; the Worker never does',
         );
+      else {
+        const schedule = normalizeCron(warm.cron);
+        const wrangler = ctx.project.wrangler.config;
+        if (wrangler && !(wrangler.triggers?.crons ?? []).some((c) => normalizeCron(c) === schedule))
+          problems.push(
+            `wrangler triggers.crons does not declare "${warm.cron}", so the Worker is never triggered (\`hypdriv doctor --fix --only wrangler.crons\` adds it)`,
+          );
+        if (!ctx.config.resolved.site.origin)
+          problems.push(
+            'site.origin is not set, so the scheduled warm-up requests a placeholder host and cache keys (which include the host) never match a visitor; set it to the URL visitors use, or warm each host with `hypdriv warm --url … --hot`',
+          );
+      }
       if (problems.length) return warn(`${problems.join('; ')}.`);
       return pass(
         `The ${warm.cron} cron warms the ${hot.limit} busiest cacheable pages of the last ${hot.days} day(s) (at least ${hot.minViews} views each) next to cache.warm.routes.`,

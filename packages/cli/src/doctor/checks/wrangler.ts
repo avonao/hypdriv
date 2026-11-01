@@ -4,6 +4,7 @@ import { queueConsumerFor } from '@hypdriv/core';
 import { BACKUP_SUFFIX } from '../../init/plan';
 import { editWranglerJsonc } from '../../init/wrangler';
 import { atLeast, monthsBetween } from '../../semver';
+import { normalizeCron } from '../../util/cron';
 import { rel } from '../../util/fs';
 import { envBindingGaps } from '../../wrangler-config';
 import { type Check, type CheckContext, type CheckFix, fail, info, pass, skip, warn } from '../types';
@@ -36,8 +37,12 @@ function jsoncFix(
   };
 }
 
+/** Every schedule the Worker has to be triggered on: `jobs.cron` and the warm-up's `cache.warm.cron`. */
 function configuredCrons(ctx: CheckContext): string[] {
-  return [...new Set(Object.values(ctx.config.resolved.jobs.cron).map((j) => j.cron))];
+  const resolved = ctx.config.resolved;
+  const crons = Object.values(resolved.jobs.cron).map((j) => j.cron);
+  if (resolved.cache.warm.cron) crons.push(resolved.cache.warm.cron);
+  return [...new Set(crons.map(normalizeCron))];
 }
 
 export const wranglerChecks: Check[] = [
@@ -305,7 +310,7 @@ export const wranglerChecks: Check[] = [
   },
   {
     id: 'wrangler.crons',
-    title: 'Cron triggers match jobs.cron',
+    title: 'Cron triggers match jobs.cron and cache.warm.cron',
     category: 'wrangler',
     severity: 'error',
     run(ctx) {
@@ -313,12 +318,14 @@ export const wranglerChecks: Check[] = [
       const cfg = ctx.project.wrangler.config;
       if (!crons.length) return pass('No cron jobs configured.');
       if (!cfg) return skip('no wrangler config.');
-      const declared = cfg.triggers?.crons ?? [];
+      const declared = (cfg.triggers?.crons ?? []).map(normalizeCron);
       const missing = crons.filter((c) => !declared.includes(c));
       const extra = declared.filter((c) => !crons.includes(c));
       if (missing.length) {
+        const warmCron = ctx.config.resolved.cache.warm.cron;
+        const warmMissing = !!warmCron && missing.includes(normalizeCron(warmCron));
         return fail(
-          `triggers.crons lacks ${missing.map((c) => `"${c}"`).join(', ')}; the scheduled handler never fires for those jobs.`,
+          `triggers.crons lacks ${missing.map((c) => `"${c}"`).join(', ')}; the scheduled handler never fires for ${warmMissing ? 'those jobs or the cache warm-up (cache.warm.cron)' : 'those jobs'}.`,
           {
             fix: jsoncFix(ctx, `add ${missing.length} cron trigger(s)`, {
               main: cfg.main ?? 'hypdriv.worker.ts',
@@ -330,7 +337,7 @@ export const wranglerChecks: Check[] = [
       }
       if (extra.length)
         return info(
-          `All job crons are declared; ${extra.length} extra trigger(s) without a job: ${extra.join(', ')}.`,
+          `All job and warm-up crons are declared; ${extra.length} extra trigger(s) without a job: ${extra.join(', ')}.`,
         );
       return pass(`${crons.length} cron trigger(s) in sync.`);
     },

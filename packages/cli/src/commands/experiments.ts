@@ -10,6 +10,7 @@ import {
   formatVital,
   queryAnalyticsEngine,
 } from '@hypdriv/observe';
+import { UsageError } from '../args';
 import { CliError, createContext } from '../context';
 import { defineCommand } from './types';
 
@@ -45,13 +46,45 @@ export function configuredExperiments(definitions: Record<string, FlagDefinition
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+const DAY_MS = 86_400_000;
+/** Analytics Engine keeps 90 days. */
+const MAX_WINDOW_DAYS = 90;
+
+/**
+ * The start of a `--since` window: an ISO date or timestamp (`2026-10-30`, `2026-10-30T14:00:00Z`; a timestamp
+ * without a zone is UTC), or a duration back from now (`36h`, `3d`). Not in the future, at most 90 days back.
+ */
+export function parseSince(value: string, now: Date): Date {
+  const text = value.trim();
+  const relative = /^(\d{1,4})([hd])$/i.exec(text);
+  let at: number;
+  if (relative)
+    at = now.getTime() - Number(relative[1]) * (relative[2]!.toLowerCase() === 'h' ? 3_600_000 : DAY_MS);
+  else {
+    if (!/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/.test(text))
+      throw new UsageError(
+        `--since: "${value}" is neither an ISO date or timestamp (2026-10-30, 2026-10-30T14:00:00Z) nor a duration back from now (36h, 3d).`,
+      );
+    const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(text) || !text.includes(':');
+    at = Date.parse(zoned ? text.replace(' ', 'T') : `${text.replace(' ', 'T')}Z`);
+  }
+  if (Number.isNaN(at)) throw new UsageError(`--since: "${value}" is not a valid date.`);
+  if (at > now.getTime()) throw new UsageError(`--since: "${value}" is in the future.`);
+  if (now.getTime() - at > MAX_WINDOW_DAYS * DAY_MS)
+    throw new UsageError(
+      `--since: Analytics Engine keeps ${MAX_WINDOW_DAYS} days; "${value}" is further back.`,
+    );
+  return new Date(at);
+}
+
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${Math.abs(n * 100).toFixed(1)}%`;
 
 export const experimentsCommand = defineCommand({
   name: 'experiments',
   summary: 'Edge A/B experiments: what is configured, and visitors + Web Vitals per variant (--results)',
-  usage: 'hypdriv experiments [--results] [--name <experiment>] [--days 14] [--dataset <name>] [--sql]',
+  usage:
+    'hypdriv experiments [--results] [--name <experiment>] [--days 14 | --since <time>] [--dataset <name>] [--sql]',
   options: {
     results: {
       type: 'boolean',
@@ -65,6 +98,12 @@ export const experimentsCommand = defineCommand({
       description: 'Look-back window in days for --results',
       default: '14',
     },
+    since: {
+      type: 'string',
+      value: '<time>',
+      description:
+        'Start the --results window at this moment (2026-10-30, 2026-10-30T14:00:00Z, 36h, 3d) instead of --days; use it after changing weights, traffic or variants',
+    },
     dataset: {
       type: 'string',
       value: '<name>',
@@ -76,10 +115,11 @@ export const experimentsCommand = defineCommand({
     'hypdriv experiments',
     'hypdriv experiments --json',
     'CF_ACCOUNT_ID=… CF_API_TOKEN=… hypdriv experiments --results --days 14',
+    'hypdriv experiments --results --name checkout --since 2026-10-30T14:00:00Z',
     'hypdriv experiments --results --name checkout --sql',
   ],
   details:
-    'Experiments are flags with an `experiment` block in `flags.definitions`. The report shows the visitors each variant received against the configured weights (a sample ratio mismatch means the comparison cannot be trusted), and p75 LCP/INP/CLS per variant, from the exposures the flags stage and the vitals beacon write to Analytics Engine. Needs a token with Account Analytics: Read.',
+    'Experiments are flags with an `experiment` block in `flags.definitions`. The report shows the visitors each variant received against the configured weights (a sample ratio mismatch means the comparison cannot be trusted; exit code 1, also with --json), and p75 LCP/INP/CLS per variant, from the exposures the flags stage and the vitals beacon write to Analytics Engine. The visitors are compared with the weights as they are now, so a window that spans a change of weights, traffic or variants (a ramp) reads as a mismatch: start the window at the change with --since. Needs a token with Account Analytics: Read.',
   async run(args, io) {
     const ctx = createContext(args, io);
     const { ui } = ctx;
@@ -102,7 +142,12 @@ export const experimentsCommand = defineCommand({
     const dataset =
       args.string('dataset') ??
       (declared ? (typeof declared.dataset === 'string' ? declared.dataset : binding) : null);
-    const days = args.number('days', 14, { min: 1, max: 90 });
+    const sinceText = args.string('since');
+    const since = sinceText ? parseSince(sinceText, io.date()) : undefined;
+    const days = since
+      ? Math.max(1, Math.ceil((io.date().getTime() - since.getTime()) / DAY_MS))
+      : args.number('days', 14, { min: 1, max: 90 });
+    const window = { days, ...(since ? { since } : {}) };
     if (!dataset) {
       throw new CliError(
         project.platform === 'vercel'
@@ -110,9 +155,12 @@ export const experimentsCommand = defineCommand({
           : `No Analytics Engine dataset bound as ${binding} in the wrangler config. Add \`"analytics_engine_datasets": [{ "binding": "${binding}", "dataset": "<name>" }]\`, set flags.exposuresBinding, or pass --dataset.`,
       );
     }
-    const exposuresSql = experimentExposuresSql(dataset, { days, ...(only ? { experiment: only } : {}) });
+    const exposuresSql = experimentExposuresSql(dataset, {
+      ...window,
+      ...(only ? { experiment: only } : {}),
+    });
     const vitalsSqlOf = (e: ExperimentSummary, variant: string) =>
-      experimentVitalsSql(dataset, { days, experiment: e.name, variant });
+      experimentVitalsSql(dataset, { ...window, experiment: e.name, variant });
     if (args.boolean('sql')) {
       const queries = [
         { query: 'exposures', sql: exposuresSql },
@@ -161,14 +209,21 @@ export const experimentsCommand = defineCommand({
       // Variants with no exposures have no vitals either; skipping them saves a query each.
       for (const variant of variants)
         if (seen.has(variant)) vitals[variant] = await query(vitalsSqlOf(e, variant));
-      reports.push(buildExperimentReport(e, { exposures, vitals }, { days }));
+      reports.push(buildExperimentReport(e, { exposures, vitals }, window));
     }
+    // A sample ratio mismatch fails the command whatever the output format: a pipeline reads the exit code.
+    const mismatch = reports.some((r) => r.sampleRatio.status === 'mismatch');
     if (args.json) {
-      ui.printJson({ dataset, days, experiments: reports });
-      return 0;
+      ui.printJson({
+        dataset,
+        days,
+        ...(since ? { since: since.toISOString() } : {}),
+        experiments: reports,
+      });
+      return mismatch ? 1 : 0;
     }
     for (const report of reports) printReport(ctx, report, dataset);
-    return reports.some((r) => r.sampleRatio.status === 'mismatch') ? 1 : 0;
+    return mismatch ? 1 : 0;
   },
 });
 
@@ -215,7 +270,7 @@ function printConfigured(ctx: Ctx, experiments: ExperimentSummary[], exposures: 
 function printReport(ctx: Ctx, report: ExperimentReport, dataset: string): void {
   const { ui } = ctx;
   ui.heading(
-    `${report.name} — ${report.status}${report.winner ? ` → ${report.winner}` : ''} · last ${report.days} day(s) · dataset ${dataset}`,
+    `${report.name} — ${report.status}${report.winner ? ` → ${report.winner}` : ''} · ${report.since ? `since ${report.since}` : `last ${report.days} day(s)`} · dataset ${dataset}`,
   );
   if (!report.visitors) {
     ui.note('No exposures yet (is the flags stage running, and are exposures going to Analytics Engine?).');
@@ -250,13 +305,15 @@ function printReport(ctx: Ctx, report: ExperimentReport, dataset: string): void 
     },
   );
   const sr = report.sampleRatio;
+  const test =
+    sr.method === 'exact' ? 'exact binomial test' : `χ² ${sr.chiSquare?.toFixed(sr.status === 'ok' ? 2 : 1)}`;
   if (sr.status === 'mismatch') {
     ui.warn(
-      `Sample ratio mismatch (χ² ${sr.chiSquare?.toFixed(1)}, p ${sr.p !== null && sr.p < 0.0001 ? '< 0.0001' : sr.p?.toFixed(4)}): the split differs from the weights by more than chance explains. A redirect, a cache that ignores vary.flags or bots can cause this — fix it before reading the vitals.`,
+      `Sample ratio mismatch (${test}, p ${sr.p !== null && sr.p < 0.0001 ? '< 0.0001' : sr.p?.toFixed(4)}): the split differs from the weights by more than chance explains. A redirect, a cache that ignores vary.flags or bots can cause this — fix it before reading the vitals. If the weights, traffic or variants changed during this window, the visitors were assigned under the old split: start the window at the change (--since) or restart the experiment with a new salt.`,
     );
   } else if (sr.status === 'insufficient') {
     ui.note('Too few visitors for a sample ratio check (needs 100 across two or more variants).');
   } else {
-    ui.note(`Sample ratio ok (χ² ${sr.chiSquare?.toFixed(2)}, p ${sr.p?.toFixed(3)}).`);
+    ui.note(`Sample ratio ok (${test}, p ${sr.p?.toFixed(3)}).`);
   }
 }
