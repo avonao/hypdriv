@@ -2,10 +2,19 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import type { FrameworkName } from '@hypdriv/core';
 import type { LoadedConfig } from '../context';
+import { maskSource } from '../doctor/checks/hono';
 import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
 import { cloudflareConfigHint, defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
-import { addToConfigArray, configObjectStart, wrapCallArgument, wrapPropertyValue } from './config-edit';
+import {
+  addToConfigArray,
+  type ConfigEditResult,
+  configObjectStart,
+  importsModule,
+  matchClose,
+  wrapCallArgument,
+  wrapPropertyValue,
+} from './config-edit';
 import { insertImport } from './next-config';
 import { editPackageJson } from './package-json';
 import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, planVercel } from './plan';
@@ -1290,6 +1299,191 @@ export const WAKU_SPEC: HostSpec = {
         : null,
 };
 
+const RWSDK_WORKER_MODULE = '@hypdriv/rwsdk/worker';
+
+/** A new `vite.config.mts` for a RedwoodSDK project without one: the Worker environment, `redwood()`, Hypdriv last. */
+export function rwsdkViteConfigTemplate(): string {
+  return `import { cloudflare } from '@cloudflare/vite-plugin';
+import { hypdriv } from '@hypdriv/rwsdk';
+import { redwood } from 'rwsdk/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  environments: { ssr: {} },
+  plugins: [cloudflare({ viteEnvironment: { name: 'worker' } }), redwood(), hypdriv()],
+});
+`;
+}
+
+/**
+ * Puts RedwoodSDK's app behind Hypdriv in the Worker entry: `export default defineApp([...])` becomes
+ * `export default withHypDriv(defineApp([hypdrivMiddleware(), ...]))`. The middleware must be the first route:
+ * it hands RedwoodSDK the nonce of Hypdriv's CSP. `middleware` is false when it could not be placed (the routes
+ * are not an array literal), so the caller can tell the user.
+ */
+export function wrapRwsdkApp(source: string): ConfigEditResult & { middleware: boolean } {
+  // Comments and the inside of strings are blanked (same length), so a mention is not mistaken for a call.
+  const code = maskSource(source) ?? source;
+  const wrapped = /\bwithHypDriv\s*\(/.test(code) && importsModule(source, RWSDK_WORKER_MODULE);
+  const hasMiddleware = /\bhypdrivMiddleware\s*\(/.test(code);
+  if (wrapped && hasMiddleware)
+    return { changed: false, content: source, reason: 'already wrapped in withHypDriv()', middleware: true };
+
+  const call = /(?<![\w$.])defineApp\s*\(/.exec(code);
+  if (!call)
+    return {
+      changed: false,
+      content: source,
+      reason: 'no defineApp([...]) call found',
+      middleware: hasMiddleware,
+    };
+  const nameAt = call.index;
+  const open = call.index + call[0].length - 1;
+  const close = matchClose(source, open);
+  if (close === -1)
+    return {
+      changed: false,
+      content: source,
+      reason: 'could not parse defineApp()',
+      middleware: hasMiddleware,
+    };
+
+  // Wrap the call when it is the default export (directly, or through a `const` that is exported as default).
+  const before = code.slice(0, nameAt);
+  const named = /(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*$/.exec(before);
+  const exported =
+    /export\s+default\s+$/.test(before) ||
+    (named !== null && new RegExp(`export\\s+default\\s+${named[1]}\\b`).test(code));
+  const needsWrap = !wrapped && !/\bwithHypDriv\s*\(\s*$/.test(before);
+  if (needsWrap && !exported)
+    return {
+      changed: false,
+      content: source,
+      reason: 'defineApp() is not the default export of the Worker entry',
+      middleware: hasMiddleware,
+    };
+
+  let out = source;
+  let argument = open + 1;
+  if (needsWrap) {
+    out = `${source.slice(0, nameAt)}withHypDriv(${source.slice(nameAt, close + 1)})${source.slice(close + 1)}`;
+    argument += 'withHypDriv('.length;
+  }
+
+  // The middleware is the first entry of an array literal of routes.
+  let placed = hasMiddleware;
+  if (!hasMiddleware) {
+    const array = /^\s*\[/.exec(out.slice(argument));
+    if (array) {
+      const bracket = argument + array[0].length;
+      const rest = out.slice(bracket);
+      const multiline = /^[ \t]*\r?\n/.test(rest);
+      const indent = /^[ \t]*\r?\n([ \t]*)/.exec(rest)?.[1] ?? '';
+      out = multiline
+        ? `${out.slice(0, bracket)}\n${indent}hypdrivMiddleware(),${out.slice(bracket)}`
+        : `${out.slice(0, bracket)}hypdrivMiddleware(), ${out.slice(bracket)}`;
+      placed = true;
+    }
+  }
+
+  const added = placed && !hasMiddleware;
+  const names = [...(added ? ['hypdrivMiddleware'] : []), ...(needsWrap ? ['withHypDriv'] : [])].sort();
+  if (names.length && !importsModule(out, RWSDK_WORKER_MODULE))
+    out = insertImport(out, `import { ${names.join(', ')} } from '${RWSDK_WORKER_MODULE}';`, 'esm');
+  const parts = [
+    ...(needsWrap ? ['wrap defineApp() in withHypDriv()'] : []),
+    ...(added ? ['add hypdrivMiddleware() as the first route'] : []),
+  ];
+  return {
+    changed: out !== source,
+    content: out,
+    reason: parts.join(' and ') || 'nothing to change',
+    middleware: placed,
+  };
+}
+
+const RWSDK_WORKER_SNIPPET = `import { hypdrivMiddleware, withHypDriv } from '${RWSDK_WORKER_MODULE}';
+
+export default withHypDriv(
+  defineApp([
+    hypdrivMiddleware(), // first: RedwoodSDK renders with the nonce of Hypdriv's CSP
+    // …your routes
+  ]),
+);`;
+
+export const RWSDK_SPEC: HostSpec = {
+  framework: 'rwsdk',
+  packages: () => ['@hypdriv/rwsdk', '@hypdriv/core'],
+  install: () => ({ devDependencies: ['@cloudflare/vite-plugin', 'wrangler'] }),
+  register(ctx) {
+    // The Hypdriv plugin goes last: it finalises the manifest after RedwoodSDK's multi-pass build. A config that
+    // declares no Cloudflare plugin keeps RedwoodSDK's own (it registers the same `worker` environment).
+    registerInConfig(
+      ctx,
+      [
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/rwsdk';",
+          from: '@hypdriv/rwsdk',
+        },
+      ],
+      {
+        file: /vite\.config\./,
+        property: 'plugins',
+        fallback: { path: 'vite.config.mts', content: rwsdkViteConfigTemplate() },
+      },
+    );
+  },
+  platform(ctx) {
+    const configured = ctx.project.wrangler.config?.main ?? null;
+    const main = (configured ?? 'src/worker.tsx').replace(/^\.\//, '');
+    planFileEdit(
+      ctx,
+      main,
+      (source) => {
+        const wrapped = wrapRwsdkApp(source);
+        if (wrapped.changed && !wrapped.middleware)
+          ctx.notes.push(
+            `${main}: put hypdrivMiddleware() (from '${RWSDK_WORKER_MODULE}') first in the routes of defineApp([...]); without it a nonce CSP blocks RedwoodSDK's inline scripts.`,
+          );
+        return wrapped;
+      },
+      { hint: RWSDK_WORKER_SNIPPET },
+    );
+    if (ctx.platform !== 'cloudflare') {
+      ctx.notes.push(
+        'RedwoodSDK builds a Cloudflare Worker and has no Node or Vercel target, so @hypdriv/rwsdk runs on Workers only: deploy with `wrangler deploy` after `vite build`.',
+      );
+      return;
+    }
+    const assets = { binding: 'ASSETS', run_worker_first: ['/*', '!/assets/*'] };
+    planHostWrangler(ctx, {
+      main: configured ? null : main,
+      durableObjects: true,
+      assets: JSON.stringify(assets),
+      template: () =>
+        wranglerJson({
+          $schema: 'node_modules/wrangler/config-schema.json',
+          name: ctx.name,
+          main,
+          compatibility_date: defaultCompatibilityDate(ctx.now),
+          compatibility_flags: ['nodejs_compat'],
+          assets,
+          observability: { enabled: true },
+          durable_objects: { bindings: HYPDRIV_DO },
+          migrations: HYPDRIV_MIGRATION,
+        }),
+    });
+    ctx.notes.push(
+      'The Hypdriv Vite plugin exports the Durable Object classes (HypDrivLimiter, HypDrivIndex, HypDrivChannel) from the Worker entry; no export of your own is needed.',
+    );
+  },
+  scripts: () => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    'hypdriv:audit': 'hypdriv audit all --url http://localhost:4173',
+  }),
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1301,6 +1495,7 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vinext: VINEXT_SPEC,
   hono: HONO_SPEC,
   waku: WAKU_SPEC,
+  rwsdk: RWSDK_SPEC,
 };
 
 /** The init plan for a Vite host. */

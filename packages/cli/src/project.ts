@@ -53,6 +53,7 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   vite: '@hypdriv/vite',
   hono: '@hypdriv/hono',
   waku: '@hypdriv/waku',
+  rwsdk: '@hypdriv/rwsdk',
 };
 
 /** Display names. */
@@ -67,6 +68,7 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   vite: 'Vite',
   hono: 'Hono',
   waku: 'Waku',
+  rwsdk: 'RedwoodSDK',
   unknown: 'an unknown framework',
 };
 
@@ -96,6 +98,8 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   // Waku before Hono: Waku's server is a Hono app and its projects often depend on `hono` themselves.
   ['waku', 'waku'],
   ['hono', 'hono'],
+  // RedwoodSDK before Vite: its projects depend on `vite` themselves.
+  ['rwsdk', 'rwsdk'],
   ['vite', 'vite'],
 ];
 
@@ -123,6 +127,7 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   // A Hono app has no framework config: its entry is where the middleware is registered.
   hono: HONO_ENTRY_FILES,
   waku: ['waku.config.ts', 'waku.config.mts', 'waku.config.js', 'waku.config.mjs'],
+  rwsdk: ['vite.config.mts', 'vite.config.ts', 'vite.config.js', 'vite.config.mjs'],
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -756,6 +761,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/vinext',
     '@hypdriv/hono',
     '@hypdriv/waku',
+    '@hypdriv/rwsdk',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

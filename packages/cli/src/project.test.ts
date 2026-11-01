@@ -256,6 +256,54 @@ describe('Waku detection', () => {
   });
 });
 
+describe('RedwoodSDK detection', () => {
+  it('detects RedwoodSDK before Vite and finds vite.config.mts', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({
+        name: 'rw',
+        dependencies: { rwsdk: '1.7.5', react: '19.3.1' },
+        devDependencies: { vite: '^8.3.5', '@cloudflare/vite-plugin': '1.66.0' },
+      }),
+      ...installed('rwsdk', '1.7.5'),
+      ...installed('@hypdriv/rwsdk', '0.1.0'),
+      'vite.config.mts':
+        "import { hypdriv } from '@hypdriv/rwsdk';\nexport default defineConfig({ plugins: [redwood(), hypdriv()] });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'rwsdk',
+      version: '1.7.5',
+      integration: '@hypdriv/rwsdk',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.framework.configFile).toMatch(/vite\.config\.mts$/);
+    expect(info.hypdriv.packages['@hypdriv/rwsdk']).toBe('0.1.0');
+  });
+
+  it('reports a RedwoodSDK project whose Vite config does not reference the integration as unregistered', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'rw', dependencies: { rwsdk: '1.7.5' } }),
+      ...installed('rwsdk', '1.7.5'),
+      'vite.config.mts': 'export default {};\n',
+    });
+    expect(detectProject(p.dir, { env: {} }).framework).toMatchObject({
+      name: 'rwsdk',
+      integrationInstalled: null,
+      registered: false,
+    });
+  });
+
+  it('leaves a plain Vite project alone', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'v', devDependencies: { vite: '^8.3.5' } }),
+      ...installed('vite', '8.3.5'),
+      'vite.config.ts': 'export default {};\n',
+    });
+    expect(detectProject(p.dir, { env: {} }).framework.name).toBe('vite');
+  });
+});
+
 describe('platform detection', () => {
   it('detects Vercel from vercel.json, the VERCEL env and @hypdriv/vercel', () => {
     const p = tempProject({
