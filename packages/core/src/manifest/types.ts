@@ -26,7 +26,8 @@ export type FrameworkName =
   | 'vinext'
   | 'hono'
   | 'waku'
-  | 'rwsdk';
+  | 'rwsdk'
+  | 'solid-start';
 
 /** The framework (and bundler) that produced a build. */
 export interface ManifestFramework {
@@ -251,6 +252,7 @@ const FRAMEWORK_LABELS: Record<FrameworkName, string> = {
   hono: 'Hono',
   waku: 'Waku',
   rwsdk: 'RedwoodSDK',
+  'solid-start': 'SolidStart',
 };
 
 /** The framework of a manifest (`{ name: 'next' }` for manifests written by the Next.js adapter). */

@@ -54,6 +54,7 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   hono: '@hypdriv/hono',
   waku: '@hypdriv/waku',
   rwsdk: '@hypdriv/rwsdk',
+  'solid-start': '@hypdriv/solid-start',
 };
 
 /** Display names. */
@@ -69,6 +70,7 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   hono: 'Hono',
   waku: 'Waku',
   rwsdk: 'RedwoodSDK',
+  'solid-start': 'SolidStart',
   unknown: 'an unknown framework',
 };
 
@@ -97,6 +99,7 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['nuxt', 'nuxt'],
   // Waku before Hono: Waku's server is a Hono app and its projects often depend on `hono` themselves.
   ['waku', 'waku'],
+  ['solid-start', '@solidjs/start'],
   ['hono', 'hono'],
   // RedwoodSDK before Vite: its projects depend on `vite` themselves.
   ['rwsdk', 'rwsdk'],
@@ -128,6 +131,15 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   hono: HONO_ENTRY_FILES,
   waku: ['waku.config.ts', 'waku.config.mts', 'waku.config.js', 'waku.config.mjs'],
   rwsdk: ['vite.config.mts', 'vite.config.ts', 'vite.config.js', 'vite.config.mjs'],
+  // SolidStart 2 configures through Vite; the Vinxi-era app.config.* of SolidStart 1 is found so the doctor can say so.
+  'solid-start': [
+    'vite.config.ts',
+    'vite.config.mts',
+    'vite.config.js',
+    'vite.config.mjs',
+    'app.config.ts',
+    'app.config.js',
+  ],
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -763,6 +775,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/hono',
     '@hypdriv/waku',
     '@hypdriv/rwsdk',
+    '@hypdriv/solid-start',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

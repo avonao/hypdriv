@@ -152,7 +152,7 @@ export function addToConfigArray(
 }
 
 /** Index just past the expression that starts at `start` (stops at a top-level `,`, `)`, `]` or `}`). */
-function expressionEnd(source: string, start: number): number {
+export function expressionEnd(source: string, start: number): number {
   for (let i = start; i < source.length; i++) {
     const c = source[i]!;
     if (c === '(' || c === '[' || c === '{') {

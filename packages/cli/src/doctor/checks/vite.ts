@@ -17,6 +17,7 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'vinext',
   'waku',
   'rwsdk',
+  'solid-start',
 ];
 
 /** Where each host registers Hypdriv, for messages. */
@@ -32,6 +33,8 @@ const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
   vinext: "the Hypdriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
   waku: "withHypDriv() around the config in waku.config.ts (import { withHypDriv } from '@hypdriv/waku')",
   rwsdk: "hypdriv() after redwood() in vite.config.mts (import { hypdriv } from '@hypdriv/rwsdk')",
+  'solid-start':
+    "hypdriv() after solidStart() and nitro() in vite.config.ts (import { hypdriv } from '@hypdriv/solid-start/vite')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */

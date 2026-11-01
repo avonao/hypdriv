@@ -1,0 +1,103 @@
+{
+  "name": "@hypdriv/solid-start",
+  "version": "0.1.0",
+  "description": "Hypdriv for SolidStart 2: the Drivetrain around every response of the Nitro server (Node, Vercel) or the Cloudflare Worker (security headers, CSP nonces and hashes, rate limiting, bot shield, geo, flags, Early Hints, observability), the route manifest derived from SolidStart's file routes and prerendered pages, and static headers for Cloudflare Workers, Vercel and Node.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist",
+    "virtual.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/solid-start"
+  },
+  "keywords": [
+    "solid",
+    "solidjs",
+    "solid-start",
+    "solidstart",
+    "vite",
+    "nitro",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "workerd": "./dist/server.js",
+      "edge-light": "./dist/server.js",
+      "worker": "./dist/server.js",
+      "deno": "./dist/server.js",
+      "browser": "./dist/server-client.js",
+      "default": "./dist/server.js"
+    },
+    "./nitro": {
+      "source": "./src/nitro.ts",
+      "types": "./dist/nitro.d.ts",
+      "default": "./dist/nitro.js"
+    },
+    "./cloudflare": {
+      "source": "./src/cloudflare.ts",
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
+    "./vite": {
+      "source": "./src/vite.ts",
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./virtual": {
+      "types": "./virtual.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/build": "workspace:*",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/vite": "workspace:*"
+  },
+  "peerDependencies": {
+    "@solidjs/start": ">=2.0.0 <3",
+    "vite": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@solidjs/router": "catalog:",
+    "@solidjs/start": "catalog:",
+    "@types/node": "catalog:",
+    "nitro": "catalog:",
+    "solid-js": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

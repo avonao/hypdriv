@@ -304,6 +304,54 @@ describe('RedwoodSDK detection', () => {
   });
 });
 
+describe('SolidStart detection', () => {
+  it('detects SolidStart before Vite and finds vite.config', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({
+        name: 'sol',
+        dependencies: { '@solidjs/start': '^2.1.0', 'solid-js': '^1.9.18' },
+        devDependencies: { vite: '^8.3.5' },
+      }),
+      ...installed('@solidjs/start', '2.1.0'),
+      ...installed('@hypdriv/solid-start', '0.1.0'),
+      'vite.config.ts':
+        "import { hypdriv } from '@hypdriv/solid-start/vite';\nexport default defineConfig({ plugins: [solidStart(), nitro(), hypdriv()] });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'solid-start',
+      version: '2.1.0',
+      integration: '@hypdriv/solid-start',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.framework.configFile).toMatch(/vite\.config\.ts$/);
+    expect(info.hypdriv.packages['@hypdriv/solid-start']).toBe('0.1.0');
+  });
+
+  it('reports an unregistered config, and finds the app.config of SolidStart 1', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'sol', dependencies: { '@solidjs/start': '^2.1.0' } }),
+      ...installed('@solidjs/start', '2.1.0'),
+      'vite.config.ts': 'export default defineConfig({ plugins: [solidStart()] });\n',
+    });
+    expect(detectProject(p.dir, { env: {} }).framework).toMatchObject({
+      name: 'solid-start',
+      integrationInstalled: null,
+      registered: false,
+    });
+
+    const old = tempProject({
+      'package.json': JSON.stringify({ name: 'old', dependencies: { '@solidjs/start': '^1.3.2' } }),
+      ...installed('@solidjs/start', '1.3.2'),
+      'app.config.ts': 'export default defineConfig({});\n',
+    });
+    const info = detectProject(old.dir, { env: {} });
+    expect(info.framework).toMatchObject({ name: 'solid-start', version: '1.3.2', registered: false });
+    expect(info.framework.configFile).toMatch(/app\.config\.ts$/);
+  });
+});
+
 describe('platform detection', () => {
   it('detects Vercel from vercel.json, the VERCEL env and @hypdriv/vercel', () => {
     const p = tempProject({

@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-solid-start",
+  // Hypdriv's Worker shell around SolidStart (scheduled/queue/email handlers, Durable Objects).
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The Worker runs first for everything except content-hashed assets: public files (served from the assets binding
+  // by createSolidStartWorker) get the request stages too — rate limiting, bot shield, geo, flags.
+  "assets": { "binding": "ASSETS", "run_worker_first": ["/*", "!/_build/assets/*"] },
+  "observability": { "enabled": true },
+  // `jobs.cron` in hypdriv.config.ts: the shell's scheduled handler dispatches matching jobs.
+  "triggers": { "crons": ["0 * * * *"] },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" },
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }
+  ]
+}
