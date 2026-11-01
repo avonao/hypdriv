@@ -745,6 +745,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/vercel',
     '@hypdriv/cli',
     '@hypdriv/security',
+    '@hypdriv/image',
     '@hypdriv/purser',
     '@hypdriv/runtime',
     '@hypdriv/vite',

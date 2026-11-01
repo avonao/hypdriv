@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { emptyManifest, type HypRoute } from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -705,5 +706,54 @@ describe('hot warming checks', () => {
     const check = (await doctor(vercel.dir, ids)).byId['security.warm-hot'];
     expect(check).toMatchObject({ status: 'pass', informational: true });
     expect(check?.message).toContain('Cloudflare feature');
+  });
+});
+
+describe('image placeholder check', () => {
+  const ids = ['--only', 'images.placeholders'];
+  const fixtures = fileURLToPath(new URL('../../../image/src/node/__fixtures__/', import.meta.url));
+  const project = (config = 'export default { images: { placeholders: { engine: "portable" } } };\n') => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'shop', dependencies: { '@hypdriv/image': '^0.1.0' } }),
+      'hypdriv.config.ts': config,
+    });
+    mkdirSync(join(p.dir, 'public'), { recursive: true });
+    copyFileSync(join(fixtures, 'png-rgba8.png'), join(p.dir, 'public', 'logo.png'));
+    copyFileSync(join(fixtures, 'jpeg-420-baseline.jpg'), join(p.dir, 'public', 'hero.jpg'));
+    return p;
+  };
+
+  it('is skipped when the project does not use @hypdriv/image or turns placeholders off', async () => {
+    const plain = tempProject({ 'package.json': JSON.stringify({ name: 'shop' }) });
+    expect((await doctor(plain.dir, ids)).byId['images.placeholders']?.status).toBe('skip');
+    const off = project('export default { images: { placeholders: { enabled: false } } };\n');
+    expect((await doctor(off.dir, ids)).byId['images.placeholders']?.message).toContain('enabled is false');
+  });
+
+  it('warns while the file is missing, names the engine, and fixes it with --fix', async () => {
+    const p = project();
+    const missing = (await doctor(p.dir, ids)).byId['images.placeholders'];
+    expect(missing?.status).toBe('warn');
+    expect(missing?.message).toContain('is missing: 2 to generate');
+    expect(missing?.message).toContain('portable');
+    expect(missing?.fixable).toBe(true);
+
+    const fixed = (await doctor(p.dir, [...ids, '--fix'])).byId['images.placeholders'];
+    expect(fixed?.fixed).toBe(true);
+    const file = JSON.parse(p.read('.hypdriv/placeholders.json'));
+    expect(Object.keys(file.placeholders)).toEqual(['/hero.jpg', '/logo.png']);
+  });
+
+  it('passes when the file is current and warns again after a picture changes', async () => {
+    const p = project();
+    await doctor(p.dir, [...ids, '--fix']);
+    const current = (await doctor(p.dir, ids)).byId['images.placeholders'];
+    expect(current).toMatchObject({ status: 'pass' });
+    expect(current?.message).toContain('is up to date (2 images, portable, ');
+
+    copyFileSync(join(fixtures, 'gif-static.gif'), join(p.dir, 'public', 'new.gif'));
+    const stale = (await doctor(p.dir, ids)).byId['images.placeholders'];
+    expect(stale?.status).toBe('warn');
+    expect(stale?.message).toContain('is out of date: 1 to generate, 0 to remove');
   });
 });

@@ -90,7 +90,9 @@ Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs a
 
 The portable engine recognises images by their bytes, not their extension, streams PNG rows and area-averages them straight into the 16-pixel result (a 24-megapixel PNG needs about 250 MB and half a second), and refuses images above `maxPixels` (134 million) before allocating. For big JPEGs it decodes only the DC coefficients, which are the exact means of the 8×8 blocks, so a 24-megapixel photo takes about 0.1 s and 80 MB; this is what libjpeg's reduced-size decoding, and so sharp's shrink-on-load, does too. Near sharp colour edges of chroma-subsampled pictures that is an approximation; `accuracy: 'exact'` decodes every JPEG completely (about 2.5 s per 24 megapixels). Pictures smaller than eight times the placeholder are always decoded completely.
 
-Images that no installed codec can read (WebP or AVIF without sharp or the `@jsquash` codec) are listed in `unsupported` with the package to install, are not counted as errors and do not stop the others; files that fail to decode are listed in `errors` and make `hypdriv placeholders` exit `1`. `dryRun: true` decodes and writes nothing: `generated` then counts the images that would be regenerated.
+`hypdriv doctor` (`images.placeholders`) reports whether the file is current, which engine and format the next run would use, and fixes a missing or stale file with `--fix`; a `prebuild` script (`hypdriv placeholders`) keeps it current in CI.
+
+Images that no installed codec can read (WebP or AVIF without sharp or the `@jsquash` codec) are listed in `unsupported` with the package to install, are not counted as errors and do not stop the others; files that fail to decode are listed in `errors` and make `hypdriv placeholders` exit `1`. `dryRun: true` decodes and writes nothing (it compares sizes and timestamps and peeks at file headers): `generated` then counts the images that would be regenerated, and pictures no installed codec reads stay in `unsupported` instead of making the file look out of date.
 
 ## `HypImage`
 

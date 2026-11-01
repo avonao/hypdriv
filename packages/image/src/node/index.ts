@@ -1,6 +1,6 @@
-import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
-import { encodePlaceholder, renderPortable, UnsupportedImageError } from './portable';
+import { encodePlaceholder, renderPortable, UnsupportedImageError, unsupportedBy } from './portable';
 import { loadWasmCodecs, type WasmCodecs } from './wasm';
 
 export type { RasterFormat } from './portable';
@@ -208,6 +208,19 @@ interface Renderer {
   name: PlaceholderEngineName;
   format: PlaceholderFormat;
   render(abs: string, bytes: number): Promise<{ dataUrl: string; width: number; height: number }>;
+  /** Cheap look at the file header: the reason `render` would report the picture as unsupported, else `null`. */
+  precheck?(abs: string): Promise<UnsupportedImageError | null>;
+}
+
+async function readHead(abs: string, length: number): Promise<Uint8Array> {
+  const handle = await open(abs, 'r');
+  try {
+    const buffer = new Uint8Array(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
 }
 
 function sharpRenderer(sharp: SharpLike, format: PlaceholderFormat, size: number, quality: number): Renderer {
@@ -244,6 +257,9 @@ function portableRenderer(
   return {
     name: 'portable',
     format,
+    async precheck(abs) {
+      return unsupportedBy(await readHead(abs, 16), codecs);
+    },
     async render(abs) {
       const bytes = await readFile(abs);
       const rendered = await renderPortable(bytes, {
@@ -377,6 +393,12 @@ export async function generatePlaceholders(
       return;
     }
     if (options.dryRun) {
+      // a picture no installed codec reads never gets an entry: it is not "out of date" either
+      const reason = await renderer.precheck?.(abs).catch(() => null);
+      if (reason) {
+        unsupported.push({ path: rel, reason: reason.message });
+        return;
+      }
       pending.add(rel);
       generated++;
       return;

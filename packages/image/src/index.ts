@@ -4,7 +4,7 @@
  *
  * - `@hypdriv/image/loader`: the `images.loaderFile` module (default export `cloudflareLoader`).
  * - `@hypdriv/image/react`: `createHypImage(NextImage)`, `withPlaceholders`, `getPlaceholder`.
- * - `@hypdriv/image/node`: `generatePlaceholders()` (build time, uses `sharp` when installed).
+ * - `@hypdriv/image/node`: `generatePlaceholders()` (build time; `sharp` when installed, otherwise a built-in PNG/JPEG/GIF engine).
  *
  * This root entry re-exports the loader utilities (no React, no Node).
  */

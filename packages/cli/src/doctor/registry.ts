@@ -4,6 +4,7 @@ import { environmentChecks } from './checks/environment';
 import { experimentChecks } from './checks/experiments';
 import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
+import { imageChecks } from './checks/images';
 import { nextjsChecks } from './checks/nextjs';
 import { opennextChecks } from './checks/opennext';
 import { openNextCacheChecks } from './checks/opennext-cache';
@@ -63,6 +64,7 @@ export const allChecks: Check[] = [
   ...scoped(onlyOn(['cloudflare'], workersCompatChecks)),
   ...scoped(hypdrivChecks),
   ...experimentChecks,
+  ...imageChecks,
   ...sizeChecks,
   ...securityChecks,
   ...purserChecks,

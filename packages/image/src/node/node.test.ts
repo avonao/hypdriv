@@ -323,6 +323,31 @@ describe('generatePlaceholders without sharp (portable engine)', () => {
     expect(warnings.join('\n')).toMatch(/2 image\(s\) have no placeholder/);
   });
 
+  it('does not count pictures no codec reads as out of date in a dry run', async () => {
+    await copyFile(join(fixtures, 'webp-lossy.webp'), join(root, 'public', 'photo.webp'));
+    await copyFile(join(fixtures, 'avif-lossy.avif'), join(root, 'public', 'photo.avif'));
+    const base = { projectDir: root, sharp: null, wasm: NO_CODECS } as const;
+
+    const planned = await generatePlaceholders({ ...base, dryRun: true });
+    expect(planned).toMatchObject({ generated: 4, total: 4, errors: [] });
+    expect(planned.unsupported.map((u) => u.path)).toEqual(['/photo.avif', '/photo.webp']);
+
+    await generatePlaceholders(base);
+    const fresh = await generatePlaceholders({ ...base, dryRun: true });
+    expect(fresh).toMatchObject({ generated: 0, reused: 4, removed: 0 });
+    expect(fresh.unsupported).toHaveLength(2);
+
+    // installing a decoder turns the same picture into work again
+    const decodeWebp = async () => ({ width: 1, height: 1, data: new Uint8Array(4) });
+    const withCodec = await generatePlaceholders({
+      ...base,
+      wasm: { ...NO_CODECS, decodeWebp },
+      dryRun: true,
+    });
+    expect(withCodec).toMatchObject({ generated: 1, reused: 4 });
+    expect(withCodec.unsupported.map((u) => u.path)).toEqual(['/photo.avif']);
+  });
+
   it('uses WebAssembly codecs when they are available: WebP output, WebP and AVIF sources', async () => {
     await copyFile(join(fixtures, 'webp-lossy.webp'), join(root, 'public', 'photo.webp'));
     const codecs: WasmCodecs = {

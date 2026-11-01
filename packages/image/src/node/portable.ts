@@ -72,6 +72,23 @@ const CODEC_PACKAGE: Partial<Record<RasterFormat, string>> = {
   avif: '@jsquash/avif',
 };
 
+const missingCodec = (format: RasterFormat) =>
+  new UnsupportedImageError(
+    `${format.toUpperCase()} needs sharp or ${CODEC_PACKAGE[format]} to be decoded`,
+    format,
+  );
+
+/**
+ * Why the portable engine cannot decode the file that starts with `head` (at least 12 bytes), or `null` when it
+ * can try: a WebP or AVIF picture without the matching `@jsquash` codec. Used to plan a run without decoding.
+ */
+export function unsupportedBy(head: Uint8Array, codecs: WasmCodecs): UnsupportedImageError | null {
+  const format = sniffFormat(head);
+  if (format === 'webp' && !codecs.decodeWebp) return missingCodec(format);
+  if (format === 'avif' && !codecs.decodeAvif) return missingCodec(format);
+  return null;
+}
+
 /** Decodes `bytes` with the built-in decoders (or the optional WASM ones) and downscales to the placeholder. */
 export async function renderPortable(bytes: Uint8Array, options: PortableOptions): Promise<PortableRender> {
   const format = sniffFormat(bytes);
@@ -95,12 +112,7 @@ export async function renderPortable(bytes: Uint8Array, options: PortableOptions
     }
     default: {
       const decode = format === 'webp' ? options.codecs.decodeWebp : options.codecs.decodeAvif;
-      if (!decode) {
-        throw new UnsupportedImageError(
-          `${format.toUpperCase()} needs sharp or ${CODEC_PACKAGE[format]} to be decoded`,
-          format,
-        );
-      }
+      if (!decode) throw missingCodec(format);
       const image = await decode(bytes);
       if (image.width * image.height > maxPixels) {
         throw new Error(`image has ${image.width * image.height} pixels, above the limit of ${maxPixels}`);
