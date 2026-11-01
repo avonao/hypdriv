@@ -34,13 +34,13 @@ pnpm add hypdriv && npx hypdriv init [--platform vercel]
 5. adds scripts: `hypdriv:doctor`, `hypdriv:analyze`, `hypdriv:audit`,
 6. optionally scaffolds the Purser bridge when `@avonao/purser` is installed.
 
-For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
+For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext|hono` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
 1. writes `hypdriv.config.ts` and adds the framework package (`@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt` or `@hypdriv/vinext`),
 2. registers the integration in the framework's config (Vite plugin, React Router preset, Astro integration, SvelteKit adapter wrapper, Nuxt module) and wires the request hook the framework owns (root `middleware`, `src/start.ts`, `handle`, `proxy.ts`),
 3. on Cloudflare: writes the Worker entry and wrangler `main`, the assets binding and `run_worker_first` patterns (prerendered pages run the request stages through the Worker shell and are still served as built), plus the Durable Object exports; on Vercel the integration writes the Build Output with Hypdriv's Routing Middleware scoped to prerendered pages,
 4. prints the install commands for the framework's own adapter when one is missing.
 
-Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext}.md`.
+Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext,hono}.md`.
 
 Never hand-edit `.hypdriv/` — it is build output.
 

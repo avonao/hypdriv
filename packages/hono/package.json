@@ -1,0 +1,64 @@
+{
+  "name": "@hypdriv/hono",
+  "version": "0.1.0",
+  "description": "Hypdriv for Hono on Cloudflare Workers, Vercel, Node, Bun and Deno: the Drivetrain (security headers, CSP with per-request nonces, rate limiting, bot shield, geo, flags, redirects, Early Hints, logging, Server-Timing, /_hypdriv/*) as Hono middleware or as a wrapper around the app's fetch handler, plus a route manifest read from the app's own routes.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/hono"
+  },
+  "keywords": [
+    "hono",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "bun",
+    "deno",
+    "csp",
+    "security",
+    "rate-limiting",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*"
+  },
+  "peerDependencies": {
+    "hono": ">=4.6.0 <5"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "hono": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

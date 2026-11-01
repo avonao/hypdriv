@@ -1,6 +1,7 @@
 import type { DeployPlatform, ProjectFramework } from '../project';
 import { depsChecks } from './checks/deps';
 import { environmentChecks } from './checks/environment';
+import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
 import { nextjsChecks } from './checks/nextjs';
 import { opennextChecks } from './checks/opennext';
@@ -51,6 +52,7 @@ export const allChecks: Check[] = [
   ...environmentChecks,
   ...onlyFor(['next'], nextjsChecks),
   ...viteChecks,
+  ...honoChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),
   ...scoped(onlyOn(['cloudflare'], wranglerChecks)),

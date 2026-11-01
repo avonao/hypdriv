@@ -21,3 +21,4 @@
 | [0017](0017-purge-consistency.md)      | Edge-cache purges are consistent across isolates, colos and in-flight requests  | accepted |
 | [0018](0018-tag-revalidated-prerenders.md) | Prerenders with explicit cache tags are classified `isr`                     | accepted |
 | [0019](0019-vite-hosts.md)             | Vite hosts: one runtime and one build engine for every framework                 | accepted |
+| [0020](0020-hono-host.md)              | Hono: a server-framework host without a build step                               | accepted |

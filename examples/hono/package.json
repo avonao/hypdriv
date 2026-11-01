@@ -1,0 +1,29 @@
+{
+  "name": "@hypdriv/example-hono",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:node": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "deploy:cloudflare": "wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/hono": "workspace:*",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

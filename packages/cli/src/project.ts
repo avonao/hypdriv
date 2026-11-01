@@ -45,6 +45,7 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   sveltekit: '@hypdriv/sveltekit',
   nuxt: '@hypdriv/nuxt',
   vite: '@hypdriv/vite',
+  hono: '@hypdriv/hono',
 };
 
 /** Display names. */
@@ -57,6 +58,7 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   sveltekit: 'SvelteKit',
   nuxt: 'Nuxt',
   vite: 'Vite',
+  hono: 'Hono',
   unknown: 'an unknown framework',
 };
 
@@ -83,7 +85,20 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['astro', 'astro'],
   ['sveltekit', '@sveltejs/kit'],
   ['nuxt', 'nuxt'],
+  ['hono', 'hono'],
   ['vite', 'vite'],
+];
+
+/** Where a Hono app is created, in the order the wizard and the doctor look. */
+export const HONO_ENTRY_FILES = [
+  'src/index.ts',
+  'src/index.tsx',
+  'src/app.ts',
+  'src/server.ts',
+  'src/worker.ts',
+  'src/main.ts',
+  'index.ts',
+  'app.ts',
 ];
 
 const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
@@ -95,6 +110,8 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   sveltekit: ['vite.config.ts', 'vite.config.js', 'vite.config.mts', 'vite.config.mjs', 'svelte.config.js'],
   nuxt: ['nuxt.config.ts', 'nuxt.config.js', 'nuxt.config.mjs'],
   vite: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
+  // A Hono app has no framework config: its entry is where the middleware is registered.
+  hono: HONO_ENTRY_FILES,
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -699,6 +716,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/sveltekit',
     '@hypdriv/nuxt',
     '@hypdriv/vinext',
+    '@hypdriv/hono',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

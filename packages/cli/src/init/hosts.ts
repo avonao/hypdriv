@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import type { FrameworkName } from '@hypdriv/core';
 import type { LoadedConfig } from '../context';
-import { FRAMEWORK_LABEL, type ProjectInfo } from '../project';
+import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
 import { defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
 import { addToConfigArray, wrapCallArgument, wrapPropertyValue } from './config-edit';
@@ -1007,6 +1007,105 @@ export const VINEXT_SPEC: HostSpec = {
   }),
 };
 
+/** `./hypdriv.config` as the entry file at `path` imports it. */
+function configImportPath(path: string): string {
+  const relative = posix.relative(posix.dirname(path.replace(/\\/g, '/')), 'hypdriv.config');
+  return relative.startsWith('.') ? relative : `./${relative}`;
+}
+
+/** A new Hono entry for a project without one: the app behind Hypdriv, ready for the platform. */
+export function honoEntryTemplate(platform: InitPlatform, path: string): string {
+  return `import { useHypDriv } from '@hypdriv/hono';
+import { Hono } from 'hono';
+import config from '${configImportPath(path)}';
+${platform === 'node' ? "import { serve } from '@hono/node-server';\n" : ''}${platform === 'cloudflare' ? `\n// Rate limiting, tag index and live channels use these Durable Objects (bound in wrangler.jsonc).\n${DO_EXPORTS}\n` : ''}
+const app = new Hono();
+
+// Hypdriv's request stages around everything the app answers (security headers, CSP nonce, rate limiting,
+// bot shield, /_hypdriv/*). Register it first.
+useHypDriv(app, { config });
+
+app.get('/', (c) => c.text('Hello from Hono behind Hypdriv'));
+${platform === 'node' ? '\nserve({ fetch: app.fetch, port: Number(process.env.PORT ?? 3000) });\n' : ''}
+export default app;
+`;
+}
+
+export const HONO_SPEC: HostSpec = {
+  framework: 'hono',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/hono', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/hono', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare'
+      ? { devDependencies: ['wrangler', '@cloudflare/workers-types'] }
+      : platform === 'node'
+        ? { dependencies: ['@hono/node-server'] }
+        : {},
+  register(ctx) {
+    const entry = HONO_ENTRY_FILES.find((f) => existsSync(join(ctx.project.root, f)));
+    const path = entry ?? 'src/index.ts';
+    planFileEdit(
+      ctx,
+      path,
+      (source) => {
+        const declaration =
+          /^([ \t]*)(?:export\s+)?(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*new Hono\b[^\n]*;[ \t]*$/m.exec(
+            source,
+          );
+        if (!declaration)
+          return {
+            changed: false,
+            content: source,
+            reason: 'could not find a one-line `const app = new Hono();`; register the middleware by hand',
+          };
+        const app = declaration[2] as string;
+        const end = (declaration.index ?? 0) + declaration[0].length;
+        let content = `${source.slice(0, end)}\n\n// Hypdriv's request stages around everything the app answers. Register it first.\nuseHypDriv(${app}, { config });${source.slice(end)}`;
+        content = insertImport(content, "import { useHypDriv } from '@hypdriv/hono';", 'esm');
+        content = insertImport(content, `import config from '${configImportPath(path)}';`, 'esm');
+        if (ctx.platform === 'cloudflare' && !/HypDrivLimiter/.test(content))
+          content = `${content.replace(/\s*$/, '')}\n\n// Rate limiting, tag index and live channels use these Durable Objects (bound in wrangler.jsonc).\n${DO_EXPORTS}\n`;
+        return { changed: true, content, reason: 'register useHypDriv(app, { config })' };
+      },
+      {
+        done: /@hypdriv\/hono/,
+        fallback: honoEntryTemplate(ctx.platform, path),
+        hint: `import { useHypDriv } from '@hypdriv/hono';\nimport config from '${configImportPath(path)}';\n\nconst app = new Hono();\nuseHypDriv(app, { config }); // first, so it wraps everything after it${ctx.platform === 'cloudflare' ? `\n${DO_EXPORTS}` : ''}\n\n// or around the whole app: export default wrapHono(app, { config });`,
+      },
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      const entry = HONO_ENTRY_FILES.find((f) => existsSync(join(ctx.project.root, f))) ?? 'src/index.ts';
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      planHostWrangler(ctx, {
+        main: configured ? null : entry,
+        durableObjects: true,
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main: configured ?? entry,
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "On Vercel a Hono app is a Function: `export default app` from src/index.ts (Vercel's zero-config Hono support). Hypdriv's middleware runs inside it; static files in `public/` are served by the CDN before it.",
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1016,6 +1115,7 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   sveltekit: SVELTEKIT_SPEC,
   nuxt: NUXT_SPEC,
   vinext: VINEXT_SPEC,
+  hono: HONO_SPEC,
 };
 
 /** The init plan for a Vite host. */

@@ -339,4 +339,50 @@ describe('hypdriv init for framework hosts', () => {
     );
     expect(vinext.p.read('worker/index.ts')).toContain('createVinextWorker');
   });
+  it('Hono: useHypDriv() after the app, the config import, the Durable Objects and the wrangler settings', async () => {
+    const { p, out } = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', dependencies: { hono: '^4.13.16' } }),
+        ...installed('hono', '4.13.16'),
+        'src/index.ts':
+          "import { Hono } from 'hono';\n\nconst app = new Hono();\n\napp.get('/', (c) => c.text('hi'));\n\nexport default app;\n",
+      },
+      'cloudflare',
+    );
+    const entry = p.read('src/index.ts');
+    expect(entry).toContain("import { useHypDriv } from '@hypdriv/hono';");
+    expect(entry).toContain("import config from '../hypdriv.config';");
+    expect(entry.indexOf('useHypDriv(app, { config });')).toBeLessThan(entry.indexOf("app.get('/'"));
+    expect(entry).toContain(
+      "export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects';",
+    );
+    expect(parseJsonc(p.read('wrangler.jsonc'))).toMatchObject({ main: 'src/index.ts' });
+    expect(out.plan.find((i) => i.path === 'src/index.ts')?.action).toBe('modify');
+  });
+
+  it('Hono: a chained app is left to the user with the exact snippet, a new project gets an entry', async () => {
+    const chained = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', dependencies: { hono: '^4.13.16' } }),
+        ...installed('hono', '4.13.16'),
+        'src/index.ts':
+          "import { Hono } from 'hono';\nconst app = new Hono()\n  .get('/', (c) => c.text('hi'));\nexport default app;\n",
+      },
+      'vercel',
+    );
+    expect(chained.out.plan.find((i) => i.path === 'src/index.ts')?.action).toBe('manual');
+    expect(chained.p.read('src/index.ts')).not.toContain('useHypDriv');
+
+    const fresh = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', dependencies: { hono: '^4.13.16' } }),
+        ...installed('hono', '4.13.16'),
+      },
+      'node',
+    );
+    const created = fresh.p.read('src/index.ts');
+    expect(created).toContain('useHypDriv(app, { config });');
+    expect(created).toContain('serve({ fetch: app.fetch');
+    expect(created).not.toContain('durable-objects');
+  });
 });

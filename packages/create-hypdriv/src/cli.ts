@@ -35,16 +35,16 @@ export interface CliIO {
 const HELP = `create-hypdriv ${VERSION}
 
 Scaffold an app with Hypdriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
-(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) on Cloudflare Workers, Vercel or Node.
+(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) and Hono on Cloudflare Workers, Vercel or Node.
 
 Usage
   npm create hypdriv@latest [directory] -- [options]
   pnpm create hypdriv [directory] [options]
 
 Options
-  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext
+  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, hono
   --platform <cloudflare|vercel|node>
-                                  Deploy target (default: cloudflare; node for Vite frameworks only)
+                                  Deploy target (default: cloudflare; node for Vite frameworks and Hono)
   --purser                        Style the app with Purser CSS (Next.js; zero-override atomic CSS, flashless themes)
   --pm <pnpm|npm|yarn|bun>        Package manager (default: the one running create-hypdriv)
   --name <package-name>           package.json name (default: from the directory)
@@ -256,21 +256,30 @@ export async function main(io: CliIO): Promise<number> {
             `${runScript(packageManager, 'build:node')}`,
             `${runScript(packageManager, 'start')}              # Node server behind the Hypdriv pipeline`,
           ];
+  // Hono has no build step: it runs as is on Workers, Vercel Functions and Node.
+  const honoSteps =
+    platform === 'cloudflare'
+      ? [`${runScript(packageManager, 'deploy:cloudflare')}   # wrangler deploy`]
+      : platform === 'vercel'
+        ? ['vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)']
+        : [`${runScript(packageManager, 'start')}              # Node server behind the Hypdriv pipeline`];
   const steps = [
     relative(io.cwd, result.root) ? `cd ${relative(io.cwd, result.root)}` : null,
     installed ? null : `${packageManager} install`,
-    runScript(packageManager, 'dev'),
-    ...(framework === 'next'
-      ? [
-          platform === 'cloudflare'
-            ? `${runScript(packageManager, 'preview')}   # OpenNext build + wrangler dev (the Worker)`
-            : `${runScript(packageManager, 'build')}     # next build (withHypDriv emits Vercel CDN headers)`,
-          `${runScript(packageManager, 'hypdriv:doctor')}`,
-          platform === 'cloudflare'
-            ? `${runScript(packageManager, 'deploy')}`
-            : 'vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)',
-        ]
-      : [...hostSteps, `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`]),
+    runScript(packageManager, framework === 'hono' && platform === 'node' ? 'dev:node' : 'dev'),
+    ...(framework === 'hono'
+      ? [...honoSteps, `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`]
+      : framework === 'next'
+        ? [
+            platform === 'cloudflare'
+              ? `${runScript(packageManager, 'preview')}   # OpenNext build + wrangler dev (the Worker)`
+              : `${runScript(packageManager, 'build')}     # next build (withHypDriv emits Vercel CDN headers)`,
+            `${runScript(packageManager, 'hypdriv:doctor')}`,
+            platform === 'cloudflare'
+              ? `${runScript(packageManager, 'deploy')}`
+              : 'vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)',
+          ]
+        : [...hostSteps, `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`]),
   ].filter((s): s is string => s !== null);
 
   if (json)

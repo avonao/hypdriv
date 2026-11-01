@@ -14,7 +14,7 @@ import { dirname, join, relative, sep } from 'node:path';
 export type Platform = 'cloudflare' | 'vercel' | 'node';
 
 /** Frameworks the scaffolder supports: Next.js and the Vite hosts (ADR 0019). */
-export type Framework = 'next' | ViteHost;
+export type Framework = 'next' | AppHost;
 export type ViteHost = 'vite' | 'react-router' | 'tanstack-start' | 'astro' | 'sveltekit' | 'nuxt' | 'vinext';
 export const VITE_HOSTS: readonly ViteHost[] = [
   'vite',
@@ -25,13 +25,17 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'nuxt',
   'vinext',
 ];
-export const FRAMEWORKS: readonly Framework[] = ['next', ...VITE_HOSTS];
+/** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
+export type ServerHost = 'hono';
+export type AppHost = ViteHost | ServerHost;
+export const SERVER_HOSTS: readonly ServerHost[] = ['hono'];
+export const FRAMEWORKS: readonly Framework[] = ['next', ...VITE_HOSTS, ...SERVER_HOSTS];
 
 /**
- * Template ids: Next.js has one per platform, with or without Purser CSS; every Vite host has one app that builds
- * for Cloudflare, Vercel and Node.
+ * Template ids: Next.js has one per platform, with or without Purser CSS; every Vite host and Hono has one app that
+ * builds or runs on Cloudflare, Vercel and Node.
  */
-export type TemplateId = 'cloudflare' | 'cloudflare-purser' | 'vercel' | 'vercel-purser' | ViteHost;
+export type TemplateId = 'cloudflare' | 'cloudflare-purser' | 'vercel' | 'vercel-purser' | AppHost;
 
 /** Each template is a runnable example app of the repository, built and audited in CI. */
 export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
@@ -46,6 +50,7 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   sveltekit: 'examples/sveltekit',
   nuxt: 'examples/nuxt',
   vinext: 'examples/vinext',
+  hono: 'examples/hono',
 };
 
 export function templateFor(platform: Platform, purser: boolean, framework: Framework = 'next'): TemplateId {

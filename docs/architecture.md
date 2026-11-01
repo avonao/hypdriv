@@ -152,6 +152,7 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 | SvelteKit 3 | adapter wrapper + Vite plugin (`@hypdriv/sveltekit`) | `handle` |
 | Nuxt 4 | module (`@hypdriv/nuxt`) | Nitro middleware and render hooks |
 | vinext | Vite plugin (`@hypdriv/vinext`) | `proxy.ts` (`createProxy`) |
+| Hono | none (no build step): `useHypDriv(app)` middleware or `wrapHono(app)` (`@hypdriv/hono`) | the app's own `fetch` (`createHandler`, `runner: 'host'`) |
 
 **Prerendered pages.** The platform's static layer serves them (`HypRoute.servedStatically`): their posture is the static header rule (security preset, the document's hash CSP, Early Hints), and neither the build nor the runtime infers an edge-cache policy for them. To run the request stages (rate limits, bot shield, maintenance, flags) for them as well:
 
@@ -342,6 +343,7 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, runtime, build, cache, security, observe, flags, purser, vercel |
 | `@hypdriv/vite`       | Node (plugin, toolkit, `/node` server) + Workers (`/worker`) + Vercel Routing Middleware (`/vercel-middleware`) | core, runtime, build, security, cloudflare |
 | `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` | framework integrations | vite, runtime, cloudflare |
+| `@hypdriv/hono` | Hono middleware and fetch wrapper, route manifest from `app.routes` | core, runtime |
 | `@hypdriv/cloudflare` | Workers                                               | core, runtime, cache, security, observe, flags, live, purser |
 | `@hypdriv/vercel`     | neutral (Vercel Functions, Routing Middleware)        | core, cache, security                               |
 | `@hypdriv/devtools`   | browser + neutral                                     | core                                                |

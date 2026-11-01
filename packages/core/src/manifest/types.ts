@@ -23,7 +23,8 @@ export type FrameworkName =
   | 'astro'
   | 'sveltekit'
   | 'nuxt'
-  | 'vinext';
+  | 'vinext'
+  | 'hono';
 
 /** The framework (and bundler) that produced a build. */
 export interface ManifestFramework {
@@ -245,6 +246,7 @@ const FRAMEWORK_LABELS: Record<FrameworkName, string> = {
   sveltekit: 'SvelteKit',
   nuxt: 'Nuxt',
   vinext: 'vinext',
+  hono: 'Hono',
 };
 
 /** The framework of a manifest (`{ name: 'next' }` for manifests written by the Next.js adapter). */

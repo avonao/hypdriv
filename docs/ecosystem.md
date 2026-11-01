@@ -30,10 +30,10 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | **Touches your source** | Through the framework's documented extension points | Reads it statically, writes one stylesheet | Never: works on a copy |
 | **Output** | Responses with cache, CSP, security headers, rate limits, traces; `.hypdriv/manifest.json` | One generated stylesheet in cascade layers, class names | A hashed copy of the site, `squawkcode-map.json`, a pass or fail with every differing element |
 | **Command** | `hypdriv` (17 commands) | `purser` (`build`, `check`) | `squawkcode` (`init`, `transform`, `compare`, `gate`) |
-| **Package** | `hypdriv`, `@hypdriv/*` (25 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
+| **Package** | `hypdriv`, `@hypdriv/*` (26 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
 | **Node.js** | 20.9+ (some framework packages need 22+) | 22+ | 22+ |
 | **Runtime dependencies** | Platform services optional | None | None |
-| **Tests** | 1,511 in 154 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
+| **Tests** | 1,543 in 156 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
 | **Repository** | [avonao/hypdriv](https://github.com/avonao/hypdriv) | [avonao/purser](https://github.com/avonao/purser) | [avonao/squawkcode](https://github.com/avonao/squawkcode) |
 | **Homepage** | | [pursercss.dev](https://pursercss.dev) | |
 | **Status** | 0.1.0 Preview | 0.1.0 Preview | 0.1.0 Preview |
