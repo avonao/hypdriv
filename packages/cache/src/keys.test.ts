@@ -135,7 +135,8 @@ describe('buildCacheKey', () => {
       },
     );
     const k = await buildCacheKey(base);
-    expect(k.vary).toEqual(['accept-language', 'sec-ch-ua-mobile']);
+    // Flag values come from the visitor's cookies, so a shared cache in front of the Worker must vary on them.
+    expect(k.vary).toEqual(['accept-language', 'cookie', 'sec-ch-ua-mobile']);
     // Unlisted geo field and flag do not fragment.
     expect(await key({ ...base, geo: { country: 'US', city: 'SF' }, flags: { beta: true, other: 2 } })).toBe(
       k.key,

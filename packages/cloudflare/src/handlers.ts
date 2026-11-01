@@ -1,4 +1,12 @@
-import { type HypDrivEnv, type Logger, queueConsumerFor, type ResolvedConfig, readEnv } from '@hypdriv/core';
+import {
+  experimentWarmCookie,
+  HEADER,
+  type HypDrivEnv,
+  type Logger,
+  queueConsumerFor,
+  type ResolvedConfig,
+  readEnv,
+} from '@hypdriv/core';
 import { hotPaths, hotPathsSql, queryAnalyticsEngine } from '@hypdriv/observe';
 import { signing } from '@hypdriv/security';
 
@@ -12,8 +20,16 @@ export interface DispatchContext {
   waitUntil(promise: Promise<unknown>): void;
   /** `fetch` for outbound API calls (the Analytics Engine query for hot pages); defaults to the global. */
   fetch?: typeof fetch;
-  /** Whether the edge cache would keep a GET of this pathname; hot pages the cache would not keep are not warmed. */
+  /**
+   * Whether the edge cache would keep a GET of this pathname; hot pages the cache would not keep are not warmed.
+   * Without it, hot pages are not warmed at all (an unchecked list from a public beacon is never trusted).
+   */
   cacheable?: (pathname: string) => boolean;
+  /**
+   * The experiment variant combinations to warm for a pathname (`createWarmVariantPlanner`): one request per
+   * combination fills every cached copy. Without it each page is warmed once.
+   */
+  warmVariants?: (pathname: string) => Array<Record<string, string>>;
 }
 
 function originFor(config: ResolvedConfig): string {
@@ -77,6 +93,11 @@ const normalizeCron = (value: string) => value.trim().replace(/\s+/g, ' ');
 export async function hotWarmRoutes(ctx: DispatchContext): Promise<string[]> {
   const hot = ctx.config.cache.warm.hot;
   if (!hot) return [];
+  if (!ctx.cacheable) {
+    // Fail closed: without the cacheability test every pathname from the public beacon would be requested.
+    ctx.log.warn('hot warming skipped: the Worker cannot tell which pages the edge cache keeps');
+    return [];
+  }
   const accountId = readEnv(ctx.env, hot.accountIdEnv);
   const apiToken = readEnv(ctx.env, hot.apiTokenEnv);
   const dataset =
@@ -101,7 +122,7 @@ export async function hotWarmRoutes(ctx: DispatchContext): Promise<string[]> {
     const paths = hotPaths(rows, {
       limit: hot.limit,
       minViews: hot.minViews,
-      ...(ctx.cacheable ? { accept: ctx.cacheable } : {}),
+      accept: ctx.cacheable,
     }).map((p) => p.path);
     ctx.log.info('hot warm routes', { count: paths.length, days: hot.days });
     return paths;
@@ -139,6 +160,16 @@ export async function dispatchScheduled(
   const warm = ctx.config.cache.warm;
   const warmMatches = !!warm.cron && normalizeCron(warm.cron) === cron;
   if (warmMatches) {
+    if (!ctx.config.site.origin) {
+      // Cache keys include the host: the copies a warm-up of the placeholder host fills are never served to a
+      // visitor. The application's own caches (ISR, the data cache) are still filled, so the run goes ahead.
+      ctx.log.warn(
+        'site.origin is not set, so the warm-up requests a placeholder host and fills no edge cache copy',
+        {
+          hint: 'set site.origin to the URL visitors use (https://www.example.com)',
+        },
+      );
+    }
     const origin = originFor(ctx.config);
     const own = new URL(origin).origin;
     const routes = [...new Set([...warm.routes, ...(await hotWarmRoutes(ctx))])].filter((route) => {
@@ -149,15 +180,23 @@ export async function dispatchScheduled(
         return false;
       }
     });
-    if (routes.length) {
+    // One request per page and per combination of the experiment variants the page's cached copies depend on.
+    const requests = routes.flatMap((route) =>
+      (ctx.warmVariants?.(new URL(route, origin).pathname) ?? [{}]).map((assignment) => ({
+        route,
+        assignment,
+      })),
+    );
+    if (requests.length) {
       let index = 0;
-      const workers = Array.from({ length: Math.min(warm.concurrency, routes.length) }, async () => {
-        while (index < routes.length) {
-          const route = routes[index++]!;
+      const workers = Array.from({ length: Math.min(warm.concurrency, requests.length) }, async () => {
+        while (index < requests.length) {
+          const { route, assignment } = requests[index++]!;
+          const cookie = experimentWarmCookie(ctx.config.flags.experimentCookie, assignment);
           try {
             const res = await ctx.invoke(
               new Request(new URL(route, origin), {
-                headers: { 'x-hypdriv-warm': '1', accept: 'text/html' },
+                headers: { [HEADER.warm]: '1', accept: 'text/html', ...(cookie ? { cookie } : {}) },
               }),
             );
             // Released, not awaited: a cancel on a teed body only settles once every branch is consumed.

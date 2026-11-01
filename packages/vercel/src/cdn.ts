@@ -4,6 +4,7 @@ import {
   createContext,
   createRouteMatcher,
   defineStage,
+  EXPERIMENT_COOKIE_PENDING_KEY,
   emptyManifest,
   FLAGS_COOKIE_PENDING_KEY,
   getSetCookies,
@@ -331,9 +332,14 @@ function createPlanner(config: ResolvedConfig, downstream: boolean): Planner {
   };
 }
 
-/** `true` when the flags stage will add its bucketing cookie in a later `post`. */
+/**
+ * `true` when the flags stage will add a cookie in a later `post` (its stage runs after this one on the way out): the
+ * bucketing cookie, or the experiment cookie (a new or changed variant, or the mark that a visitor was counted).
+ */
 function flagsCookiePending(ctx: HypContext): boolean {
-  return ctx.state.get(FLAGS_COOKIE_PENDING_KEY) === true;
+  return (
+    ctx.state.get(FLAGS_COOKIE_PENDING_KEY) === true || ctx.state.get(EXPERIMENT_COOKIE_PENDING_KEY) === true
+  );
 }
 
 function record(ctx: HypContext, decision: CdnDecision, debugHeader: boolean): void {

@@ -62,3 +62,10 @@ export type {
   Purger,
   TagIndex,
 } from './types';
+export {
+  createWarmVariantPlanner,
+  type ExperimentAssignment,
+  enumerateVariantInputs,
+  MAX_PURGE_VARIANTS,
+  type VariantInput,
+} from './variants';

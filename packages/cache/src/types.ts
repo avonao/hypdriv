@@ -138,7 +138,11 @@ export interface EdgeCache {
   stage(): Stage;
   /** Deletes every entry indexed under the tags and asks the purger to purge them. Returns the number of keys deleted locally. */
   purgeTags(tags: string[]): Promise<number>;
-  /** Deletes the base variant of each URL (GET, no vary dimensions) and asks the purger to purge the files. */
+  /**
+   * Deletes every copy of each URL it can name: the base key, the copies per experiment variant, flag value, locale
+   * and device class the configuration knows (their keys need no index), and everything the tag index holds under
+   * the URL's `path:` tag; then asks the purger to purge the files. Returns the number of entries removed locally.
+   */
   purgeUrls(urls: string[]): Promise<number>;
   /** Serves a stale-if-error entry after the upstream threw, for runners that call `next` directly (see `UPSTREAM_KEY`). */
   recover(ctx: HypContext): Response | undefined;
