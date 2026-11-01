@@ -69,6 +69,16 @@ export function mergeSources(a: RouteAssetSources, b: RouteAssetSources | undefi
 }
 
 /**
+ * The client assets of one page on top of the shared entry assets (a lazily loaded route chunk, its CSS). `base` is
+ * the public path the client build is served from, which `assetsForEntries` prefixes to the manifest's file names.
+ */
+export type PageAssets = (
+  route: DiscoveredRoute,
+  manifest: ViteManifest,
+  base: string,
+) => RouteAssetSources | undefined;
+
+/**
  * Attaches the client assets every page loads (the entry chunks of the Vite client build, their CSS and fonts) to
  * page routes; a framework integration refines this per page through `FinalizeNitroInput.pageAssets`.
  */
@@ -76,13 +86,13 @@ export function withSharedAssets(
   routes: DiscoveredRoute[],
   manifest: ViteManifest | null,
   base: string,
-  pageAssets?: (route: DiscoveredRoute, manifest: ViteManifest) => RouteAssetSources | undefined,
+  pageAssets?: PageAssets,
 ): DiscoveredRoute[] {
   if (!manifest) return routes;
   const shared = assetsForEntries(manifest, entryKeys(manifest), base);
   return routes.map((route) => {
     if (route.kind !== 'page') return route;
-    return { ...route, sources: mergeSources(shared, pageAssets?.(route, manifest)) };
+    return { ...route, sources: mergeSources(shared, pageAssets?.(route, manifest, base)) };
   });
 }
 
@@ -107,7 +117,7 @@ export interface FinalizeNitroInput {
   /** Pages never navigated to directly (error documents, fallbacks). */
   internalPages?: string[];
   /** Per-page client assets on top of the shared entry assets. */
-  pageAssets?: (route: DiscoveredRoute, manifest: ViteManifest) => RouteAssetSources | undefined;
+  pageAssets?: PageAssets;
   log?: Logger;
 }
 

@@ -1,0 +1,102 @@
+{
+  "name": "@hypdriv/analog",
+  "version": "0.1.0",
+  "description": "Hypdriv for Analog, the Angular meta-framework on Vite and Nitro: the Hypdriv Drivetrain (security headers, CSP nonces and hashes, rate limiting, bot shield, geo, flags, Early Hints, observability) around every response, the file router's pages and API routes in the route manifest, and static headers for Cloudflare Workers, Vercel and Node.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/analog"
+  },
+  "keywords": [
+    "analog",
+    "analogjs",
+    "angular",
+    "nitro",
+    "vite",
+    "cloudflare",
+    "workers",
+    "vercel",
+    "csp",
+    "security",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./angular": {
+      "source": "./src/angular.ts",
+      "types": "./dist/angular.d.ts",
+      "default": "./dist/angular.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/nitro": "workspace:*",
+    "@hypdriv/runtime": "workspace:*",
+    "@hypdriv/vite": "workspace:*"
+  },
+  "peerDependencies": {
+    "@analogjs/platform": "^2.9.0 || >=3.0.0-beta.0 <4",
+    "@analogjs/router": "^2.9.0 || >=3.0.0-beta.0 <4",
+    "@angular/core": ">=19.0.0",
+    "nitropack": ">=2.12.0 <3",
+    "vite": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@analogjs/router": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "nitropack": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@analogjs/content": "catalog:",
+    "@analogjs/router": "catalog:",
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/core": "catalog:",
+    "@angular/platform-browser": "catalog:",
+    "@angular/platform-server": "catalog:",
+    "@angular/router": "catalog:",
+    "@types/node": "catalog:",
+    "nitropack": "catalog:",
+    "rxjs": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

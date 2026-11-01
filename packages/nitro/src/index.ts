@@ -23,6 +23,7 @@ export {
   finalizeNitroManifest,
   type NitroOutputInput,
   type NitroOutputResult,
+  type PageAssets,
   type PrerenderedRoute,
   prerenderedDocuments,
   runtimeManifestFiles,
