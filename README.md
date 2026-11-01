@@ -133,7 +133,7 @@ The bundle contains one tarball per package (`tarballs/`), `SHA256SUMS`, the ver
 
 `install.sh` verifies the checksums, copies the 16 tarballs a Next.js application needs into `vendor/hypdriv/` and runs `npm install --save` on them. Commit `vendor/hypdriv/` so CI can install the same bytes. Running the script from a newer bundle updates the application.
 
-Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 29 and 28 tarballs are not installed together, because `@hypdriv/vinext`, `@hypdriv/waku`, `@hypdriv/rwsdk`, `@hypdriv/solid-start` and `@hypdriv/qwik` declare peers on `vinext`, `waku`, `rwsdk`, `@solidjs/start` and `@qwik.dev/router`.
+Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 30 tarballs are not installed together, because `@hypdriv/vinext`, `@hypdriv/waku`, `@hypdriv/rwsdk`, `@hypdriv/solid-start` and `@hypdriv/qwik` declare peers on `vinext`, `waku`, `rwsdk`, `@solidjs/start` and `@qwik.dev/router`.
 
 ### From source
 
