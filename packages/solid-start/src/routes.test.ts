@@ -52,6 +52,86 @@ describe('stripNonCode', () => {
   });
 });
 
+describe('stripNonCode (the fallback reader)', () => {
+  it('blanks template interpolations and nested templates as one string', () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the source under test holds template placeholders
+    const source = 'const a = `x ${ `y ${ "export default" }` } z`;\nexport const GET = 1;';
+    const code = stripNonCode(source);
+    expect(code).toHaveLength(source.length);
+    expect(code).not.toMatch(/export default/);
+    expect(code).toContain('export const GET');
+  });
+
+  it('blanks regular expression literals, quotes inside classes included, but not divisions', () => {
+    const code = stripNonCode(
+      'const re = /["\'`]/g;\nconst q = a / b / c;\nexport default function Page() {}',
+    );
+    expect(code).toContain('export default function Page');
+    expect(code).toContain('a / b / c');
+    expect(stripNonCode('x = /export default/')).not.toMatch(/export/);
+    expect(stripNonCode('return /"export default/.test(s);')).not.toMatch(/export/);
+  });
+});
+
+describe('moduleExports reads real syntax', () => {
+  it('is not fooled by quotes in JSX text, regular expressions or templates', () => {
+    const source = [
+      "import { createSignal } from 'solid-js';",
+      'const quote = /["\']/;',
+      'function Hero() {',
+      '  return <p>Don\'t panic, it\'s "fine"</p>;',
+      '}',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: the source under test holds template placeholders
+      'const tpl = `a ${ `b ${ c }` } d`;',
+      'export default Hero;',
+      'export const route = { preload() {} };',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: the source under test holds template placeholders
+      'export async function GET() { return new Response(`${1}`); }',
+    ].join('\n');
+    expect(moduleExports(source, 'hero.tsx')).toEqual({ default: true, names: ['route', 'GET'] });
+  });
+
+  it('reads destructured, multiple and renamed exports and leaves types out', () => {
+    const source = [
+      'export const { GET, post: POST, nested: { deep: DELETE }, ...rest } = handlers;',
+      'export const [first, , third = 3, ...others] = list;',
+      'export type T = string;',
+      'export interface I {}',
+      'export declare function ghost(): void;',
+      'export type { Q } from "./q";',
+      'export { type Z, y, w as PUT } from "./z";',
+      'export enum E { A }',
+      'export * from "./all";',
+    ].join('\n');
+    const { default: hasDefault, names } = moduleExports(source, 'api.ts');
+    expect(hasDefault).toBe(false);
+    expect(names).toEqual(
+      expect.arrayContaining(['GET', 'POST', 'DELETE', 'rest', 'first', 'third', 'others', 'y', 'PUT', 'E']),
+    );
+    for (const absent of ['T', 'I', 'ghost', 'Q', 'Z', 'w']) expect(names).not.toContain(absent);
+  });
+
+  it('knows string export names and export-as-default lists', () => {
+    expect(moduleExports('const a = 1; export { a as default, a as "my name" };', 'x.ts')).toEqual({
+      default: true,
+      names: ['my name'],
+    });
+  });
+
+  it('parses by extension, and tries TypeScript and TSX for others', () => {
+    // A `<T>` cast is TypeScript, not TSX: the .ts reading handles it, an unknown extension falls back to it.
+    const cast = 'export const GET = (x: unknown) => <string>x;';
+    expect(moduleExports(cast, 'a.ts').names).toEqual(['GET']);
+    expect(moduleExports(cast, 'a.custom').names).toEqual(['GET']);
+    expect(moduleExports('export default () => <div />;', 'a.jsx').default).toBe(true);
+  });
+
+  it('reads a module the parser rejects with the lexical fallback', () => {
+    const broken = 'export default function Page() {\nexport const GET = ;';
+    expect(moduleExports(broken, 'broken.tsx')).toEqual({ default: true, names: ['GET'] });
+  });
+});
+
 describe('moduleExports', () => {
   it('reads the default export and the named value exports', () => {
     expect(moduleExports('export default function Home() {}')).toEqual({ default: true, names: [] });
@@ -59,7 +139,7 @@ describe('moduleExports', () => {
       moduleExports(
         'export async function GET() {}\nexport const POST = () => {};\nexport let PUT = 1, x;\nexport class Thing {}',
       ),
-    ).toEqual({ default: false, names: ['GET', 'POST', 'PUT', 'Thing'] });
+    ).toEqual({ default: false, names: ['GET', 'POST', 'PUT', 'x', 'Thing'] });
     expect(moduleExports('export function* gen() {}').names).toEqual(['gen']);
   });
 
