@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { honoRegistration } from './hono';
+import { honoRegistration, maskSource } from './hono';
 
 describe('honoRegistration', () => {
   it('accepts the middleware first', () => {
@@ -26,5 +26,45 @@ describe('honoRegistration', () => {
       routesBefore: null,
     });
     expect(honoRegistration("app.get('/', h);")).toBeNull();
+  });
+
+  it('ignores calls that merely look like routes', () => {
+    const src = [
+      'const app = new Hono();',
+      'const [a, b] = await Promise.all([load(), load()]);',
+      "const user = c.get('user');",
+      'useHypDriv(app, { config });',
+      "app.get('/', h);",
+    ].join('\n');
+    expect(honoRegistration(src)).toEqual({ wrapped: false, routesBefore: null });
+  });
+
+  it('only counts routes of the app the middleware is registered on', () => {
+    const sub =
+      "const api = new Hono();\napi.get('/x', h);\nconst app = new Hono();\nuseHypDriv(app, { config });";
+    expect(honoRegistration(sub)).toEqual({ wrapped: false, routesBefore: null });
+    const chained = "const app = new Hono().get('/health', h);\nuseHypDriv(app, { config });";
+    expect(honoRegistration(chained)).toEqual({ wrapped: false, routesBefore: '.get()' });
+  });
+
+  it('is not fooled by comments and strings', () => {
+    const commented =
+      "// export default wrapHono(app, { config });\n/* app.get('/old', h); */\nuseHypDriv(app, { config });\n";
+    expect(honoRegistration(commented)).toEqual({ wrapped: false, routesBefore: null });
+    expect(honoRegistration("const hint = 'use wrapHono(app) instead';\napp.get('/', h);")).toBeNull();
+    expect(
+      honoRegistration("app.use('*', hypdriv({ config }));\nconst url = 'https://x.dev/a'; app.get('/', h);"),
+    ).toEqual({ wrapped: false, routesBefore: null });
+  });
+
+  it('does not guess when a literal is left open', () => {
+    expect(maskSource("const a = 'open;\nuseHypDriv(app);")).toBeNull();
+    expect(maskSource('/* never closed')).toBeNull();
+    expect(honoRegistration("const a = 'open;\nuseHypDriv(app); app.get('/', h);")).toBeNull();
+  });
+
+  it('keeps indices when masking', () => {
+    const source = `a('x\\'y'); // tail\n\`t\${1}\`;`;
+    expect(maskSource(source)?.length).toBe(source.length);
   });
 });

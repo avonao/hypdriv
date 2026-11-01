@@ -20,6 +20,7 @@ import {
   type KVNamespaceLike,
   loadConfig,
   nodeEnvironment,
+  normalizeIp,
   orderStages,
   platformWaitUntil,
   type ResolvedConfig,
@@ -371,7 +372,7 @@ export function createHandler(options: CreateHandlerOptions): HypHandler {
     if (upgrade) return upgrade;
 
     const cf = input.cf ?? getCf(request);
-    const ip = input.ip ?? clientIp(request.headers, platform.config.security.trustedProxies);
+    const ip = normalizeIp(input.ip ?? clientIp(request.headers, platform.config.security.trustedProxies));
     const country = geoFrom(cf, request.headers).country;
     const waitUntil =
       input.waitUntil ??

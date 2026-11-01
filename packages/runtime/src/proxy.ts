@@ -14,6 +14,7 @@ import {
   isResolvedConfig,
   loadConfig,
   nodeEnvironment,
+  normalizeIp,
   type ResolvedConfig,
   registerRuntime,
   runPipeline,
@@ -145,7 +146,7 @@ export function createProxyHandler(
       target: platform.target,
     });
     if (upgrade) return upgrade;
-    const ip = clientIp(request.headers, platform.config.security.trustedProxies);
+    const ip = normalizeIp(clientIp(request.headers, platform.config.security.trustedProxies));
     // `/_hypdriv/*` (health, vitals, CSP reports, live polling fallback, dev endpoints) on every host.
     // The visitor's country for vitals and reports: Cloudflare's `cf`, else the edge headers Vercel and other
     // CDNs set (x-vercel-ip-country, cf-ipcountry).

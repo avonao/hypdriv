@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HypManifest } from '@hypdriv/core';
+import { type HypManifest, routeId } from '@hypdriv/core';
 import { writeManifest } from '@hypdriv/core/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -11,7 +11,7 @@ import {
   tempProject,
 } from '../__tests__/helpers';
 import { runCommand } from '../main';
-import { diffFails, diffRoutes, loadBaseline } from './routes-diff';
+import { BASELINE_ERROR_EXIT, diffFails, diffRoutes, loadBaseline } from './routes-diff';
 
 let baseline: HypManifest;
 let project: TempProject;
@@ -157,15 +157,74 @@ describe('diffRoutes()', () => {
   });
 
   it('hides _not-found unless asked', () => {
+    const before = clone(baseline);
+    const home = route(before, '/');
+    before.routes = before.routes.filter((r) => r.pathname !== '/_not-found');
+    before.routes.push({ ...clone(home), id: `${home.id}-nf`, pathname: '/_not-found' });
+    const current = clone(before);
+    route(current, '/_not-found').classification = 'dynamic';
+    expect(route(before, '/_not-found').classification).toBe('static');
+    expect(diffRoutes(before, current).changes.some((c) => c.route === '/_not-found')).toBe(false);
+    expect(diffRoutes(before, current, { all: true }).changes).toEqual([
+      expect.objectContaining({ route: '/_not-found', kind: 'classification', severity: 'regression' }),
+    ]);
+  });
+
+  it('pairs a route whose kind changed by its path instead of reporting an addition and a removal', () => {
     const current = clone(baseline);
-    const missing = current.routes.find((r) => r.pathname === '/_not-found');
-    if (missing) {
-      missing.classification = 'dynamic';
-      expect(diffRoutes(baseline, current).changes.some((c) => c.route === '/_not-found')).toBe(false);
-      expect(
-        diffRoutes(baseline, current, { all: true }).changes.some((c) => c.route === '/_not-found'),
-      ).toBe(missing.classification !== baseline.routes.find((r) => r.id === missing.id)?.classification);
+    const dashboard = route(current, '/dashboard');
+    dashboard.kind = 'app-route';
+    dashboard.id = routeId('app-route', '/dashboard');
+    const diff = diffRoutes(baseline, current);
+    expect(diff.changes).toEqual([
+      expect.objectContaining({ route: '/dashboard', kind: 'route-kind', severity: 'info' }),
+    ]);
+    expect(diff.summary).toMatchObject({ added: 0, removed: 0 });
+    expect(diff.summary.matched).toBeGreaterThan(0);
+  });
+
+  it('counts the routes both builds share, none for an unrelated baseline', () => {
+    const same = diffRoutes(baseline, clone(baseline));
+    expect(same.summary.matched).toBe(same.summary.unchanged);
+    const other = clone(baseline);
+    for (const r of other.routes) {
+      r.pathname = `/other${r.pathname === '/' ? '' : r.pathname}`;
+      r.id = `${r.id}-other`;
     }
+    expect(diffRoutes(baseline, other).summary.matched).toBe(0);
+  });
+
+  it('treats a revalidate that shrank by more than half as a regression, and a slower one as an improvement', () => {
+    const slow = clone(baseline);
+    const fast = clone(baseline);
+    const blogSlow = route(slow, '/blog/[slug]');
+    const blogFast = route(fast, '/blog/[slug]');
+    blogSlow.prerender = { ...blogSlow.prerender!, revalidate: 3600 };
+    blogFast.prerender = { ...blogFast.prerender!, revalidate: 1 };
+    const worse = diffRoutes(slow, fast).changes.find((c) => c.kind === 'revalidate');
+    expect(worse).toMatchObject({ severity: 'regression', from: '3600s', to: '1s' });
+    expect(worse?.note).toContain('as often');
+    expect(diffRoutes(fast, slow).changes.find((c) => c.kind === 'revalidate')).toMatchObject({
+      severity: 'improvement',
+    });
+    blogFast.prerender = { ...blogFast.prerender!, revalidate: false };
+    expect(diffRoutes(fast, slow).changes.find((c) => c.kind === 'revalidate')?.severity).toBe('regression');
+  });
+
+  it('treats most prerendered paths disappearing as a regression, but not a small drop', () => {
+    const many = clone(baseline);
+    const blog = route(many, '/blog/[slug]');
+    blog.prerender = { ...blog.prerender!, pathCount: 100 };
+    const few = clone(many);
+    route(few, '/blog/[slug]').prerender = { ...blog.prerender!, pathCount: 1 };
+    expect(diffRoutes(many, few).changes.find((c) => c.kind === 'prerendered-paths')).toMatchObject({
+      severity: 'regression',
+      from: '100',
+      to: '1',
+    });
+    const some = clone(many);
+    route(some, '/blog/[slug]').prerender = { ...blog.prerender!, pathCount: 70 };
+    expect(diffRoutes(many, some).changes.find((c) => c.kind === 'prerendered-paths')?.severity).toBe('info');
   });
 });
 
@@ -203,6 +262,25 @@ describe('loadBaseline()', () => {
     expect(() => loadBaseline('broken.json', dir.dir)).toThrow(/not valid JSON/);
     expect(() => loadBaseline('other.json', dir.dir)).toThrow(/not a Hypdriv manifest/);
     expect(() => loadBaseline('.', dir.dir)).toThrow(/No manifest\.json/);
+  });
+
+  it('refuses an incomplete baseline with the baseline exit code instead of crashing in the diff', () => {
+    const dir = tempProject({ 'package.json': '{}' });
+    for (const field of ['csp', 'earlyHints', 'weights'] as const) {
+      const partial = clone(baseline) as unknown as Record<string, unknown>;
+      delete partial[field];
+      writeFileSync(join(dir.dir, `no-${field}.json`), JSON.stringify(partial));
+      let error: unknown;
+      try {
+        loadBaseline(`no-${field}.json`, dir.dir);
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toMatchObject({
+        exitCode: BASELINE_ERROR_EXIT,
+        message: expect.stringContaining('incomplete'),
+      });
+    }
   });
 });
 
@@ -256,7 +334,35 @@ describe('hypdriv routes --diff', () => {
     );
     expect(bad).not.toBe(0);
     const missing = memoryIO(project.dir);
-    expect(await runCommand('routes', ['--diff', 'missing.json'], missing)).toBe(1);
+    expect(await runCommand('routes', ['--diff', 'missing.json'], missing)).toBe(2);
     expect(missing.err).toContain('not found');
+  });
+
+  it('exits 2, not 0, when the baseline shares no route with the build (and warns under --fail-on never)', async () => {
+    const other = clone(baseline);
+    for (const r of other.routes) {
+      r.pathname = `/other${r.pathname === '/' ? '' : r.pathname}`;
+      r.id = `${r.id}-other`;
+    }
+    await writeManifest(project.dir, other);
+    writeFileSync(join(project.dir, 'baseline.json'), JSON.stringify(baseline));
+    const io = memoryIO(project.dir);
+    expect(await runCommand('routes', ['--diff', 'baseline.json'], io)).toBe(2);
+    expect(io.err).toContain('share no route');
+    const lenient = memoryIO(project.dir);
+    expect(
+      await runCommand('routes', ['--diff', 'baseline.json', '--fail-on', 'never', '--json'], lenient),
+    ).toBe(0);
+    expect(JSON.parse(lenient.out).warnings[0]).toContain('share no route');
+  });
+
+  it('exits 2 for an incomplete baseline and 1 for a regression, so a pipeline can tell them apart', async () => {
+    await writeManifest(project.dir, clone(baseline));
+    const partial = clone(baseline) as unknown as Record<string, unknown>;
+    delete partial.weights;
+    writeFileSync(join(project.dir, 'partial.json'), JSON.stringify(partial));
+    const io = memoryIO(project.dir);
+    expect(await runCommand('routes', ['--diff', 'partial.json'], io)).toBe(2);
+    expect(io.err).toContain('incomplete');
   });
 });

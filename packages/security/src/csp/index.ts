@@ -12,6 +12,7 @@ export {
   withoutSource,
 } from './directives';
 export {
+  decodeContentEncoding,
   injectNonceIntoHtml,
   injectNonceStream,
   type NonceInjectionOptions,

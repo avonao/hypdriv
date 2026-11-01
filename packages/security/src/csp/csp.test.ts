@@ -728,3 +728,39 @@ describe('cspStage on runners that own the body', () => {
     expect(response.headers.get('content-security-policy')).toBe("default-src 'none'");
   });
 });
+
+describe('cspStage with compressed HTML', () => {
+  const gzipped = (text: string, encoding = 'gzip') =>
+    new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip')), {
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'content-encoding': encoding,
+        'content-length': '999',
+      },
+    });
+
+  it('decodes a gzip body before injecting the nonce, instead of corrupting it', async () => {
+    const ctx = makeCtx({ route: isrRoute, manifest, url: 'https://app.test/blog' });
+    const { response } = await runStage(
+      cspStage(ctx.config, { htmlRewriter: null, portableInjection: true }),
+      ctx,
+      () => gzipped('<html><script>x()</script></html>'),
+    );
+    const nonce = ctx.state.get(NONCE_KEY)!;
+    expect(response.headers.get('content-encoding')).toBeNull();
+    expect(response.headers.get('content-length')).toBeNull();
+    expect(await response.text()).toContain(`<script nonce="${nonce}">x()</script>`);
+  });
+
+  it('leaves an encoding it cannot decode untouched and says so', async () => {
+    const ctx = makeCtx({ route: isrRoute, manifest, url: 'https://app.test/blog' });
+    const { response } = await runStage(
+      cspStage(ctx.config, { htmlRewriter: null, portableInjection: true }),
+      ctx,
+      () => gzipped('<html><script>x()</script></html>', 'br'),
+    );
+    expect(response.headers.get('content-encoding')).toBe('br');
+    expect(response.headers.get('content-security-policy')).toBeTruthy();
+    expect(ctx.timings.list()).toContainEqual({ name: 'csp', desc: 'nonce-not-injected' });
+  });
+});

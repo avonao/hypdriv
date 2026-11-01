@@ -6,16 +6,78 @@ const REGISTRATION =
   "useHypDriv(app, { config }) from '@hypdriv/hono' (or `export default wrapHono(app, { config })`)";
 
 /**
- * Where the Hypdriv middleware sits in the entry, or `null` when it does not use it. A Hono middleware only wraps
- * the routes registered after it, so a route before it answers without the Drivetrain.
+ * The source with comments removed and the inside of string and template literals blanked (same length, so indices
+ * hold). Returns `null` when a literal or comment is left open, i.e. the source is not something to reason about.
+ */
+export function maskSource(source: string): string | null {
+  let out = '';
+  let i = 0;
+  while (i < source.length) {
+    const c = source[i] as string;
+    const next = source[i + 1];
+    if (c === '/' && next === '/') {
+      while (i < source.length && source[i] !== '\n') {
+        out += ' ';
+        i += 1;
+      }
+    } else if (c === '/' && next === '*') {
+      const close = source.indexOf('*/', i + 2);
+      if (close === -1) return null;
+      out += source.slice(i, close + 2).replace(/[^\n]/g, ' ');
+      i = close + 2;
+    } else if (c === "'" || c === '"' || c === '`') {
+      out += c;
+      i += 1;
+      let closed = false;
+      while (i < source.length) {
+        const d = source[i] as string;
+        if (d === '\\') {
+          out += source[i + 1] === '\n' ? ' \n' : '__';
+          i += 2;
+          continue;
+        }
+        if (d === c) {
+          closed = true;
+          break;
+        }
+        if (d === '\n' && c !== '`') return null;
+        out += d === '\n' ? '\n' : '_';
+        i += 1;
+      }
+      if (!closed) return null;
+      out += c;
+      i += 1;
+    } else {
+      out += c;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+const ROUTE_METHODS = 'get|post|put|delete|patch|options|head|all|on|route|mount';
+
+/**
+ * Where the Hypdriv middleware sits in the entry, or `null` when it does not use it (or the source cannot be read
+ * reliably). A Hono middleware only wraps the routes registered after it, so a route of the same app before it
+ * answers without the Drivetrain.
  */
 export function honoRegistration(source: string): { wrapped: boolean; routesBefore: string | null } | null {
-  if (/\bwrapHono\s*\(/.test(source)) return { wrapped: true, routesBefore: null };
-  const use = /\b(?:useHypDriv\s*\(|\.use\s*\(\s*(?:'[^']*'\s*,\s*)?hypdriv\s*\()/.exec(source);
+  const code = maskSource(source);
+  if (code === null) return null;
+  if (/\bwrapHono\s*\(/.test(code)) return { wrapped: true, routesBefore: null };
+  const use =
+    /\b(?:useHypDriv\s*(?:<[^>]*>)?\s*\(\s*([A-Za-z_$][\w$]*)|([A-Za-z_$][\w$]*)\s*\.use\s*\(\s*(?:['"`][^'"`]*['"`]\s*,\s*)?hypdriv\s*\()/.exec(
+      code,
+    );
   if (!use) return null;
-  const route = /\.(get|post|put|delete|patch|options|head|all|on|route|mount)\s*\(/.exec(
-    source.slice(0, use.index),
+  const app = (use[1] ?? use[2]) as string;
+  // A route call on the app itself (`app.get('/x', …)`) or chained on a call (`new Hono().get('/x', …)`), with a
+  // path literal first: `Promise.all(…)`, `c.get('user')` and friends are not routes of the app.
+  const routes = new RegExp(
+    `(?:\\b${app.replace(/\$/g, '\\$')}|\\))\\s*\\.(${ROUTE_METHODS})\\s*\\(\\s*(?:\\[[^\\]]*\\]\\s*,\\s*)?['"\`]`,
   );
+  const route = routes.exec(code.slice(0, use.index));
   return { wrapped: false, routesBefore: route ? `.${route[1]}()` : null };
 }
 

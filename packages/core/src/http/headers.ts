@@ -184,6 +184,27 @@ export function normalizeHeaderRecord(record: Record<string, string | undefined>
 }
 
 /** Client IP: Cloudflare's `cf-connecting-ip`, else the right-most trusted hop of `x-forwarded-for`. */
+/**
+ * Canonical text form of a client address: no brackets or zone id, and IPv4-mapped IPv6 (`::ffff:203.0.113.9`,
+ * what a dual-stack Node socket reports) as plain IPv4, so allow lists, rate-limit keys and bot rules written
+ * with `203.0.113.9` match.
+ */
+export function normalizeIp(address: string): string {
+  const text = address
+    .trim()
+    .replace(/^\[|\]$/g, '')
+    .replace(/%[^\s]*$/, '');
+  const dotted = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(text);
+  if (dotted) return dotted[1]!;
+  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(text);
+  if (hex) {
+    const high = Number.parseInt(hex[1]!, 16);
+    const low = Number.parseInt(hex[2]!, 16);
+    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
+  }
+  return text;
+}
+
 export function clientIp(headers: Headers, trustedProxies = 0): string {
   const cf = headers.get('cf-connecting-ip');
   if (cf) return cf.trim();

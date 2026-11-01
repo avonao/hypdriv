@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { injectNonceIntoHtml, injectNonceStream, NonceInjector } from './inject';
+import { decodeContentEncoding, injectNonceIntoHtml, injectNonceStream, NonceInjector } from './inject';
 
 const N = 'abc123';
 
@@ -84,5 +84,48 @@ describe('portable nonce injection', () => {
     expect(injectNonceIntoHtml('<script></script>', 'a"b&c')).toBe(
       '<script nonce="a&quot;b&amp;c"></script>',
     );
+  });
+});
+
+describe('decodeContentEncoding()', () => {
+  const gzip = async (text: string) =>
+    new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip')), {
+      headers: { 'content-type': 'text/html', 'content-encoding': 'gzip', 'content-length': '999' },
+    });
+
+  it('returns unencoded responses as they are', () => {
+    const response = new Response('<p>x</p>', { headers: { 'content-type': 'text/html' } });
+    expect(decodeContentEncoding(response)).toBe(response);
+    const identity = new Response('x', { headers: { 'content-encoding': 'identity' } });
+    expect(decodeContentEncoding(identity)).toBe(identity);
+  });
+
+  it('decompresses gzip and deflate and drops the encoding headers', async () => {
+    const decoded = decodeContentEncoding(await gzip('<script>a()</script>'));
+    expect(decoded).not.toBeNull();
+    expect(decoded!.headers.get('content-encoding')).toBeNull();
+    expect(decoded!.headers.get('content-length')).toBeNull();
+    expect(decoded!.headers.get('content-type')).toBe('text/html');
+    expect(await decoded!.text()).toBe('<script>a()</script>');
+    const deflated = new Response(
+      new Blob(['<b>z</b>']).stream().pipeThrough(new CompressionStream('deflate')),
+      {
+        headers: { 'content-encoding': 'deflate' },
+      },
+    );
+    expect(await decodeContentEncoding(deflated)!.text()).toBe('<b>z</b>');
+  });
+
+  it('gives up on encodings the runtime cannot decode', () => {
+    for (const encoding of ['br', 'zstd', 'gzip, br'])
+      expect(
+        decodeContentEncoding(new Response('x', { headers: { 'content-encoding': encoding } })),
+      ).toBeNull();
+  });
+
+  it('lets the nonce reach compressed HTML through the portable injector', async () => {
+    const decoded = decodeContentEncoding(await gzip('<html><script>x()</script></html>'))!;
+    const body = await injectNonceStream(decoded, 'N0NCE').text();
+    expect(body).toContain('<script nonce="N0NCE">x()</script>');
   });
 });

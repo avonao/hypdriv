@@ -258,6 +258,28 @@ export function injectNonceIntoHtml(
 }
 
 /**
+ * Decompresses a `gzip` / `deflate` body so the HTML can be rewritten, dropping `content-encoding` and
+ * `content-length` (the edge compresses again). Returns the response as it is when it is not encoded, and `null`
+ * for an encoding the runtime cannot decode (`br`, `zstd`, stacked encodings): its bytes are not HTML to rewrite.
+ */
+export function decodeContentEncoding(response: Response): Response | null {
+  const encoding = response.headers.get('content-encoding')?.trim().toLowerCase();
+  if (!encoding || encoding === 'identity') return response;
+  const format =
+    encoding === 'gzip' || encoding === 'x-gzip' ? 'gzip' : encoding === 'deflate' ? 'deflate' : null;
+  if (!format || typeof DecompressionStream === 'undefined') return null;
+  if (!response.body) return response;
+  const headers = new Headers(response.headers);
+  headers.delete('content-encoding');
+  headers.delete('content-length');
+  return new Response(response.body.pipeThrough(new DecompressionStream(format)), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+/**
  * Returns a response whose HTML body carries the nonce, streaming (no full buffering). Responses without a
  * body are returned unchanged. The body must be UTF-8 (HTML documents served by frameworks are).
  */

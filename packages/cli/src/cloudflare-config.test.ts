@@ -147,6 +147,23 @@ export default defineConfig({ worker: { name: NAME, compatibilityDate: "2026-01-
     expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`).name).toBe('shared-name');
   });
 
+  it('names a computed error message and a missing import', () => {
+    const computed = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+const missing = ["CF_ACCOUNT_ID", "CF_ZONE"].filter((k) => !process.env[k]);
+export default defineConfig(() => { throw new Error("missing environment: " + missing.join(", ")); });`,
+    });
+    expect(() => readCloudflareConfig(`${computed.dir}/cloudflare.config.ts`)).toThrow(
+      /missing environment: CF_ACCOUNT_ID, CF_ZONE/,
+    );
+    const absent = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+import { NAME } from "./does-not-exist.ts";
+export default defineConfig({ worker: { name: NAME } });`,
+    });
+    expect(() => readCloudflareConfig(`${absent.dir}/cloudflare.config.ts`)).toThrow(/does-not-exist/);
+  });
+
   it('reports a config error readably', () => {
     const p = project({
       'cloudflare.config.ts': `import { defineConfig } from "cf/config";
@@ -161,6 +178,87 @@ export default defineConfig(() => { throw new Error("no account id"); });`,
 export default defineConfig({ accountId: "abc" });`,
     });
     expect(() => readCloudflareConfig(`${p.dir}/cloudflare.config.ts`)).toThrow(/no `worker`/);
+  });
+
+  it('is not confused by a config that prints to stdout', () => {
+    const p = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+console.log("loading .env");
+process.stdout.write("[dotenv] injected 3 variables\\n");
+export default defineConfig({ worker: { name: "chatty", compatibilityDate: "2026-01-01" } });`,
+    });
+    expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`).name).toBe('chatty');
+  });
+
+  it('returns the config even when something keeps the event loop alive', () => {
+    const p = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+setInterval(() => {}, 1000);
+export default defineConfig({ worker: { name: "lingering", compatibilityDate: "2026-01-01" } });`,
+    });
+    const started = Date.now();
+    expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`, { timeoutMs: 15_000 }).name).toBe(
+      'lingering',
+    );
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it('accepts a function or a promise as the worker', () => {
+    const fn = project({
+      'cloudflare.config.ts': `import { defineConfig, defineWorker } from "cf/config";
+export default defineConfig({
+  worker: defineWorker(({ mode }) => ({ name: mode === "staging" ? "fn-staging" : "fn", compatibilityDate: "2026-01-01" })),
+});`,
+    });
+    expect(readCloudflareConfig(`${fn.dir}/cloudflare.config.ts`).name).toBe('fn');
+    expect(readCloudflareConfig(`${fn.dir}/cloudflare.config.ts`, { mode: 'staging' }).name).toBe(
+      'fn-staging',
+    );
+    const promised = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+export default defineConfig({ worker: Promise.resolve({ name: "later-worker", compatibilityDate: "2026-01-01" }) });`,
+    });
+    expect(readCloudflareConfig(`${promised.dir}/cloudflare.config.ts`).name).toBe('later-worker');
+  });
+
+  it('reads a config whose entry is a build output that does not exist yet', () => {
+    const p = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+import * as entrypoint from "./.open-next/worker.js" with { type: "cf-worker" };
+export default defineConfig({ worker: { name: "next-app", entrypoint, compatibilityDate: "2026-01-01" } });`,
+    });
+    expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`).main).toBe('./.open-next/worker.js');
+  });
+
+  it('does not hand credentials from the CLI’s environment to the config', () => {
+    const p = project({
+      'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+const seen = [process.env.HYPDRIV_TEST_VISIBLE, process.env.HYPDRIV_TEST_API_TOKEN ?? "none", process.env.CLOUDFLARE_API_TOKEN ?? "none"];
+export default defineConfig({ worker: { name: seen.join("|"), compatibilityDate: "2026-01-01" } });`,
+    });
+    const before = { ...process.env };
+    process.env.HYPDRIV_TEST_VISIBLE = 'visible';
+    process.env.HYPDRIV_TEST_API_TOKEN = 'hunter2';
+    process.env.CLOUDFLARE_API_TOKEN = 'cf-secret';
+    try {
+      expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`).name).toBe('visible|none|none');
+      expect(readCloudflareConfig(`${p.dir}/cloudflare.config.ts`, { env: { ...process.env } }).name).toBe(
+        'visible|hunter2|cf-secret',
+      );
+    } finally {
+      for (const key of ['HYPDRIV_TEST_VISIBLE', 'HYPDRIV_TEST_API_TOKEN', 'CLOUDFLARE_API_TOKEN'])
+        if (before[key] === undefined) delete process.env[key];
+        else process.env[key] = before[key];
+    }
+  });
+
+  it('explains a top-level await that can never settle', () => {
+    const p = project({
+      'cloudflare.config.ts': 'await new Promise(() => {});\nexport default {};',
+    });
+    expect(() => readCloudflareConfig(`${p.dir}/cloudflare.config.ts`)).toThrow(
+      /never finished|never settles/,
+    );
   });
 
   it('gives up on a config that never finishes', () => {
@@ -190,6 +288,49 @@ describe('cloudflareConfigToWrangler()', () => {
       '/app',
     );
     expect(doc).toEqual({ name: 'w', main: './src/worker.ts', assets: { binding: 'A' } });
+  });
+
+  it('relates a Windows entry path to the config directory', () => {
+    const doc = cloudflareConfigToWrangler(
+      { worker: { name: 'w', entrypoint: { __cfWorker: 'C:\\app\\src\\worker.ts' } } },
+      'C:\\app',
+    );
+    expect(doc.main).toBe('./src/worker.ts');
+    expect(
+      cloudflareConfigToWrangler(
+        { worker: { entrypoint: { __cfWorker: '/app/.open-next/worker.js' } } },
+        '/app',
+      ).main,
+    ).toBe('./.open-next/worker.js');
+  });
+
+  it('maps the Durable Object class states', () => {
+    const doc = cloudflareConfigToWrangler(
+      {
+        worker: {
+          name: 'w',
+          exports: {
+            Live: { __hypdriv: 'export', kind: 'durableObject', args: [{ storage: 'sqlite' }] },
+            Old: {
+              __hypdriv: 'export',
+              kind: 'durableObject',
+              args: [{ state: 'renamed', renamedTo: 'Live' }],
+            },
+            Moved: { __hypdriv: 'export', kind: 'durableObject', args: [{ state: 'transferred' }] },
+            Gone: { __hypdriv: 'export', kind: 'durableObject', args: [{ state: 'deleted' }] },
+          },
+        },
+      },
+      '/app',
+    );
+    expect(doc.migrations).toEqual([
+      {
+        tag: 'cloudflare.config.ts',
+        new_sqlite_classes: ['Live'],
+        deleted_classes: ['Gone'],
+        renamed_classes: [{ from: 'Old', to: 'Live' }],
+      },
+    ]);
   });
 
   it('returns an empty document when there is no worker', () => {

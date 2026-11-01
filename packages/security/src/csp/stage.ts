@@ -21,7 +21,7 @@ import {
 import { CSP_EXTRA_HASHES_KEY, CSP_MODE_KEY, type CspMode, NONCE_KEY } from '../keys';
 import { buildCspDirectives } from './build';
 import { mergeDirectives, serializeCsp, withoutSource } from './directives';
-import { injectNonceStream } from './inject';
+import { decodeContentEncoding, injectNonceStream } from './inject';
 
 /** Structural subset of Workers' `HTMLRewriter` (kept local: this package never imports workers-types). */
 export interface HtmlRewriterElementLike {
@@ -300,11 +300,21 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
       if (decision.mode === 'nonce' && decision.nonce && decision.inject) {
         const styles = !decision.effective.unsafeInlineStyles;
         const rewriter = resolveRewriter(options);
-        out = rewriter
-          ? injectNonce(out, decision.nonce, { styles, htmlRewriter: rewriter })
-          : options.portableInjection
-            ? injectNonceStream(out, decision.nonce, { styles })
-            : out;
+        if (rewriter || options.portableInjection) {
+          // Compressed HTML (an app-side `compress()` middleware) cannot be rewritten as text: decode it first.
+          const decoded = decodeContentEncoding(out);
+          if (!decoded) {
+            ctx.log.warn(
+              'csp: the HTML response is compressed with an encoding the runtime cannot decode, so no nonce was injected; let the platform compress instead of the application',
+              { encoding: out.headers.get('content-encoding') },
+            );
+            ctx.timings.mark('csp', 'nonce-not-injected');
+          } else {
+            out = rewriter
+              ? injectNonce(decoded, decision.nonce, { styles, htmlRewriter: rewriter })
+              : injectNonceStream(decoded, decision.nonce, { styles });
+          }
+        }
       }
       if (enforced) headers['content-security-policy'] = enforced;
       if (reportOnly) headers['content-security-policy-report-only'] = reportOnly;

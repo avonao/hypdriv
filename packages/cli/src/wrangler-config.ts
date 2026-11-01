@@ -425,6 +425,7 @@ export interface WranglerConfig {
     new_classes?: string[];
     new_sqlite_classes?: string[];
     deleted_classes?: string[];
+    renamed_classes?: Array<{ from: string; to: string }>;
   }>;
   analytics_engine_datasets: WranglerBinding[];
   ratelimits: WranglerBinding[];

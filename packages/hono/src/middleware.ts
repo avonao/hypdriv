@@ -1,10 +1,17 @@
-import type { GeoProperties, HypDrivConfig, HypDrivEnv, ResolvedConfig } from '@hypdriv/core';
+import {
+  type GeoProperties,
+  type HypDrivConfig,
+  type HypDrivEnv,
+  normalizeIp,
+  type ResolvedConfig,
+} from '@hypdriv/core';
 import {
   type CreateHandlerOptions,
   createHandler,
   type HandleInput,
   type HypHandler,
   type ManifestSource,
+  REVALIDATE_HEADER,
   nonce as requestNonce,
 } from '@hypdriv/runtime';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -26,6 +33,17 @@ export interface HypDrivHonoOptions extends Omit<CreateHandlerOptions, 'config' 
   manifest?: ManifestSource;
   /** The framework label (default `hono`). */
   host?: string;
+  /**
+   * The Hono app behind the middleware (`useHypDriv(app)` sets it). Background revalidation
+   * (stale-while-revalidate) renders through `app.fetch`, because the request that served the stale entry is
+   * long finished by then.
+   */
+  app?: AppFetch;
+}
+
+/** The part of a Hono app the middleware calls for background revalidation. */
+export interface AppFetch {
+  fetch(request: Request, env?: unknown, ctx?: unknown): Response | Promise<Response>;
 }
 
 /** A middleware plus the handler behind it (tests, custom hosts). */
@@ -35,18 +53,44 @@ interface ExecutionContextLike {
   waitUntil?(promise: Promise<unknown>): void;
 }
 
-interface NodeBindings {
+/**
+ * What the server runtimes hand to `fetch` as its second argument instead of an environment:
+ * `@hono/node-server` passes `{ incoming, outgoing }`, `Bun.serve` its `server` (with `requestIP()`), `Deno.serve`
+ * a `{ remoteAddr, completed }` info object. They carry the socket address and no bindings.
+ */
+interface ConnectionBindings {
   incoming?: { socket?: { remoteAddress?: string } };
+  outgoing?: unknown;
+  requestIP?: (request: Request) => { address?: string } | null | undefined;
+  remoteAddr?: { hostname?: string; transport?: string };
+  completed?: unknown;
 }
 
-/** `@hono/node-server` hands `{ incoming, outgoing }` to `fetch` as the bindings: not an environment. */
-function isNodeBindings(env: unknown): env is NodeBindings & object {
-  return typeof env === 'object' && env !== null && 'incoming' in env && 'outgoing' in env;
+function isConnectionBindings(env: unknown): env is ConnectionBindings {
+  if (typeof env !== 'object' || env === null) return false;
+  const e = env as ConnectionBindings;
+  return (
+    ('incoming' in e && 'outgoing' in e) ||
+    typeof e.requestIP === 'function' ||
+    (typeof e.remoteAddr === 'object' && e.remoteAddr !== null && 'completed' in e)
+  );
+}
+
+function socketAddress(env: ConnectionBindings, request: Request): string | undefined {
+  if (env.incoming) return env.incoming.socket?.remoteAddress;
+  if (typeof env.requestIP === 'function') {
+    try {
+      return env.requestIP(request)?.address;
+    } catch {
+      return undefined;
+    }
+  }
+  return env.remoteAddr?.hostname;
 }
 
 /**
  * The platform facts a Hono call exposes, as `createHandler` input: Cloudflare bindings and `ctx.waitUntil`, the
- * socket address on Node (`@hono/node-server`; used unless the config says the server sits behind proxies, whose
+ * socket address on Node, Bun and Deno (used unless the config says the server sits behind proxies, whose
  * forwarded headers decide instead), `request.cf`. Anything missing falls back inside `createHandler`
  * (`process.env`, Vercel's request context, forwarded headers).
  */
@@ -57,9 +101,9 @@ export function platformInput(
   config: ResolvedConfig,
 ): Pick<HandleInput, 'env' | 'waitUntil' | 'ip' | 'cf'> {
   const out: Pick<HandleInput, 'env' | 'waitUntil' | 'ip' | 'cf'> = {};
-  if (isNodeBindings(env)) {
-    const address = env.incoming?.socket?.remoteAddress;
-    if (address && config.security.trustedProxies === 0) out.ip = address;
+  if (isConnectionBindings(env)) {
+    const address = socketAddress(env, request);
+    if (address && config.security.trustedProxies === 0) out.ip = normalizeIp(address);
   } else if (env && typeof env === 'object') {
     out.env = env as HypDrivEnv;
   }
@@ -99,21 +143,39 @@ function replaceResponse(c: Context, response: Response): void {
  * Early Hints, logging and `Server-Timing`.
  *
  * Register it first (`app.use(hypdriv({ config }))`), so it also wraps the responses of the middleware after it.
- * Middleware cannot rewrite the request the app sees; `wrapHono()` wraps the whole app and forwards the
- * pipeline's request.
+ * The app receives the pipeline's request (sanitised headers, the stages' `x-hypdriv-*` headers, the body).
+ * Background revalidation (stale-while-revalidate) renders through `options.app`, which `useHypDriv(app)` sets;
+ * `wrapHono()` wraps the whole app and needs no such wiring.
  */
 export function hypdriv(options: HypDrivHonoOptions): HypDrivHonoMiddleware {
-  const { config, manifest, host, ...rest } = options;
+  const { config, manifest, host, app, ...rest } = options;
   const handler = createHandler({
     ...rest,
     config,
     ...(manifest !== undefined ? { manifest } : {}),
     host: host ?? HOST_LABEL,
   });
+  // Requests the middleware itself sends back into the app (background revalidation) must not enter the
+  // Drivetrain again: the app answers them directly.
+  const direct = new WeakSet<Request>();
   const middleware: MiddlewareHandler = async (c, next) => {
+    if (direct.has(c.req.raw)) return next();
+    const env = c.env;
+    const exec = executionContext(c);
     const response = await handler(c.req.raw, {
-      ...platformInput(c.req.raw, c.env, executionContext(c), handler.config),
-      upstream: async () => {
+      ...platformInput(c.req.raw, env, exec, handler.config),
+      upstream: async (forwarded) => {
+        if (forwarded.headers.has(REVALIDATE_HEADER)) {
+          if (!app)
+            throw new Error(
+              'stale-while-revalidate needs the app behind the middleware: register it with useHypDriv(app, { config }) or pass `app` to hypdriv()',
+            );
+          direct.add(forwarded);
+          return app.fetch(forwarded, env, exec);
+        }
+        // The app sees the pipeline's request: sanitised headers, the stages' x-hypdriv-* headers, and the body
+        // (the pipeline moved it out of the original request).
+        c.req.raw = forwarded;
         const current = requestNonce();
         if (current) (c as Context<{ Variables: HypDrivHonoVariables }>).set('hypdrivNonce', current);
         await next();
@@ -132,10 +194,14 @@ export function hypdriv(options: HypDrivHonoOptions): HypDrivHonoMiddleware {
  * registered them all).
  */
 export function useHypDriv(
-  app: HonoRoutesSource & { use(...handlers: MiddlewareHandler[]): unknown },
+  app: HonoRoutesSource & { use(...handlers: MiddlewareHandler[]): unknown } & Partial<AppFetch>,
   options: HypDrivHonoOptions,
 ): HypDrivHonoMiddleware {
-  const middleware = hypdriv({ manifest: () => honoManifest(app), ...options });
+  const middleware = hypdriv({
+    manifest: () => honoManifest(app),
+    app: app as unknown as AppFetch,
+    ...options,
+  });
   app.use(middleware);
   return middleware;
 }

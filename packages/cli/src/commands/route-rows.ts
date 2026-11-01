@@ -23,7 +23,7 @@ export function routeRows(manifest: HypManifest, options: { all?: boolean } = {}
   return manifest.routes
     .filter((r) => r.kind !== 'static-file' && (options.all || !HIDDEN.has(r.pathname)))
     .map((r) => {
-      const w = manifest.weights.client[r.id];
+      const w = manifest.weights?.client?.[r.id];
       return {
         id: r.id,
         route: r.pathname,
@@ -32,7 +32,7 @@ export function routeRows(manifest: HypManifest, options: { all?: boolean } = {}
         revalidate: r.prerender?.revalidate ?? null,
         cachePolicy: r.cachePolicyId ?? null,
         csp: cspModeFor(r, manifest),
-        hints: manifest.earlyHints[r.id]?.length ?? 0,
+        hints: manifest.earlyHints?.[r.id]?.length ?? 0,
         js: w ? w.js : null,
         css: w ? w.css : null,
         atoms: manifest.purser ? (manifest.purser.atomsByRoute[r.id]?.length ?? 0) : null,

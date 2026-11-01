@@ -2,7 +2,14 @@ import { frameworkLabel, manifestFramework } from '@hypdriv/core';
 import { CliError, createContext } from '../context';
 import { bytes } from '../ui';
 import { type RouteRow, routeRows } from './route-rows';
-import { diffFails, diffRoutes, type FailOn, loadBaseline, type RouteChange } from './routes-diff';
+import {
+  BASELINE_ERROR_EXIT,
+  diffFails,
+  diffRoutes,
+  type FailOn,
+  loadBaseline,
+  type RouteChange,
+} from './routes-diff';
 import { defineCommand } from './types';
 
 export { type RouteRow, routeRows };
@@ -204,6 +211,14 @@ function runDiff(
     weights: args.boolean('weights'),
     weightThreshold: threshold,
   });
+  // Two builds that share no route are not comparable (another app, another framework): "no changes" would be a lie.
+  const unrelated = diff.summary.matched === 0 && diff.summary.added > 0 && diff.summary.removed > 0;
+  const warnings: string[] = [];
+  if (unrelated) {
+    const message = `The baseline (${baseline.buildId}) and this build (${manifest.buildId}) share no route: nothing could be compared. Is the baseline from another app, framework or base path?`;
+    if (failOn !== 'never') throw new CliError(message, BASELINE_ERROR_EXIT);
+    warnings.push(message);
+  }
   const fails = diffFails(diff, failOn);
   const describe = (m: typeof manifest) => ({
     buildId: m.buildId,
@@ -215,6 +230,7 @@ function runDiff(
       current: describe(manifest),
       failOn,
       failed: fails,
+      ...(warnings.length ? { warnings } : {}),
       summary: diff.summary,
       changes: diff.changes,
     });
@@ -223,7 +239,8 @@ function runDiff(
   ui.heading(
     `Route diff — baseline ${baseline.buildId} (${frameworkLabel(baseline)}) → build ${manifest.buildId} (${frameworkLabel(manifest)})`,
   );
-  if (diff.changes.length === 0) {
+  for (const warning of warnings) ui.status('warn', warning);
+  if (diff.changes.length === 0 && !unrelated) {
     ui.status('pass', `No route changes (${diff.summary.unchanged} routes compared).`);
     return 0;
   }

@@ -102,6 +102,6 @@ export function cspModeFor(route: HypRoute | null, manifest: HypManifest | null)
     route.kind === 'static-file'
   )
     return 'none';
-  if (route.classification === 'static' && manifest?.csp[route.id]) return 'hash';
+  if (route.classification === 'static' && manifest?.csp?.[route.id]) return 'hash';
   return 'nonce';
 }
