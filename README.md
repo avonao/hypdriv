@@ -67,7 +67,7 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 | **Observability** | Tracing (OTLP/HTTP, console, Analytics Engine) · structured logs with redaction · `Server-Timing` for every stage · Web Vitals with route and cache attribution · `onRequestError` hooks · an in-app DevTools HUD |
 | **Cloudflare-native** | Worker shell around OpenNext with `scheduled`, `queue`, `email` and `tail` handlers dispatched to Route Handlers · geo and locale negotiation · live channels (Durable Objects with SSE and WebSocket, polling fallback) · edge feature flags · KV-managed redirects · maintenance mode · typed bindings in server code |
 | **Vercel-native** | Edge-cache policies expressed as `Vercel-CDN-Cache-Control` and `Vercel-Cache-Tag` (route headers, `withVercelCdn`) with tag purge on Vercel's CDN · Upstash Redis for exact global rate limits · Global Config for flags, redirects and maintenance · Vercel WAF rate-limit rules · BotID guards for Server Actions · Vercel Cron with `CRON_SECRET` · Vercel Queues for `enqueue()` · Vercel geo headers |
-| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext and Waku (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
+| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku and RedwoodSDK (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
 | **Purser CSS** | In-process build and watch inside `withHypDriv` · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
 | **Operations** | Signed operator purge (`hypdriv purge`, `POST /_hypdriv/purge`) that clears every cache tier · signed audit tokens so audits pass your own bot shield · a production implementation guide for Cloudflare |
 | **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for ten frameworks · a testing kit · an agent skill |
@@ -87,6 +87,7 @@ The full list, with baseline and upgrade behaviour per feature, is in [`docs/fea
 | Nuxt 4 | `@hypdriv/nuxt` | Worker shell around Nitro | Routing Middleware | Nitro |
 | vinext | `@hypdriv/vinext` | Worker entry | Routing Middleware | Node server |
 | Waku 1 | `@hypdriv/waku` | Worker shell around Waku's adapter | Routing Middleware | Node server |
+| RedwoodSDK 1 | `@hypdriv/rwsdk` | Worker shell around `defineApp` | — | — |
 | Hono 4 | `@hypdriv/hono` | Worker (`export default app`) | Function (`export default app`) | `@hono/node-server` |
 
 Cloudflare and Vercel are the two first-class platforms ([ADR 0013](docs/adr/0013-deploy-targets.md)). Node is supported for local development, containers and self-hosting; capabilities that need a platform service report their baseline behaviour there.
@@ -97,7 +98,7 @@ Verification of each combination is recorded in [Preview status](#preview-status
 
 | Component | Requirement |
 | --- | --- |
-| Node.js | 20.9 or later for the core, runtime, Next.js, Cloudflare and Vercel packages and for the CLI. Vite packages need 20.19+, Astro and TanStack Start 22.12+, SvelteKit 22.17+, React Router 22.22+, vinext 22+, Waku 22.15+. Loading a `hypdriv.config.ts` needs Node 22.13+ (22.18+ recommended); on older versions use `hypdriv.config.js` or `.mjs`. |
+| Node.js | 20.9 or later for the core, runtime, Next.js, Cloudflare and Vercel packages and for the CLI. Vite packages need 20.19+, Astro and TanStack Start 22.12+, SvelteKit 22.17+, React Router 22.22+, vinext 22+, Waku 22.15+, RedwoodSDK 22.12+. Loading a `hypdriv.config.ts` needs Node 22.13+ (22.18+ recommended); on older versions use `hypdriv.config.js` or `.mjs`. |
 | Package manager | pnpm 10+ for this repository. Applications can use npm, pnpm, yarn or bun. |
 | Next.js | 16.0 or later (App Router first, Pages Router supported) with React 19.2+. Verified on 16.4. |
 | OpenNext for Cloudflare | `@opennextjs/cloudflare` 1.15+. Verified on 1.20. |
@@ -193,7 +194,7 @@ npx hypdriv doctor
 pnpm build                       # writes .hypdriv/manifest.json, CSP hashes and static headers for the target
 ```
 
-Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [Hono](docs/guides/hono.md).
+Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [Hono](docs/guides/hono.md).
 
 ## How it attaches
 
@@ -346,6 +347,7 @@ Twenty-seven packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`@hypdriv/nuxt`](packages/nuxt) | Nuxt | ≥ 20.19 |
 | [`@hypdriv/vinext`](packages/vinext) | vinext | ≥ 22 |
 | [`@hypdriv/waku`](packages/waku) | Waku | ≥ 22.15 |
+| [`@hypdriv/rwsdk`](packages/rwsdk) | RedwoodSDK | ≥ 22.12 |
 | [`@hypdriv/hono`](packages/hono) | Hono | ≥ 22.12 |
 | [`@hypdriv/cli`](packages/cli) | The `hypdriv` command | ≥ 20.9 |
 | [`create-hypdriv`](packages/create-hypdriv) | Scaffolder | ≥ 20.9 |
@@ -366,6 +368,7 @@ Twenty-seven packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`examples/nuxt`](examples/nuxt) | Nuxt 4 | Cloudflare, Vercel, Node | Nitro plugin, `useHyp()` |
 | [`examples/vinext`](examples/vinext) | vinext | Cloudflare, Vercel, Node | Request hook in every runtime |
 | [`examples/waku`](examples/waku) | Waku 1 | Cloudflare, Vercel, Node | Adapter wrapper, `hyp()` in server components, rate-limited `_api` route |
+| [`examples/rwsdk`](examples/rwsdk) | RedwoodSDK 1 | Cloudflare | `withHypDriv(defineApp)`, nonce hand-off, `hyp()` in server components, rate-limited API route |
 | [`examples/hono`](examples/hono) | Hono 4 | Cloudflare, Vercel, Node | `useHypDriv(app)` middleware, nonce in JSX, Durable Objects |
 
 The end-to-end suites in [`e2e/`](e2e) (`cloudflare`, `vercel`, `hosts`) run every capability against a real account.
@@ -426,7 +429,7 @@ Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
 - **Concepts:** [Architecture](docs/architecture.md) · [Ecosystem: Purser CSS and SquawkCode](docs/ecosystem.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md) · [Preview status](docs/preview-status.md) · [Roadmap](docs/roadmap.md)
 - **Start:** [Getting started](docs/guides/getting-started.md) · [Configuration reference](docs/guides/configuration.md) · [CLI](docs/guides/cli.md)
 - **Platforms:** [Cloudflare](docs/guides/cloudflare.md) · [Production on Cloudflare](docs/guides/production-cloudflare.md) · [Vercel](docs/guides/vercel.md)
-- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [Hono](docs/guides/hono.md)
+- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [Hono](docs/guides/hono.md)
 - **Capabilities:** [Caching](docs/guides/caching.md) · [Security](docs/guides/security.md) · [Observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [Flags](docs/guides/flags.md) · [Live channels](docs/guides/live.md) · [Jobs](docs/guides/jobs.md)
 - **Test reports:** [`docs/testing`](docs/testing)
 - **Coding agents:** [`AGENTS.md`](AGENTS.md) and [`skills/hypdriv`](skills/hypdriv/SKILL.md)

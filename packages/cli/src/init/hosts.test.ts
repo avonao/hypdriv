@@ -6,6 +6,7 @@ import { canEvaluateCloudflareConfig } from '../cloudflare-config';
 import { runCommand } from '../main';
 import { parseJsonc } from '../wrangler-config';
 import { addToConfigArray, configObjectStart, importsModule } from './config-edit';
+import { wrapRwsdkApp } from './hosts';
 
 afterEach(cleanupProjects);
 
@@ -544,5 +545,176 @@ export default defineConfig({
     expect(wrangler.name).toBe('my-waku');
     expect(wrangler.main).toBe('./src/waku.server');
     expect(wrangler.durable_objects.bindings).toHaveLength(3);
+  });
+
+  const rwsdk = {
+    'package.json': JSON.stringify({
+      name: 'rw',
+      dependencies: { rwsdk: '1.7.5' },
+      devDependencies: { vite: '^8.3.5' },
+    }),
+    ...installed('rwsdk', '1.7.5'),
+    'vite.config.mts': `import { cloudflare } from '@cloudflare/vite-plugin';
+import { redwood } from 'rwsdk/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  environments: { ssr: {} },
+  plugins: [cloudflare({ viteEnvironment: { name: 'worker' } }), redwood()],
+});
+`,
+    'src/worker.tsx': `import { render, route } from 'rwsdk/router';
+import { defineApp } from 'rwsdk/worker';
+import { Document } from '@/app/Document';
+import { Home } from '@/app/pages/Home';
+
+export default defineApp([
+  render(Document, [route('/', Home)]),
+]);
+`,
+    'wrangler.jsonc':
+      '{\n  "name": "my-rw",\n  "main": "src/worker.tsx",\n  "compatibility_date": "2026-10-01",\n  "compatibility_flags": ["nodejs_compat"],\n  "assets": { "binding": "ASSETS" }\n}\n',
+  };
+
+  it('RedwoodSDK: hypdriv() after redwood(), the Worker wrapped with the nonce middleware first, the Worker settings', async () => {
+    const { p, out } = await init(rwsdk, 'cloudflare');
+    const config = p.read('vite.config.mts');
+    expect(config).toContain("import { hypdriv } from '@hypdriv/rwsdk';");
+    expect(config).toContain(
+      "plugins: [cloudflare({ viteEnvironment: { name: 'worker' } }), redwood(), hypdriv()]",
+    );
+    const worker = p.read('src/worker.tsx');
+    expect(worker).toContain("import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';");
+    expect(worker).toContain(
+      'export default withHypDriv(defineApp([\n  hypdrivMiddleware(),\n  render(Document',
+    );
+    expect(worker.match(/hypdrivMiddleware\(\)/g)).toHaveLength(1);
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler.name).toBe('my-rw');
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+    expect(wrangler.migrations[0]?.new_sqlite_classes).toContain('HypDrivLimiter');
+    expect(out.plan.find((i) => i.path === 'vite.config.mts')?.action).toBe('modify');
+    expect(out.plan.find((i) => i.path === 'src/worker.tsx')?.action).toBe('modify');
+    expect(out.notes.join('\n')).toContain('run_worker_first');
+    expect(out.notes.join('\n')).toContain('exports the Durable Object classes');
+    const pkg = JSON.parse(p.read('package.json')) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies['@hypdriv/rwsdk']).toBeDefined();
+    expect(pkg.scripts['hypdriv:audit']).toContain('4173');
+    // A second run changes nothing.
+    const again = await init({ ...rwsdk, 'vite.config.mts': config, 'src/worker.tsx': worker }, 'cloudflare');
+    expect(again.out.plan.find((i) => i.path === 'vite.config.mts')?.action).toBe('skip');
+    expect(again.out.plan.find((i) => i.path === 'src/worker.tsx')?.action).toBe('skip');
+  });
+
+  it('RedwoodSDK: a project without a Vite config or a Wrangler config gets both', async () => {
+    const { p } = await init(
+      {
+        'package.json': rwsdk['package.json'],
+        ...installed('rwsdk', '1.7.5'),
+        'src/worker.tsx': rwsdk['src/worker.tsx'],
+      },
+      'cloudflare',
+    );
+    expect(p.read('vite.config.mts')).toContain(
+      "cloudflare({ viteEnvironment: { name: 'worker' } }), redwood(), hypdriv()",
+    );
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler).toMatchObject({
+      main: 'src/worker.tsx',
+      assets: { binding: 'ASSETS', run_worker_first: ['/*', '!/assets/*'] },
+    });
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+  });
+
+  it('RedwoodSDK: only Workers are a target, and a Worker it cannot edit gets the snippet', async () => {
+    const vercel = await init(rwsdk, 'vercel');
+    expect(vercel.out.notes.join('\n')).toContain('Cloudflare Worker and has no Node or Vercel target');
+    expect(existsSync(join(vercel.p.dir, 'vercel.json'))).toBe(false);
+    expect(vercel.p.read('src/worker.tsx')).toContain('withHypDriv(defineApp(');
+
+    const unreadable = await init(
+      { ...rwsdk, 'src/worker.tsx': 'export default makeApp();\n' },
+      'cloudflare',
+    );
+    const item = unreadable.out.plan.find((i) => i.path === 'src/worker.tsx');
+    expect(item?.action).toBe('manual');
+    expect(item?.hint).toContain('hypdrivMiddleware()');
+    expect(unreadable.p.read('src/worker.tsx')).toBe('export default makeApp();\n');
+  });
+});
+
+describe('wrapRwsdkApp', () => {
+  const imports = "import { defineApp } from 'rwsdk/worker';\n";
+
+  it('wraps a default export and puts the middleware first in a multi-line array, matching its indent', () => {
+    const r = wrapRwsdkApp(
+      `${imports}\nexport default defineApp([\n    render(Document, [route('/', Home)]),\n  ]);\n`,
+    );
+    expect(r.changed).toBe(true);
+    expect(r.middleware).toBe(true);
+    expect(r.content).toContain(
+      "export default withHypDriv(defineApp([\n    hypdrivMiddleware(),\n    render(Document, [route('/', Home)]),\n  ]));",
+    );
+    expect(
+      r.content.startsWith(
+        `${imports}import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';`,
+      ),
+    ).toBe(true);
+    expect(r.reason).toBe('wrap defineApp() in withHypDriv() and add hypdrivMiddleware() as the first route');
+  });
+
+  it('handles an inline array and a const that is exported as default', () => {
+    const inline = wrapRwsdkApp(`${imports}export default defineApp([route('/', Home)]);\n`);
+    expect(inline.content).toContain(
+      "export default withHypDriv(defineApp([hypdrivMiddleware(), route('/', Home)]));",
+    );
+    const named = wrapRwsdkApp(`${imports}const app = defineApp([route('/', Home)]);\nexport default app;\n`);
+    expect(named.content).toContain(
+      "const app = withHypDriv(defineApp([hypdrivMiddleware(), route('/', Home)]));",
+    );
+    expect(named.middleware).toBe(true);
+  });
+
+  it('adds only what is missing', () => {
+    const wrapped = `import { withHypDriv } from '@hypdriv/rwsdk/worker';\n${imports}export default withHypDriv(defineApp([route('/', Home)]));\n`;
+    const r = wrapRwsdkApp(wrapped);
+    expect(r.content).toContain("withHypDriv(defineApp([hypdrivMiddleware(), route('/', Home)]))");
+    // The existing import from the module is left alone (the user maintains it).
+    expect(r.content.match(/@hypdriv\/rwsdk\/worker/g)).toHaveLength(1);
+    expect(r.reason).toBe('add hypdrivMiddleware() as the first route');
+
+    const complete = `import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';\nexport default withHypDriv(defineApp([hypdrivMiddleware()]));\n`;
+    expect(wrapRwsdkApp(complete)).toMatchObject({ changed: false, content: complete, middleware: true });
+  });
+
+  it('wraps routes that are not an array literal but cannot place the middleware', () => {
+    const r = wrapRwsdkApp(
+      `${imports}import { routes } from './routes';\nexport default defineApp(routes);\n`,
+    );
+    expect(r.changed).toBe(true);
+    expect(r.middleware).toBe(false);
+    expect(r.content).toContain('export default withHypDriv(defineApp(routes));');
+    expect(r.content).not.toContain('hypdrivMiddleware');
+  });
+
+  it('leaves alone a file with no defineApp(), one whose app is not the default export, and broken code', () => {
+    expect(wrapRwsdkApp('export default makeApp();\n')).toMatchObject({ changed: false, middleware: false });
+    const other = wrapRwsdkApp(
+      `${imports}export const app = defineApp([route('/', Home)]);\nexport default {};\n`,
+    );
+    expect(other).toMatchObject({ changed: false });
+    expect(other.reason).toContain('not the default export');
+    expect(wrapRwsdkApp(`${imports}export default defineApp([route('/', Home)`).reason).toContain(
+      'could not parse',
+    );
+  });
+
+  it('ignores defineApp in strings and comments of other calls', () => {
+    const r = wrapRwsdkApp(`${imports}// defineApp(old)\nexport default defineApp([route('/', Home)]);\n`);
+    expect(r.content).toContain('// defineApp(old)');
+    expect(r.content).toContain('withHypDriv(defineApp([hypdrivMiddleware(), route');
   });
 });

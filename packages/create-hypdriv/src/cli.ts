@@ -35,14 +35,15 @@ export interface CliIO {
 const HELP = `create-hypdriv ${VERSION}
 
 Scaffold an app with Hypdriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
-(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku) and Hono on Cloudflare Workers, Vercel or Node.
+(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK) and Hono on Cloudflare Workers, Vercel or Node
+(RedwoodSDK: Cloudflare Workers only).
 
 Usage
   npm create hypdriv@latest [directory] -- [options]
   pnpm create hypdriv [directory] [options]
 
 Options
-  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, hono
+  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, rwsdk, hono
   --platform <cloudflare|vercel|node>
                                   Deploy target (default: cloudflare; node for Vite frameworks and Hono)
   --purser                        Style the app with Purser CSS (Next.js; zero-override atomic CSS, flashless themes)
@@ -158,8 +159,13 @@ export async function main(io: CliIO): Promise<number> {
   const framework: Framework =
     (frameworkArg as Framework | undefined) ??
     (prompt ? await askChoice(ask, 'Framework', FRAMEWORKS, 'next') : 'next');
+  // RedwoodSDK builds a Cloudflare Worker and has no other target.
   const platforms =
-    framework === 'next' ? (['cloudflare', 'vercel'] as const) : (['cloudflare', 'vercel', 'node'] as const);
+    framework === 'next'
+      ? (['cloudflare', 'vercel'] as const)
+      : framework === 'rwsdk'
+        ? (['cloudflare'] as const)
+        : (['cloudflare', 'vercel', 'node'] as const);
   const platformArg = values.platform?.toLowerCase();
   if (platformArg && !(platforms as readonly string[]).includes(platformArg)) {
     io.stderr.write(
@@ -169,7 +175,9 @@ export async function main(io: CliIO): Promise<number> {
   }
   const platform: Platform =
     (platformArg as Platform | undefined) ??
-    (prompt ? await askChoice(ask, 'Deploy to', platforms, 'cloudflare') : 'cloudflare');
+    (prompt && platforms.length > 1
+      ? await askChoice(ask, 'Deploy to', platforms, 'cloudflare')
+      : 'cloudflare');
   if (values.purser && framework !== 'next') {
     io.stderr.write('create-hypdriv: --purser is available for Next.js apps only\n');
     return 2;

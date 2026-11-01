@@ -16,6 +16,7 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'nuxt',
   'vinext',
   'waku',
+  'rwsdk',
 ];
 
 /** Where each host registers Hypdriv, for messages. */
@@ -30,6 +31,7 @@ const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
   nuxt: "modules: ['@hypdriv/nuxt'] in nuxt.config.ts",
   vinext: "the Hypdriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
   waku: "withHypDriv() around the config in waku.config.ts (import { withHypDriv } from '@hypdriv/waku')",
+  rwsdk: "hypdriv() after redwood() in vite.config.mts (import { hypdriv } from '@hypdriv/rwsdk')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */
@@ -197,6 +199,16 @@ export const viteChecks: Check[] = [
       if (!existsSync(entry) && ctx.project.framework.name === 'waku')
         return pass(
           `${bound.length} Hypdriv Durable Object(s) bound; Waku's managed server entry has no file (${main}) and @hypdriv/waku exports the classes from the Worker.`,
+        );
+      // The RedwoodSDK plugin appends the exports to the Worker entry at build time (unless `durableObjects: false`).
+      if (
+        ctx.project.framework.name === 'rwsdk' &&
+        !/\bdurableObjects\s*:\s*false\b/.test(
+          ctx.project.framework.configFile ? readFileSync(ctx.project.framework.configFile, 'utf8') : '',
+        )
+      )
+        return pass(
+          `${bound.length} Hypdriv Durable Object(s) bound; the @hypdriv/rwsdk Vite plugin exports the classes from ${main}.`,
         );
       if (!existsSync(entry))
         return info(

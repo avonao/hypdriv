@@ -84,6 +84,18 @@ describe('template sync', () => {
     expect(manifest.templates.waku).toContain('waku.config.ts');
     expect(manifest.templates.waku).toContain('wrangler.jsonc');
     expect(manifest.templates.waku).toContain('src/pages/_api/api/hello.ts');
+    // RedwoodSDK builds a Cloudflare Worker only: its template has the Worker files and no Vercel or Node ones.
+    const rwsdk = manifest.templates.rwsdk ?? [];
+    for (const file of [
+      'hypdriv.config.ts',
+      '.dev.vars.example',
+      'vite.config.mts',
+      'wrangler.jsonc',
+      'src/worker.tsx',
+    ])
+      expect(rwsdk).toContain(file);
+    expect(rwsdk).not.toContain('.env.example');
+    expect(rwsdk.some((f) => /^(dist|\.wrangler|\.hypdriv|node_modules)\//.test(f))).toBe(false);
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
     for (const files of Object.values(manifest.templates))
@@ -413,6 +425,46 @@ describe('cli', () => {
       expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
       expect(readFileSync(join(root, 'waku.config.ts'), 'utf8')).toContain('withHypDriv(');
       expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    }
+  });
+
+  it('scaffolds a RedwoodSDK app for Cloudflare Workers, the only target RedwoodSDK has', async () => {
+    const t = io(['docs', '--framework', 'rwsdk', '--no-git', '--json'], { run: () => 0 });
+    expect(await main(t.value)).toBe(0);
+    const out = JSON.parse(t.out.join('')) as {
+      template: string;
+      framework: string;
+      platform: string;
+      secretsFile: string;
+      next: string[];
+    };
+    expect(out).toMatchObject({
+      template: 'rwsdk',
+      framework: 'rwsdk',
+      platform: 'cloudflare',
+      secretsFile: '.dev.vars',
+    });
+    expect(out.next.join('\n')).toContain('deploy:cloudflare');
+    const root = join(t.cwd, 'docs');
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+      name: string;
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.name).toBe('docs');
+    expect(pkg.dependencies['@hypdriv/rwsdk']).toMatch(/^\^0\./);
+    expect(pkg.dependencies.rwsdk).toMatch(/^\^?1\./);
+    expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+    expect(readFileSync(join(root, 'src', 'worker.tsx'), 'utf8')).toContain('withHypDriv(');
+    expect(readFileSync(join(root, 'vite.config.mts'), 'utf8')).toContain('hypdriv()');
+    expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    expect(readFileSync(join(root, '.dev.vars'), 'utf8')).toMatch(/HYPDRIV_SESSION_SECRET=\S{16,}/);
+
+    for (const platform of ['vercel', 'node']) {
+      const bad = io(['other', '--framework', 'rwsdk', '--platform', platform, '--no-git', '--json'], {
+        run: () => 0,
+      });
+      expect(await main(bad.value)).toBe(2);
+      expect(bad.err.join('')).toContain('--platform must be cloudflare for rwsdk');
     }
   });
 
