@@ -2,6 +2,8 @@
 
 [Purser CSS](https://pursercss.dev) compiles styles written next to your components into one deterministic atomic stylesheet in which no declaration is ever overridden. Hypdriv makes Purser first-class in a Next.js 16 project without touching Purser itself (ADR 0009).
 
+Purser is one of Hypdriv's sister products, together with SquawkCode (which proves that a CSS change did not change the look). How the three fit together is described in [Ecosystem](../ecosystem.md).
+
 ## Setup
 
 ```sh

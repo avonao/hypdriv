@@ -17,6 +17,14 @@
   <img alt="Node 20.9+" src="https://img.shields.io/badge/node-%E2%89%A520.9-339933">
 </p>
 
+<p align="center">
+  <a href="#install-a-preview-build">Install</a> ·
+  <a href="docs/guides/getting-started.md">Getting started</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
+  <a href="docs/ecosystem.md"><strong>Ecosystem: Purser CSS and SquawkCode</strong></a> ·
+  <a href="docs/preview-status.md">Preview status</a>
+</p>
+
 Hypdriv is a **sidecar**. It attaches to a web application through the public extension points of its framework and platform (`next.config.ts`, the Adapter API, `proxy.ts`, Vite plugins, framework integrations, the Worker entry and your application code) and adds an edge cache, a CSP autopilot, rate limiting, a bot shield, feature flags, tracing and a command-line toolchain. It never patches Next.js, OpenNext, Vite, a framework or a platform builder.
 
 It runs the same ordered pipeline, the **Drivetrain**, on three targets:
@@ -43,6 +51,7 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 - [Configuration](#configuration)
 - [Packages](#packages)
 - [Examples](#examples)
+- [Ecosystem](#ecosystem)
 - [Preview status](#preview-status)
 - [Documentation](#documentation)
 - [Develop from source](#develop-from-source)
@@ -355,6 +364,22 @@ Twenty-five packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re-
 
 The end-to-end suites in [`e2e/`](e2e) (`cloudflare`, `vercel`, `hosts`) run every capability against a real account.
 
+## Ecosystem
+
+Hypdriv has two sister products from Avonao. They work on their own and fit together; the [ecosystem page](docs/ecosystem.md) describes each in detail, how the three connect, and how to adopt them.
+
+| Product | What it is | Where it fits |
+| --- | --- | --- |
+| **[Hypdriv](https://github.com/avonao/hypdriv)** (this repository) | Sidecar for performance, security and observability on Cloudflare Workers, Vercel and Node | Builds the manifest, serves the site through the Drivetrain, audits the deployment |
+| **[Purser CSS](https://github.com/avonao/purser)** (`@avonao/purser`) | Compile-time atomic CSS in which an overridden declaration, an `!important` and a raw color cannot happen | Writes the stylesheet. Hypdriv runs its build and watch in Next.js, guards against a stale stylesheet, reports atom usage per route, pins themes at the edge and audits a deployment for zero overrides ([guide](docs/guides/purser.md)) |
+| **[SquawkCode](https://github.com/avonao/squawkcode)** (formerly ClassHash) | Hashes CSS class names in a copy of a site and proves with headless Chrome that no computed style changed | Runs before deploy. It proves that moving a site onto Purser, or hashing its class names, did not change how it looks; Hypdriv audits the result after deploy |
+
+```
+write (Purser) → build (Hypdriv adapter + manifest) → prove (SquawkCode gate) → serve (Hypdriv Drivetrain) → audit (hypdriv audit css)
+```
+
+All three are 0.1.0 Preview releases under the MIT license, distributed as source and tarballs. Hypdriv works without Purser, Purser without Hypdriv, and SquawkCode with either or neither. Details, compatibility across the three, adoption paths and an end-to-end CI example: [`docs/ecosystem.md`](docs/ecosystem.md).
+
 ## Preview status
 
 | | Status |
@@ -392,7 +417,7 @@ Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Documentation
 
-- **Concepts:** [Architecture](docs/architecture.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md) · [Preview status](docs/preview-status.md) · [Roadmap](docs/roadmap.md)
+- **Concepts:** [Architecture](docs/architecture.md) · [Ecosystem: Purser CSS and SquawkCode](docs/ecosystem.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md) · [Preview status](docs/preview-status.md) · [Roadmap](docs/roadmap.md)
 - **Start:** [Getting started](docs/guides/getting-started.md) · [Configuration reference](docs/guides/configuration.md) · [CLI](docs/guides/cli.md)
 - **Platforms:** [Cloudflare](docs/guides/cloudflare.md) · [Production on Cloudflare](docs/guides/production-cloudflare.md) · [Vercel](docs/guides/vercel.md)
 - **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md)
