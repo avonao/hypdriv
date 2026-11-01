@@ -3,7 +3,7 @@ import { join, posix } from 'node:path';
 import type { FrameworkName } from '@hypdriv/core';
 import type { LoadedConfig } from '../context';
 import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
-import { defaultCompatibilityDate, workerName } from '../templates';
+import { cloudflareConfigHint, defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
 import { addToConfigArray, wrapCallArgument, wrapPropertyValue } from './config-edit';
 import { insertImport } from './next-config';
@@ -262,6 +262,23 @@ export function planHostWrangler(
     return;
   }
   const path = rel(project.root, file);
+  if (project.wrangler.format === 'cloudflare-config') {
+    const hint = cloudflareConfigHint(
+      { entrypoint: o.main, assets: o.assets !== undefined, durableObjects: o.durableObjects },
+      project.wrangler.config,
+    );
+    ctx.items.push(
+      hint
+        ? {
+            path,
+            action: 'manual',
+            reason: 'cloudflare.config.ts (cf CLI format) is not edited automatically; add these settings',
+            hint,
+          }
+        : { path, action: 'skip', reason: 'already configured' },
+    );
+    return;
+  }
   if (project.wrangler.format === 'toml') {
     ctx.items.push({
       path,

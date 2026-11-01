@@ -169,6 +169,16 @@ Internal requests are unaffected by both: Cron Triggers, Queues, the tail consum
 
 Hypdriv's edge stages are latency-sensitive and should stay at the edge; if you enable Smart Placement for database-heavy rendering, the whole Worker (including the shell) moves. Prefer Hyperdrive for database proximity. `run_worker_first` makes asset requests hit the Worker too; only enable it when you need Hypdriv headers on static assets (the `_headers` file covers immutable caching without it).
 
+## `cloudflare.config.ts` (the `cf` CLI)
+
+Projects on the `cf` CLI keep their Worker configuration in `cloudflare.config.ts` (`defineConfig` from `cf/config`) instead of `wrangler.jsonc`. When there is no Wrangler file, Hypdriv reads it: `hypdriv doctor` runs every Wrangler check against it and `hypdriv init` prints the settings it lacks. With both files present, the Wrangler file wins and doctor (`wrangler.cloudflare-config`) reminds you to keep them in sync.
+
+- **How it is read.** The file is a program, so it is evaluated in a child Node process (20 s timeout, never in the CLI itself) where `cf/config` is a recording stand-in and `import … with { type: "cf-worker" }` is a stub that records the entry file; the Worker's own code never runs. This needs Node 22.18 or later (the `cf` CLI requires the same); on older Node, doctor reports why it cannot read the file.
+- **What is understood.** `worker.name`, `entrypoint` (a path or the `cf-worker` import), `compatibilityDate`, `compatibilityFlags`, `workersDev`, `observability`, `assets` (`runWorkerFirst`, `htmlHandling`, `notFoundHandling`), the `env` bindings `text`, `json`, `assets`, `kv`, `r2`, `d1`, `queue`, `worker`, `durableObject`, `ai`, `images` and Analytics Engine, `exports.durableObject({ storage })` (as the Durable Object migration), and the `triggers` `scheduled` and `queue`. Anything else stays unread and unchecked.
+- **Modes.** A function-form `defineConfig(({ mode }) => …)` receives `mode` from `--env <name>` (cf's `--mode`); without it `mode` is `undefined`, as under Wrangler.
+- **Never edited.** Hypdriv does not rewrite a TypeScript program. `init` and `doctor --fix` print the lines to add, for example `exports: { HypDrivChannel: exports.durableObject({ storage: "sqlite" }) }` and the matching `bindings.durableObject({ worker, exportName })` entries.
+- **Assets.** The format has no assets directory (the build tool decides it), so `wrangler.assets` checks the binding only.
+
 ## `next dev` and `wrangler dev`
 
 - `next dev` runs the stages through `proxy.ts` (Node runtime). Edge-only stages (HTML transforms, nonce injection for cached HTML, edge cache storage) are skipped and the HUD shows `runner: proxy`.

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { LoadedConfig } from '../context';
 import type { ProjectInfo } from '../project';
 import {
+  cloudflareConfigHint,
   defaultCompatibilityDate,
   devVarsExampleTemplate,
   envExampleTemplate,
@@ -373,7 +374,22 @@ function planCloudflare(
   }
 
   // wrangler config
-  if (project.wrangler.configFile && project.wrangler.format === 'toml') {
+  if (project.wrangler.configFile && project.wrangler.format === 'cloudflare-config') {
+    const hint = cloudflareConfigHint(
+      { entrypoint: 'hypdriv.worker.ts', crons: o.crons },
+      project.wrangler.config,
+    );
+    items.push(
+      hint
+        ? {
+            path: rel(root, project.wrangler.configFile),
+            action: 'manual',
+            reason: 'cloudflare.config.ts (cf CLI format) is not edited automatically; add these settings',
+            hint,
+          }
+        : { path: rel(root, project.wrangler.configFile), action: 'skip', reason: 'already configured' },
+    );
+  } else if (project.wrangler.configFile && project.wrangler.format === 'toml') {
     const cfg = project.wrangler.config;
     const needsMain = cfg?.main !== 'hypdriv.worker.ts';
     const needsObs = cfg?.observability?.enabled !== true;

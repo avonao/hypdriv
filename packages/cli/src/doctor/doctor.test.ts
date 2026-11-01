@@ -12,6 +12,7 @@ import {
   tempProject,
   WRANGLER_JSONC,
 } from '../__tests__/helpers';
+import { canEvaluateCloudflareConfig } from '../cloudflare-config';
 import { runCommand } from '../main';
 import { allChecks } from './registry';
 import type { CheckReport } from './types';
@@ -55,6 +56,64 @@ describe('check registry', () => {
     ])
       expect(categories.has(c as never)).toBe(true);
     for (const c of allChecks) expect(c.id).toMatch(/^[a-z-]+\.[a-z0-9-]+$/);
+  });
+});
+
+describe.skipIf(!canEvaluateCloudflareConfig())('hypdriv doctor on a cf CLI project', () => {
+  const config = `import { bindings, defineConfig } from "cf/config";
+import * as entrypoint from "./hypdriv.worker.ts" with { type: "cf-worker" };
+export default defineConfig({
+  worker: {
+    name: "shop",
+    entrypoint,
+    compatibilityDate: "2026-09-01",
+    compatibilityFlags: ["nodejs_compat"],
+    env: { ASSETS: bindings.assets() },
+  },
+});
+`;
+
+  it('reads cloudflare.config.ts instead of skipping the Wrangler checks', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'shop', type: 'module', dependencies: { next: '16.4.3' } }),
+      'hypdriv.worker.ts': 'export default {};\n',
+      'cloudflare.config.ts': config,
+    });
+    const { byId } = await doctor(p.dir, [
+      '--only',
+      'wrangler.config,wrangler.cloudflare-config,wrangler.main,wrangler.compat-flags,wrangler.assets',
+    ]);
+    expect(byId['wrangler.config']?.status).toBe('pass');
+    expect(byId['wrangler.config']?.message).toContain('cf CLI format, evaluated');
+    expect(byId['wrangler.cloudflare-config']?.message).toContain(
+      'is the Worker configuration Hypdriv reads',
+    );
+    expect(byId['wrangler.main']?.status).toBe('pass');
+    // No assets directory in this format: only the binding is checked.
+    expect(byId['wrangler.assets']?.status).toBe('pass');
+    expect(byId['wrangler.assets']?.message).toContain('(build output) → ASSETS');
+  });
+
+  it('reports a config that cannot be evaluated, and offers manual fixes only', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'shop', type: 'module', dependencies: { next: '16.4.3' } }),
+      'cloudflare.config.ts':
+        'import { defineConfig } from "cf/config";\nexport default defineConfig(() => { throw new Error("no account"); });\n',
+    });
+    const { byId } = await doctor(p.dir, ['--only', 'wrangler.config']);
+    expect(byId['wrangler.config']?.status).toBe('fail');
+    expect(byId['wrangler.config']?.message).toContain('no account');
+
+    const bare = tempProject({
+      'package.json': JSON.stringify({ name: 'shop', type: 'module', dependencies: { next: '16.4.3' } }),
+      'cloudflare.config.ts':
+        'import { defineConfig } from "cf/config";\nimport * as entrypoint from "./w.ts" with { type: "cf-worker" };\nexport default defineConfig({ worker: { name: "shop", entrypoint, compatibilityDate: "2026-09-01" } });\n',
+      'w.ts': 'export default {};\n',
+    });
+    const main = await doctor(bare.dir, ['--only', 'wrangler.main']);
+    expect(main.byId['wrangler.main']?.status).toBe('fail');
+    expect(main.byId['wrangler.main']?.fix).toContain('cloudflare.config.ts manually');
+    expect(main.byId['wrangler.main']?.fixable).toBe(false);
   });
 });
 

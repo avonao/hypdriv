@@ -234,3 +234,73 @@ export function wranglerTomlHint(crons: string[]): string {
   if (crons.length) lines.push('', '[triggers]', `crons = ${JSON.stringify(crons)}`);
   return lines.join('\n');
 }
+
+/**
+ * The settings to add to the `worker` of a `cloudflare.config.ts` (the `cf` CLI's format, which Hypdriv reads but
+ * never edits), limited to what `config` (the evaluated file) lacks. Returns null when nothing is missing.
+ */
+export function cloudflareConfigHint(
+  wanted: {
+    entrypoint?: string | null;
+    assets?: boolean;
+    durableObjects?: boolean;
+    crons?: string[];
+  },
+  config: {
+    main?: string;
+    compatibility_flags: string[];
+    observability?: { enabled?: boolean };
+    assets?: { run_worker_first?: boolean | string[]; binding?: string };
+    durable_objects: { bindings: Array<{ class_name?: string }> };
+    migrations: Array<{ new_classes?: string[]; new_sqlite_classes?: string[] }>;
+    triggers?: { crons?: string[] };
+  } | null,
+): string | null {
+  const lines: string[] = [];
+  const entry = wanted.entrypoint ?? null;
+  if (entry && config?.main?.replace(/^\.\//, '') !== entry.replace(/^\.\//, ''))
+    lines.push(`entrypoint: ${JSON.stringify(entry)},`);
+  const flags = ['nodejs_compat', 'global_fetch_strictly_public'].filter(
+    (f) => !(config?.compatibility_flags ?? []).includes(f),
+  );
+  if (flags.length)
+    lines.push(
+      `compatibilityFlags: [${[...(config?.compatibility_flags ?? []), ...flags].map((f) => JSON.stringify(f)).join(', ')}],`,
+    );
+  if (config?.observability?.enabled !== true) lines.push('observability: { enabled: true },');
+  if (wanted.assets && !config?.assets?.run_worker_first)
+    lines.push('assets: { runWorkerFirst: ["/*", "!/assets/*"] },');
+  const env: string[] = [];
+  if (wanted.assets && !config?.assets?.binding) env.push('  ASSETS: bindings.assets(),');
+  const classes = ['HypDrivChannel', 'HypDrivLimiter', 'HypDrivIndex'];
+  if (wanted.durableObjects) {
+    const known = new Set([
+      ...(config?.durable_objects.bindings.map((b) => b.class_name) ?? []),
+      ...(config?.migrations.flatMap((m) => [...(m.new_classes ?? []), ...(m.new_sqlite_classes ?? [])]) ??
+        []),
+    ]);
+    const missing = classes.filter((c) => !known.has(c));
+    if (missing.length) {
+      const names: Record<string, string> = {
+        HypDrivChannel: 'HYPDRIV_CHANNEL',
+        HypDrivLimiter: 'HYPDRIV_LIMITER',
+        HypDrivIndex: 'HYPDRIV_INDEX',
+      };
+      for (const c of missing)
+        env.push(
+          `  ${names[c]}: bindings.durableObject({ worker: "<this worker's name>", exportName: "${c}" }),`,
+        );
+      lines.push(
+        `exports: { ${missing.map((c) => `${c}: exports.durableObject({ storage: "sqlite" })`).join(', ')} },`,
+      );
+    }
+  }
+  if (env.length) lines.push('env: {', ...env, '},');
+  const missingCrons = (wanted.crons ?? []).filter((c) => !(config?.triggers?.crons ?? []).includes(c));
+  if (missingCrons.length)
+    lines.push(
+      `triggers: [${missingCrons.map((c) => `triggers.scheduled({ schedule: ${JSON.stringify(c)} })`).join(', ')}],`,
+    );
+  if (!lines.length) return null;
+  return ['// cloudflare.config.ts → worker: { …', ...lines.map((l) => `  ${l}`), '// }'].join('\n');
+}

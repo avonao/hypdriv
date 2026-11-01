@@ -12,6 +12,12 @@ import {
   readManifestSync,
   readPackageJson,
 } from '@hypdriv/core/node';
+import {
+  CLOUDFLARE_CONFIG_FILES,
+  findCloudflareConfig,
+  isCloudflareConfigFile,
+  readCloudflareConfig,
+} from './cloudflare-config';
 import { parseVersion } from './semver';
 import { type SourceScanResult, scanSources } from './source-scan';
 import { exists, firstExisting, isDirectory, readJsonFile, readText } from './util/fs';
@@ -207,11 +213,15 @@ export interface NextConfigAnalysis {
   defaultExport: 'identifier' | 'object' | 'call' | 'function' | 'cjs' | 'none';
 }
 
+/** Where the Worker configuration comes from: a Wrangler file or the `cf` CLI's `cloudflare.config.*`. */
+export type WranglerSourceFormat = WranglerFormat | 'cloudflare-config';
+
 export interface WranglerInfo extends VersionInfo {
   configFile: string | null;
   /** The environment (`--env`) the config was resolved for, or null for the top level. */
   environment: string | null;
-  format: WranglerFormat | null;
+  /** `cloudflare-config` is the `cf` CLI's `cloudflare.config.ts`, read by evaluating it (never edited). */
+  format: WranglerSourceFormat | null;
   config: WranglerConfig | null;
   parseError: string | null;
 }
@@ -422,6 +432,26 @@ function readWrangler(
   environment: string | null = null,
 ): WranglerInfo {
   const base = { ...versionInfo(root, pkg, 'wrangler'), environment };
+  const fromCloudflareConfig = (file: string): WranglerInfo => {
+    try {
+      return {
+        ...base,
+        configFile: file,
+        format: 'cloudflare-config',
+        config: readCloudflareConfig(file, { mode: environment }),
+        parseError: null,
+      };
+    } catch (err) {
+      return {
+        ...base,
+        configFile: file,
+        format: 'cloudflare-config',
+        config: null,
+        parseError: (err as Error).message,
+      };
+    }
+  };
+  if (override && isCloudflareConfigFile(override)) return fromCloudflareConfig(override);
   if (override) {
     const format: WranglerFormat = override.endsWith('.toml')
       ? 'toml'
@@ -477,6 +507,9 @@ function readWrangler(
       return { ...base, configFile: file, format, config: null, parseError: (err as Error).message };
     }
   }
+  // No Wrangler file: a project on the `cf` CLI keeps its Worker configuration in cloudflare.config.ts.
+  const cloudflareConfig = findCloudflareConfig(root);
+  if (cloudflareConfig) return fromCloudflareConfig(cloudflareConfig);
   return { ...base, configFile: null, format: null, config: null, parseError: null };
 }
 
@@ -728,11 +761,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
   const vercel = readVercel(root, linkDir);
   const opennext = versionInfo(root, pkg, '@opennextjs/cloudflare');
   const next = versionInfo(root, pkg, 'next');
-  const cloudflareConfigFile = firstExisting(root, [
-    'cloudflare.config.ts',
-    'cloudflare.config.js',
-    'cloudflare.config.mjs',
-  ]);
+  const cloudflareConfigFile = firstExisting(root, [...CLOUDFLARE_CONFIG_FILES]);
   const hypdrivWorkerFile = firstExisting(root, WORKER_FILES);
   const platformDetection = detectPlatform(
     {

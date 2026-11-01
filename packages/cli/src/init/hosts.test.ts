@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupProjects, installed, memoryIO, tempProject } from '../__tests__/helpers';
+import { canEvaluateCloudflareConfig } from '../cloudflare-config';
 import { runCommand } from '../main';
 import { parseJsonc } from '../wrangler-config';
 import { addToConfigArray, configObjectStart, importsModule } from './config-edit';
@@ -385,4 +386,63 @@ describe('hypdriv init for framework hosts', () => {
     expect(created).toContain('serve({ fetch: app.fetch');
     expect(created).not.toContain('durable-objects');
   });
+
+  it.skipIf(!canEvaluateCloudflareConfig())(
+    'Hono on a cf CLI project: reads cloudflare.config.ts, never edits it, and prints the missing settings',
+    async () => {
+      const files = {
+        'package.json': JSON.stringify({ name: 'api', type: 'module', dependencies: { hono: '^4.13.16' } }),
+        ...installed('hono', '4.13.16'),
+        'src/index.ts':
+          "import { Hono } from 'hono';\n\nconst app = new Hono();\napp.get('/', (c) => c.text('hi'));\nexport default app;\n",
+        'cloudflare.config.ts': `import { defineConfig } from "cf/config";
+import * as entrypoint from "./src/index.ts" with { type: "cf-worker" };
+export default defineConfig({ worker: { name: "api", entrypoint, compatibilityDate: "2026-09-01" } });
+`,
+      };
+      const first = await init(files, 'cloudflare');
+      expect(first.p.read('cloudflare.config.ts')).toBe(files['cloudflare.config.ts']);
+      expect(existsSync(join(first.p.dir, 'wrangler.jsonc'))).toBe(false);
+      const item = first.out.plan.find((i) => i.path === 'cloudflare.config.ts');
+      expect(item).toMatchObject({ action: 'manual' });
+      expect(item?.hint).toContain('compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"]');
+      expect(item?.hint).toContain('observability: { enabled: true }');
+      expect(item?.hint).toContain('HypDrivChannel: exports.durableObject({ storage: "sqlite" })');
+      expect(item?.hint).toContain('HYPDRIV_LIMITER: bindings.durableObject(');
+      expect(item?.hint).not.toContain('entrypoint:');
+
+      // A config that already has everything needs nothing.
+      const complete = await init(
+        {
+          ...files,
+          'cloudflare.config.ts': `import { bindings, defineConfig, exports } from "cf/config";
+import * as entrypoint from "./src/index.ts" with { type: "cf-worker" };
+export default defineConfig({
+  worker: {
+    name: "api",
+    entrypoint,
+    compatibilityDate: "2026-09-01",
+    compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"],
+    observability: { enabled: true },
+    env: {
+      HYPDRIV_LIMITER: bindings.durableObject({ worker: "api", exportName: "HypDrivLimiter" }),
+      HYPDRIV_INDEX: bindings.durableObject({ worker: "api", exportName: "HypDrivIndex" }),
+      HYPDRIV_CHANNEL: bindings.durableObject({ worker: "api", exportName: "HypDrivChannel" }),
+    },
+    exports: {
+      HypDrivLimiter: exports.durableObject({ storage: "sqlite" }),
+      HypDrivIndex: exports.durableObject({ storage: "sqlite" }),
+      HypDrivChannel: exports.durableObject({ storage: "sqlite" }),
+    },
+  },
+});
+`,
+        },
+        'cloudflare',
+      );
+      expect(complete.out.plan.find((i) => i.path === 'cloudflare.config.ts')).toMatchObject({
+        action: 'skip',
+      });
+    },
+  );
 });

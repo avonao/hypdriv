@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupProjects, installed, openNextProject, tempProject } from './__tests__/helpers';
+import { canEvaluateCloudflareConfig } from './cloudflare-config';
 import { analyzeNextConfig, detectPlatform, detectProject } from './project';
 import { importSpecifiers, scanNodeApis, scanRevalidation } from './source-scan';
 
@@ -136,6 +137,84 @@ describe('detectProject', () => {
     expect(info.wrangler).toMatchObject({ format: 'toml', parseError: null });
     expect(info.wrangler.config?.main).toBe('hypdriv.worker.ts');
   });
+});
+
+describe('cloudflare.config.ts (cf CLI format)', () => {
+  const evaluable = canEvaluateCloudflareConfig();
+  const CF = `import { bindings, defineConfig, exports, triggers } from "cf/config";
+import * as entrypoint from "./hypdriv.worker.ts" with { type: "cf-worker" };
+export default defineConfig({
+  worker: {
+    name: "shop",
+    entrypoint,
+    compatibilityDate: "2026-09-01",
+    compatibilityFlags: ["nodejs_compat"],
+    observability: { enabled: true },
+    env: { ASSETS: bindings.assets(), CACHE: bindings.kv({ title: "cache" }) },
+    exports: { HypDrivChannel: exports.durableObject({ storage: "sqlite" }) },
+    triggers: [triggers.scheduled({ schedule: "*/15 * * * *" })],
+  },
+});
+`;
+
+  it.skipIf(!evaluable)('reads the Worker configuration when there is no Wrangler file', () => {
+    const p = tempProject({
+      'package.json': '{"name":"x","type":"module"}',
+      'hypdriv.worker.ts': 'export default {};\n',
+      'cloudflare.config.ts': CF,
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.wrangler).toMatchObject({ format: 'cloudflare-config', parseError: null });
+    expect(info.wrangler.configFile).toBe(join(p.dir, 'cloudflare.config.ts'));
+    expect(info.wrangler.config).toMatchObject({
+      name: 'shop',
+      main: './hypdriv.worker.ts',
+      compatibility_flags: ['nodejs_compat'],
+      assets: { binding: 'ASSETS' },
+      triggers: { crons: ['*/15 * * * *'] },
+    });
+    expect(info.cloudflareConfigFile).toBe(join(p.dir, 'cloudflare.config.ts'));
+    expect(info.platform).toBe('cloudflare');
+  });
+
+  it.skipIf(!evaluable)('prefers a Wrangler file when both exist, and reports a broken config file', () => {
+    const both = tempProject({
+      'package.json': '{"name":"x"}',
+      'wrangler.jsonc': '{ "name": "from-wrangler" }',
+      'cloudflare.config.ts': CF,
+    });
+    const info = detectProject(both.dir, { env: {} });
+    expect(info.wrangler).toMatchObject({ format: 'jsonc' });
+    expect(info.wrangler.config?.name).toBe('from-wrangler');
+    expect(info.cloudflareConfigFile).toBeTruthy();
+
+    const broken = tempProject({
+      'package.json': '{"name":"x","type":"module"}',
+      'cloudflare.config.ts':
+        'import { defineConfig } from "cf/config";\nexport default defineConfig(() => { throw new Error("missing account"); });\n',
+    });
+    const failed = detectProject(broken.dir, { env: {} });
+    expect(failed.wrangler.format).toBe('cloudflare-config');
+    expect(failed.wrangler.config).toBeNull();
+    expect(failed.wrangler.parseError).toContain('missing account');
+  });
+
+  it.skipIf(!evaluable)(
+    'selects the mode with the environment option and accepts the file as the override',
+    () => {
+      const p = tempProject({
+        'package.json': '{"name":"x","type":"module"}',
+        'cloudflare.config.ts':
+          'import { defineConfig } from "cf/config";\nexport default defineConfig(({ mode }) => ({ worker: { name: mode === "staging" ? "shop-staging" : "shop", compatibilityDate: "2026-09-01" } }));\n',
+      });
+      expect(detectProject(p.dir, { env: {} }).wrangler.config?.name).toBe('shop');
+      expect(detectProject(p.dir, { env: {}, wranglerEnv: 'staging' }).wrangler.config?.name).toBe(
+        'shop-staging',
+      );
+      const viaFlag = detectProject(p.dir, { env: {}, wrangler: join(p.dir, 'cloudflare.config.ts') });
+      expect(viaFlag.wrangler.format).toBe('cloudflare-config');
+    },
+  );
 });
 
 describe('platform detection', () => {

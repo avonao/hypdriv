@@ -17,6 +17,10 @@ function jsoncFix(
   options: Parameters<typeof editWranglerJsonc>[1],
 ): CheckFix | undefined {
   const w = ctx.project.wrangler;
+  if (w.format === 'cloudflare-config')
+    return {
+      description: `${description} (edit ${w.configFile ? rel(ctx.root, w.configFile) : 'cloudflare.config.ts'} manually)`,
+    };
   if (!w.configFile || w.format === 'toml')
     return { description: `${description} (edit wrangler.toml manually)` };
   const file = w.configFile;
@@ -76,6 +80,10 @@ export const wranglerChecks: Check[] = [
         return fail(
           `${rel(ctx.root, w.configFile)}${w.environment ? ` (--env ${w.environment})` : ''} could not be read: ${w.parseError}`,
         );
+      if (w.format === 'cloudflare-config')
+        return pass(
+          `${rel(ctx.root, w.configFile)} (cf CLI format, evaluated)${w.environment ? `, mode "${w.environment}" (name ${w.config?.name ?? 'unset'})` : ''}`,
+        );
       return pass(
         `${rel(ctx.root, w.configFile)} (${w.format})${w.environment ? `, checked as environment "${w.environment}" (name ${w.config?.name ?? 'unset'})` : ''}`,
       );
@@ -117,8 +125,13 @@ export const wranglerChecks: Check[] = [
     run(ctx) {
       const file = ctx.project.cloudflareConfigFile;
       if (!file) return pass('Not using the cf CLI config format.');
+      const w = ctx.project.wrangler;
+      if (w.format === 'cloudflare-config')
+        return info(
+          `${rel(ctx.root, file)} (the \`cf\` CLI) is the Worker configuration Hypdriv reads: it is evaluated with a stand-in for \`cf/config\` (the Worker entry never runs). Doctor never edits it; fixes name the settings to add. \`--env <name>\` selects its \`mode\`.`,
+        );
       return info(
-        `${rel(ctx.root, file)} detected (the new \`cf\` CLI). Hypdriv reads wrangler.jsonc; keep main, compatibility settings and bindings in sync between the two.`,
+        `${rel(ctx.root, file)} detected (the new \`cf\` CLI) next to ${w.configFile ? rel(ctx.root, w.configFile) : 'the Wrangler config'}, which Hypdriv reads; keep main, compatibility settings and bindings in sync between the two.`,
       );
     },
   },
@@ -212,12 +225,16 @@ export const wranglerChecks: Check[] = [
       // Wrangler resolves `directory` against the config file, which may live outside the project (`--wrangler`).
       const configDir = ctx.project.wrangler.configFile ? dirname(ctx.project.wrangler.configFile) : ctx.root;
       const directory = cfg.assets.directory ? resolve(configDir, cfg.assets.directory) : null;
-      if (directory !== resolve(ctx.root, '.open-next/assets'))
+      // cloudflare.config.ts has no assets directory (the build tool decides it): only the binding is checkable.
+      if (
+        ctx.project.wrangler.format !== 'cloudflare-config' &&
+        directory !== resolve(ctx.root, '.open-next/assets')
+      )
         problems.push(`directory is "${cfg.assets.directory ?? ''}" (expected .open-next/assets)`);
       if (cfg.assets.binding !== wanted)
         problems.push(`binding is "${cfg.assets.binding ?? ''}" (expected ${wanted})`);
       if (problems.length) return warn(`assets: ${problems.join('; ')}.`);
-      return pass(`assets ${cfg.assets.directory} → ${cfg.assets.binding}`);
+      return pass(`assets ${cfg.assets.directory ?? '(build output)'} → ${cfg.assets.binding}`);
     },
   },
   {
