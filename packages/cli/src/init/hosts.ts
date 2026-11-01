@@ -10,8 +10,9 @@ import {
   addToConfigArray,
   type ConfigEditResult,
   configObjectStart,
+  ensureNamedImports,
   expressionEnd,
-  importsModule,
+  importsName,
   matchClose,
   wrapCallArgument,
   wrapPropertyValue,
@@ -1332,7 +1333,7 @@ export default defineConfig({
 export function wrapRwsdkApp(source: string): ConfigEditResult & { middleware: boolean } {
   // Comments and the inside of strings are blanked (same length), so a mention is not mistaken for a call.
   const code = maskSource(source) ?? source;
-  const wrapped = /\bwithHypDriv\s*\(/.test(code) && importsModule(source, RWSDK_WORKER_MODULE);
+  const wrapped = /\bwithHypDriv\s*\(/.test(code) && importsName(source, RWSDK_WORKER_MODULE, 'withHypDriv');
   const hasMiddleware = /\bhypdrivMiddleware\s*\(/.test(code);
   if (wrapped && hasMiddleware)
     return { changed: false, content: source, reason: 'already wrapped in withHypDriv()', middleware: true };
@@ -1396,8 +1397,7 @@ export function wrapRwsdkApp(source: string): ConfigEditResult & { middleware: b
 
   const added = placed && !hasMiddleware;
   const names = [...(added ? ['hypdrivMiddleware'] : []), ...(needsWrap ? ['withHypDriv'] : [])].sort();
-  if (names.length && !importsModule(out, RWSDK_WORKER_MODULE))
-    out = insertImport(out, `import { ${names.join(', ')} } from '${RWSDK_WORKER_MODULE}';`, 'esm');
+  if (names.length) out = ensureNamedImports(out, RWSDK_WORKER_MODULE, names);
   const parts = [
     ...(needsWrap ? ['wrap defineApp() in withHypDriv()'] : []),
     ...(added ? ['add hypdrivMiddleware() as the first route'] : []),

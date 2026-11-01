@@ -728,12 +728,40 @@ describe('wrapRwsdkApp', () => {
     const wrapped = `import { withHypDriv } from '@hypdriv/rwsdk/worker';\n${imports}export default withHypDriv(defineApp([route('/', Home)]));\n`;
     const r = wrapRwsdkApp(wrapped);
     expect(r.content).toContain("withHypDriv(defineApp([hypdrivMiddleware(), route('/', Home)]))");
-    // The existing import from the module is left alone (the user maintains it).
+    // The name that is not imported yet joins the existing import from the module (still one import of it).
     expect(r.content.match(/@hypdriv\/rwsdk\/worker/g)).toHaveLength(1);
+    expect(r.content).toContain("import { withHypDriv, hypdrivMiddleware } from '@hypdriv/rwsdk/worker';");
     expect(r.reason).toBe('add hypdrivMiddleware() as the first route');
 
     const complete = `import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';\nexport default withHypDriv(defineApp([hypdrivMiddleware()]));\n`;
     expect(wrapRwsdkApp(complete)).toMatchObject({ changed: false, content: complete, middleware: true });
+  });
+
+  it('imports each name on its own: an existing import of the module does not stand in for the others', () => {
+    // Only the middleware is imported: withHypDriv() would be a ReferenceError at run time.
+    const middlewareOnly = wrapRwsdkApp(
+      `import { hypdrivMiddleware } from '@hypdriv/rwsdk/worker';\n${imports}export default defineApp([hypdrivMiddleware(), route('/', Home)]);\n`,
+    );
+    expect(middlewareOnly.content).toContain(
+      "import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';",
+    );
+    expect(middlewareOnly.content).toContain('export default withHypDriv(defineApp([hypdrivMiddleware()');
+    expect(middlewareOnly.reason).toBe('wrap defineApp() in withHypDriv()');
+
+    // A multi-line import keeps its layout; a type-only import binds nothing, so a value import is added.
+    const multiline = wrapRwsdkApp(
+      `import {\n  withHypDriv,\n} from '@hypdriv/rwsdk/worker';\n${imports}export default withHypDriv(defineApp([route('/', Home)]));\n`,
+    );
+    expect(multiline.content).toContain(
+      "import {\n  withHypDriv,\n  hypdrivMiddleware,\n} from '@hypdriv/rwsdk/worker';",
+    );
+    const typeOnly = wrapRwsdkApp(
+      `import type { HypDrivApp } from '@hypdriv/rwsdk/worker';\n${imports}export default defineApp([route('/', Home)]);\n`,
+    );
+    expect(typeOnly.content).toContain(
+      "import { hypdrivMiddleware, withHypDriv } from '@hypdriv/rwsdk/worker';",
+    );
+    expect(typeOnly.content).toContain("import type { HypDrivApp } from '@hypdriv/rwsdk/worker';");
   });
 
   it('wraps routes that are not an array literal but cannot place the middleware', () => {

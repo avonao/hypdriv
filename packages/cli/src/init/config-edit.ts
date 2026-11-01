@@ -18,6 +18,108 @@ export function importsModule(source: string, module: string): boolean {
   return new RegExp(`(?:from\\s*|import\\s*\\(?\\s*)['"]${escaped}['"]`).test(source);
 }
 
+/** One `import … from 'module'` statement of a source file (a line-anchored match, so comments are not mistaken for it). */
+interface ImportStatement {
+  start: number;
+  end: number;
+  typeOnly: boolean;
+  /** Default import binding, if any. */
+  defaultName: string | null;
+  /** Named value bindings (`{ a, b as c }`): the imported name and the local one. */
+  named: Array<{ imported: string; local: string }>;
+  /** Index just inside the `{`/`}` of the named clause, when there is one. */
+  braces: { open: number; close: number } | null;
+}
+
+function importStatements(source: string, module: string): ImportStatement[] {
+  const escaped = module.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const re = new RegExp(
+    `^[ \\t]*import\\s+(type\\s+)?([^;'"]*?)\\s*from\\s*['"]${escaped}['"][ \\t]*;?`,
+    'gm',
+  );
+  const out: ImportStatement[] = [];
+  for (const m of source.matchAll(re)) {
+    const clause = m[2] ?? '';
+    const open = clause.indexOf('{');
+    const close = clause.lastIndexOf('}');
+    const head = (open === -1 ? clause : clause.slice(0, open)).replace(/,\s*$/, '').trim();
+    const defaultName = /^[\w$]+$/.test(head) ? head : null;
+    const named: ImportStatement['named'] = [];
+    let braces: ImportStatement['braces'] = null;
+    if (open !== -1 && close > open) {
+      const clauseAt = m.index + m[0].indexOf(clause, m[0].indexOf('import') + 6);
+      braces = { open: clauseAt + open + 1, close: clauseAt + close };
+      for (const part of clause.slice(open + 1, close).split(',')) {
+        const spec = part.trim();
+        // `type Foo` / `type Foo as Bar` specifiers are types: they bind nothing at run time.
+        if (!spec || /^type\s+[\w$]/.test(spec)) continue;
+        const [imported, local] = spec.split(/\s+as\s+/).map((x) => x.trim());
+        if (imported) named.push({ imported, local: local || imported });
+      }
+    }
+    out.push({
+      start: m.index,
+      end: m.index + m[0].length,
+      typeOnly: Boolean(m[1]),
+      defaultName,
+      named,
+      braces,
+    });
+  }
+  return out;
+}
+
+/** Whether `name` is imported from `module` as a value under its own name (`import { name }`, not a type import). */
+export function importsName(source: string, module: string, name: string): boolean {
+  return importStatements(source, module).some(
+    (st) => !st.typeOnly && st.named.some((n) => n.imported === name && n.local === name),
+  );
+}
+
+/**
+ * Makes sure each of `names` is imported from `module`: the missing ones join an existing value import of that
+ * module (`import { a } from 'm'` → `import { a, b } from 'm'`) or get an import line of their own. A file that
+ * already imports *something* from the module is not enough: only the names it actually binds count.
+ */
+export function ensureNamedImports(source: string, module: string, names: readonly string[]): string {
+  const statements = importStatements(source, module);
+  const missing = [...new Set(names)].filter((name) => !importsName(source, module, name));
+  if (!missing.length) return source;
+  const target = statements.find((st) => !st.typeOnly && st.braces);
+  if (!target?.braces)
+    return insertImport(source, `import { ${missing.join(', ')} } from '${module}';`, 'esm');
+  const { open, close } = target.braces;
+  const inner = source.slice(open, close);
+  const trimmed = inner.replace(/\s+$/, '');
+  const tail = inner.slice(trimmed.length);
+  const multiline = trimmed.includes('\n');
+  const indent = multiline ? (/\n([ \t]*)\S[^\n]*$/.exec(trimmed)?.[1] ?? '  ') : '';
+  const comma = trimmed.endsWith(',') || trimmed.trim() === '' ? '' : ',';
+  const added = multiline ? missing.map((n) => `\n${indent}${n},`).join('') : ` ${missing.join(', ')}`;
+  // `{ a }` → `{ a, b }`; a trailing-comma list keeps its comma.
+  const body = multiline
+    ? `${trimmed}${comma}${added}${tail.includes('\n') ? tail : '\n'}`
+    : `${trimmed}${comma}${added}${trimmed.endsWith(',') ? ',' : ''}${tail || ' '}`;
+  return `${source.slice(0, open)}${body}${source.slice(close)}`;
+}
+
+/**
+ * Adds the import `line` (`import { a, b } from 'm';`) for the names it binds that the source does not already import
+ * from the same module; any other form of import line (default, namespace) is added when the module is not imported.
+ */
+export function ensureImportLine(source: string, line: string, module: string): string {
+  const named = /^import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/.exec(line.trim());
+  if (!named) return importsModule(source, module) ? source : insertImport(source, line, 'esm');
+  const names = (named[1] ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  // Aliased specifiers are inserted whole (`a as b`): they are compared as written.
+  if (names.some((n) => /\s/.test(n)))
+    return importsModule(source, module) ? source : insertImport(source, line, 'esm');
+  return ensureNamedImports(source, module, names);
+}
+
 function indentAt(source: string, index: number): string {
   const lineStart = source.lastIndexOf('\n', index - 1) + 1;
   return /^[ \t]*/.exec(source.slice(lineStart))?.[0] ?? '';
@@ -200,9 +302,12 @@ export function addToConfigArray(
     out = `${source.slice(0, start + 1)}${insert}${source.slice(start + 1)}`;
     changed = true;
   }
-  if (options.importLine && options.importFrom && !importsModule(out, options.importFrom)) {
-    out = insertImport(out, options.importLine, 'esm');
-    changed = true;
+  if (options.importLine && options.importFrom) {
+    const withImport = ensureImportLine(out, options.importLine, options.importFrom);
+    if (withImport !== out) {
+      out = withImport;
+      changed = true;
+    }
   }
   return {
     changed,
@@ -297,6 +402,6 @@ export function wrapPropertyValue(
     return { changed: false, content: source, reason: `could not parse ${options.property}` };
   const value = source.slice(valueStart, valueEnd).replace(/\s+$/, '');
   let out = `${source.slice(0, valueStart)}${options.wrapper}(${value})${source.slice(valueStart + value.length)}`;
-  if (!importsModule(out, options.importFrom)) out = insertImport(out, options.importLine, 'esm');
+  out = ensureImportLine(out, options.importLine, options.importFrom);
   return { changed: true, content: out, reason: `wrap ${options.property} in ${options.wrapper}()` };
 }
