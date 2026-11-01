@@ -1,48 +1,11 @@
-import { frameworkLabel, type HypManifest, type HypRoute, manifestFramework } from '@hypdriv/core';
-import { cspModeFor } from '../audit/paths';
-import { createContext } from '../context';
+import { frameworkLabel, manifestFramework } from '@hypdriv/core';
+import { CliError, createContext } from '../context';
 import { bytes } from '../ui';
+import { type RouteRow, routeRows } from './route-rows';
+import { diffFails, diffRoutes, type FailOn, loadBaseline, type RouteChange } from './routes-diff';
 import { defineCommand } from './types';
 
-const HIDDEN = new Set(['/_not-found', '/_global-error', '/_error']);
-
-export interface RouteRow {
-  id: string;
-  route: string;
-  kind: HypRoute['kind'];
-  classification: HypRoute['classification'];
-  revalidate: number | false | null;
-  cachePolicy: string | null;
-  csp: 'hash' | 'nonce' | 'none';
-  hints: number;
-  js: number | null;
-  css: number | null;
-  atoms: number | null;
-  prerenderedPaths: number | null;
-}
-
-/** Table rows for the manifest's routes. */
-export function routeRows(manifest: HypManifest, options: { all?: boolean } = {}): RouteRow[] {
-  return manifest.routes
-    .filter((r) => r.kind !== 'static-file' && (options.all || !HIDDEN.has(r.pathname)))
-    .map((r) => {
-      const w = manifest.weights.client[r.id];
-      return {
-        id: r.id,
-        route: r.pathname,
-        kind: r.kind,
-        classification: r.classification,
-        revalidate: r.prerender?.revalidate ?? null,
-        cachePolicy: r.cachePolicyId ?? null,
-        csp: cspModeFor(r, manifest),
-        hints: manifest.earlyHints[r.id]?.length ?? 0,
-        js: w ? w.js : null,
-        css: w ? w.css : null,
-        atoms: manifest.purser ? (manifest.purser.atomsByRoute[r.id]?.length ?? 0) : null,
-        prerenderedPaths: r.prerender?.pathCount ?? r.prerender?.paths?.length ?? null,
-      };
-    });
-}
+export { type RouteRow, routeRows };
 
 function revalidateLabel(v: RouteRow['revalidate']): string {
   if (v === null) return '—';
@@ -54,17 +17,42 @@ export const routesCommand = defineCommand({
   name: 'routes',
   summary:
     'Table of routes from the manifest: classification, revalidate, cache policy, CSP mode, hints, JS/CSS, Purser atoms',
-  usage: 'hypdriv routes [--css] [--cache] [--csp] [--all]',
+  usage:
+    'hypdriv routes [--css] [--cache] [--csp] [--all] [--diff <manifest>] [--fail-on regress|change|never]',
   options: {
     css: { type: 'boolean', description: 'Add Purser atom counts and unused atoms' },
     cache: { type: 'boolean', description: 'Add cache policy details (ttl/swr/tags)' },
     csp: { type: 'boolean', description: 'Add CSP hash counts per route' },
     all: { type: 'boolean', description: 'Include _not-found and _global-error' },
+    diff: {
+      type: 'string',
+      value: '<manifest>',
+      description:
+        'Compare with the manifest of an earlier build (a manifest.json, or a directory holding .hypdriv/manifest.json) and report routes that became more dynamic',
+    },
+    'fail-on': {
+      type: 'string',
+      value: 'regress|change|never',
+      description: 'With --diff: exit 1 on regressions (default), on any change, or never',
+    },
+    weights: { type: 'boolean', description: 'With --diff: also compare client JS/CSS weights' },
+    'weight-threshold': {
+      type: 'string',
+      value: '<percent>',
+      description: 'With --diff --weights: relative change that counts (default 10)',
+    },
   },
-  examples: ['hypdriv routes', 'hypdriv routes --css --json'],
+  examples: [
+    'hypdriv routes',
+    'hypdriv routes --css --json',
+    'hypdriv routes --diff ../main-build/.hypdriv/manifest.json',
+    'hypdriv routes --diff baseline.json --fail-on change --json',
+  ],
   async run(args, io) {
     const ctx = createContext(args, io);
     const manifest = ctx.requireManifest();
+    const baselinePath = args.string('diff');
+    if (baselinePath !== undefined) return runDiff(ctx, manifest, baselinePath);
     const config = await ctx.loadConfig();
     const rows = routeRows(manifest, { all: args.boolean('all') });
     const policies = new Map((config.resolved.cache.edge?.policies ?? []).map((p) => [p.id, p]));
@@ -197,4 +185,75 @@ function policyDetail(
   if (id.startsWith('inferred:') && inferred)
     return { ...inferred, tags: [`route:${id.slice('inferred:'.length)}`], source: 'inferred' };
   return null;
+}
+
+const FAIL_ON: readonly FailOn[] = ['regress', 'change', 'never'];
+
+function runDiff(
+  ctx: ReturnType<typeof createContext>,
+  manifest: ReturnType<ReturnType<typeof createContext>['requireManifest']>,
+  baselinePath: string,
+): number {
+  const { args, ui } = ctx;
+  const failOn = (args.string('fail-on') ?? 'regress') as FailOn;
+  if (!FAIL_ON.includes(failOn)) throw new CliError(`--fail-on must be one of ${FAIL_ON.join(', ')}.`, 2);
+  const threshold = args.number('weight-threshold', 10, { min: 0, max: 1000 });
+  const baseline = loadBaseline(baselinePath, ctx.io.cwd);
+  const diff = diffRoutes(baseline, manifest, {
+    all: args.boolean('all'),
+    weights: args.boolean('weights'),
+    weightThreshold: threshold,
+  });
+  const fails = diffFails(diff, failOn);
+  const describe = (m: typeof manifest) => ({
+    buildId: m.buildId,
+    framework: manifestFramework(m),
+  });
+  if (args.json) {
+    ui.printJson({
+      baseline: describe(baseline),
+      current: describe(manifest),
+      failOn,
+      failed: fails,
+      summary: diff.summary,
+      changes: diff.changes,
+    });
+    return fails ? 1 : 0;
+  }
+  ui.heading(
+    `Route diff — baseline ${baseline.buildId} (${frameworkLabel(baseline)}) → build ${manifest.buildId} (${frameworkLabel(manifest)})`,
+  );
+  if (diff.changes.length === 0) {
+    ui.status('pass', `No route changes (${diff.summary.unchanged} routes compared).`);
+    return 0;
+  }
+  const section = (title: string, rows: RouteChange[]) => {
+    if (rows.length === 0) return;
+    ui.line();
+    ui.subheading(`${title} (${rows.length})`);
+    ui.table(
+      rows.map((c) => [c.route, c.kind, c.from, '→', c.to]),
+      { columns: ['route', 'change', 'from', '', 'to'] },
+    );
+    for (const c of rows) if (c.note) ui.note(`${c.route}: ${c.note}`);
+  };
+  section(
+    'Regressions',
+    diff.changes.filter((c) => c.severity === 'regression'),
+  );
+  section(
+    'Improvements',
+    diff.changes.filter((c) => c.severity === 'improvement'),
+  );
+  section(
+    'Other changes',
+    diff.changes.filter((c) => c.severity === 'info'),
+  );
+  ui.line();
+  const { regressions, improvements, added, removed, unchanged } = diff.summary;
+  ui.status(
+    fails ? 'fail' : regressions > 0 ? 'warn' : 'pass',
+    `${regressions} regression${regressions === 1 ? '' : 's'}, ${improvements} improvement${improvements === 1 ? '' : 's'}, ${added} added, ${removed} removed, ${unchanged} unchanged.`,
+  );
+  return fails ? 1 : 0;
 }

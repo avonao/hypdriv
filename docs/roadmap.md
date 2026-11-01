@@ -11,7 +11,6 @@ Everything in `docs/feature-catalog.md` marked ✅ or 🧪, validated end to end
 - **OpenNext adapter integration**: when OpenNext's Adapter-API-based Cloudflare adapter ships, make it the default base adapter and read its output map (Worker entry, assets directory) instead of assuming `.open-next/`.
 - **`cloudflare.config.ts` support**: `hypdriv init` and `doctor` understand the `cf` CLI's TypeScript configuration in addition to `wrangler.jsonc`.
 - **Vitals dashboard page**: `/_hypdriv/dash` (token protected) rendering p75 trends from Analytics Engine without the CLI.
-- **Route-level prerender diff**: `hypdriv routes --diff` comparing classifications between builds to catch accidental dynamic opt-ins (complements `ensureStatic`).
 
 ## 0.3
 

@@ -7,7 +7,7 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv init [--platform …] [--purser] [--no-proxy] [--yes] [--dry-run]` | Detects the project and writes/updates `hypdriv.config.ts`, `next.config.ts` (wraps with `withHypDriv`), `proxy.ts`, `instrumentation.ts`, scripts and, per platform, `hypdriv.worker.ts` + `wrangler.jsonc#main` + `public/_headers` + `.dev.vars.example` (Cloudflare) or `vercel.json#crons` + `.env.example` (Vercel). For Vite hosts (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) it registers the integration in the framework's own config (Vite plugins, Astro integrations, Nuxt modules, the React Router preset, root middleware and server entry, `withHypDriv()` around TanStack Start's options and `src/start.ts`, the SvelteKit adapter wrapper and `handle` hook) and writes the platform files (Worker entry, wrangler `main`, assets routing and Hypdriv's Durable Objects on Cloudflare; the Node server and `start` script); edits it cannot place safely are printed as manual steps. Backs up edited files as `*.hypdriv.bak` and adds `.dev.vars` (Cloudflare), `.hypdriv/` and `*.hypdriv.bak` to `.gitignore` (append-only, no backup). |
 | `hypdriv doctor [--fix] [--ci]` | 100+ checks for the detected platform: Node/pnpm, Next.js version & config, adapter chain, `proxy.ts` vs deprecated `middleware.ts`, Edge runtime segments, wrangler compatibility date/flags/bindings/triggers, Node APIs unsupported on workerd, Worker size vs limits, startup risks; `vercel.json` regions/crons, `CRON_SECRET`, Build Output API freshness and function sizes vs 250 MB; env leaks, secrets, header posture (from the manifest), Purser setup and TS compatibility, dependency freshness. `--fix` applies safe fixes (cron sync, `_headers`, scripts). |
 | `hypdriv analyze [--worker] [--routes]` | Cloudflare: Worker weight report (runs `wrangler deploy --dry-run --outdir` or reads an existing bundle, attributes bytes via the source map and the OpenNext esbuild metafile, lists largest modules/packages/duplicates and top-level `await`s). Vercel: function sizes from `.vercel/output` (after `vercel build`). Both: per-route JS/CSS (gzip) from the manifest and budget evaluation; writes the weights back into `.hypdriv/manifest.json`. |
-| `hypdriv routes [--css] [--cache] [--csp]` | Table of routes with classification, revalidate, cache policy, CSP mode, hints count, JS/CSS weight, Purser atoms. |
+| `hypdriv routes [--css] [--cache] [--csp] [--diff <manifest>]` | Table of routes with classification, revalidate, cache policy, CSP mode, hints count, JS/CSS weight, Purser atoms. `--diff` compares with an earlier build's manifest (see [Catching accidental dynamic routes](#catching-accidental-dynamic-routes)). |
 | `hypdriv audit <headers|csp|cache|https|css|all> --url <base> [--anonymous] [--header …]` | Fetches routes from the manifest (or `--paths`) against a running server: grades security headers (A+ model), validates CSP syntax and nonce/hash coverage (Hypdriv's declared `'unsafe-inline'` fallback for cached HTML on Node/Vercel is a warning), checks cache behaviour like a browser (repeat visits carry the first response's cookies; `x-vercel-cache` and planned Vercel CDN headers on Vercel), verifies HTTPS enforcement on an https deployment (`https`, part of `all`: pages, `/_hypdriv/health` and a content-hashed asset requested over `http://` must answer `301`/`308` to the same URL over https; the probes are anonymous so no gateway header or token travels in clear text; assets served before your code on Cloudflare need the zone's Always Use HTTPS or a Redirect Rule), and runs Purser's zero-override check in headless Chrome (`css`; pages answered with an error status or without evaluable CSS fail instead of passing vacuously). Requests carry a short-lived `x-hypdriv-audit` token signed with `HYPDRIV_INTERNAL_SECRET`, so your bot shield and rate limits let the audit through; `--anonymous` sends unsigned requests. |
 | `hypdriv budget [--ci] [--snapshot] [--diff]` | Evaluates budgets from the manifest and the worker report, stores snapshots under `.hypdriv/snapshots`, prints Markdown diffs for PR comments. |
 | `hypdriv csp hashes [--route <path>]` / `hypdriv csp suggest [--reports <file>]` / `hypdriv csp print` | Shows static route hashes, proposes allow-list additions from collected violation reports, prints the effective policy. |
@@ -60,3 +60,25 @@ The endpoint takes `{ "tags": [], "paths": [], "urls": [] }` (at most 200 entrie
 | Anything else (WAF gate, basic auth, …) | `HYPDRIV_ACCESS_HEADERS` (`name: value` lines — `\n`-separated on one line — or a JSON object) | as given |
 
 `--header 'name: value'` (repeatable) adds more for one run; prefer the variable for secrets, so they stay out of shell history and process lists.
+
+## Catching accidental dynamic routes
+
+A single `cookies()`, `headers()` or uncached `fetch` turns a prerendered page into one rendered on every request. `hypdriv routes --diff` compares the build with the manifest of an earlier build (matched by route id) and fails when a route became more dynamic:
+
+```sh
+# on the default branch: keep the manifest of every build
+cp .hypdriv/manifest.json "$ARTIFACTS/manifest.main.json"
+
+# on a pull request, after the build
+hypdriv routes --diff "$ARTIFACTS/manifest.main.json"            # exit 1 on regressions
+hypdriv routes --diff main.json --weights --fail-on change --json   # JSON for a PR comment
+```
+
+| Severity | Changes |
+| --- | --- |
+| regression | classification moved toward `dynamic` (`static` → `isr` → `shell` → `dynamic`; the note names an `ensureStatic` guard when the route has one); a static route lost its hash CSP; an edge cache policy was dropped; all prerendered paths of a route vanished; with `--weights`, client JS or CSS grew by more than the threshold (`--weight-threshold`, default 10 %, never under 1 KB) |
+| improvement | the reverse of each regression |
+| info | routes added or removed, revalidate or cache policy changes, fewer prerendered paths |
+
+`--fail-on` chooses what exits 1: `regress` (default), any `change`, or `never`. The baseline is a `manifest.json` file or a directory holding `.hypdriv/manifest.json`; it works for every framework the manifest describes. `ensureStatic` guards a single route at build time; the diff guards the whole route table against changes nobody annotated.
+

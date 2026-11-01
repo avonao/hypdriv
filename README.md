@@ -274,7 +274,7 @@ The `hypdriv` command ships in `@hypdriv/cli` (and the `hypdriv` umbrella packag
 | `hypdriv init` | Detect the project and write or update the configuration, wrangler file, Worker entry, proxy and Vercel files (every supported host) |
 | `hypdriv doctor` | 100+ checks for the detected framework and platform; `--fix` applies safe fixes, `--ci` fails the build on findings |
 | `hypdriv analyze` | Worker weight report and route analysis |
-| `hypdriv routes` | Routes with classification, revalidate, cache policy, CSP mode, hints, weights and Purser atoms |
+| `hypdriv routes` | Routes with classification, revalidate, cache policy, CSP mode, hints, weights and Purser atoms; `--diff <manifest>` catches routes that became more dynamic between builds |
 | `hypdriv audit` | Audits of `headers`, `csp`, `cache`, `https` and `css` (or `all`) against a running URL |
 | `hypdriv budget` | Budgets from the manifest and the Worker report, snapshots and diffs |
 | `hypdriv csp` | Static route hashes, allow-list suggestions from reports, the generated policy |
