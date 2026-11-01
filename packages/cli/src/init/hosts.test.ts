@@ -385,4 +385,101 @@ describe('hypdriv init for framework hosts', () => {
     expect(created).toContain('serve({ fetch: app.fetch');
     expect(created).not.toContain('durable-objects');
   });
+
+  const waku = {
+    'package.json': JSON.stringify({ name: 'wk', dependencies: { waku: '1.0.0-rc.4', hono: '^4.12.14' } }),
+    ...installed('waku', '1.0.0-rc.4'),
+  };
+
+  it('Waku: withHypDriv() around the config, cloudflare() on the rsc environment and the Worker settings', async () => {
+    const { p, out } = await init(
+      {
+        ...waku,
+        'waku.config.ts':
+          "import { defineConfig } from 'waku/config';\n\nexport default defineConfig({\n  basePath: '/',\n});\n",
+      },
+      'cloudflare',
+    );
+    const config = p.read('waku.config.ts');
+    expect(config).toContain("import { withHypDriv } from '@hypdriv/waku';");
+    expect(config).toContain("import { cloudflare } from '@cloudflare/vite-plugin';");
+    expect(config).toContain('defineConfig(withHypDriv({');
+    expect(config).toContain("cloudflare({ viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] } })");
+    expect(config).toContain("basePath: '/'");
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler).toMatchObject({
+      main: './src/waku.server',
+      assets: { directory: './dist/public', run_worker_first: ['/*', '!/assets/*'] },
+    });
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+    expect(out.plan.find((i) => i.path === 'waku.config.ts')?.action).toBe('modify');
+    // Waku's own server file is not needed: the plugin exports the Durable Objects from the managed entry.
+    expect(existsSync(join(p.dir, 'src', 'waku.server.tsx'))).toBe(false);
+    const pkg = JSON.parse(p.read('package.json')) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies['@hypdriv/waku']).toBeDefined();
+    expect(pkg.scripts['hypdriv:audit']).toContain('8787');
+  });
+
+  it('Waku: a config that already has vite.plugins or a vite object gets the Cloudflare plugin there', async () => {
+    const withPlugins = await init(
+      {
+        ...waku,
+        'waku.config.ts':
+          "import { defineConfig } from 'waku/config';\nimport tailwind from '@tailwindcss/vite';\n\nexport default defineConfig({\n  vite: { plugins: [tailwind()] },\n});\n",
+      },
+      'cloudflare',
+    );
+    expect(withPlugins.p.read('waku.config.ts')).toMatch(/plugins: \[cloudflare\(.*\), tailwind\(\)\]/);
+
+    const withVite = await init(
+      {
+        ...waku,
+        'waku.config.ts':
+          "import { defineConfig } from 'waku/config';\n\nexport default defineConfig({\n  vite: { resolve: { alias: {} } },\n});\n",
+      },
+      'cloudflare',
+    );
+    expect(withVite.p.read('waku.config.ts')).toContain('plugins: [cloudflare(');
+  });
+
+  it('Waku: Vercel and Node need no plugin, a new project gets waku.config.ts, an unwrappable config a snippet', async () => {
+    const vercel = await init(
+      {
+        ...waku,
+        'waku.config.ts': "import { defineConfig } from 'waku/config';\nexport default defineConfig({});\n",
+      },
+      'vercel',
+    );
+    expect(vercel.p.read('waku.config.ts')).toContain('defineConfig(withHypDriv({}))');
+    expect(vercel.p.read('waku.config.ts')).not.toContain('cloudflare');
+    expect(existsSync(join(vercel.p.dir, 'wrangler.jsonc'))).toBe(false);
+
+    const fresh = await init(waku, 'node');
+    expect(fresh.p.read('waku.config.ts')).toContain('export default defineConfig(\n  withHypDriv({}),\n);');
+    expect(JSON.parse(fresh.p.read('package.json')).scripts.start).toBe('waku start --port 3000');
+    expect(fresh.out.notes.join('\n')).toContain('dist/serve-node.js');
+
+    const plain = await init({ ...waku, 'waku.config.ts': 'export default { basePath: "/" };\n' }, 'node');
+    expect(plain.out.plan.find((i) => i.path === 'waku.config.ts')?.action).toBe('manual');
+    expect(plain.p.read('waku.config.ts')).not.toContain('withHypDriv');
+  });
+
+  it('Waku: an existing wrangler config keeps its name and gets the missing settings', async () => {
+    const { p } = await init(
+      {
+        ...waku,
+        'waku.config.ts': "import { defineConfig } from 'waku/config';\nexport default defineConfig({});\n",
+        'wrangler.jsonc':
+          '{\n  "name": "my-waku",\n  "main": "./src/waku.server",\n  "compatibility_date": "2026-10-01",\n  "compatibility_flags": ["nodejs_compat"]\n}\n',
+      },
+      'cloudflare',
+    );
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler.name).toBe('my-waku');
+    expect(wrangler.main).toBe('./src/waku.server');
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+  });
 });

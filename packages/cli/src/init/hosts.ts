@@ -5,7 +5,7 @@ import type { LoadedConfig } from '../context';
 import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
 import { defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
-import { addToConfigArray, wrapCallArgument, wrapPropertyValue } from './config-edit';
+import { addToConfigArray, configObjectStart, wrapCallArgument, wrapPropertyValue } from './config-edit';
 import { insertImport } from './next-config';
 import { editPackageJson } from './package-json';
 import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, planVercel } from './plan';
@@ -42,6 +42,10 @@ export interface HostSpec {
   /** Platform files (Worker entry, wrangler settings, Vercel config). */
   platform?: (ctx: HostContext) => void;
   scripts: (platform: InitPlatform) => Record<string, string>;
+  /** The production build command (default `vite build`). */
+  buildCommand?: string;
+  /** How to run the build locally for `hypdriv audit` (default: `vite preview` on Cloudflare, `hypdriv serve` on Node). */
+  preview?: (platform: InitPlatform) => { url: string; via: string } | null;
 }
 
 const HYPDRIV_DO = [
@@ -1106,6 +1110,169 @@ export const HONO_SPEC: HostSpec = {
   }),
 };
 
+const WAKU_CLOUDFLARE_PLUGIN = "cloudflare({ viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] } })";
+const CLOUDFLARE_PLUGIN_IMPORT = "import { cloudflare } from '@cloudflare/vite-plugin';";
+
+/** A new `waku.config.ts` for a project without one: Waku with Hypdriv for the platform. */
+export function wakuConfigTemplate(platform: InitPlatform): string {
+  const cf = platform === 'cloudflare';
+  return `${cf ? `${CLOUDFLARE_PLUGIN_IMPORT}\n` : ''}import { withHypDriv } from '@hypdriv/waku';
+import { defineConfig } from 'waku/config';
+
+// withHypDriv() selects the Hypdriv adapter of the build target (HYPDRIV_TARGET, VERCEL=1, else Node) and adds the
+// Hypdriv Vite plugin.
+export default defineConfig(
+  withHypDriv({${cf ? `\n    vite: { plugins: [${WAKU_CLOUDFLARE_PLUGIN}] },\n  ` : ''}}),
+);
+`;
+}
+
+/**
+ * Adds `cloudflare()` for Waku's RSC and SSR environments to the config's `vite.plugins` (call it on the config
+ * before it is wrapped in `withHypDriv()`, whose argument the config editors do not look into).
+ */
+export function addWakuCloudflarePlugin(source: string): {
+  changed: boolean;
+  content: string;
+  reason: string;
+} {
+  if (/\bcloudflare\s*\(/.test(source))
+    return { changed: false, content: source, reason: 'cloudflare() already registered' };
+  const done = (content: string) => ({
+    changed: true,
+    content: insertImport(content, CLOUDFLARE_PLUGIN_IMPORT, 'esm'),
+    reason: 'register cloudflare() in vite.plugins',
+  });
+  if (/\bplugins\s*:\s*\[/.test(source)) {
+    const r = addToConfigArray(source, {
+      property: 'plugins',
+      element: WAKU_CLOUDFLARE_PLUGIN,
+      importLine: CLOUDFLARE_PLUGIN_IMPORT,
+      importFrom: '@cloudflare/vite-plugin',
+      position: 'first',
+    });
+    return { ...r, reason: r.changed ? 'register cloudflare() in vite.plugins' : r.reason };
+  }
+  const vite = /\bvite\s*:\s*\{/.exec(source);
+  if (vite) {
+    const at = vite.index + vite[0].length;
+    return done(`${source.slice(0, at)}\n      plugins: [${WAKU_CLOUDFLARE_PLUGIN}],${source.slice(at)}`);
+  }
+  const start = configObjectStart(source);
+  if (start !== -1)
+    return done(
+      `${source.slice(0, start + 1)}\n  vite: { plugins: [${WAKU_CLOUDFLARE_PLUGIN}] },${source.slice(start + 1)}`,
+    );
+  const empty = /\bdefineConfig\(\s*\)/.exec(source);
+  if (empty)
+    return done(
+      `${source.slice(0, empty.index)}defineConfig({ vite: { plugins: [${WAKU_CLOUDFLARE_PLUGIN}] } })${source.slice(empty.index + empty[0].length)}`,
+    );
+  return {
+    changed: false,
+    content: source,
+    reason: 'could not place cloudflare() in the Waku config; add it to vite.plugins by hand',
+  };
+}
+
+export const WAKU_SPEC: HostSpec = {
+  framework: 'waku',
+  buildCommand: 'waku build',
+  packages: () => ['@hypdriv/waku', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare' ? { devDependencies: ['@cloudflare/vite-plugin', 'wrangler'] } : {},
+  register(ctx) {
+    const configured = ctx.project.framework.configFile;
+    const path = configured ? rel(ctx.project.root, configured) : 'waku.config.ts';
+    planFileEdit(
+      ctx,
+      path,
+      (source) => {
+        if (/\bwithHypDriv\s*\(/.test(source) && /@hypdriv\/waku/.test(source))
+          return { changed: false, content: source, reason: 'already wrapped in withHypDriv()' };
+        // The Cloudflare plugin first: the editors read the config object, which `withHypDriv()` then wraps.
+        const plugin =
+          ctx.platform === 'cloudflare'
+            ? addWakuCloudflarePlugin(source)
+            : { changed: false, content: source, reason: 'already registered' };
+        const wrapped = wrapCallArgument(plugin.content, {
+          callee: 'defineConfig',
+          wrapper: 'withHypDriv',
+          importLine: "import { withHypDriv } from '@hypdriv/waku';",
+          importFrom: '@hypdriv/waku',
+        });
+        if (!wrapped.changed) return wrapped;
+        if (!plugin.changed && !/already/.test(plugin.reason))
+          ctx.notes.push(`${path}: ${plugin.reason}: ${WAKU_CLOUDFLARE_PLUGIN}.`);
+        return {
+          changed: true,
+          content: wrapped.content,
+          reason: plugin.changed ? `${wrapped.reason}; ${plugin.reason}` : wrapped.reason,
+        };
+      },
+      {
+        fallback: wakuConfigTemplate(ctx.platform),
+        hint: `${ctx.platform === 'cloudflare' ? `${CLOUDFLARE_PLUGIN_IMPORT}\n` : ''}import { withHypDriv } from '@hypdriv/waku';\n\nexport default defineConfig(\n  withHypDriv({${ctx.platform === 'cloudflare' ? `\n    vite: { plugins: [${WAKU_CLOUDFLARE_PLUGIN}] },\n  ` : ''}}),\n);`,
+      },
+    );
+    if (ctx.platform === 'node')
+      ctx.notes.push(
+        'On Node, `waku build` writes dist/serve-node.js; run it with `waku start` (the first free port from 8080; `--port`, `PORT` and `HOST` select the address) or `node dist/serve-node.js` (port 3000 unless PORT is set). Behind a reverse proxy set `security.trustedProxies` in hypdriv.config.ts.',
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      // Waku's Cloudflare guide: main is its server entry. Without a src/waku.server file Waku's managed entry
+      // runs, and @hypdriv/waku exports the Durable Objects from it.
+      const assets = {
+        binding: 'ASSETS',
+        directory: './dist/public',
+        html_handling: 'drop-trailing-slash',
+        run_worker_first: ['/*', '!/assets/*'],
+      };
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      planHostWrangler(ctx, {
+        main: configured ? null : './src/waku.server',
+        durableObjects: true,
+        assets: JSON.stringify(assets),
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main: './src/waku.server',
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            assets,
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+      if (existsSync(join(ctx.project.root, 'src'))) {
+        const own = readdirSync(join(ctx.project.root, 'src')).find((f) => /^waku\.server\./.test(f));
+        if (own)
+          ctx.notes.push(
+            `src/${own}: export the Durable Objects from it for \`waku dev\` (export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/waku/durable-objects'); builds export them from Waku's server entry already.`,
+          );
+      }
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "Waku's Vercel adapter writes .vercel/output; Hypdriv adds its header routes, clean-URL overrides for prerendered pages and a Routing Middleware so the request stages run for them.",
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'waku start --port 3000' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev --config dist/server/wrangler.json' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'waku start --port 3000' }
+        : null,
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1116,6 +1283,7 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   nuxt: NUXT_SPEC,
   vinext: VINEXT_SPEC,
   hono: HONO_SPEC,
+  waku: WAKU_SPEC,
 };
 
 /** The init plan for a Vite host. */
@@ -1217,14 +1385,23 @@ export function buildHostPlan(
   if (install.dependencies?.length) ctx.nextSteps.push(`${add} ${install.dependencies.join(' ')}`);
   if (install.devDependencies?.length) ctx.nextSteps.push(`${add} -D ${install.devDependencies.join(' ')}`);
   ctx.nextSteps.push(
-    `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}vite build or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
+    `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}${spec?.buildCommand ?? 'vite build'} or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
   );
   if (options.platform === 'cloudflare')
     ctx.nextSteps.push(
       'Set production secrets: `wrangler secret put HYPDRIV_SESSION_SECRET`, `wrangler secret put HYPDRIV_INTERNAL_SECRET`.',
     );
+  const preview = spec?.preview?.(options.platform);
   ctx.nextSteps.push(
-    `Verify: \`hypdriv doctor\`, \`hypdriv routes\` after the build, then \`hypdriv audit all --url ${options.platform === 'cloudflare' ? 'http://localhost:4173` against `vite preview`' : options.platform === 'node' ? 'http://localhost:3000` against `hypdriv serve`' : 'https://<deployment>` (VERCEL_AUTOMATION_BYPASS_SECRET for protected deployments)'}.`,
+    `Verify: \`hypdriv doctor\`, \`hypdriv routes\` after the build, then \`hypdriv audit all --url ${
+      preview
+        ? `${preview.url}\` against \`${preview.via}\``
+        : options.platform === 'cloudflare'
+          ? 'http://localhost:4173` against `vite preview`'
+          : options.platform === 'node'
+            ? 'http://localhost:3000` against `hypdriv serve`'
+            : 'https://<deployment>` (VERCEL_AUTOMATION_BYPASS_SECRET for protected deployments)'
+    }.`,
   );
   return {
     platform: options.platform,

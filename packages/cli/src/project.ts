@@ -46,6 +46,7 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   nuxt: '@hypdriv/nuxt',
   vite: '@hypdriv/vite',
   hono: '@hypdriv/hono',
+  waku: '@hypdriv/waku',
 };
 
 /** Display names. */
@@ -59,6 +60,7 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   nuxt: 'Nuxt',
   vite: 'Vite',
   hono: 'Hono',
+  waku: 'Waku',
   unknown: 'an unknown framework',
 };
 
@@ -85,6 +87,8 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['astro', 'astro'],
   ['sveltekit', '@sveltejs/kit'],
   ['nuxt', 'nuxt'],
+  // Waku before Hono: Waku's server is a Hono app and its projects often depend on `hono` themselves.
+  ['waku', 'waku'],
   ['hono', 'hono'],
   ['vite', 'vite'],
 ];
@@ -112,6 +116,7 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   vite: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
   // A Hono app has no framework config: its entry is where the middleware is registered.
   hono: HONO_ENTRY_FILES,
+  waku: ['waku.config.ts', 'waku.config.mts', 'waku.config.js', 'waku.config.mjs'],
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -717,6 +722,7 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/nuxt',
     '@hypdriv/vinext',
     '@hypdriv/hono',
+    '@hypdriv/waku',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

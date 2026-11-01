@@ -67,6 +67,7 @@ describe('template sync', () => {
       'sveltekit',
       'nuxt',
       'vinext',
+      'waku',
       'hono',
     ]) {
       const files = manifest.templates[host]!;
@@ -80,6 +81,9 @@ describe('template sync', () => {
     }
     expect(manifest.templates.vinext).toContain('cloudflare/wrangler.jsonc');
     expect(manifest.templates.sveltekit).toContain('src/hooks.server.ts');
+    expect(manifest.templates.waku).toContain('waku.config.ts');
+    expect(manifest.templates.waku).toContain('wrangler.jsonc');
+    expect(manifest.templates.waku).toContain('src/pages/_api/api/hello.ts');
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
     for (const files of Object.values(manifest.templates))
@@ -383,6 +387,33 @@ describe('cli', () => {
     expect(readFileSync(join(root, '.env.local'), 'utf8')).toMatch(/^HYPDRIV_INTERNAL_SECRET=\S{20,}$/m);
     expect(readFileSync(join(root, 'hypdriv.config.ts'), 'utf8')).toContain("name: 'shop'");
     expect(existsSync(join(root, 'biome.json'))).toBe(false);
+  });
+
+  it('scaffolds a Waku app for every platform with the build and run steps of its target', async () => {
+    for (const [platform, expected] of [
+      ['node', 'build:node'],
+      ['cloudflare', 'deploy:cloudflare'],
+      ['vercel', 'build:vercel'],
+    ] as const) {
+      const t = io(['docs', '--framework', 'waku', '--platform', platform, '--no-git', '--json'], {
+        run: () => 0,
+      });
+      expect(await main(t.value)).toBe(0);
+      const out = JSON.parse(t.out.join('')) as { template: string; framework: string; next: string[] };
+      expect(out).toMatchObject({ template: 'waku', framework: 'waku' });
+      expect(out.next.join('\n')).toContain(expected);
+      const root = join(t.cwd, 'docs');
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+        name: string;
+        dependencies: Record<string, string>;
+      };
+      expect(pkg.name).toBe('docs');
+      expect(pkg.dependencies['@hypdriv/waku']).toMatch(/^\^0\./);
+      expect(pkg.dependencies.waku).toMatch(/^1\./);
+      expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+      expect(readFileSync(join(root, 'waku.config.ts'), 'utf8')).toContain('withHypDriv(');
+      expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    }
   });
 
   it('scaffolds a Hono app that runs as is, with its own next steps per platform', async () => {

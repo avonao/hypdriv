@@ -15,6 +15,7 @@ export const VITE_HOSTS: ProjectFramework[] = [
   'sveltekit',
   'nuxt',
   'vinext',
+  'waku',
 ];
 
 /** Where each host registers Hypdriv, for messages. */
@@ -28,12 +29,14 @@ const REGISTRATION: Partial<Record<ProjectFramework, string>> = {
     "the Hypdriv adapter wrapper and Vite plugin in vite.config.ts (import from '@hypdriv/sveltekit')",
   nuxt: "modules: ['@hypdriv/nuxt'] in nuxt.config.ts",
   vinext: "the Hypdriv Vite plugin next to vinext() in vite.config.ts (import from '@hypdriv/vinext')",
+  waku: "withHypDriv() around the config in waku.config.ts (import { withHypDriv } from '@hypdriv/waku')",
 };
 
 /** Build output directories the static configuration of each platform is written to. */
 function builtHeaders(root: string): string[] {
   const candidates = [
     'dist/client/_headers',
+    'dist/public/_headers',
     'dist/_headers',
     'build/client/_headers',
     '.output/public/_headers',
@@ -191,6 +194,10 @@ export const viteChecks: Check[] = [
       const configDir =
         cfg.main && ctx.project.wrangler.configFile ? dirname(ctx.project.wrangler.configFile) : ctx.root;
       const entry = join(configDir, main);
+      if (!existsSync(entry) && ctx.project.framework.name === 'waku')
+        return pass(
+          `${bound.length} Hypdriv Durable Object(s) bound; Waku's managed server entry has no file (${main}) and @hypdriv/waku exports the classes from the Worker.`,
+        );
       if (!existsSync(entry))
         return info(
           `main ${main} is generated at build time; make sure it exports ${bound.map((b) => b.class_name).join(', ')}.`,

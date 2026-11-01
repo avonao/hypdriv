@@ -11,6 +11,7 @@ import { securityChecks } from './checks/security';
 import { sizeChecks } from './checks/size';
 import { vercelChecks } from './checks/vercel';
 import { viteChecks } from './checks/vite';
+import { wakuChecks } from './checks/waku';
 import { workersCompatChecks } from './checks/workers-compat';
 import { wranglerChecks } from './checks/wrangler';
 import type { Check } from './types';
@@ -52,6 +53,7 @@ export const allChecks: Check[] = [
   ...environmentChecks,
   ...onlyFor(['next'], nextjsChecks),
   ...viteChecks,
+  ...wakuChecks,
   ...honoChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),
