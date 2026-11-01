@@ -1,0 +1,44 @@
+{
+  "name": "@hypdriv/example-analog",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare vite build",
+    "build:vercel": "HYPDRIV_TARGET=vercel vite build",
+    "build:node": "HYPDRIV_TARGET=node vite build",
+    "start": "node dist/analog/server/index.mjs",
+    "preview:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare vite build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc -p tsconfig.check.json"
+  },
+  "dependencies": {
+    "@analogjs/content": "catalog:",
+    "@analogjs/router": "catalog:",
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/core": "catalog:",
+    "@angular/platform-browser": "catalog:",
+    "@angular/platform-server": "catalog:",
+    "@angular/router": "catalog:",
+    "@hypdriv/analog": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "h3": "catalog:",
+    "rxjs": "catalog:",
+    "tslib": "catalog:"
+  },
+  "devDependencies": {
+    "@analogjs/platform": "catalog:",
+    "@analogjs/vite-plugin-angular": "catalog:",
+    "@angular/build": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

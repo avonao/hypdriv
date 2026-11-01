@@ -1,0 +1,11 @@
+/* `pnpm typecheck`: the application plus the Node-side files (server routes, Vite and Hypdriv config). */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "files": ["src/main.ts", "src/main.server.ts"],
+  "include": ["src/**/*.d.ts", "src/app/**/*.ts", "src/server/**/*.ts", "vite.config.ts", "hypdriv.config.ts"]
+}
