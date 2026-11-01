@@ -70,7 +70,7 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 | **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku and RedwoodSDK (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
 | **Purser CSS** | In-process build and watch inside `withHypDriv` · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
 | **Operations** | Signed operator purge (`hypdriv purge`, `POST /_hypdriv/purge`) that clears every cache tier · signed audit tokens so audits pass your own bot shield · a production implementation guide for Cloudflare |
-| **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for ten frameworks · a testing kit · an agent skill |
+| **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for eleven frameworks · a testing kit · an agent skill |
 
 The full list, with baseline and upgrade behaviour per feature, is in [`docs/feature-catalog.md`](docs/feature-catalog.md).
 
@@ -131,7 +131,7 @@ The bundle contains one tarball per package (`tarballs/`), `SHA256SUMS`, the ver
 
 `install.sh` verifies the checksums, copies the 16 tarballs a Next.js application needs into `vendor/hypdriv/` and runs `npm install --save` on them. Commit `vendor/hypdriv/` so CI can install the same bytes. Running the script from a newer bundle updates the application.
 
-Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 27 tarballs are not installed together, because `@hypdriv/vinext` and `@hypdriv/waku` declare peers on `vinext` and `waku`.
+Vite-host applications install the tarballs of the packages they use (`@hypdriv/core`, `@hypdriv/vite` and the integration for their framework, plus `@hypdriv/cli`). Install the tarballs of one host at a time: the 28 tarballs are not installed together, because `@hypdriv/vinext` and `@hypdriv/waku` declare peers on `vinext` and `waku`.
 
 ### From source
 
@@ -395,7 +395,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | --- | --- |
 | Release | 0.1.0 Preview |
 | Implemented | Every capability in the [feature catalog](docs/feature-catalog.md) |
-| Unit and integration tests | 2,015 tests in 178 files on Node 22 and 24 |
+| Unit and integration tests | 2,138 tests in 185 files on Node 22 and 24 |
 | Live runs | Next.js on Cloudflare Workers and on Vercel; seven Vite hosts on Cloudflare Workers and on Vercel |
 | API stability | Not yet guaranteed. 1.0 will commit to the `defineConfig` schema, the manifest schema and semver |
 | Distribution | Source and release-bundle tarballs |
