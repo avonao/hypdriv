@@ -764,6 +764,11 @@ describe('wrapRwsdkApp', () => {
     expect(typeOnly.content).toContain("import type { HypDrivApp } from '@hypdriv/rwsdk/worker';");
   });
 
+  it('accepts the helpers used through a namespace import', () => {
+    const source = `import * as hd from '@hypdriv/rwsdk/worker';\n${imports}export default hd.withHypDriv(defineApp([hd.hypdrivMiddleware(), route('/', Home)]));\n`;
+    expect(wrapRwsdkApp(source)).toMatchObject({ changed: false, content: source, middleware: true });
+  });
+
   it('wraps routes that are not an array literal but cannot place the middleware', () => {
     const r = wrapRwsdkApp(
       `${imports}import { routes } from './routes';\nexport default defineApp(routes);\n`,

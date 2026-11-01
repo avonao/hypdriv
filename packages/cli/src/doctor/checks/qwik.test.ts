@@ -273,6 +273,55 @@ describe('Qwik doctor checks', () => {
     });
   });
 
+  it('vite.durable-objects: only an export counts, not a mention of the classes or of the module', async () => {
+    const wrangler = JSON.stringify({
+      name: 'qk',
+      main: './src/worker.ts',
+      durable_objects: {
+        bindings: [
+          { name: 'HYPDRIV_LIMITER', class_name: 'HypDrivLimiter' },
+          { name: 'HYPDRIV_INDEX', class_name: 'HypDrivIndex' },
+        ],
+      },
+    });
+    const status = async (worker: string) =>
+      (
+        await doctor(project({ 'wrangler.jsonc': wrangler, 'src/worker.ts': worker }), [
+          'vite.durable-objects',
+        ])
+      ).byId['vite.durable-objects']?.status;
+
+    expect(
+      await status(
+        "// TODO: export { HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects'\nexport default {};\n",
+      ),
+    ).toBe('fail');
+    expect(
+      await status(
+        "import { HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects';\nconst names = ['HypDrivLimiter', 'HypDrivIndex'];\nexport default {};\n",
+      ),
+    ).toBe('fail');
+    // Only one of the two classes is exported.
+    expect(await status("export { HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects';\n")).toBe(
+      'fail',
+    );
+
+    expect(
+      await status(
+        "export {\n  HypDrivIndex,\n  HypDrivLimiter,\n} from '@hypdriv/cloudflare/durable-objects';\n",
+      ),
+    ).toBe('pass');
+    expect(await status("export * from '@hypdriv/cloudflare/durable-objects';\n")).toBe('pass');
+    expect(
+      await status(
+        "import { A, B } from './mine';\nexport { A as HypDrivLimiter, B as HypDrivIndex };\nexport default {};\n",
+      ),
+    ).toBe('pass');
+    expect(
+      await status('export class HypDrivLimiter {}\nexport class HypDrivIndex {}\nexport default {};\n'),
+    ).toBe('pass');
+  });
+
   it('applies to Qwik projects only', async () => {
     const next = {
       'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),

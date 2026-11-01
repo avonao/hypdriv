@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { CaptureResponse, type NodeResponseLike, writeResponse } from './capture';
 
@@ -198,6 +200,61 @@ describe('CaptureResponse', () => {
     const capture = new CaptureResponse({ original });
     capture.writeEarlyHints({ link: '</a.js>; rel=preload; as=script' });
     expect(sent).toEqual([{ link: '</a.js>; rel=preload; as=script' }]);
+  });
+});
+
+describe('writeResponse on a real Node ServerResponse', () => {
+  /** Serves `response()` through `writeResponse` and returns the raw status line and headers a client sees. */
+  async function serve(response: () => Response, method = 'GET') {
+    const server = createServer((req, res) => {
+      void writeResponse(res, response(), { method: req.method ?? 'GET' });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const result = await fetch(`http://127.0.0.1:${port}/`, { method });
+      return {
+        status: result.status,
+        statusText: result.statusText,
+        headers: result.headers,
+        body: await result.text(),
+      };
+    } finally {
+      server.close();
+      server.closeAllConnections();
+    }
+  }
+
+  it('sends the status text, every cookie and the body to a client', async () => {
+    const headers = new Headers({ 'content-type': 'text/plain' });
+    headers.append('set-cookie', 'a=1; Path=/');
+    headers.append('set-cookie', 'b=2; Path=/');
+    const result = await serve(
+      () => new Response('hello', { status: 202, statusText: 'Accepted Later', headers }),
+    );
+    expect(result.status).toBe(202);
+    expect(result.statusText).toBe('Accepted Later');
+    expect(result.headers.getSetCookie()).toEqual(['a=1; Path=/', 'b=2; Path=/']);
+    expect(result.body).toBe('hello');
+  });
+
+  it('falls back to the standard reason phrase when the response has none', async () => {
+    const result = await serve(() => new Response('gone', { status: 410 }));
+    expect(result.status).toBe(410);
+    expect(result.statusText).toBe('Gone');
+    expect(result.body).toBe('gone');
+  });
+
+  it('sends no body for HEAD and no content for 204', async () => {
+    const head = await serve(
+      () => new Response('hello', { headers: { 'content-type': 'text/plain' } }),
+      'HEAD',
+    );
+    expect(head.status).toBe(200);
+    expect(head.body).toBe('');
+    const none = await serve(() => new Response(null, { status: 204 }));
+    expect(none.status).toBe(204);
+    expect(none.body).toBe('');
   });
 });
 

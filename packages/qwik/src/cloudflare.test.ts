@@ -1,5 +1,5 @@
 import { ensureContextStore } from '@hypdriv/runtime';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface FetchCall {
   method: string;
@@ -219,6 +219,102 @@ describe('wrapCloudflare', () => {
     );
     expect(missing.status).toBe(404);
     expect(fetched).toEqual([]);
+  });
+
+  describe('with Qwik’s Cache API (`custom:qwikrouter`)', () => {
+    const opened: string[] = [];
+    const store = new Map<string, Response>();
+    const cacheable = () =>
+      new Response('<!DOCTYPE html><html><body><script>boot()</script></body></html>', {
+        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' },
+      });
+
+    beforeEach(() => {
+      opened.length = 0;
+      store.clear();
+      vi.stubGlobal('caches', {
+        open: async (name: string) => {
+          opened.push(name);
+          return {
+            match: async (request: Request) => store.get(request.url)?.clone(),
+            put: async (request: Request, response: Response) => void store.set(request.url, response),
+          };
+        },
+      });
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    const get = async (worker: Worker, path: string, headers: Record<string, string> = {}) => {
+      const ctx = exec();
+      const response = await worker.fetch(
+        new Request(`https://shop.example${path}`, { headers: { ...BROWSER, ...headers } }),
+        {},
+        ctx,
+      );
+      await Promise.all(ctx.waiting);
+      return response;
+    };
+
+    it('shares one entry between visitors, holding the document as Qwik rendered it', async () => {
+      answer = cacheable;
+      const worker = wrapCloudflare({} as never, true, options() as never) as unknown as Worker;
+      const first = await get(worker, '/blog/');
+      const second = await get(worker, '/blog/');
+      expect(opened).toEqual(['custom:qwikrouter', 'custom:qwikrouter']);
+      // Qwik rendered once; the second visitor was served from the cache.
+      expect(fetched.map((f) => f.path)).toEqual(['/blog/']);
+      expect(await second.text()).toContain('boot()');
+
+      // The entry is the application’s response, not the pipeline’s: no policy, cookie or nonce of the first visitor.
+      const entry = store.get('https://shop.example/blog/');
+      expect(entry).toBeDefined();
+      expect(entry?.headers.get('content-security-policy')).toBeNull();
+      expect(entry?.headers.get('set-cookie')).toBeNull();
+      expect(await entry?.clone().text()).not.toMatch(/nonce=/);
+
+      // Each visitor still gets a policy of its own.
+      const nonce = (response: Response) =>
+        /'nonce-([^']+)'/.exec(response.headers.get('content-security-policy') ?? '')?.[1];
+      expect(nonce(first)).toBeTruthy();
+      expect(nonce(second)).toBeTruthy();
+      expect(nonce(second)).not.toBe(nonce(first));
+    });
+
+    it('does not use the cache for requests Qwik does not cache', async () => {
+      answer = cacheable;
+      const worker = wrapCloudflare({} as never, true, options() as never) as unknown as Worker;
+      await get(worker, '/blog/', { cookie: 'session=1' });
+      await get(worker, '/blog/', { authorization: 'Bearer x' });
+      const post = exec();
+      await worker.fetch(new Request('https://shop.example/blog/', { method: 'POST' }), {}, post);
+      expect(store.size).toBe(0);
+      expect(fetched).toHaveLength(3);
+
+      const off = wrapCloudflare({} as never, false, options() as never) as unknown as Worker;
+      await get(off, '/other/');
+      await get(off, '/other/');
+      expect(fetched.filter((f) => f.path === '/other/')).toHaveLength(2);
+    });
+
+    it('stores only responses a shared cache may keep', async () => {
+      const worker = wrapCloudflare({} as never, true, options() as never) as unknown as Worker;
+      const variants: Record<string, string>[] = [
+        { 'cache-control': 'private, max-age=60' },
+        { 'cache-control': 'no-store' },
+        { 'cache-control': 'public, max-age=60', 'set-cookie': 'a=1' },
+        {},
+      ];
+      for (const [index, headers] of variants.entries()) {
+        answer = () =>
+          new Response('<html></html>', { headers: { 'content-type': 'text/html', ...headers } });
+        await get(worker, `/page-${index}/`);
+      }
+      expect(store.size).toBe(0);
+      answer = () =>
+        new Response('gone', { status: 404, headers: { 'cache-control': 'public, max-age=60' } });
+      await get(worker, '/missing/');
+      expect(store.size).toBe(0);
+    });
   });
 
   it('answers with 404 when Qwik has no route and with 500 when it fails', async () => {

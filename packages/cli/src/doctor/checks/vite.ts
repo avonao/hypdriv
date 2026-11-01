@@ -85,6 +85,40 @@ function workerSource(file: string, depth = 0): string {
   return [source, ...[...targets].map((target) => workerSource(target, depth + 1))].join('\n');
 }
 
+/** The source without line and block comments (a commented-out export is not an export). */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+}
+
+/**
+ * Whether a Worker module exports `name`: `export class|function|const NAME`, `export { NAME }` (also renamed
+ * `x as NAME`, with or without `from`) or a wildcard re-export of a `durable-objects` module. A mention in a comment,
+ * a string or an import is not an export.
+ */
+export function exportsDurableObject(source: string, name: string): boolean {
+  const code = withoutComments(source);
+  if (/\bexport\s*\*\s*from\s*["'][^"']*durable-objects[^"']*["']/.test(code)) return true;
+  if (
+    new RegExp(
+      `\\bexport\\s+(?:default\\s+)?(?:async\\s+)?(?:class|function|const|let|var)\\s+${name}\\b`,
+    ).test(code)
+  )
+    return true;
+  for (const list of code.matchAll(/\bexport\s*(?:type\s*)?\{([^}]*)\}/g))
+    for (const part of (list[1] ?? '').split(',')) {
+      const spec = part.trim();
+      if (!spec || /^type\s/.test(spec)) continue;
+      if (
+        spec
+          .split(/\s+as\s+/)
+          .at(-1)
+          ?.trim() === name
+      )
+        return true;
+    }
+  return false;
+}
+
 export const viteChecks: Check[] = [
   {
     id: 'vite.integration',
@@ -238,9 +272,7 @@ export const viteChecks: Check[] = [
           `main ${main} is generated at build time; make sure it exports ${bound.map((b) => b.class_name).join(', ')}.`,
         );
       const source = workerSource(entry);
-      const missing = bound.filter(
-        (b) => !source.includes(b.class_name ?? '') && !/durable-objects/.test(source),
-      );
+      const missing = bound.filter((b) => !exportsDurableObject(source, b.class_name ?? ''));
       if (missing.length)
         return fail(
           `${main} does not export ${missing.map((m) => m.class_name).join(', ')}; add \`export { HypDrivChannel, HypDrivLimiter, HypDrivIndex } from '@hypdriv/cloudflare/durable-objects'\`.`,
