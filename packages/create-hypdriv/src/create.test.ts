@@ -68,6 +68,8 @@ describe('template sync', () => {
       'nuxt',
       'vinext',
       'waku',
+      'nitro',
+      'analog',
       'hono',
     ]) {
       const files = manifest.templates[host]!;
@@ -75,7 +77,9 @@ describe('template sync', () => {
       expect(files).toContain('.dev.vars.example');
       expect(files).toContain('.env.example');
       expect(
-        files.some((f) => /^(dist|build|\.svelte-kit|\.output|\.nuxt|\.astro|\.react-router)\//.test(f)),
+        files.some((f) =>
+          /^(dist|build|\.svelte-kit|\.output|\.nuxt|\.astro|\.react-router|\.nitro|\.angular)\//.test(f),
+        ),
       ).toBe(false);
       expect(files).not.toContain('biome.json');
     }
@@ -84,6 +88,11 @@ describe('template sync', () => {
     expect(manifest.templates.waku).toContain('waku.config.ts');
     expect(manifest.templates.waku).toContain('wrangler.jsonc');
     expect(manifest.templates.waku).toContain('src/pages/_api/api/hello.ts');
+    expect(manifest.templates.nitro).toContain('nitro.config.ts');
+    expect(manifest.templates.nitro).toContain('server/api/hello.get.ts');
+    expect(manifest.templates.analog).toContain('vite.config.ts');
+    expect(manifest.templates.analog).toContain('src/app/app.config.server.ts');
+    expect(manifest.templates.analog).toContain('src/server/routes/api/hello.ts');
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
     for (const files of Object.values(manifest.templates))
@@ -413,6 +422,38 @@ describe('cli', () => {
       expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
       expect(readFileSync(join(root, 'waku.config.ts'), 'utf8')).toContain('withHypDriv(');
       expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    }
+  });
+
+  it('scaffolds Nitro and Analog apps with the build and run steps of their target', async () => {
+    for (const [framework, config, dependency] of [
+      ['nitro', 'nitro.config.ts', '@hypdriv/nitro'],
+      ['analog', 'vite.config.ts', '@hypdriv/analog'],
+    ] as const) {
+      for (const [platform, expected] of [
+        ['node', 'build:node'],
+        ['cloudflare', 'deploy:cloudflare'],
+        ['vercel', 'build:vercel'],
+      ] as const) {
+        const t = io(['app', '--framework', framework, '--platform', platform, '--no-git', '--json'], {
+          run: () => 0,
+        });
+        expect(await main(t.value)).toBe(0);
+        const out = JSON.parse(t.out.join('')) as { template: string; framework: string; next: string[] };
+        expect(out).toMatchObject({ template: framework, framework });
+        expect(out.next.join('\n')).toContain(expected);
+        const root = join(t.cwd, 'app');
+        const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+          name: string;
+          dependencies: Record<string, string>;
+        };
+        expect(pkg.name).toBe('app');
+        expect(pkg.dependencies[dependency]).toMatch(/^\^0\./);
+        expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+        expect(readFileSync(join(root, config), 'utf8')).toMatch(/hypdrivNitro\(|withHypDriv\(/);
+        expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "app"');
+        expect(existsSync(join(root, '.gitignore'))).toBe(true);
+      }
     }
   });
 
