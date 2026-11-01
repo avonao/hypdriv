@@ -256,6 +256,46 @@ describe('Waku detection', () => {
   });
 });
 
+describe('Qwik detection', () => {
+  it('detects Qwik v2 before Hono and Vite and finds vite.config', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({
+        name: 'qk',
+        dependencies: { '@qwik.dev/router': '2.0.0-rc.4', hono: '^4.12.14' },
+        devDependencies: { vite: '^8.3.5' },
+      }),
+      ...installed('@qwik.dev/router', '2.0.0-rc.4'),
+      ...installed('@hypdriv/qwik', '0.1.0'),
+      'vite.config.ts':
+        "import { hypdriv } from '@hypdriv/qwik';\nexport default { plugins: [qwikRouter(), qwikVite(), hypdriv()] };\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'qwik',
+      version: '2.0.0-rc.4',
+      integration: '@hypdriv/qwik',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.framework.configFile).toMatch(/vite\.config\.ts$/);
+    expect(info.hypdriv.packages['@hypdriv/qwik']).toBe('0.1.0');
+  });
+
+  it('recognises a Qwik v1 project (Qwik City) so the doctor can name the migration', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'qk1', dependencies: { '@builder.io/qwik-city': '1.20.3' } }),
+      ...installed('@builder.io/qwik-city', '1.20.3'),
+      'vite.config.ts': 'export default {};\n',
+    });
+    expect(detectProject(p.dir, { env: {} }).framework).toMatchObject({
+      name: 'qwik',
+      version: '1.20.3',
+      integrationInstalled: null,
+      registered: false,
+    });
+  });
+});
+
 describe('platform detection', () => {
   it('detects Vercel from vercel.json, the VERCEL env and @hypdriv/vercel', () => {
     const p = tempProject({

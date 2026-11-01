@@ -8,6 +8,7 @@ import { nextjsChecks } from './checks/nextjs';
 import { opennextChecks } from './checks/opennext';
 import { openNextCacheChecks } from './checks/opennext-cache';
 import { purserChecks } from './checks/purser';
+import { qwikChecks } from './checks/qwik';
 import { securityChecks } from './checks/security';
 import { sizeChecks } from './checks/size';
 import { vercelChecks } from './checks/vercel';
@@ -55,6 +56,7 @@ export const allChecks: Check[] = [
   ...onlyFor(['next'], nextjsChecks),
   ...viteChecks,
   ...wakuChecks,
+  ...qwikChecks,
   ...honoChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),

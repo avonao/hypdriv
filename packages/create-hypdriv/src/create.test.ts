@@ -68,6 +68,7 @@ describe('template sync', () => {
       'nuxt',
       'vinext',
       'waku',
+      'qwik',
       'hono',
     ]) {
       const files = manifest.templates[host]!;
@@ -84,6 +85,13 @@ describe('template sync', () => {
     expect(manifest.templates.waku).toContain('waku.config.ts');
     expect(manifest.templates.waku).toContain('wrangler.jsonc');
     expect(manifest.templates.waku).toContain('src/pages/_api/api/hello.ts');
+    expect(manifest.templates.qwik).toContain('vite.config.ts');
+    expect(manifest.templates.qwik).toContain('wrangler.jsonc');
+    expect(manifest.templates.qwik).toContain('adapters/vercel/vite.config.ts');
+    expect(manifest.templates.qwik).toContain('src/entry.node.tsx');
+    expect(manifest.templates.qwik).toContain('src/routes/api/hello/index.ts');
+    // `vite build` writes Qwik's server bundle to server/: build output, never part of the template.
+    expect(manifest.templates.qwik!.some((f) => f.startsWith('server/'))).toBe(false);
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
     for (const files of Object.values(manifest.templates))
@@ -413,6 +421,36 @@ describe('cli', () => {
       expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
       expect(readFileSync(join(root, 'waku.config.ts'), 'utf8')).toContain('withHypDriv(');
       expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    }
+  });
+
+  it('scaffolds a Qwik app for every platform with the build and run steps of its target', async () => {
+    for (const [platform, expected] of [
+      ['node', 'build:node'],
+      ['cloudflare', 'deploy:cloudflare'],
+      ['vercel', 'build:vercel'],
+    ] as const) {
+      const t = io(['docs', '--framework', 'qwik', '--platform', platform, '--no-git', '--json'], {
+        run: () => 0,
+      });
+      expect(await main(t.value)).toBe(0);
+      const out = JSON.parse(t.out.join('')) as { template: string; framework: string; next: string[] };
+      expect(out).toMatchObject({ template: 'qwik', framework: 'qwik' });
+      expect(out.next.join('\n')).toContain(expected);
+      const root = join(t.cwd, 'docs');
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+        name: string;
+        dependencies: Record<string, string>;
+        scripts: Record<string, string>;
+      };
+      expect(pkg.name).toBe('docs');
+      expect(pkg.dependencies['@hypdriv/qwik']).toMatch(/^\^0\./);
+      expect(pkg.dependencies['@qwik.dev/router']).toMatch(/^2\./);
+      expect(pkg.scripts['build:node']).toBeDefined();
+      expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+      expect(readFileSync(join(root, 'vite.config.ts'), 'utf8')).toContain('hypdriv()');
+      expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+      expect(existsSync(join(root, 'server'))).toBe(false);
     }
   });
 

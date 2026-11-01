@@ -35,14 +35,14 @@ export interface CliIO {
 const HELP = `create-hypdriv ${VERSION}
 
 Scaffold an app with Hypdriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
-(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku) and Hono on Cloudflare Workers, Vercel or Node.
+(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, Qwik) and Hono on Cloudflare Workers, Vercel or Node.
 
 Usage
   npm create hypdriv@latest [directory] -- [options]
   pnpm create hypdriv [directory] [options]
 
 Options
-  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, hono
+  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, qwik, hono
   --platform <cloudflare|vercel|node>
                                   Deploy target (default: cloudflare; node for Vite frameworks and Hono)
   --purser                        Style the app with Purser CSS (Next.js; zero-override atomic CSS, flashless themes)

@@ -23,7 +23,8 @@ export type ViteHost =
   | 'sveltekit'
   | 'nuxt'
   | 'vinext'
-  | 'waku';
+  | 'waku'
+  | 'qwik';
 export const VITE_HOSTS: readonly ViteHost[] = [
   'vite',
   'react-router',
@@ -33,6 +34,7 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'nuxt',
   'vinext',
   'waku',
+  'qwik',
 ];
 /** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
 export type ServerHost = 'hono';
@@ -60,6 +62,7 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   nuxt: 'examples/nuxt',
   vinext: 'examples/vinext',
   waku: 'examples/waku',
+  qwik: 'examples/qwik',
   hono: 'examples/hono',
 };
 
@@ -108,6 +111,15 @@ const EXCLUDED = new Set([
   'biome.json',
 ]);
 
+/**
+ * Build output that is only recognisable per example (the directory name is a source directory in other
+ * frameworks): top-level paths a template never takes from its example.
+ */
+export const TEMPLATE_BUILD_OUTPUT: Partial<Record<TemplateId, readonly string[]>> = {
+  // `vite build` writes Qwik's server bundle to `server/` (`dist/` is excluded everywhere).
+  qwik: ['server'],
+};
+
 export function excluded(rel: string): boolean {
   const parts = rel.split(sep);
   if (parts.some((p) => EXCLUDED.has(p))) return true;
@@ -121,13 +133,13 @@ export function excluded(rel: string): boolean {
   return false;
 }
 
-function walk(dir: string, root = dir): string[] {
+function walk(dir: string, root = dir, skip: readonly string[] = []): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort()) {
     const full = join(dir, name);
     const rel = relative(root, full);
-    if (excluded(rel)) continue;
-    if (statSync(full).isDirectory()) out.push(...walk(full, root));
+    if (excluded(rel) || skip.includes(rel)) continue;
+    if (statSync(full).isDirectory()) out.push(...walk(full, root, skip));
     else out.push(rel);
   }
   return out;
@@ -252,7 +264,7 @@ export function syncTemplates(options: SyncOptions): Record<TemplateId, string[]
     const appName = exampleAppName(sourceDir);
     const target = join(options.outDir, id);
     const files: string[] = [];
-    for (const rel of walk(sourceDir)) {
+    for (const rel of walk(sourceDir, sourceDir, TEMPLATE_BUILD_OUTPUT[id] ?? [])) {
       const from = join(sourceDir, rel);
       const posix = rel.split(sep).join('/');
       const outRel = posix === '.gitignore' ? '_gitignore' : posix;

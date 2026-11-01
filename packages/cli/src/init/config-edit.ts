@@ -65,14 +65,74 @@ export function matchClose(source: string, open: number): number {
   return -1;
 }
 
-/** Where the exported config object starts: `defineConfig({`, `defineNuxtConfig({`, `export default {` … */
+/**
+ * The object a function-form config returns: `defineConfig(({ command }) => ({ … }))`,
+ * `defineConfig(({ command }): UserConfig => { return { … }; })`, `defineConfig(async function () { return { … } })`.
+ * Returns the index of the object's `{`, or -1.
+ */
+function returnedObjectStart(source: string): number {
+  const call = /export\s+default\s+[\w$.]+\s*\(\s*/.exec(source);
+  if (!call) return -1;
+  const open = call.index + call[0].length;
+  const head = /^(?:async\s+)?(?:function\b[^(]*)?/.exec(source.slice(open))?.[0] ?? '';
+  const paramsAt = open + head.length;
+  let arrowAt: number;
+  if (source[paramsAt] === '(') {
+    const paramsClose = matchClose(source, paramsAt);
+    if (paramsClose === -1) return -1;
+    const rest = source.slice(paramsClose + 1);
+    // A function expression has its body next; an arrow function has `=>` (after an optional return type).
+    const body = head.includes('function')
+      ? /^\s*(?::[^{]*)?\{/.exec(rest)
+      : /^\s*(?::[^=]*)?=>\s*/.exec(rest);
+    if (!body) return -1;
+    arrowAt = paramsClose + 1 + body[0].length;
+    if (head.includes('function')) arrowAt -= 1;
+  } else {
+    // `config => …`
+    const param = /^[\w$]+\s*=>\s*/.exec(source.slice(paramsAt));
+    if (!param) return -1;
+    arrowAt = paramsAt + param[0].length;
+  }
+  if (source[arrowAt] === '(') {
+    const object = /^\(\s*\{/.exec(source.slice(arrowAt));
+    return object ? arrowAt + object[0].length - 1 : -1;
+  }
+  if (source[arrowAt] !== '{') return -1;
+  const blockEnd = matchClose(source, arrowAt);
+  if (blockEnd === -1) return -1;
+  // The `return` at the top level of the function body.
+  let depth = 0;
+  for (let i = arrowAt + 1; i < blockEnd; i++) {
+    const c = source[i] as string;
+    if (c === '"' || c === "'" || c === '`') i = skipString(source, i);
+    else if (c === '/' && source[i + 1] === '/') {
+      const nl = source.indexOf('\n', i);
+      i = nl === -1 ? blockEnd : nl;
+    } else if (c === '/' && source[i + 1] === '*') {
+      const end = source.indexOf('*/', i + 2);
+      i = end === -1 ? blockEnd : end + 1;
+    } else if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth--;
+    else if (depth === 0 && source.startsWith('return', i) && !/[\w$]/.test(source[i - 1] ?? ' ')) {
+      const object = /^return\s*\(?\s*\{/.exec(source.slice(i));
+      if (object) return i + object[0].length - 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Where the exported config object starts: `defineConfig({`, `defineNuxtConfig({`, `export default {` …, or the
+ * object a function-form config returns (`defineConfig(({ mode }) => ({ … }))`).
+ */
 export function configObjectStart(source: string): number {
   const call = /export\s+default\s+(?:[\w$.]+\s*\(\s*)?\{/.exec(source);
   if (call) return call.index + call[0].length - 1;
   const named = /(?:const|let)\s+(\w+)\s*(?::\s*[\w.<>]+\s*)?=\s*(?:[\w$.]+\s*\(\s*)?\{/.exec(source);
   if (named && new RegExp(`export\\s+default\\s+(?:[\\w$.]+\\s*\\(\\s*)?${named[1]}\\b`).test(source))
     return named.index + named[0].length - 1;
-  return -1;
+  return returnedObjectStart(source);
 }
 
 /**
