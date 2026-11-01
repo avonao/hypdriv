@@ -90,7 +90,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 ### `warm`
 
-`{ routes: [], onDeploy: false, cron?: '…', concurrency: 4, hot?: true | { limit: 25, days: 7, minViews: 20, dataset?, datasetEnv: 'HYPDRIV_ANALYTICS_DATASET', accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID', apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN' } }`. `hot` adds the busiest cacheable pages, learned from Web Vitals in Analytics Engine ([Hot pages](caching.md#hot-pages)).
+`{ routes: [], onDeploy: false, cron?: '…', concurrency: 4, hot?: true | { limit: 25, days: 7, minViews: 20, dataset?, datasetEnv: 'HYPDRIV_ANALYTICS_DATASET', accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID', apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN' } }`. `hot` adds the busiest cacheable pages, learned from Web Vitals in Analytics Engine ([Hot pages](caching.md#hot-pages)). `cron` has to be declared in `triggers.crons` of the Worker and needs `site.origin` (cache keys include the host); each page is requested once per combination of the running experiments its policy varies on, marked `x-hypdriv-warm` ([Warming](caching.md#warming)).
 
 ## `performance`
 
