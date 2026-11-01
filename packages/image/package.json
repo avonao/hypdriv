@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/image",
   "version": "0.1.0",
-  "description": "Hypdriv images: Cloudflare image loader for next/image, placeholder generation and the HypImage component.",
+  "description": "Hypdriv images: Cloudflare image loader for next/image, placeholder generation (sharp or pure TypeScript/WASM) and the HypImage component.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",
@@ -63,7 +63,9 @@
   "peerDependencies": {
     "next": ">=16.0.0",
     "react": "^19.0.0",
-    "sharp": ">=0.33.0"
+    "sharp": ">=0.33.0",
+    "@jsquash/webp": ">=1.4.0",
+    "@jsquash/avif": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "next": {
@@ -73,6 +75,12 @@
       "optional": true
     },
     "sharp": {
+      "optional": true
+    },
+    "@jsquash/webp": {
+      "optional": true
+    },
+    "@jsquash/avif": {
       "optional": true
     }
   },
@@ -84,6 +92,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "@types/react": "catalog:",
-    "@types/react-dom": "catalog:"
+    "@types/react-dom": "catalog:",
+    "@jsquash/webp": "catalog:",
+    "@jsquash/avif": "catalog:"
   }
 }

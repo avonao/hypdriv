@@ -123,7 +123,9 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 ## `images`
 
-`{ loader: 'cloudflare', cdnCgi: 'auto', quality: 75, formats: ['auto'], placeholders: { enabled: true, file: '.hypdriv/placeholders.json', size: 16, sources: ['public'] }, allowedHosts: [] }`.
+`{ loader: 'cloudflare', cdnCgi: 'auto', quality: 75, formats: ['auto'], placeholders: { enabled: true, file: '.hypdriv/placeholders.json', size: 16, sources: ['public'], engine: 'auto', format: 'auto', quality: 40, accuracy: 'fast' }, allowedHosts: [] }`.
+
+`placeholders` drives `hypdriv placeholders`. `engine: 'auto'` uses `sharp` when it is installed and the built-in engine otherwise (`'sharp'` insists on sharp, `'portable'` never loads native code); `format: 'auto'` is WebP when an encoder exists (sharp, or `@jsquash/webp`) and PNG otherwise; `quality` is the WebP quality; `accuracy: 'exact'` decodes big JPEGs completely instead of from their DC coefficients (built-in engine).
 
 ## `jobs`
 

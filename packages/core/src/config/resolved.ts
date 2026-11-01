@@ -339,7 +339,16 @@ export interface ResolvedImages {
   cdnCgi: boolean | 'auto';
   quality: number;
   formats: Array<'avif' | 'webp' | 'auto'>;
-  placeholders: { enabled: boolean; file: string; size: number; sources: string[] };
+  placeholders: {
+    enabled: boolean;
+    file: string;
+    size: number;
+    sources: string[];
+    engine: 'auto' | 'sharp' | 'portable';
+    format: 'auto' | 'webp' | 'png';
+    quality: number;
+    accuracy: 'fast' | 'exact';
+  };
   allowedHosts: string[];
 }
 

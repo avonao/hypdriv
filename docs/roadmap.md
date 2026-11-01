@@ -10,10 +10,6 @@ Everything in `docs/feature-catalog.md` marked ✅ or 🧪, validated end to end
 
 - **OpenNext adapter integration**: when OpenNext's Adapter-API-based Cloudflare adapter ships, make it the default base adapter and read its output map (Worker entry, assets directory) instead of assuming `.open-next/`.
 
-## 0.3
-
-- **Image placeholders without sharp**: a pure-WASM decoder path for CI environments without native modules.
-
 ## 1.0
 
 - Stability guarantees for the config schema (`defineConfig`) and the manifest schema (`version: 1`), semver commitments, and a verified compatibility matrix across Next 16.x and 17.

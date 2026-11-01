@@ -1,14 +1,22 @@
-import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   generatePlaceholders,
   loadSharp,
+  loadWasmCodecs,
   type PlaceholdersFile,
   readPlaceholdersFile,
   type SharpLike,
+  type WasmCodecs,
 } from './index';
+import { decodePng, probePng } from './png';
+import { Downscaler } from './raster';
+
+const fixtures = join(dirname(fileURLToPath(import.meta.url)), '__fixtures__');
+const NO_CODECS: WasmCodecs = { decodeWebp: null, decodeAvif: null, encodeWebp: null, problems: {} };
 
 let dir: string;
 beforeEach(async () => {
@@ -51,10 +59,11 @@ function fakeSharp(calls: string[]): SharpLike {
 }
 
 describe('generatePlaceholders', () => {
-  it('returns sharp-missing without writing when sharp is unavailable', async () => {
+  it('returns sharp-missing without writing when sharp is required but unavailable', async () => {
     const warnings: string[] = [];
     const result = await generatePlaceholders({
       projectDir: dir,
+      engine: 'sharp',
       sharp: null,
       log: { info() {}, warn: (m) => warnings.push(m) },
     });
@@ -68,11 +77,21 @@ describe('generatePlaceholders', () => {
   it('walks sources, writes the map keyed by public path and skips ignored/unsupported files', async () => {
     const calls: string[] = [];
     const result = await generatePlaceholders({ projectDir: dir, sharp: fakeSharp(calls), size: 12 });
-    expect(result).toMatchObject({ generated: 2, reused: 0, removed: 0, total: 2, errors: [] });
+    expect(result).toMatchObject({
+      generated: 2,
+      reused: 0,
+      removed: 0,
+      total: 2,
+      errors: [],
+      unsupported: [],
+      engine: 'sharp',
+      format: 'webp',
+    });
     expect(result.file).toBe(join(dir, '.hypdriv', 'placeholders.json'));
     const file = JSON.parse(await readFile(result.file, 'utf8')) as PlaceholdersFile;
     expect(file.version).toBe(1);
     expect(file.size).toBe(12);
+    expect(file).toMatchObject({ engine: 'sharp', format: 'webp', quality: 40 });
     expect(Object.keys(file.placeholders)).toEqual(['/hero.jpg', '/img/nested/photo.PNG']);
     expect(file.placeholders['/hero.jpg']).toBe(
       `data:image/webp;base64,${Buffer.from('webp:jpeg-bytes-1').toString('base64')}`,
@@ -163,5 +182,330 @@ describe('generatePlaceholders', () => {
     const file = (await readPlaceholdersFile(result.file))!;
     expect(file.placeholders['/hero.jpg']).toMatch(/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/);
     expect(file.meta['/hero.jpg']).toMatchObject({ width: 2, height: 2 });
+  });
+});
+
+describe('generatePlaceholders without sharp (portable engine)', () => {
+  let root: string;
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'hypdriv-portable-'));
+    await mkdir(join(root, 'public', 'img'), { recursive: true });
+    await copyFile(join(fixtures, 'jpeg-420-baseline.jpg'), join(root, 'public', 'hero.jpg'));
+    await copyFile(join(fixtures, 'png-rgba8.png'), join(root, 'public', 'img', 'logo.png'));
+    await copyFile(join(fixtures, 'gif-transparent.gif'), join(root, 'public', 'img', 'anim.gif'));
+    // the extension lies: the bytes decide
+    await copyFile(join(fixtures, 'jpeg-gray.jpg'), join(root, 'public', 'img', 'looks-like-png.PNG'));
+  });
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('falls back to the portable engine when sharp is missing and writes PNG placeholders', async () => {
+    const info: string[] = [];
+    const result = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: null,
+      log: { info: (m) => info.push(m), warn() {} },
+    });
+    expect(result.skipped).toBeUndefined();
+    expect(result).toMatchObject({
+      generated: 4,
+      total: 4,
+      errors: [],
+      unsupported: [],
+      engine: 'portable',
+      format: 'png',
+    });
+    expect(info.at(-1)).toContain('portable, png');
+
+    const file = (await readPlaceholdersFile(result.file))!;
+    expect(file).toMatchObject({ engine: 'portable', format: 'png', quality: 40, size: 16 });
+    expect(Object.keys(file.placeholders)).toEqual([
+      '/hero.jpg',
+      '/img/anim.gif',
+      '/img/logo.png',
+      '/img/looks-like-png.PNG',
+    ]);
+    expect(file.meta['/hero.jpg']).toMatchObject({ width: 320, height: 200 });
+    expect(file.meta['/img/logo.png']).toMatchObject({ width: 96, height: 60 });
+
+    for (const [key, url] of Object.entries(file.placeholders)) {
+      expect(url, key).toMatch(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/);
+      const png = Buffer.from(url.split(',')[1]!, 'base64');
+      expect(png.length, key).toBeLessThan(900);
+      expect(probePng(png).width, key).toBe(16);
+    }
+    // the logo has an alpha ramp, so its placeholder is an RGBA PNG; the opaque JPEG's is RGB
+    expect(
+      probePng(Buffer.from(file.placeholders['/img/logo.png']!.split(',')[1]!, 'base64')).colorType,
+    ).toBe(6);
+    expect(probePng(Buffer.from(file.placeholders['/hero.jpg']!.split(',')[1]!, 'base64')).colorType).toBe(2);
+    // and it decodes back to the picture's colours: the JPEG's top-left corner is dark red/green → gradient start
+    const scaler = new Downscaler(16, 10);
+    decodePng(Buffer.from(file.placeholders['/hero.jpg']!.split(',')[1]!, 'base64'), scaler);
+    const pixels = scaler.finish().data;
+    expect(pixels[0]!).toBeLessThan(pixels[15 * 4]!); // red channel rises left to right
+  });
+
+  it('is the default engine order: sharp first, portable otherwise', async () => {
+    const withSharp = await generatePlaceholders({
+      projectDir: root,
+      sharp: fakeSharp([]),
+      wasm: null,
+      sources: ['public/img'],
+    });
+    expect(withSharp.engine).toBe('sharp');
+    const portable = await generatePlaceholders({
+      projectDir: root,
+      engine: 'portable',
+      sharp: fakeSharp([]), // present but not wanted
+      wasm: null,
+      sources: ['public/img'],
+    });
+    expect(portable.engine).toBe('portable');
+    expect(portable.generated).toBe(3); // engine change invalidates the cache
+    expect(portable.reused).toBe(0);
+  });
+
+  it('plans without decoding or writing when dryRun is set', async () => {
+    const base = { projectDir: root, sharp: null, wasm: null } as const;
+    const fresh = await generatePlaceholders({ ...base, dryRun: true });
+    expect(fresh).toMatchObject({ generated: 4, reused: 0, removed: 0, total: 4, engine: 'portable' });
+    await expect(stat(join(root, '.hypdriv', 'placeholders.json'))).rejects.toThrow();
+
+    await generatePlaceholders(base);
+    expect(await generatePlaceholders({ ...base, dryRun: true })).toMatchObject({
+      generated: 0,
+      reused: 4,
+      removed: 0,
+    });
+    await rm(join(root, 'public', 'img', 'logo.png'));
+    await copyFile(join(fixtures, 'png-rgb8.png'), join(root, 'public', 'new.png'));
+    expect(await generatePlaceholders({ ...base, dryRun: true })).toMatchObject({
+      generated: 1,
+      reused: 3,
+      removed: 1,
+      total: 4,
+    });
+    // and nothing was written by the dry runs
+    expect(
+      Object.keys((await readPlaceholdersFile(join(root, '.hypdriv', 'placeholders.json')))!.placeholders),
+    ).toContain('/img/logo.png');
+  });
+
+  it('reuses entries only for the same engine, format, quality and size', async () => {
+    const base = { projectDir: root, sharp: null, wasm: null } as const;
+    expect((await generatePlaceholders(base)).generated).toBe(4);
+    expect(await generatePlaceholders(base)).toMatchObject({ generated: 0, reused: 4 });
+    expect((await generatePlaceholders({ ...base, quality: 80 })).generated).toBe(4);
+    expect((await generatePlaceholders({ ...base, quality: 80, size: 24 })).generated).toBe(4);
+    expect(await generatePlaceholders({ ...base, quality: 80, size: 24 })).toMatchObject({ reused: 4 });
+  });
+
+  it('reports WebP and AVIF as unsupported (not errors) when no codec is installed, and keeps the rest', async () => {
+    await copyFile(join(fixtures, 'webp-lossy.webp'), join(root, 'public', 'photo.webp'));
+    await copyFile(join(fixtures, 'avif-lossy.avif'), join(root, 'public', 'photo.avif'));
+    await writeFile(join(root, 'public', 'broken.png'), 'definitely not an image');
+    const warnings: string[] = [];
+    const result = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: NO_CODECS,
+      log: { info() {}, warn: (m) => warnings.push(m) },
+    });
+    expect(result.generated).toBe(4);
+    expect(result.unsupported.map((u) => u.path)).toEqual(['/photo.avif', '/photo.webp']);
+    expect(result.unsupported[0]!.reason).toContain('@jsquash/avif');
+    expect(result.errors).toEqual([
+      { path: '/broken.png', error: expect.stringContaining('not a PNG, JPEG, GIF') },
+    ]);
+    expect(warnings.join('\n')).toMatch(/2 image\(s\) have no placeholder/);
+  });
+
+  it('uses WebAssembly codecs when they are available: WebP output, WebP and AVIF sources', async () => {
+    await copyFile(join(fixtures, 'webp-lossy.webp'), join(root, 'public', 'photo.webp'));
+    const codecs: WasmCodecs = {
+      ...NO_CODECS,
+      decodeWebp: async () => ({ width: 40, height: 20, data: new Uint8ClampedArray(40 * 20 * 4).fill(180) }),
+      encodeWebp: async (image, quality) =>
+        new TextEncoder().encode(`webp:${image.width}x${image.height}:q${quality}`),
+    };
+    const result = await generatePlaceholders({ projectDir: root, sharp: null, wasm: codecs, quality: 55 });
+    expect(result).toMatchObject({ generated: 5, engine: 'portable', format: 'webp', unsupported: [] });
+    const file = (await readPlaceholdersFile(result.file))!;
+    expect(file.placeholders['/photo.webp']).toBe(
+      `data:image/webp;base64,${Buffer.from('webp:16x8:q55').toString('base64')}`,
+    );
+    expect(file.meta['/photo.webp']).toMatchObject({ width: 40, height: 20 });
+    expect(file.placeholders['/hero.jpg']).toContain(Buffer.from('webp:16x10:q55').toString('base64'));
+  });
+
+  it('honours format: png even when a WebP encoder exists, and skips when webp is forced without one', async () => {
+    const encode = async () => new Uint8Array([1, 2, 3]);
+    const png = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: { ...NO_CODECS, encodeWebp: encode },
+      format: 'png',
+    });
+    expect(png.format).toBe('png');
+    const warnings: string[] = [];
+    const forced = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: NO_CODECS,
+      format: 'webp',
+      file: 'forced.json',
+      log: { info() {}, warn: (m) => warnings.push(m) },
+    });
+    expect(forced.skipped).toBe('engine-missing');
+    expect(forced.message).toContain('@jsquash/webp');
+    expect(warnings).toHaveLength(1);
+    await expect(stat(join(root, 'forced.json'))).rejects.toThrow();
+  });
+
+  it('warns about codecs that resolved but failed to load, and carries on without them', async () => {
+    const warnings: string[] = [];
+    const result = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: { ...NO_CODECS, problems: { '@jsquash/webp': 'wasm exploded' } },
+      log: { info() {}, warn: (m) => warnings.push(m) },
+    });
+    expect(result.generated).toBe(4);
+    expect(warnings[0]).toContain('@jsquash/webp could not be loaded (wasm exploded)');
+  });
+
+  it('enforces the pixel budget per image and supports the exact JPEG mode', async () => {
+    const budget = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: null,
+      maxPixels: 10_000,
+      file: 'a.json',
+    });
+    expect(budget.errors.map((e) => e.path)).toEqual(['/hero.jpg', '/img/looks-like-png.PNG']);
+    expect(budget.errors[0]!.error).toMatch(/above the limit of 10000/);
+    const exact = await generatePlaceholders({
+      projectDir: root,
+      sharp: null,
+      wasm: null,
+      accuracy: 'exact',
+      file: 'b.json',
+    });
+    expect(exact).toMatchObject({ generated: 4, errors: [] });
+    const fast = await generatePlaceholders({ projectDir: root, sharp: null, wasm: null, file: 'c.json' });
+    const a = (await readPlaceholdersFile(exact.file))!.placeholders['/hero.jpg'];
+    const b = (await readPlaceholdersFile(fast.file))!.placeholders['/hero.jpg'];
+    expect(a).toMatch(/^data:image\/png/);
+    expect(b).toMatch(/^data:image\/png/);
+  });
+
+  it('matches what sharp produces when sharp is installed', async () => {
+    const sharp = await loadSharp();
+    if (!sharp) return; // optional peer: the comparison needs the real thing
+    const options = { projectDir: root, sources: ['public/img'] };
+    const viaSharp = await generatePlaceholders({ ...options, sharp, format: 'png', file: 'sharp.json' });
+    const viaPortable = await generatePlaceholders({
+      ...options,
+      engine: 'portable',
+      wasm: null,
+      file: 'portable.json',
+    });
+    expect(viaSharp.engine).toBe('sharp');
+    const a = (await readPlaceholdersFile(viaSharp.file))!;
+    const b = (await readPlaceholdersFile(viaPortable.file))!;
+    expect(Object.keys(b.placeholders)).toEqual(Object.keys(a.placeholders));
+    for (const key of Object.keys(b.placeholders)) {
+      const left = pixelsOf(a.placeholders[key]!);
+      const right = pixelsOf(b.placeholders[key]!);
+      expect(right.width, key).toBe(left.width);
+      expect(Math.abs(right.height - left.height), key).toBeLessThanOrEqual(1);
+      if (right.height !== left.height) continue;
+      let sum = 0;
+      for (let i = 0; i < left.data.length; i++) sum += Math.abs(left.data[i]! - right.data[i]!);
+      // sharp resamples with Lanczos, the portable engine averages areas: same picture, slightly different edges
+      expect(sum / left.data.length, key).toBeLessThan(14);
+    }
+  });
+});
+
+/** Decodes a placeholder `data:` URL (PNG) to raw RGBA. */
+function pixelsOf(dataUrl: string): { width: number; height: number; data: Uint8Array } {
+  const bytes = Buffer.from(dataUrl.split(',')[1]!, 'base64');
+  const { width, height } = probePng(bytes);
+  const data = new Uint8Array(width * height * 4);
+  decodePng(bytes, {
+    begin() {},
+    push(y, row) {
+      data.set(row, y * width * 4);
+    },
+  });
+  return { width, height, data };
+}
+
+describe('@jsquash WebAssembly codecs', () => {
+  let root: string;
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'hypdriv-wasm-'));
+    await mkdir(join(root, 'public'), { recursive: true });
+  });
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('loads from the project or from Hypdriv and reports nothing for a missing package', async () => {
+    const codecs = await loadWasmCodecs(root);
+    expect(codecs.problems).toEqual({});
+    // the repository installs both as devDependencies, so they resolve through @hypdriv/image
+    expect(codecs.decodeWebp).toBeTypeOf('function');
+    expect(codecs.decodeAvif).toBeTypeOf('function');
+    expect(codecs.encodeWebp).toBeTypeOf('function');
+  });
+
+  it('decodes real WebP and AVIF files like libwebp / libavif', async () => {
+    const codecs = await loadWasmCodecs(root);
+    const webp = await codecs.decodeWebp!(new Uint8Array(await readFile(join(fixtures, 'webp-lossy.webp'))));
+    expect([webp.width, webp.height]).toEqual([160, 100]);
+    expect(webp.data).toHaveLength(160 * 100 * 4);
+    const avif = await codecs.decodeAvif!(new Uint8Array(await readFile(join(fixtures, 'avif-lossy.avif'))));
+    expect([avif.width, avif.height]).toEqual([128, 80]);
+    await expect(codecs.decodeWebp!(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow();
+  });
+
+  it('generates WebP placeholders from JPEG, PNG, GIF, WebP and AVIF without any native module', async () => {
+    for (const [from, to] of [
+      ['jpeg-420-baseline.jpg', 'a.jpg'],
+      ['png-rgba8.png', 'b.png'],
+      ['gif-static.gif', 'c.gif'],
+      ['webp-lossy.webp', 'd.webp'],
+      ['webp-lossless-alpha.webp', 'e.webp'],
+      ['avif-lossy.avif', 'f.avif'],
+    ] as const) {
+      await copyFile(join(fixtures, from), join(root, 'public', to));
+    }
+    const result = await generatePlaceholders({ projectDir: root, engine: 'portable', quality: 60 });
+    expect(result).toMatchObject({
+      generated: 6,
+      errors: [],
+      unsupported: [],
+      engine: 'portable',
+      format: 'webp',
+    });
+    const file = (await readPlaceholdersFile(result.file))!;
+    expect(file.meta['/f.avif']).toMatchObject({ width: 128, height: 80 });
+    expect(file.meta['/e.webp']).toMatchObject({ width: 96, height: 60 });
+    const codecs = await loadWasmCodecs(root);
+    for (const [key, url] of Object.entries(file.placeholders)) {
+      expect(url, key).toMatch(/^data:image\/webp;base64,/);
+      const bytes = Buffer.from(url.split(',')[1]!, 'base64');
+      expect(bytes.length, key).toBeLessThan(400);
+      const decoded = await codecs.decodeWebp!(bytes);
+      expect(decoded.width, key).toBe(16);
+    }
+    // a decoded placeholder is the picture, only smaller: the red ramp of the source scene survives
+    const hero = await codecs.decodeWebp!(Buffer.from(file.placeholders['/a.jpg']!.split(',')[1]!, 'base64'));
+    expect(hero.data[0]!).toBeLessThan(hero.data[(hero.width - 1) * 4]!);
   });
 });

@@ -198,6 +198,42 @@ describe('cache.warm.hot', () => {
   });
 });
 
+describe('images.placeholders', () => {
+  it('defaults to the sharp-or-portable engine with automatic output', () => {
+    expect(resolveConfig({}).images.placeholders).toEqual({
+      enabled: true,
+      file: '.hypdriv/placeholders.json',
+      size: 16,
+      sources: ['public'],
+      engine: 'auto',
+      format: 'auto',
+      quality: 40,
+      accuracy: 'fast',
+    });
+    expect(
+      resolveConfig({
+        images: { placeholders: { engine: 'portable', format: 'png', quality: 70, accuracy: 'exact' } },
+      }).images.placeholders,
+    ).toMatchObject({ engine: 'portable', format: 'png', quality: 70, accuracy: 'exact', size: 16 });
+  });
+
+  it('validates the engine options', () => {
+    const errorsOf = (placeholders: Record<string, unknown>) =>
+      validateConfig({ images: { placeholders } })
+        .filter((x) => x.severity === 'error')
+        .map((x) => x.path);
+    expect(errorsOf({ engine: 'sharp', format: 'webp', quality: 80, accuracy: 'fast' })).toEqual([]);
+    expect(errorsOf({ engine: 'wasm', format: 'gif', quality: 0, accuracy: 'slow' })).toEqual(
+      expect.arrayContaining([
+        'images.placeholders.engine',
+        'images.placeholders.format',
+        'images.placeholders.quality',
+        'images.placeholders.accuracy',
+      ]),
+    );
+  });
+});
+
 describe('validateConfig', () => {
   it('validates experiments', () => {
     const errorsOf = (definitions: Record<string, unknown>) =>

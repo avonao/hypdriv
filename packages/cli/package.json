@@ -63,13 +63,18 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "@hypdriv/vite": "workspace:*"
+    "@hypdriv/vite": "workspace:*",
+    "@hypdriv/image": "workspace:*"
   },
   "peerDependencies": {
-    "@hypdriv/vite": "workspace:*"
+    "@hypdriv/vite": "workspace:*",
+    "@hypdriv/image": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@hypdriv/vite": {
+      "optional": true
+    },
+    "@hypdriv/image": {
       "optional": true
     }
   }

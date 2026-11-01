@@ -3,6 +3,9 @@
  * builds, tests and runs even when an optional sibling lacks an export; callers get `null` and print a
  * clear message instead of crashing.
  */
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type {
   CspDirectives,
   HypManifest,
@@ -167,6 +170,35 @@ export interface NextAdapterModule {
   ) => Promise<{ manifest: HypManifest; failures: string[]; html: Record<string, string> }>;
 }
 
+/** The slice of `@hypdriv/image/node` the `placeholders` command uses. */
+export interface ImageNodeModule {
+  generatePlaceholders?: (options: {
+    projectDir: string;
+    sources?: string[];
+    size?: number;
+    file?: string;
+    quality?: number;
+    engine?: 'auto' | 'sharp' | 'portable';
+    format?: 'auto' | 'webp' | 'png';
+    accuracy?: 'fast' | 'exact';
+    dryRun?: boolean;
+    concurrency?: number;
+    log?: { info(message: string): void; warn(message: string): void };
+  }) => Promise<{
+    generated: number;
+    reused: number;
+    removed: number;
+    total: number;
+    file: string;
+    skipped?: 'sharp-missing' | 'engine-missing' | 'no-sources';
+    message?: string;
+    engine?: 'sharp' | 'portable';
+    format?: 'webp' | 'png';
+    errors: Array<{ path: string; error: string }>;
+    unsupported: Array<{ path: string; reason: string }>;
+  }>;
+}
+
 async function tryImport<T>(specifier: string): Promise<T | null> {
   try {
     return (await import(specifier)) as T;
@@ -181,6 +213,15 @@ export const loadSecurityNode = (): Promise<SecurityNodeModule | null> =>
   tryImport<SecurityNodeModule>('@hypdriv/security/node');
 export const loadPurserNode = (): Promise<PurserNodeModule | null> =>
   tryImport<PurserNodeModule>('@hypdriv/purser/node');
+/** `@hypdriv/image/node` from the project first (it is the project's dependency), else the CLI's own copy. */
+export async function loadImageNode(projectRoot: string): Promise<ImageNodeModule | null> {
+  try {
+    const resolved = createRequire(join(projectRoot, 'package.json')).resolve('@hypdriv/image/node');
+    return (await import(pathToFileURL(resolved).href)) as ImageNodeModule;
+  } catch {
+    return tryImport<ImageNodeModule>('@hypdriv/image/node');
+  }
+}
 export const loadNextAdapter = (): Promise<NextAdapterModule | null> =>
   tryImport<NextAdapterModule>('@hypdriv/next/adapter');
 

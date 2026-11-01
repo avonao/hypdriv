@@ -177,7 +177,7 @@ export const securityChecks: Check[] = [
         return warn('cache.warm.hot is on but the edge cache is off; there is nothing to warm.');
       const problems: string[] = [];
       const vitals = ctx.config.resolved.observe.vitals;
-      if (!vitals || vitals.sink !== 'analytics-engine')
+      if (vitals?.sink !== 'analytics-engine')
         problems.push(
           "observe.vitals.sink is not 'analytics-engine', so no page views are recorded to learn from",
         );

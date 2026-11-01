@@ -41,7 +41,7 @@ packages/observe     tracing, logging, Server-Timing, Web Vitals
 packages/purser      Purser bridge (build/watch, verification, themes, audit)
 packages/flags       edge feature flags
 packages/live        live channels (DO + SSE/WS + hooks)
-packages/image       Cloudflare image loader + placeholders
+packages/image       Cloudflare image loader + placeholders (sharp or the built-in PNG/JPEG/GIF engine, optional WASM for WebP/AVIF)
 packages/devtools    in-app HUD
 packages/testing     fakes, request builders, vitest presets
 packages/cli         the `hypdriv` command

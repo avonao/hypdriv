@@ -191,6 +191,12 @@ catalogs:
     '@hono/node-server':
       specifier: ^2.1.5
       version: 2.1.5
+    '@jsquash/avif':
+      specifier: ^2.1.1
+      version: 2.1.1
+    '@jsquash/webp':
+      specifier: ^1.5.0
+      version: 1.5.0
     '@opennextjs/cloudflare':
       specifier: ^1.20.15
       version: 1.20.15
@@ -1157,6 +1163,9 @@ importers:
         specifier: workspace:*
         version: link:../security
     devDependencies:
+      '@hypdriv/image':
+        specifier: workspace:*
+        version: link:../image
       '@hypdriv/vite':
         specifier: workspace:*
         version: link:../vite
@@ -1430,6 +1439,12 @@ importers:
         specifier: '>=0.33.0'
         version: 0.35.5(@types/node@26.6.6)
     devDependencies:
+      '@jsquash/avif':
+        specifier: 'catalog:'
+        version: 2.1.1
+      '@jsquash/webp':
+        specifier: 'catalog:'
+        version: 1.5.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -3237,6 +3252,12 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@jsquash/avif@2.1.1':
+    resolution: {integrity: sha512-LMRxd0fMgfCLtobDh0/sFYJMMiRJTNYSEEWvRDKXlAeZ08t3gI5V+1thIT0XjXJ+SVG7Zug9B0XPyx0Ti5VRNA==}
+
+  '@jsquash/webp@1.5.0':
+    resolution: {integrity: sha512-KggLoj2MnRSfIqTeKe1EmbljTX2vuV7mh79k89PCL1pyqiDULcPM1L47twxXt0hkb68F70bXiL31MxsuoZtKFw==}
 
   '@manypkg/find-root@3.1.0':
     resolution: {integrity: sha512-BcSqCyKhBVZ5YkSzOiheMCV41kqAFptW6xGqYSTjkVTl9XQpr+pqHhwgGCOHQtjDCv7Is6EFyA14Sm5GVbVABA==}
@@ -8186,6 +8207,9 @@ packages:
       react-dom: ~19.3.1
       react-server-dom-webpack: ~19.3.1
 
+  wasm-feature-detect@1.9.0:
+    resolution: {integrity: sha512-zonE+xlIIYtxPy++L24ow0hAD8CICb4+FgPyROd3buyXIqsJvUEDkBgfCCoXOd1Hu3DUr0GOfnPIdcGV+YpNaA==}
+
   watchpack@2.6.3:
     resolution: {integrity: sha512-s3NZy0QpTY9qGqzc0wtz4qI28z3+5qKbbAec4MV4G9N3CfgZ9wgvQRr0cl2jh/tqkWG1NWHkmVMHZpCamev5Wg==}
     engines: {node: '>=10.13.0'}
@@ -9877,6 +9901,14 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@jsquash/avif@2.1.1':
+    dependencies:
+      wasm-feature-detect: 1.9.0
+
+  '@jsquash/webp@1.5.0':
+    dependencies:
+      wasm-feature-detect: 1.9.0
 
   '@manypkg/find-root@3.1.0':
     dependencies:
@@ -15301,6 +15333,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  wasm-feature-detect@1.9.0: {}
 
   watchpack@2.6.3:
     dependencies:

@@ -11,6 +11,7 @@ import { experimentsCommand } from './experiments';
 import { initCommand } from './init';
 import { jobsCommand } from './jobs';
 import { manifestCommand } from './manifest';
+import { placeholdersCommand } from './placeholders';
 import { purgeCommand } from './purge';
 import { routesCommand } from './routes';
 import { serveCommand } from './serve';
@@ -28,6 +29,7 @@ export const commands: Command[] = [
   budgetCommand,
   cspCommand,
   cssCommand,
+  placeholdersCommand,
   warmCommand,
   purgeCommand,
   benchCommand,

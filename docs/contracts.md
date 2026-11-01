@@ -177,7 +177,7 @@ export interface LiveEvent { id: string; type: string; data: unknown; ts: number
 
 `@hypdriv/image/loader`: `default function cloudflareLoader({ src, width, quality }): string` (next.js `loaderFile` contract; uses `/cdn-cgi/image/width=,quality=,format=auto/<src>` when `globalThis.__HYPDRIV_IMAGE_CDN_CGI__ !== false`; reads a global config object set by `withHypDriv`), `buildCdnCgiUrl(options)`, `buildNextImageUrl()`.
 `@hypdriv/image/react`: `HypImage` (wraps `next/image`, injects `placeholder="blur"` + `blurDataURL` from a placeholders map, sensible `sizes` defaults), `withPlaceholders(map)`.
-`@hypdriv/image/node`: `generatePlaceholders({ projectDir, sources, size, file })` using `sharp` when available (dynamic import), else skips with a diagnostic; writes `.hypdriv/placeholders.json`.
+`@hypdriv/image/node`: `generatePlaceholders({ projectDir, sources, size, file, quality, engine, format, accuracy, dryRun })` writes `.hypdriv/placeholders.json` (`version: 1`, plus `engine`, `format`, `quality` so a run with other settings regenerates). `engine: 'auto'` uses `sharp` when available (dynamic import) and otherwise the portable engine: PNG, JPEG and GIF are decoded by built-in TypeScript decoders (sources are recognised by their bytes, not their extension), WebP and AVIF through the optional `@jsquash/webp` / `@jsquash/avif` WebAssembly codecs; the placeholder is a WebP when sharp or `@jsquash/webp` can encode it and a PNG otherwise. Images no installed codec can read are reported in `unsupported`, not `errors`. `skipped` is `sharp-missing` (`engine: 'sharp'` without sharp), `engine-missing` (`format: 'webp'` without an encoder) or `no-sources`; the function never throws for a missing optional engine.
 
 ## `@hypdriv/purser`
 

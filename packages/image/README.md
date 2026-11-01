@@ -8,8 +8,9 @@ OpenNext already serves `/_next/image` through the Images binding, so nothing he
 
 ```sh
 pnpm add @hypdriv/image
-pnpm add -D sharp   # optional: enables placeholder generation
 ```
+
+Placeholder generation needs nothing else. Optional upgrades: `pnpm add -D sharp` (native, every format, WebP output) or `pnpm add -D @jsquash/webp @jsquash/avif` (WebAssembly: reads WebP and AVIF sources and encodes WebP placeholders without native modules).
 
 ## Loader
 
@@ -47,23 +48,49 @@ configureImageLoader({
 ## Placeholders
 
 ```sh
-# build step (hypdriv css/build hooks call this; or run it yourself)
-node -e "import('@hypdriv/image/node').then(m => m.generatePlaceholders({ sources: ['public'], size: 16 }))"
+pnpm exec hypdriv placeholders            # generate (incrementally) into .hypdriv/placeholders.json
+pnpm exec hypdriv placeholders --check    # CI: exit 1 when the file is missing or out of date
 ```
 
-`generatePlaceholders({ projectDir, sources, size, file, concurrency, quality })` walks the source directories for `png/jpg/jpeg/webp/avif/gif`, resizes each to `size` px wide with `sharp`, encodes a `webp` at quality 40 and writes `.hypdriv/placeholders.json`:
+`hypdriv placeholders` reads `images.placeholders` from `hypdriv.config.ts` (`sources`, `size`, `file`, `engine`, `format`, `quality`, `accuracy`; see the [configuration guide](../../docs/guides/configuration.md#images)). The same thing from code:
+
+```ts
+import { generatePlaceholders } from '@hypdriv/image/node';
+
+const result = await generatePlaceholders({ sources: ['public'], size: 16 });
+// { generated, reused, removed, total, file, engine, format, errors, unsupported }
+```
+
+`generatePlaceholders({ projectDir, sources, size, file, concurrency, quality, engine, format, accuracy, dryRun })` walks the source directories for `png/jpg/jpeg/webp/avif/gif`, resizes each to `size` px wide (never enlarging, aspect ratio kept) and writes `.hypdriv/placeholders.json`:
 
 ```json
 {
   "version": 1,
   "generatedAt": "2026-10-30T12:00:00.000Z",
   "size": 16,
-  "placeholders": { "/hero.jpg": "data:image/webp;base64,UklGR..." },
+  "engine": "portable",
+  "format": "png",
+  "quality": 40,
+  "placeholders": { "/hero.jpg": "data:image/png;base64,iVBORw0..." },
   "meta": { "/hero.jpg": { "mtimeMs": 1761825600000, "bytes": 184233, "width": 2400, "height": 1200 } }
 }
 ```
 
-Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs are incremental: entries whose size and mtime match are reused, vanished sources are removed. Without `sharp` the function returns `{ generated: 0, skipped: 'sharp-missing', message }` and never throws, so builds on machines without native modules still pass.
+Keys are `/`-prefixed public paths (`public/img/a.jpg` → `/img/a.jpg`). Runs are incremental: entries whose size and mtime match are reused (when engine, format, quality and size are unchanged), vanished sources are removed.
+
+### Two engines
+
+| | `sharp` | `portable` |
+| --- | --- | --- |
+| Needs | the native `sharp` package | nothing; optional `@jsquash/webp` and `@jsquash/avif` |
+| Reads | everything sharp reads | PNG (all color types and depths, Adam7, `tRNS`), JPEG (baseline, progressive, any subsampling, restart intervals, grayscale, YCbCr, RGB, CMYK/YCCK), GIF (first frame); WebP and AVIF with the `@jsquash` codec |
+| Writes | WebP (PNG with `format: 'png'`) | WebP with `@jsquash/webp`, otherwise PNG |
+
+`engine: 'auto'` (the default) uses sharp when it is installed and the portable engine otherwise, so a CI image without native modules still produces placeholders instead of skipping them. `engine: 'sharp'` insists on sharp and returns `{ generated: 0, skipped: 'sharp-missing', message }` without it; `engine: 'portable'` never loads native code. The function never throws for a missing optional engine, and `format: 'webp'` without an encoder returns `skipped: 'engine-missing'`.
+
+The portable engine recognises images by their bytes, not their extension, streams PNG rows and area-averages them straight into the 16-pixel result (a 24-megapixel PNG needs about 250 MB and half a second), and refuses images above `maxPixels` (134 million) before allocating. For big JPEGs it decodes only the DC coefficients, which are the exact means of the 8×8 blocks, so a 24-megapixel photo takes about 0.1 s and 80 MB; this is what libjpeg's reduced-size decoding, and so sharp's shrink-on-load, does too. Near sharp colour edges of chroma-subsampled pictures that is an approximation; `accuracy: 'exact'` decodes every JPEG completely (about 2.5 s per 24 megapixels). Pictures smaller than eight times the placeholder are always decoded completely.
+
+Images that no installed codec can read (WebP or AVIF without sharp or the `@jsquash` codec) are listed in `unsupported` with the package to install, are not counted as errors and do not stop the others; files that fail to decode are listed in `errors` and make `hypdriv placeholders` exit `1`. `dryRun: true` decodes and writes nothing: `generated` then counts the images that would be regenerated.
 
 ## `HypImage`
 
@@ -92,7 +119,7 @@ Explicit props always win (`sizes`, `placeholder`, `decoding`, `fetchPriority`);
 
 - `@hypdriv/image` / `@hypdriv/image/loader`: `cloudflareLoader` (default), `buildCdnCgiUrl`, `buildNextImageUrl`, `configureImageLoader`, `getImageLoaderConfig`, `isCdnCgiEnabled`, `isPassthroughSource`
 - `@hypdriv/image/react`: `createHypImage`, `withPlaceholders`, `getPlaceholder`, `resetPlaceholders`, `defaultSizes`, types `Placeholders`, `PlaceholdersFile`, `BaseImageProps`
-- `@hypdriv/image/node`: `generatePlaceholders`, `readPlaceholdersFile`, `loadSharp`
+- `@hypdriv/image/node`: `generatePlaceholders`, `readPlaceholdersFile`, `loadSharp`, `loadWasmCodecs`, `sniffFormat`, types `GeneratePlaceholdersOptions`, `GeneratePlaceholdersResult`, `PlaceholdersFile`, `WasmCodecs`
 
 ## License
 
