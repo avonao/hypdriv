@@ -31,6 +31,7 @@ export {
   type CspDecision,
   type CspStageOptions,
   cspStage,
+  demoteNonceForSharedCache,
   type HtmlRewriterConstructor,
   type HtmlRewriterElementLike,
   type HtmlRewriterLike,

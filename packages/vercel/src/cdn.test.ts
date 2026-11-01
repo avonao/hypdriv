@@ -4,13 +4,16 @@ import { join } from 'node:path';
 import {
   createContext,
   createRouteMatcher,
+  HEADER,
   type HypDrivConfig,
   type HypManifest,
   loadConfig,
   parseServerTiming,
   type ResolvedConfig,
+  runPipeline,
   stateKey,
 } from '@hypdriv/core';
+import { CSP_DECISION_KEY, CSP_MODE_KEY, cspStage, NONCE_KEY } from '@hypdriv/security';
 import { runStage } from '@hypdriv/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureLogger, makeManifest, makeRoute } from './__fixtures__/fakes';
@@ -399,6 +402,134 @@ describe('vercelCdnStage', () => {
     expect(parseServerTiming(ctx.timings.toHeader('compact')).find((e) => e.name === 'cache')?.desc).toBe(
       'CDN',
     );
+  });
+});
+
+describe('vercelCdnStage with a per-request CSP nonce', () => {
+  const dynamicPages = makeManifest([
+    makeRoute({ pathname: '/products/[id]', classification: 'dynamic' }),
+    makeRoute({ pathname: '/api/items', kind: 'app-route', classification: 'route' }),
+    makeRoute({ pathname: '/docs', classification: 'static' }),
+  ]);
+  const forced = {
+    id: 'forced',
+    match: ['/products/:id', '/api/items', '/docs'],
+    ttl: '5m',
+    respectOrigin: false,
+  };
+  const html = (headers: Record<string, string> = {}) =>
+    new Response('<html><script>1</script></html>', {
+      headers: { 'content-type': 'text/html; charset=utf-8', ...headers },
+    });
+
+  async function pipeline(
+    url: string,
+    options: {
+      policy?: Record<string, unknown>;
+      csp?: HypDrivConfig['security'];
+      headers?: HeadersInit;
+      responseOwner?: boolean;
+      next?: () => Response;
+    } = {},
+  ) {
+    const config = loadConfig({
+      security: options.csp ?? {},
+      cache: { edge: { policies: [options.policy ?? PRODUCTS] } },
+    } as HypDrivConfig);
+    const { ctx, log } = ctxFor(url, { config, manifest: dynamicPages, headers: options.headers });
+    let forwarded: Request | null = null;
+    const { response } = await runPipeline({
+      stages: [
+        cspStage(config),
+        vercelCdnStage(config, options.responseOwner ? { responseOwner: true } : {})!,
+      ],
+      ctx,
+      next: async (request) => {
+        forwarded = request;
+        return (options.next ?? html)();
+      },
+    });
+    return { response, ctx, log, forwarded: forwarded as Request | null };
+  }
+
+  it('serves a force-cached page with the unsafe-inline fallback instead of a nonce the CDN would reuse', async () => {
+    const { response, ctx, log, forwarded } = await pipeline('https://shop.example.com/products/7', {
+      policy: forced,
+    });
+    expect(response.headers.get('vercel-cdn-cache-control')).toBe('s-maxage=300');
+    expect(ctx.state.get(CDN_DECISION_KEY)?.status).toBe('CDN');
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('unsafe-inline-fallback');
+    expect(ctx.state.get(NONCE_KEY)).toBeUndefined();
+    expect(response.headers.get('x-hypdriv-csp')).toBe('unsafe-inline-fallback');
+    expect(response.headers.get('content-security-policy')).not.toContain('nonce-');
+    expect(forwarded?.headers.get(HEADER.nonce)).toBeNull();
+    expect(forwarded?.headers.get('content-security-policy')).toBeNull();
+    expect(log.lines.filter((l) => l.message.includes('per-request CSP nonce'))).toHaveLength(1);
+  });
+
+  it('keeps the nonce on a policy that respects the origin, and keeps the page out of the CDN', async () => {
+    const { response, ctx, forwarded } = await pipeline('https://shop.example.com/products/7');
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('nonce');
+    expect(forwarded?.headers.get(HEADER.nonce)).toBeTruthy();
+    expect(response.headers.get('vercel-cdn-cache-control')).toBeNull();
+    expect(response.headers.get('vercel-cache-tag')).toBeNull();
+    expect(response.headers.get('x-hypdriv-cache')).toBe('BYPASS');
+    expect(ctx.state.get(CDN_DECISION_KEY)).toMatchObject({ status: 'BYPASS', reason: 'uncacheable:nonce' });
+    expect(response.headers.get('content-security-policy')).toContain('nonce-');
+  });
+
+  it('replaces shared-cache headers on a nonce document produced by the function', async () => {
+    const { response, log } = await pipeline('https://shop.example.com/products/7', {
+      responseOwner: true,
+      next: () =>
+        html({ 'cache-control': 'public, s-maxage=600', 'vercel-cdn-cache-control': 'max-age=600' }),
+    });
+    expect(response.headers.get('cache-control')).toBe('private, no-cache');
+    expect(response.headers.get('vercel-cdn-cache-control')).toBeNull();
+    expect(response.headers.get('cdn-cache-control')).toBeNull();
+    expect(log.lines.filter((l) => l.message.includes('replaced with "private, no-cache"'))).toHaveLength(1);
+  });
+
+  it("leaves a nonce document's private caching alone", async () => {
+    const { response, log } = await pipeline('https://shop.example.com/products/7', {
+      responseOwner: true,
+      next: () => html({ 'cache-control': 'private, max-age=0, must-revalidate' }),
+    });
+    expect(response.headers.get('cache-control')).toBe('private, max-age=0, must-revalidate');
+    expect(log.lines.some((l) => l.message.includes('replaced with'))).toBe(false);
+  });
+
+  it('does not touch Route Handlers, client navigation payloads or non-HTML responses', async () => {
+    const handler = await pipeline('https://shop.example.com/api/items', {
+      policy: forced,
+      next: () => Response.json({ ok: true }),
+    });
+    expect(handler.response.headers.get('vercel-cdn-cache-control')).toBe('s-maxage=300');
+    expect(handler.ctx.state.get(CSP_DECISION_KEY)?.mode).toBe('nonce');
+
+    const rsc = await pipeline('https://shop.example.com/products/7', {
+      policy: forced,
+      headers: { rsc: '1' },
+      next: () => new Response('0:[]', { headers: { 'content-type': 'text/x-component' } }),
+    });
+    expect(rsc.response.headers.get('vercel-cdn-cache-control')).toBe('s-maxage=300');
+    expect(rsc.ctx.state.get(CSP_DECISION_KEY)?.mode).toBe('nonce');
+  });
+
+  it('does nothing for hash CSP, disabled CSP and routes the policy does not cover', async () => {
+    const hash = await pipeline('https://shop.example.com/docs', { policy: forced });
+    expect(hash.ctx.state.get(CSP_MODE_KEY)).not.toBe('nonce');
+    expect(hash.response.headers.get('vercel-cdn-cache-control')).toBe('s-maxage=300');
+
+    const off = await pipeline('https://shop.example.com/products/7', {
+      policy: forced,
+      csp: { csp: false },
+    });
+    expect(off.response.headers.get('vercel-cdn-cache-control')).toBe('s-maxage=300');
+    expect(off.response.headers.get('content-security-policy')).toBeNull();
+
+    const unmatched = await pipeline('https://shop.example.com/other');
+    expect(unmatched.ctx.state.get(CDN_DECISION_KEY)?.reason).toBe('no-policy');
   });
 });
 

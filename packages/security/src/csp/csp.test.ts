@@ -5,7 +5,13 @@ import { CSP_EXTRA_HASHES_KEY, CSP_MODE_KEY, NONCE_KEY } from '../keys';
 import { buildCspDirectives, buildCspHeader, formatHashSource } from './build';
 import { mergeDirectives, parseCsp, serializeCsp, withoutSource } from './directives';
 import { type CspReport, cspReportHandler, suggestPolicy } from './report';
-import { CSP_DECISION_KEY, cspStage, type HtmlRewriterConstructor, injectNonce } from './stage';
+import {
+  CSP_DECISION_KEY,
+  cspStage,
+  demoteNonceForSharedCache,
+  type HtmlRewriterConstructor,
+  injectNonce,
+} from './stage';
 
 const baseCsp = resolveConfig({}).security.csp!;
 const HASH = "'sha256-AbCdEf0123456789AbCdEf0123456789AbCdEf0123456789AbCdEf0123='";
@@ -762,5 +768,75 @@ describe('cspStage with compressed HTML', () => {
     expect(response.headers.get('content-encoding')).toBe('br');
     expect(response.headers.get('content-security-policy')).toBeTruthy();
     expect(ctx.timings.list()).toContainEqual({ name: 'csp', desc: 'nonce-not-injected' });
+  });
+});
+
+describe('demoteNonceForSharedCache', () => {
+  it('moves a nonce decision to the unsafe-inline fallback and withdraws the nonce from the request', async () => {
+    const ctx = makeCtx({ route: dynamicRoute, manifest, url: 'https://app.test/dash' });
+    const stage = cspStage(ctx.config);
+    await stage.pre?.(ctx);
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('nonce');
+    expect(ctx.requestHeaders.get(HEADER.nonce)).toBeTruthy();
+    expect(ctx.requestHeaders.get('content-security-policy')).toContain("'nonce-");
+
+    expect(demoteNonceForSharedCache(ctx)).toBe(true);
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('unsafe-inline-fallback');
+    expect(ctx.state.get(NONCE_KEY)).toBeUndefined();
+    expect(ctx.state.get(CSP_DECISION_KEY)).toMatchObject({ mode: 'unsafe-inline', inject: false });
+    expect(ctx.state.get(CSP_DECISION_KEY)?.nonce).toBeUndefined();
+    expect(ctx.requestHeaders.has(HEADER.nonce)).toBe(false);
+    expect(ctx.requestHeaders.has('content-security-policy')).toBe(false);
+
+    const response = await stage.post?.(ctx, htmlNext());
+    const d = parseCsp(response?.headers.get('content-security-policy'));
+    expect(d['script-src']).toContain("'unsafe-inline'");
+    expect(JSON.stringify(d)).not.toContain('nonce-');
+    expect(response?.headers.get(HEADER.cspMode)).toBe('unsafe-inline-fallback');
+    // No nonce document any more: no private/no-cache marker either.
+    expect(response?.headers.get('cache-control')).toBeNull();
+  });
+
+  it('keeps report-only as the effective mode', async () => {
+    const ctx = makeCtx({
+      route: dynamicRoute,
+      manifest,
+      url: 'https://app.test/dash',
+      config: { security: { csp: { reportOnly: true } } },
+    });
+    await cspStage(ctx.config).pre?.(ctx);
+    expect(demoteNonceForSharedCache(ctx)).toBe(true);
+    expect(ctx.state.get(CSP_MODE_KEY)).toBe('report-only');
+  });
+
+  it('leaves hash, off and disabled decisions alone', async () => {
+    const hash = makeCtx({ route: staticRoute, manifest, url: 'https://app.test/' });
+    await cspStage(hash.config).pre?.(hash);
+    expect(demoteNonceForSharedCache(hash)).toBe(false);
+    expect(hash.state.get(CSP_MODE_KEY)).toBe('hash');
+
+    const off = makeCtx({
+      route: dynamicRoute,
+      url: 'https://app.test/dash',
+      config: { security: { csp: { mode: 'off' } } },
+    });
+    await cspStage(off.config).pre?.(off);
+    expect(demoteNonceForSharedCache(off)).toBe(false);
+
+    const disabled = makeCtx({
+      route: dynamicRoute,
+      url: 'https://app.test/dash',
+      config: { security: { csp: false } },
+    });
+    await cspStage(disabled.config).pre?.(disabled);
+    expect(demoteNonceForSharedCache(disabled)).toBe(false);
+  });
+
+  it('keeps a content-security-policy request header the application did not get from the stage', async () => {
+    const ctx = makeCtx({ route: dynamicRoute, manifest, url: 'https://app.test/dash' });
+    await cspStage(ctx.config).pre?.(ctx);
+    ctx.requestHeaders.set('content-security-policy', "default-src 'self'");
+    expect(demoteNonceForSharedCache(ctx)).toBe(true);
+    expect(ctx.requestHeaders.get('content-security-policy')).toBe("default-src 'self'");
   });
 });

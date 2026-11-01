@@ -11,6 +11,8 @@ import {
   HEADER,
   type HypContext,
   type HypManifest,
+  isHtmlLike,
+  isRscRequest,
   type Logger,
   parseCacheControl,
   type ResolvedConfig,
@@ -19,7 +21,9 @@ import {
   type Stage,
   type StateKey,
   stateKey,
+  withoutHeaders,
 } from '@hypdriv/core';
+import { CSP_DECISION_KEY, demoteNonceForSharedCache } from '@hypdriv/security';
 import { nextHeaderSource } from './route-source';
 import { MAX_TAGS_PER_RESPONSE, pathTag, routeTag, sanitizeTags } from './tags';
 import { type ConfigInput, readBuildManifest, resolveInput, warnOnce } from './util';
@@ -342,6 +346,34 @@ function flagsCookiePending(ctx: HypContext): boolean {
   );
 }
 
+/**
+ * `true` when the response to this request is an HTML document: a page request that is not a client navigation
+ * payload (RSC). Requests without a matched route count when they ask for HTML.
+ */
+function expectsHtmlDocument(ctx: HypContext): boolean {
+  if (isRscRequest(ctx.request.headers)) return false;
+  const kind = ctx.route?.route.kind;
+  if (kind === 'app-page' || kind === 'page') return true;
+  if (kind) return false;
+  return (ctx.request.headers.get('accept') ?? '').includes('text/html');
+}
+
+/** `true` when the `csp` stage gave this request a per-request nonce (the document will carry it). */
+function carriesNonce(ctx: HypContext): boolean {
+  const csp = ctx.state.get(CSP_DECISION_KEY);
+  return csp?.mode === 'nonce' && Boolean(csp.nonce);
+}
+
+/** Whether the response headers let a shared cache (Vercel's CDN, a CDN in front of it) store the response. */
+function sharedCacheable(headers: Headers): boolean {
+  if (headers.has(VERCEL_CDN_CACHE_CONTROL) || headers.has(CDN_CACHE_CONTROL)) return true;
+  const cc = parseCacheControl(headers.get('cache-control'));
+  if (cc['no-store'] || cc.private) return false;
+  const shared = seconds(cc['s-maxage']);
+  if (shared !== undefined) return shared > 0;
+  return Boolean(cc.public) && (seconds(cc['max-age']) ?? 0) > 0;
+}
+
 function record(ctx: HypContext, decision: CdnDecision, debugHeader: boolean): void {
   ctx.state.set(CDN_DECISION_KEY, decision);
   ctx.timings.mark('cache', decision.status);
@@ -419,6 +451,22 @@ export function vercelCdnStage(configInput: ConfigInput, options: VercelCdnOptio
         decision = { status: 'BYPASS', reason: `route-header:${pageReason}`, policy: decision.policy! };
         plan = undefined;
       }
+      // A policy that forces caching (`respectOrigin: false`) stores the page whatever it contains. A document with
+      // a per-request nonce would be served to the next visitor next to a policy naming another nonce, so such pages
+      // take the documented cached-HTML fallback (`'unsafe-inline'` scripts) instead.
+      if (
+        plan &&
+        !plan.respectOrigin &&
+        decision.policy &&
+        expectsHtmlDocument(ctx) &&
+        demoteNonceForSharedCache(ctx)
+      )
+        warnOnce(
+          ctx.log,
+          `vercel-cdn:nonce:${decision.policy.id}`,
+          `vercel-cdn: edge-cache policy "${decision.policy.id}" CDN-caches pages that would carry a per-request CSP nonce, so they are served with the 'unsafe-inline' script fallback (x-hypdriv-csp: unsafe-inline-fallback); use respectOrigin (the default) to keep dynamic pages out of the CDN, or give the route hash CSP`,
+          { policy: decision.policy.id },
+        );
       if (plan && decision.cacheControl) {
         writeCdnHeaders(ctx.responseHeaders, decision.cacheControl, plan);
         if (plan.vary.length) appendListHeader(ctx.responseHeaders, 'vary', plan.vary);
@@ -427,9 +475,30 @@ export function vercelCdnStage(configInput: ConfigInput, options: VercelCdnOptio
       record(ctx, decision, debugHeader);
     },
     post(ctx, response) {
+      // A document that carries a per-request nonce is for one visitor: Vercel's CDN (which follows the function's
+      // headers) and CDNs in front of it must not store it.
+      const nonceDocument = carriesNonce(ctx) && isHtmlLike(ctx, response);
+      if (nonceDocument && options.responseOwner) {
+        const shared = sharedCacheable(response.headers);
+        if (shared) {
+          response = withoutHeaders(response, [VERCEL_CDN_CACHE_CONTROL, CDN_CACHE_CONTROL]);
+          ctx.responseHeaders.set('cache-control', 'private, no-cache');
+          warnOnce(
+            ctx.log,
+            `vercel-cdn:nonce-response:${ctx.route?.route.id ?? ctx.url.pathname}`,
+            'vercel-cdn: a document with a per-request CSP nonce was sent with shared-cache headers; they were replaced with "private, no-cache" (a CDN would serve one visitor\'s nonce to the next)',
+            { route: ctx.route?.route.id ?? ctx.url.pathname },
+          );
+        }
+      }
       const decision = ctx.state.get(CDN_DECISION_KEY);
       const plan = ctx.state.get(PLAN_KEY);
       if (decision?.status !== 'CDN' || !plan) return response;
+      if (nonceDocument) {
+        removeCdnHeaders(ctx.responseHeaders);
+        record(ctx, { ...decision, status: 'BYPASS', reason: 'uncacheable:nonce' }, debugHeader);
+        return response;
+      }
       const pendingSetCookie = getSetCookies(ctx.responseHeaders).length > 0 || flagsCookiePending(ctx);
       const verdict = cdnVerdict(plan, response, { pendingSetCookie });
       if (!verdict.ok) {

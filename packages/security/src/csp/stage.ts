@@ -331,6 +331,30 @@ export function cspStage(config: ResolvedConfig, options: CspStageOptions = {}):
   });
 }
 
+/**
+ * Moves a request whose CSP decision is `nonce` to the documented cached-HTML fallback (`'unsafe-inline'` scripts,
+ * every other directive strict, `x-hypdriv-csp: unsafe-inline-fallback`) and withdraws the nonce from the request
+ * headers, so the application renders without one.
+ *
+ * For platforms whose shared cache stores the *application's* response (Vercel's CDN): a document that carries a
+ * per-request nonce cannot be cached, because the next visitor would be served the first visitor's nonce next to
+ * a policy that names another. Call it from a `pre` step that runs after `csp` and before the application renders,
+ * when the response is going to be cached regardless of what it contains. Returns `true` when the decision changed.
+ */
+export function demoteNonceForSharedCache(ctx: HypContext): boolean {
+  const decision = ctx.state.get(CSP_DECISION_KEY);
+  if (decision?.mode !== 'nonce') return false;
+  const { nonce: _nonce, requestPolicy, ...rest } = decision;
+  const demoted: CspDecision = { ...rest, mode: 'unsafe-inline', inject: false };
+  ctx.state.set(CSP_DECISION_KEY, demoted);
+  ctx.state.set(CSP_MODE_KEY, effectiveMode(demoted));
+  ctx.state.delete(NONCE_KEY);
+  ctx.requestHeaders.delete(decision.effective.nonceHeader);
+  if (requestPolicy && ctx.requestHeaders.get('content-security-policy') === requestPolicy)
+    ctx.requestHeaders.delete('content-security-policy');
+  return true;
+}
+
 function effectiveMode(decision: CspDecision): CspMode {
   if (decision.mode === 'off') return 'off';
   if (decision.reportOnly === true) return 'report-only';
