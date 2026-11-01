@@ -132,3 +132,8 @@ allowBuilds:
   esbuild: true
   workerd: true
   sharp: true
+  # @angular/build (Analog): these ship prebuilt binaries as optional dependencies; their install scripts only
+  # fall back to compiling.
+  '@parcel/watcher': false
+  lmdb: false
+  msgpackr-extract: false

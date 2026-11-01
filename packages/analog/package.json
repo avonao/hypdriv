@@ -50,6 +50,11 @@
       "types": "./dist/angular.d.ts",
       "default": "./dist/angular.js"
     },
+    "./angular/server": {
+      "source": "./src/angular-server.ts",
+      "types": "./dist/angular-server.d.ts",
+      "default": "./dist/angular-server.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -84,6 +89,7 @@
   },
   "devDependencies": {
     "@analogjs/content": "catalog:",
+    "@analogjs/platform": "catalog:",
     "@analogjs/router": "catalog:",
     "@angular/common": "catalog:",
     "@angular/compiler": "catalog:",

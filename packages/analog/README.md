@@ -46,7 +46,7 @@ export default defineConfig({
 // src/app/app.config.server.ts
 import { mergeApplicationConfig } from '@angular/core';
 import { provideServerRendering } from '@angular/platform-server';
-import { provideHypDriv } from '@hypdriv/analog/angular';
+import { provideHypDriv } from '@hypdriv/analog/angular/server';
 import { appConfig } from './app.config';
 
 export const config = mergeApplicationConfig(appConfig, {
@@ -54,13 +54,15 @@ export const config = mergeApplicationConfig(appConfig, {
 });
 ```
 
-`provideHypDriv()` (server config only) provides Angular's `CSP_NONCE` as the request's nonce, so Angular stamps it on the styles it renders, and `HYP_CONTEXT` for `injectHyp()`. Prerendered pages carry hashes instead; outside Hypdriv's pipeline (`vite dev`) both are inert.
+`provideHypDriv()` (server config only; `@hypdriv/analog/angular/server` imports the Hypdriv runtime, so keep it out of browser code) provides Angular's `CSP_NONCE` as the request's nonce, so Angular stamps it on the styles it renders, and `HYP_CONTEXT` for `injectHyp()`. Prerendered pages carry hashes instead; outside Hypdriv's pipeline (`vite dev`) both are inert.
 
 ```ts
-import { injectHyp, injectNonce } from '@hypdriv/analog/angular';
+import { injectHyp } from '@hypdriv/analog/angular'; // browser-safe: no runtime code
 
-const hyp = injectHyp(); // request id, runner, route, country, locale, CSP mode, flags — or null
+const hyp = injectHyp(); // on the server: request id, runner, route, country, locale, CSP mode, flags; else null
 ```
+
+`injectHyp()` is `null` in the browser: hand what a page shows over with Angular's `TransferState` (see `examples/analog`). `injectNonce()` (from `@hypdriv/analog/angular/server`) returns the request's nonce for code that writes its own `<script nonce>` while rendering.
 
 API routes (`src/server/routes`) read the context from `@hypdriv/analog/server` (`hyp`, `requireHyp`, `nonce`, `flag`, `geo`, `defer`, `jobHandler`).
 

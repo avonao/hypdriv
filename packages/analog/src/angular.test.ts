@@ -1,5 +1,6 @@
 import { REQUEST } from '@analogjs/router/tokens';
 import {
+  APP_BOOTSTRAP_LISTENER,
   CSP_NONCE,
   createEnvironmentInjector,
   type EnvironmentInjector,
@@ -9,7 +10,8 @@ import {
 import { createContext, HEADER, loadConfig, runWithContext } from '@hypdriv/core';
 import { ensureContextStore } from '@hypdriv/runtime';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { HYP_CONTEXT, injectHyp, injectNonce, provideHypDriv } from './angular';
+import { HYP_CONTEXT, injectHyp } from './angular';
+import { injectNonce, provideHypDriv } from './angular-server';
 
 beforeAll(async () => {
   await ensureContextStore();
@@ -45,6 +47,37 @@ describe('provideHypDriv', () => {
     // No pipeline context in this async flow (zone.js apps can lose it).
     expect(runInInjectionContext(injector, () => injectNonce())).toBe('nonce-from-header');
     expect(injector.get(CSP_NONCE)).toBe('nonce-from-header');
+  });
+
+  describe('the ngCspNonce attribute on the root element', () => {
+    type Listener = (root: {
+      location: { nativeElement: { setAttribute(name: string, value: string): void } };
+    }) => void;
+    const rootWith = () => {
+      const attributes: Record<string, string> = {};
+      return {
+        attributes,
+        root: {
+          location: { nativeElement: { setAttribute: (n: string, v: string) => (attributes[n] = v) } },
+        },
+      };
+    };
+
+    it('carries the request’s nonce, for the styles the browser side of Angular adds later', () => {
+      const injector = applicationInjector();
+      const { attributes, root } = rootWith();
+      runWithContext(pipeline('root-nonce'), () => {
+        for (const listener of injector.get(APP_BOOTSTRAP_LISTENER) as Listener[]) listener(root);
+      });
+      expect(attributes).toEqual({ ngCspNonce: 'root-nonce' });
+    });
+
+    it('is not written without a nonce (prerender, vite dev)', () => {
+      const injector = applicationInjector();
+      const { attributes, root } = rootWith();
+      for (const listener of injector.get(APP_BOOTSTRAP_LISTENER) as Listener[]) listener(root);
+      expect(attributes).toEqual({});
+    });
   });
 
   it('prefers the pipeline context over the header', () => {

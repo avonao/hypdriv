@@ -15,7 +15,8 @@
  * ```
  *
  * Server code reads the request context from `@hypdriv/analog/server`; the Angular server config adds
- * `provideHypDriv()` from `@hypdriv/analog/angular`.
+ * `provideHypDriv()` from `@hypdriv/analog/angular/server`; components read the request with `injectHyp()` from
+ * `@hypdriv/analog/angular`.
  */
 export {
   type AnalogOptionsLike,

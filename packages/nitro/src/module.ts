@@ -23,6 +23,7 @@ import {
   type FinalizeNitroInput,
   finalizeNitroManifest,
   type PrerenderedRoute,
+  removeViteMetadata,
 } from './build/finalize';
 import {
   bundledModules,
@@ -68,6 +69,9 @@ export interface NitroLike {
     noExternals?: boolean | Array<string | RegExp>;
     builtinModules?: string[];
     builder?: string;
+    routeRules?: Record<string, unknown>;
+    /** consola's level (Nitro 2 and 3). */
+    logLevel?: number;
     [key: string]: unknown;
   };
   hooks: { hook(name: string, listener: (...args: never[]) => unknown): unknown };
@@ -134,6 +138,13 @@ export interface HypdrivNitroOptions {
   };
   /** Public path prefixes of immutable build assets, answered without the pipeline (default `['/assets/']`). */
   assetPrefixes?: string[];
+  /**
+   * Serve the files under `assetPrefixes` with `cache-control: public, max-age=31536000, immutable`, as a Nitro route
+   * rule (Nitro writes it into `_headers` / the Vercel Build Output too). A prefix that already has a
+   * `cache-control` rule keeps it. Default: on when `assetPrefixes` is given (the prefixes are then known to hold
+   * content-hashed files), off for the `/assets/` guess; with plain Nitro use `publicAssets` + `maxAge`.
+   */
+  immutableAssets?: boolean;
   /** The framework that builds the app on top of Nitro (default: plain Nitro). */
   framework?: {
     name?: FrameworkName;
@@ -158,14 +169,20 @@ export interface HypdrivNitroOptions {
   }) => ViteManifest | null | Promise<ViteManifest | null>;
 }
 
-function toHypLogger(logger: NitroLike['logger']): Logger {
+/**
+ * Hypdriv's logger on Nitro's. Nitro's consola levels: 0 prints errors only, 1 warnings, 3 info. A host that builds
+ * Nitro quietly (Analog uses level 0) must not hide Hypdriv's build warnings, so those go to the console then.
+ */
+function toHypLogger(nitro: NitroLike): Logger {
+  const { logger } = nitro;
+  const level = typeof nitro.options.logLevel === 'number' ? nitro.options.logLevel : 3;
   const fmt = (message: string, fields?: Record<string, unknown>) =>
     fields && Object.keys(fields).length ? `${message} ${JSON.stringify(fields)}` : message;
   const out: Logger = {
     level: 'info',
     debug: (m, f) => logger.debug(fmt(m, f)),
     info: (m, f) => logger.info(fmt(m, f)),
-    warn: (m, f) => logger.warn(fmt(m, f)),
+    warn: (m, f) => (level < 1 ? console.warn(fmt(m, f)) : logger.warn(fmt(m, f))),
     error: (m, f) => logger.error(fmt(m, f)),
     child: () => out,
   };
@@ -192,13 +209,37 @@ function viteVersion(rootDir: string): string | undefined {
   return packageVersion(rootDir, 'vite');
 }
 
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+
+/**
+ * Route rules that cache the content-hashed build assets for a year. Rules are relative to Nitro's `baseURL`; a prefix
+ * that already carries a `cache-control` rule is left to the application.
+ */
+function immutableAssetRules(nitro: NitroLike, prefixes: string[]): void {
+  const base = (nitro.options.baseURL || '/').replace(/\/+$/, '');
+  nitro.options.routeRules ||= {};
+  const rules = nitro.options.routeRules as Record<string, { headers?: Record<string, string> }>;
+  for (const prefix of prefixes) {
+    const dir = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    const relative = base && dir.startsWith(`${base}/`) ? dir.slice(base.length) : dir;
+    const glob = `${relative}**`;
+    const existing = rules[glob];
+    if (
+      existing?.headers &&
+      Object.keys(existing.headers).some((name) => name.toLowerCase() === 'cache-control')
+    )
+      continue;
+    rules[glob] = { ...existing, headers: { ...existing?.headers, 'cache-control': IMMUTABLE } };
+  }
+}
+
 async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promise<void> {
   const major = nitroMajor(nitro);
   const preset = nitro.options.preset;
   const dev = !!nitro.options.dev || isDevPreset(preset);
   const prerenderer = isPrerenderPreset(preset);
   const rootDir = options.root ?? nitro.options.rootDir;
-  const log = toHypLogger(nitro.logger);
+  const log = toHypLogger(nitro);
   const loaded: LoadedHypConfig = await loadHypConfig(rootDir, options.config);
   const assetPrefixes = options.assetPrefixes ?? ['/assets/'];
   const frameworkName: FrameworkName = options.framework?.name ?? 'nitro';
@@ -210,6 +251,8 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     result: FinalizeResult | null;
     finalizedWith: number;
     pending: Promise<FinalizeResult> | null;
+    /** The Vite client manifest, read once: the public output's copy is removed after the first build step. */
+    clientManifest?: ViteManifest | null;
   } = { prerendered: [], result: null, finalizedWith: -1, pending: null };
 
   const framework = (): ManifestFramework => {
@@ -266,9 +309,11 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
     if (state.pending) return state.pending;
     const pending = (async () => {
       const publicDir = nitro.options.output.publicDir;
-      const clientManifest = options.clientManifest
-        ? await options.clientManifest({ publicDir, rootDir })
-        : readViteManifest(publicDir);
+      if (state.clientManifest === undefined)
+        state.clientManifest = options.clientManifest
+          ? await options.clientManifest({ publicDir, rootDir })
+          : readViteManifest(publicDir);
+      const clientManifest = state.clientManifest;
       const result = await finalizeNitroManifest({
         rootDir,
         config: loaded.resolved,
@@ -355,6 +400,9 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
   // The prerenderer is a second Nitro instance that renders the routes on Node: runtime and virtual modules only.
   if (prerenderer) return;
 
+  if (!dev && (options.immutableAssets ?? options.assetPrefixes !== undefined))
+    immutableAssetRules(nitro, assetPrefixes);
+
   if (exportsModule && !supportsWorkerEntry(preset) && !dev)
     log.warn(`hypdriv: cloudflare.exports only applies to the cloudflare-module preset (building ${preset})`);
 
@@ -381,13 +429,16 @@ async function setupNitro(nitro: NitroLike, options: HypdrivNitroOptions): Promi
   });
 
   // Finalise right before the server bundle (the manifest module also does it on first load).
+  // The Vite client manifest has been read by then: it must not end up among the public assets.
   nitro.hooks.hook(major === 3 ? 'vite:compile:before' : 'rollup:before', async () => {
     await finalize();
+    removeViteMetadata(nitro.options.output.publicDir);
   });
 
   nitro.hooks.hook('compiled', async () => {
     // A manifest finalised before the prerenderer finished (an unusual hook order) is rebuilt.
     const result = await finalize(state.result !== null && state.finalizedWith !== state.prerendered.length);
+    removeViteMetadata(nitro.options.output.publicDir);
     if (isStaticPreset(preset) && target() === 'node') return;
     const out = completeNitroOutput({
       target: target(),

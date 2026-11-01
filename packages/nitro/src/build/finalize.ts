@@ -1,4 +1,4 @@
-import { type Dirent, readdirSync, readFileSync } from 'node:fs';
+import { type Dirent, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RouteAssetSources } from '@hypdriv/build';
 import type { HypManifest, Logger, ManifestFramework, ResolvedConfig } from '@hypdriv/core';
@@ -147,6 +147,18 @@ export async function finalizeNitroManifest(input: FinalizeNitroInput): Promise<
     internalPages: [...NITRO_INTERNAL_PAGES, ...(input.internalPages ?? [])],
     ...(input.log ? { log: input.log } : {}),
   });
+}
+
+/**
+ * Removes the Vite client build's metadata (`<publicDir>/.vite/`) from the public output. The build reads the manifest
+ * for the per-page assets; it must not be served (Nitro lists dot files as public assets, Cloudflare uploads them).
+ * Returns whether anything was removed.
+ */
+export function removeViteMetadata(publicDir: string): boolean {
+  const dir = join(publicDir, '.vite');
+  if (!existsSync(dir)) return false;
+  rmSync(dir, { recursive: true, force: true });
+  return true;
 }
 
 /** Throws when the manifest checks found problems that must fail the build. */

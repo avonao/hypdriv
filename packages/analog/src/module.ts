@@ -1,4 +1,5 @@
 import { join, resolve } from 'node:path';
+import type { Options as AnalogPlatformOptions } from '@analogjs/platform';
 import { installedVersion } from '@hypdriv/core/node';
 import { type HypdrivNitroOptions, hypdrivNitro, type NitroModuleLike } from '@hypdriv/nitro';
 import { readViteManifest } from '@hypdriv/vite';
@@ -74,18 +75,14 @@ export function hypdrivAnalog(options: HypdrivAnalogOptions = {}): NitroModuleLi
   };
 }
 
-/** Analog's own options, as far as the Hypdriv integration reads or extends them. */
-export interface AnalogOptionsLike {
-  nitro?: { modules?: unknown[] };
-  sourceRoot?: string;
-  workspaceRoot?: string;
-  additionalPagesDirs?: string[];
-  additionalContentDirs?: string[];
-}
+/** The options of `analog()` (`@analogjs/platform`); Analog reads `sourceRoot` without declaring it. */
+export type AnalogOptionsLike = AnalogPlatformOptions & { sourceRoot?: string };
+
+type NitroModules = NonNullable<NonNullable<AnalogPlatformOptions['nitro']>['modules']>;
 
 /** Analog's options with the Hypdriv module in `nitro.modules`. */
 export type WithHypDriv<T extends AnalogOptionsLike> = T & {
-  nitro: NonNullable<T['nitro']> & { modules: unknown[] };
+  nitro: NonNullable<T['nitro']> & { modules: NitroModules };
 };
 
 /**
@@ -111,7 +108,10 @@ export function withHypDriv<T extends AnalogOptionsLike>(
     ...analog,
     nitro: {
       ...analog.nitro,
-      modules: [hypdrivAnalog({ ...inherited, ...options }), ...(analog.nitro?.modules ?? [])],
+      modules: [
+        hypdrivAnalog({ ...inherited, ...options }) as NitroModules[number],
+        ...(analog.nitro?.modules ?? []),
+      ],
     },
   } as WithHypDriv<T>;
 }

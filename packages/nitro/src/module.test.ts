@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MANIFEST_SENTINEL_VALUE, VIRTUAL_CONFIG, VIRTUAL_MANIFEST } from '@hypdriv/vite';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hypdrivNitro, type NitroLike, nitroMajor, withHypDriv } from './module';
 import { VIRTUAL_CLOUDFLARE_EXPORTS, VIRTUAL_OPTIONS } from './runtime/options';
 
@@ -151,6 +151,53 @@ describe('Nitro 2', () => {
     const code = await virtual(nitro, VIRTUAL_OPTIONS);
     expect(code).toContain('"socketIp":true');
     expect(code).toContain('"target":"node"');
+  });
+});
+
+describe('immutable build assets', () => {
+  const IMMUTABLE = 'public, max-age=31536000, immutable';
+  const rules = (nitro: NitroLike) =>
+    nitro.options.routeRules as Record<string, { headers?: Record<string, string> }>;
+
+  it('caches the files under explicit asset prefixes for a year (Nitro 2 and 3)', async () => {
+    for (const major of [2, 3] as const) {
+      const { nitro } = await setup(fakeNitro({ major }), { assetPrefixes: ['/assets/', '/_analog'] });
+      expect(rules(nitro)['/assets/**']?.headers?.['cache-control']).toBe(IMMUTABLE);
+      expect(rules(nitro)['/_analog/**']?.headers?.['cache-control']).toBe(IMMUTABLE);
+    }
+  });
+
+  it('leaves the default /assets/ guess alone, and keeps what the application set', async () => {
+    const guess = await setup(fakeNitro({ major: 2 }));
+    expect(guess.nitro.options.routeRules).toBeUndefined();
+
+    const fake = fakeNitro({ major: 2 });
+    fake.nitro.options.routeRules = {
+      '/assets/**': { headers: { 'Cache-Control': 'public, max-age=60' }, cors: true },
+      '/static/**': { cors: true },
+    };
+    await setup(fake, { assetPrefixes: ['/assets/', '/static/'] });
+    expect(rules(fake.nitro)['/assets/**']?.headers).toEqual({ 'Cache-Control': 'public, max-age=60' });
+    expect(rules(fake.nitro)['/static/**']).toEqual({ cors: true, headers: { 'cache-control': IMMUTABLE } });
+  });
+
+  it('can be forced on or off, is relative to the base URL, and skips dev and the prerenderer', async () => {
+    const forced = await setup(fakeNitro({ major: 2 }), { immutableAssets: true });
+    expect(rules(forced.nitro)['/assets/**']).toBeDefined();
+    const off = await setup(fakeNitro({ major: 2 }), { assetPrefixes: ['/assets/'], immutableAssets: false });
+    expect(off.nitro.options.routeRules).toBeUndefined();
+
+    const based = fakeNitro({ major: 2 });
+    based.nitro.options.baseURL = '/app/';
+    await setup(based, { assetPrefixes: ['/app/assets/'] });
+    expect(Object.keys(rules(based.nitro))).toEqual(['/assets/**']);
+
+    const dev = await setup(fakeNitro({ major: 2, dev: true }), { assetPrefixes: ['/assets/'] });
+    expect(dev.nitro.options.routeRules).toBeUndefined();
+    const prerender = await setup(fakeNitro({ major: 2, preset: 'nitro-prerender' }), {
+      assetPrefixes: ['/assets/'],
+    });
+    expect(prerender.nitro.options.routeRules).toBeUndefined();
   });
 });
 
@@ -305,6 +352,24 @@ describe('the build', () => {
     expect(built.messages.some((m) => m.startsWith('warn:'))).toBe(false);
   });
 
+  it('keeps the Vite client manifest out of the public output (and still uses it after a rebuild)', async () => {
+    const built = await build('cloudflare-module');
+    // The manifest was read; its public copy is gone before the server bundle lists the public assets.
+    expect(existsSync(join(built.publicDir, '.vite'))).toBe(false);
+    expect(existsSync(join(built.publicDir, 'assets', 'main-1.js'))).toBe(true);
+    await built.fire('prerender:done', {
+      prerenderedRoutes: [{ route: '/', fileName: '/index.html', contentType: 'text/html' }],
+    });
+    await built.fire('compiled');
+    const bundled = readFileSync(join(built.serverFile), 'utf8');
+    expect(bundled).toContain('page:/');
+    const manifest = JSON.parse(readFileSync(join(built.root, '.hypdriv', 'manifest.json'), 'utf8')) as {
+      routes: Array<{ id: string; assets: { js: string[] } }>;
+    };
+    expect(manifest.routes.find((r) => r.id === 'page:/')?.assets.js).toEqual(['/assets/main-1.js']);
+    expect(existsSync(join(built.publicDir, '.vite'))).toBe(false);
+  });
+
   it('Node: completes the output without a static header file', async () => {
     const built = await build('node-server');
     await built.fire('compiled');
@@ -330,6 +395,25 @@ describe('the build', () => {
     expect(fake.messages.some((m) => m.startsWith('warn:') && m.includes('no server file embeds'))).toBe(
       true,
     );
+  });
+
+  it('still shows its warnings when the host builds Nitro quietly (consola level 0)', async () => {
+    const fake = fakeNitro({ major: 2, preset: 'node-server' });
+    fake.nitro.options.logLevel = 0;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await setup(fake, { routes: () => [{ pathname: '/', kind: 'page' }] });
+      write(join(fake.nitro.options.output.publicDir, 'index.html'), html('Home'));
+      write(join(fake.nitro.options.output.serverDir, 'index.mjs'), 'export default 1;');
+      await fake.fire('prerender:done', {
+        prerenderedRoutes: [{ route: '/', fileName: '/index.html', contentType: 'text/html' }],
+      });
+      await fake.fire('compiled');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('no server file embeds'));
+      expect(fake.messages.some((m) => m.startsWith('warn:'))).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('rebuilds a manifest that was finalised before the prerenderer finished', async () => {

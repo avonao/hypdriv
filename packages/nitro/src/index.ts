@@ -26,6 +26,7 @@ export {
   type PageAssets,
   type PrerenderedRoute,
   prerenderedDocuments,
+  removeViteMetadata,
   runtimeManifestFiles,
 } from './build/finalize';
 export {

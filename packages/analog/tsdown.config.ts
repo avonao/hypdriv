@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     server: 'src/server.ts',
     angular: 'src/angular.ts',
+    'angular-server': 'src/angular-server.ts',
   },
   format: ['esm'],
   platform: 'neutral',
