@@ -66,6 +66,10 @@ catalog:
   isbot: ^5.2.2
   "@vercel/react-router": ^1.3.7
   "@vercel/nft": ^1.11.0
+  # SolidStart 2 (Vite 8 + Nitro 3 or @cloudflare/vite-plugin; @hypdriv/solid-start)
+  "@solidjs/start": 2.1.0
+  "@solidjs/router": ^0.16.3
+  solid-js: ^1.9.18
   # Nuxt (Nuxt 4.6 runs on Nitro 2 / h3 1.x)
   nuxt: ^4.6.3
   nitropack: ^2.13.5

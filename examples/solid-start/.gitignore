@@ -1,0 +1,6 @@
+# Build output (Nitro, SolidStart)
+.output/
+.nitro/
+.solid/
+.vercel/
+dist/

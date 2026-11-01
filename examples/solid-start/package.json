@@ -1,0 +1,37 @@
+{
+  "name": "@hypdriv/example-solid-start",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare vite build",
+    "build:vercel": "HYPDRIV_TARGET=vercel vite build",
+    "build:node": "HYPDRIV_TARGET=node vite build",
+    "preview": "wrangler dev -c dist/server/wrangler.json",
+    "start": "node .output/server/index.mjs",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare vite build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/solid-start": "workspace:*",
+    "@solidjs/router": "catalog:",
+    "@solidjs/start": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@hypdriv/vite": "workspace:*",
+    "@types/node": "catalog:",
+    "nitro": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  }
+}
