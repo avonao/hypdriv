@@ -70,6 +70,7 @@ export {
   type VitalsHandlerOptions,
   vitalsHandler,
 } from './vitals/handler';
+export { type HotPath, type HotPathsSqlOptions, hotPaths, hotPathsSql, sanitizeHotPath } from './vitals/hot';
 export { type MemoryVitals, type MemoryVitalsOptions, memoryVitals } from './vitals/memory';
 export {
   AnalyticsEngineQueryError,

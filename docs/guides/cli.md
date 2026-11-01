@@ -12,7 +12,7 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv budget [--ci] [--snapshot] [--diff]` | Evaluates budgets from the manifest and the worker report, stores snapshots under `.hypdriv/snapshots`, prints Markdown diffs for PR comments. |
 | `hypdriv csp hashes [--route <path>]` / `hypdriv csp suggest [--reports <file>]` / `hypdriv csp print` | Shows static route hashes, proposes allow-list additions from collected violation reports, prints the effective policy. |
 | `hypdriv css build|check|watch` | Purser through the bridge with the config's options. |
-| `hypdriv warm --url <base> [--concurrency 4] [--anonymous] [--header …]` | Fetches the configured warm routes (or all static routes), signed with the audit token. |
+| `hypdriv warm --url <base> [--concurrency 4] [--anonymous] [--header …] [--hot [--days 7] [--limit 25]]` | Fetches the configured warm routes (or all static routes), signed with the audit token. `--hot` adds the busiest cacheable pages learned from Web Vitals in Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`); `--hot --sql` prints the query. |
 | `hypdriv purge --url <base> (--tag <tag> \| --path </path> \| --all) [--header …]` | Purges the edge cache of a running deployment through its signed `POST /_hypdriv/purge` endpoint: every cache tier, by tag, path or whole build. See [Purging a deployment](#purging-a-deployment). |
 | `hypdriv bench --url <base> [--paths …] [--n 20] [--anonymous] [--header …]` | TTFB p50/p95 and cache status distribution per path, signed with the audit token. |
 | `hypdriv deps [--update safe|major] [--only <name>]` | Dependency freshness across the workspace (npm registry): patch/minor/major classification, optional updates. |

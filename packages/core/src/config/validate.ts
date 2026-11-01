@@ -448,6 +448,21 @@ const rootCheck = checkObjectShape({
       onDeploy: checkBoolean,
       cron: checkString,
       concurrency: checkNumber(1, 64),
+      hot: boolOr(
+        checkObjectShape({
+          limit: checkNumber(1, 200),
+          days: checkNumber(1, 90),
+          minViews: checkNumber(1, 1_000_000),
+          dataset: (v, p, o) => {
+            if (v === undefined) return;
+            if (typeof v !== 'string' || !/^[A-Za-z0-9_]+$/.test(v))
+              error(o, p, 'must be an Analytics Engine dataset name (letters, digits and underscores)');
+          },
+          datasetEnv: checkString,
+          accountIdEnv: checkString,
+          apiTokenEnv: checkString,
+        }),
+      ),
     }),
   }),
   performance: checkObjectShape({

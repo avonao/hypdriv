@@ -374,8 +374,31 @@ export interface CacheConfig {
         /** Add `x-hypdriv-cache` debug header (default true). */
         debugHeader?: boolean;
       };
-  /** Routes warmed by `hypdriv warm` and by the scheduled handler. */
-  warm?: { routes?: string[]; onDeploy?: boolean; cron?: string; concurrency?: number };
+  /**
+   * Routes warmed by `hypdriv warm` and by the scheduled handler. `hot` adds the busiest cacheable pages, learned
+   * from the Web Vitals in Workers Analytics Engine (`observe.vitals.sink: 'analytics-engine'`).
+   */
+  warm?: {
+    routes?: string[];
+    onDeploy?: boolean;
+    cron?: string;
+    concurrency?: number;
+    hot?:
+      | boolean
+      | {
+          /** Pages to add (default 25). */
+          limit?: number;
+          /** Look-back window in days (default 7). */
+          days?: number;
+          /** Ignore pages with fewer measured views (default 20): one forged beacon never earns a warm-up. */
+          minViews?: number;
+          /** Analytics Engine dataset (default: `HYPDRIV_ANALYTICS_DATASET`, else `observe.vitals.dashboard.dataset`). */
+          dataset?: string;
+          datasetEnv?: string;
+          accountIdEnv?: string;
+          apiTokenEnv?: string;
+        };
+  };
 }
 
 // ---------------------------------------------------------------------------

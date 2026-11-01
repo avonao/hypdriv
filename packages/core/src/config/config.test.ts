@@ -163,6 +163,41 @@ describe('experiments in the cache policies', () => {
   });
 });
 
+describe('cache.warm.hot', () => {
+  it('is off unless asked for, and has defaults when on', () => {
+    expect(resolveConfig({}).cache.warm.hot).toBeNull();
+    expect(resolveConfig({ cache: { warm: { hot: false } } }).cache.warm.hot).toBeNull();
+    expect(resolveConfig({ cache: { warm: { hot: true } } }).cache.warm.hot).toEqual({
+      limit: 25,
+      days: 7,
+      minViews: 20,
+      dataset: null,
+      datasetEnv: 'HYPDRIV_ANALYTICS_DATASET',
+      accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID',
+      apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN',
+    });
+    expect(
+      resolveConfig({ cache: { warm: { hot: { limit: 5, dataset: 'shop_vitals' } } } }).cache.warm.hot,
+    ).toMatchObject({ limit: 5, days: 7, dataset: 'shop_vitals' });
+  });
+
+  it('validates the options', () => {
+    expect(validateConfig({ cache: { warm: { hot: true } } }).filter((x) => x.severity === 'error')).toEqual(
+      [],
+    );
+    const paths = validateConfig({
+      cache: { warm: { hot: { limit: 0, days: 400, minViews: 0, dataset: 'not a dataset', datasetEnv: 3 } } },
+    })
+      .filter((x) => x.severity === 'error')
+      .map((x) => x.path);
+    for (const key of ['limit', 'days', 'minViews', 'dataset', 'datasetEnv'])
+      expect(paths).toContain(`cache.warm.hot.${key}`);
+    expect(validateConfig({ cache: { warm: { hot: 'yes' } } }).some((x) => x.severity === 'error')).toBe(
+      true,
+    );
+  });
+});
+
 describe('validateConfig', () => {
   it('validates experiments', () => {
     const errorsOf = (definitions: Record<string, unknown>) =>

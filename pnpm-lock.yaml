@@ -1138,6 +1138,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@hypdriv/cache':
+        specifier: workspace:*
+        version: link:../cache
       '@hypdriv/core':
         specifier: workspace:*
         version: link:../core

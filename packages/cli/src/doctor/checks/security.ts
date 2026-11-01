@@ -161,6 +161,50 @@ export const securityChecks: Check[] = [
     },
   },
   {
+    id: 'security.warm-hot',
+    title: 'Hot page warming',
+    category: 'security',
+    severity: 'warn',
+    run(ctx) {
+      const warm = ctx.config.resolved.cache.warm;
+      const hot = warm.hot;
+      if (!hot) return skip('cache.warm.hot is off.');
+      if (ctx.project.platform !== 'cloudflare')
+        return info(
+          `Hot page warming reads Web Vitals from Analytics Engine, a Cloudflare feature; on ${ctx.project.platform ?? 'this platform'} it has no data source (hypdriv warm --hot needs it too).`,
+        );
+      if (!ctx.config.resolved.cache.edge)
+        return warn('cache.warm.hot is on but the edge cache is off; there is nothing to warm.');
+      const problems: string[] = [];
+      const vitals = ctx.config.resolved.observe.vitals;
+      if (!vitals || vitals.sink !== 'analytics-engine')
+        problems.push(
+          "observe.vitals.sink is not 'analytics-engine', so no page views are recorded to learn from",
+        );
+      const missing = [
+        [hot.accountIdEnv, secretAvailable(ctx, hot.accountIdEnv)],
+        [hot.apiTokenEnv, secretAvailable(ctx, hot.apiTokenEnv)],
+        ...(hot.dataset || vitals?.dashboard?.dataset
+          ? []
+          : [[hot.datasetEnv, secretAvailable(ctx, hot.datasetEnv)]]),
+      ]
+        .filter(([, where]) => !where)
+        .map(([name]) => name);
+      if (missing.length)
+        problems.push(
+          `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not set (${setHint(ctx, missing[0]!)}; the token needs Account Analytics: Read)`,
+        );
+      if (!warm.cron)
+        problems.push(
+          'cache.warm.cron is not set, so only `hypdriv warm --hot` warms hot pages; the Worker never does',
+        );
+      if (problems.length) return warn(`${problems.join('; ')}.`);
+      return pass(
+        `The ${warm.cron} cron warms the ${hot.limit} busiest cacheable pages of the last ${hot.days} day(s) (at least ${hot.minViews} views each) next to cache.warm.routes.`,
+      );
+    },
+  },
+  {
     id: 'security.secret-strength',
     title: 'Secret length in .dev.vars',
     category: 'security',

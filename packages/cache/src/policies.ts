@@ -1,5 +1,6 @@
 import {
   cleanRoutePathname,
+  createRouteMatcher,
   type HypContext,
   type HypManifest,
   type HypRoute,
@@ -123,6 +124,23 @@ function inferredDurations(
     default:
       return null;
   }
+}
+
+/**
+ * A test for "would a visitor's GET of this path be served from the edge cache?": the path matches an explicit
+ * policy or an inferred one (a static or ISR route). Warming uses it to skip pages the cache would not keep.
+ */
+export function createCacheableTest(
+  config: ResolvedConfig,
+  manifest: HypManifest,
+): (pathname: string) => boolean {
+  const policies = resolvePolicies(config, manifest);
+  if (!policies.length) return () => false;
+  const matcher = createRouteMatcher(manifest);
+  return (pathname) => {
+    const url = new URL(pathname, 'https://hypdriv.internal');
+    return matchPolicyFor(policies, url, matcher.match(url.pathname), manifest.basePath) !== null;
+  };
 }
 
 /** Explicit policies (config order) followed by inferred ones (specificity order). */

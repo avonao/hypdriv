@@ -8,6 +8,7 @@ export {
 } from './keys';
 export {
   cacheControlFor,
+  createCacheableTest,
   effectiveTags,
   INFERRED_POLICY_PREFIX,
   inferPolicies,

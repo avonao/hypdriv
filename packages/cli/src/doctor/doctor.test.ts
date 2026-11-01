@@ -652,3 +652,58 @@ describe('experiment checks', () => {
     expect(warned?.message).toContain('one dataset');
   });
 });
+
+describe('hot warming checks', () => {
+  const ids = ['--only', 'security.warm-hot'];
+  const project = (config: string, files: Record<string, string> = {}) =>
+    tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': WRANGLER_JSONC,
+      'hypdriv.config.ts': `export default ${config};\n`,
+      ...files,
+    });
+  const env = {
+    HYPDRIV_ANALYTICS_ACCOUNT_ID: 'acc',
+    HYPDRIV_ANALYTICS_API_TOKEN: 'tok',
+    HYPDRIV_ANALYTICS_DATASET: 'shop_vitals',
+  };
+
+  it('stays out of the way while hot warming is off', async () => {
+    const { byId } = await doctor(project('{}').dir, ids);
+    expect(byId['security.warm-hot']?.status).toBe('skip');
+  });
+
+  it('lists everything a hot warm-up still needs', async () => {
+    const p = project('{ cache: { warm: { hot: true } } }');
+    const check = (await doctor(p.dir, ids)).byId['security.warm-hot'];
+    expect(check?.status).toBe('warn');
+    expect(check?.message).toContain("observe.vitals.sink is not 'analytics-engine'");
+    expect(check?.message).toContain(
+      'HYPDRIV_ANALYTICS_ACCOUNT_ID, HYPDRIV_ANALYTICS_API_TOKEN, HYPDRIV_ANALYTICS_DATASET are not set',
+    );
+    expect(check?.message).toContain('cache.warm.cron is not set');
+  });
+
+  it('passes once the sink, the secrets and the schedule are in place', async () => {
+    const p = project(
+      "{ cache: { warm: { cron: '*/30 * * * *', hot: { limit: 10, days: 3 } } }, observe: { vitals: { sink: 'analytics-engine' } } }",
+    );
+    const check = (await doctor(p.dir, ids, env)).byId['security.warm-hot'];
+    expect(check?.status).toBe('pass');
+    expect(check?.message).toContain('10 busiest cacheable pages');
+    expect(check?.message).toContain('3 day(s)');
+  });
+
+  it('warns when the edge cache is off and explains Vercel', async () => {
+    const off = project('{ cache: { edge: false, warm: { hot: true } } }');
+    expect((await doctor(off.dir, ids)).byId['security.warm-hot']?.message).toContain('edge cache is off');
+    const vercel = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'vercel.json': '{}',
+      'hypdriv.config.ts': 'export default { cache: { warm: { hot: true } } };\n',
+    });
+    const check = (await doctor(vercel.dir, ids)).byId['security.warm-hot'];
+    expect(check).toMatchObject({ status: 'pass', informational: true });
+    expect(check?.message).toContain('Cloudflare feature');
+  });
+});

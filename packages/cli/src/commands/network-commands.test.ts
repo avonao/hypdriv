@@ -58,6 +58,103 @@ describe('warm', () => {
   });
 });
 
+describe('warm --hot', () => {
+  const wrangler =
+    '{ "analytics_engine_datasets": [{ "binding": "HYPDRIV_ANALYTICS", "dataset": "shop_vitals" }] }';
+  const rows = {
+    data: [
+      { pathname: '/blog/hello-world', views: 900 },
+      { pathname: '/dashboard', views: 800 },
+      { pathname: '//evil.test/x', views: 700 },
+      { pathname: '/pricing', views: 400 },
+      { pathname: '/blog/second', views: 3 },
+    ],
+  };
+  const handler = (url: string) =>
+    url.startsWith('https://api.cloudflare.com/')
+      ? response(JSON.stringify(rows))
+      : response('<html></html>', { headers: { 'x-hypdriv-cache': 'MISS' } });
+  const env = { CF_ACCOUNT_ID: 'acc123', CF_API_TOKEN: 'tok' };
+
+  async function project(config = "export default { cache: { warm: { routes: ['/'] } } };\n") {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    await writeManifest(p.dir, await fixtureManifest());
+    return p;
+  }
+
+  it('adds the busiest pages the edge cache would keep to the configured routes', async () => {
+    const p = await project();
+    const { fetch, calls } = fakeFetch(handler);
+    const io = memoryIO(p.dir, { fetch, env });
+    const code = await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], io);
+    expect(code).toBe(0);
+    const out = JSON.parse(io.out);
+    expect(out.hot).toEqual([
+      { path: '/blog/hello-world', views: 900 },
+      { path: '/pricing', views: 400 },
+    ]);
+    expect(out.results.map((r: { path: string }) => r.path)).toEqual(['/', '/blog/hello-world', '/pricing']);
+    expect(calls[0]!.url).toBe('https://api.cloudflare.com/client/v4/accounts/acc123/analytics_engine/sql');
+    expect(calls[0]!.body).toContain('FROM shop_vitals');
+    expect(calls[0]!.body).toContain("INTERVAL '7' DAY");
+  });
+
+  it('takes the window, limit and threshold from the flags and from cache.warm.hot', async () => {
+    const p = await project(
+      'export default { cache: { warm: { hot: { limit: 1, days: 3, minViews: 500 } } } };\n',
+    );
+    const { fetch, calls } = fakeFetch(handler);
+    const io = memoryIO(p.dir, { fetch, env });
+    await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--json'], io);
+    expect(calls[0]!.body).toContain("INTERVAL '3' DAY");
+    expect(JSON.parse(io.out).hot).toEqual([{ path: '/blog/hello-world', views: 900 }]);
+    const flags = memoryIO(p.dir, { fetch, env });
+    await runCommand(
+      'warm',
+      ['--url', 'https://shop.test', '--hot', '--min-views', '1', '--limit', '3', '--days', '30', '--json'],
+      flags,
+    );
+    expect(JSON.parse(flags.out).hot.map((h: { path: string }) => h.path)).toEqual([
+      '/blog/hello-world',
+      '/pricing',
+      '/blog/second',
+    ]);
+    expect(calls.filter((c) => c.url.startsWith('https://api.cloudflare.com/')).at(-1)!.body).toContain(
+      "INTERVAL '30' DAY",
+    );
+  });
+
+  it('prints the SQL without credentials and degrades clearly without them', async () => {
+    const p = await project();
+    const sql = memoryIO(p.dir);
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot', '--sql'], sql)).toBe(0);
+    expect(sql.out).toContain("blob1 = 'TTFB'");
+    const none = memoryIO(p.dir);
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot'], none)).toBe(1);
+    expect(none.err).toContain('CF_ACCOUNT_ID and CF_API_TOKEN');
+    const bare = tempProject({ 'package.json': '{"name":"x"}', 'wrangler.jsonc': '{}' });
+    const noDataset = memoryIO(bare.dir);
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot'], noDataset)).toBe(1);
+    expect(noDataset.err).toContain('No Analytics Engine dataset');
+  });
+
+  it('says so when nothing is hot yet and nothing is configured', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': 'export default {};\n',
+      'wrangler.jsonc': wrangler,
+    });
+    const { fetch } = fakeFetch(() => response(JSON.stringify({ data: [] })));
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('warm', ['--url', 'https://shop.test', '--hot'], io)).toBe(0);
+    expect(io.out).toContain('No hot pages yet');
+  });
+});
+
 describe('purge', () => {
   const secret = 'p'.repeat(40);
   const project = () =>

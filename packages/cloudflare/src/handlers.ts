@@ -1,4 +1,5 @@
 import { type HypDrivEnv, type Logger, queueConsumerFor, type ResolvedConfig, readEnv } from '@hypdriv/core';
+import { hotPaths, hotPathsSql, queryAnalyticsEngine } from '@hypdriv/observe';
 import { signing } from '@hypdriv/security';
 
 export type Invoke = (request: Request) => Promise<Response>;
@@ -9,6 +10,10 @@ export interface DispatchContext {
   log: Logger;
   invoke: Invoke;
   waitUntil(promise: Promise<unknown>): void;
+  /** `fetch` for outbound API calls (the Analytics Engine query for hot pages); defaults to the global. */
+  fetch?: typeof fetch;
+  /** Whether the edge cache would keep a GET of this pathname; hot pages the cache would not keep are not warmed. */
+  cacheable?: (pathname: string) => boolean;
 }
 
 function originFor(config: ResolvedConfig): string {
@@ -64,6 +69,48 @@ export interface ScheduledEventLike {
 /** Dispatches a cron trigger to the configured job routes (and warms routes when `cache.warm.cron` matches). */
 const normalizeCron = (value: string) => value.trim().replace(/\s+/g, ' ');
 
+/**
+ * The busiest cacheable pages, learned from the Web Vitals in Analytics Engine (`cache.warm.hot`). Pathnames come
+ * from a public beacon, so they are sanitised, need a minimum view count and must be pages the edge cache keeps.
+ * A missing credential or a failing query only costs the hot pages: configured routes are still warmed.
+ */
+export async function hotWarmRoutes(ctx: DispatchContext): Promise<string[]> {
+  const hot = ctx.config.cache.warm.hot;
+  if (!hot) return [];
+  const accountId = readEnv(ctx.env, hot.accountIdEnv);
+  const apiToken = readEnv(ctx.env, hot.apiTokenEnv);
+  const dataset =
+    hot.dataset ?? readEnv(ctx.env, hot.datasetEnv) ?? ctx.config.observe.vitals?.dashboard?.dataset ?? null;
+  const missing = [
+    ...(accountId ? [] : [hot.accountIdEnv]),
+    ...(apiToken ? [] : [hot.apiTokenEnv]),
+    ...(dataset ? [] : [`${hot.datasetEnv} (or cache.warm.hot.dataset)`]),
+  ];
+  if (!accountId || !apiToken || !dataset) {
+    ctx.log.warn('hot warming skipped: Analytics Engine settings are missing', { missing });
+    return [];
+  }
+  try {
+    const rows = await queryAnalyticsEngine({
+      accountId,
+      apiToken,
+      sql: hotPathsSql(dataset, { days: hot.days, limit: hot.limit }),
+      timeoutMs: 15_000,
+      ...(ctx.fetch ? { fetch: ctx.fetch } : {}),
+    });
+    const paths = hotPaths(rows, {
+      limit: hot.limit,
+      minViews: hot.minViews,
+      ...(ctx.cacheable ? { accept: ctx.cacheable } : {}),
+    }).map((p) => p.path);
+    ctx.log.info('hot warm routes', { count: paths.length, days: hot.days });
+    return paths;
+  } catch (err) {
+    ctx.log.warn('hot warming skipped: the Analytics Engine query failed', { error: (err as Error).message });
+    return [];
+  }
+}
+
 export async function dispatchScheduled(
   event: ScheduledEventLike,
   ctx: DispatchContext,
@@ -91,25 +138,38 @@ export async function dispatchScheduled(
   }
   const warm = ctx.config.cache.warm;
   const warmMatches = !!warm.cron && normalizeCron(warm.cron) === cron;
-  if (warmMatches && warm.routes.length) {
+  if (warmMatches) {
     const origin = originFor(ctx.config);
-    let index = 0;
-    const workers = Array.from({ length: Math.min(warm.concurrency, warm.routes.length) }, async () => {
-      while (index < warm.routes.length) {
-        const route = warm.routes[index++]!;
-        try {
-          const res = await ctx.invoke(
-            new Request(new URL(route, origin), { headers: { 'x-hypdriv-warm': '1', accept: 'text/html' } }),
-          );
-          // Released, not awaited: a cancel on a teed body only settles once every branch is consumed.
-          void res.body?.cancel().catch(() => undefined);
-        } catch (err) {
-          ctx.log.warn('warm failed', { route, error: (err as Error).message });
-        }
+    const own = new URL(origin).origin;
+    const routes = [...new Set([...warm.routes, ...(await hotWarmRoutes(ctx))])].filter((route) => {
+      // Configured routes are trusted; hot pages are sanitised already. Either way a request never leaves the site.
+      try {
+        return new URL(route, origin).origin === own;
+      } catch {
+        return false;
       }
     });
-    await Promise.all(workers);
-    ran.push('warm');
+    if (routes.length) {
+      let index = 0;
+      const workers = Array.from({ length: Math.min(warm.concurrency, routes.length) }, async () => {
+        while (index < routes.length) {
+          const route = routes[index++]!;
+          try {
+            const res = await ctx.invoke(
+              new Request(new URL(route, origin), {
+                headers: { 'x-hypdriv-warm': '1', accept: 'text/html' },
+              }),
+            );
+            // Released, not awaited: a cancel on a teed body only settles once every branch is consumed.
+            void res.body?.cancel().catch(() => undefined);
+          } catch (err) {
+            ctx.log.warn('warm failed', { route, error: (err as Error).message });
+          }
+        }
+      });
+      await Promise.all(workers);
+      ran.push('warm');
+    }
   }
   if (!jobs.length && !warmMatches) ctx.log.warn('cron trigger has no configured job', { cron });
   if (failed.length) throw new Error(`hypdriv: ${failed.length} cron job(s) failed: ${failed.join(', ')}`);

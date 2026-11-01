@@ -1,4 +1,4 @@
-import { createKvTagIndex, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
+import { createCacheableTest, createKvTagIndex, registerEdgePurger, UPSTREAM_KEY } from '@hypdriv/cache';
 import {
   assertManifest,
   cacheVersion,
@@ -349,17 +349,25 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
     runtime: Runtime,
     env: HypDrivEnv,
     exec: ExecutionContextLike,
-  ): DispatchContext => ({
-    config: runtime.platform.config,
-    env,
-    log: runtime.platform.log,
-    waitUntil: (p) => exec.waitUntil(p),
-    invoke: async (request) => {
-      const self = env.WORKER_SELF_REFERENCE as { fetch(request: Request): Promise<Response> } | undefined;
-      if (self && typeof self.fetch === 'function') return self.fetch(request);
-      return fetchHandler(request, env, exec);
-    },
-  });
+  ): DispatchContext => {
+    // Built on first use: only warming needs it, and queue or email events never do.
+    let cacheable: ((pathname: string) => boolean) | undefined;
+    return {
+      config: runtime.platform.config,
+      env,
+      log: runtime.platform.log,
+      waitUntil: (p) => exec.waitUntil(p),
+      cacheable: (pathname) => {
+        cacheable ??= createCacheableTest(runtime.platform.config, runtime.platform.manifest);
+        return cacheable(pathname);
+      },
+      invoke: async (request) => {
+        const self = env.WORKER_SELF_REFERENCE as { fetch(request: Request): Promise<Response> } | undefined;
+        if (self && typeof self.fetch === 'function') return self.fetch(request);
+        return fetchHandler(request, env, exec);
+      },
+    };
+  };
 
   return {
     fetch: fetchHandler,

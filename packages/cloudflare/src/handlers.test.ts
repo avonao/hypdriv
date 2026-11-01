@@ -90,6 +90,134 @@ describe('dispatchScheduled', () => {
     expect(urls).toContain('GET /pricing (warm)');
   });
 
+  describe('hot warming', () => {
+    const hotConfig = loadConfig({
+      site: { origin: 'https://shop.example.com' },
+      cache: {
+        warm: { cron: '*/30 * * * *', routes: ['/'], concurrency: 2, hot: { limit: 3, minViews: 20 } },
+      },
+    });
+    const creds = {
+      HYPDRIV_INTERNAL_SECRET: SECRET,
+      HYPDRIV_ANALYTICS_ACCOUNT_ID: 'a'.repeat(32),
+      HYPDRIV_ANALYTICS_API_TOKEN: 'token',
+      HYPDRIV_ANALYTICS_DATASET: 'shop_vitals',
+    };
+    const rows = (data: Array<Record<string, unknown>>) =>
+      vi.fn(async () => Response.json({ meta: [], data, rows: data.length }));
+
+    it('adds the busiest cacheable pages to the configured routes', async () => {
+      const warmed: string[] = [];
+      const fetchSpy = rows([
+        { pathname: '/blog/hello', views: 900 },
+        { pathname: '/', views: 800 },
+        { pathname: '/account', views: 700 },
+        { pathname: '/pricing', views: 600 },
+        { pathname: '/rare', views: 5 },
+      ]);
+      const result = await dispatchScheduled(
+        { cron: '*/30 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(
+            hotConfig,
+            async (request) => {
+              warmed.push(new URL(request.url).pathname);
+              return new Response('ok');
+            },
+            creds,
+          ),
+          fetch: fetchSpy as never,
+          cacheable: (path) => path !== '/account',
+        },
+      );
+      expect(result.ran).toEqual(['warm']);
+      expect(warmed.sort()).toEqual(['/', '/blog/hello', '/pricing']);
+      const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe(
+        `https://api.cloudflare.com/client/v4/accounts/${'a'.repeat(32)}/analytics_engine/sql`,
+      );
+      expect(String(init.body)).toContain("blob1 = 'TTFB'");
+      expect(String(init.body)).toContain('FROM shop_vitals');
+    });
+
+    it('never requests a path outside the site, whatever the beacons claimed', async () => {
+      const warmed: string[] = [];
+      await dispatchScheduled(
+        { cron: '*/30 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(
+            hotConfig,
+            async (request) => {
+              warmed.push(request.url);
+              return new Response('ok');
+            },
+            creds,
+          ),
+          fetch: rows([
+            { pathname: '//evil.example/x', views: 999 },
+            { pathname: 'https://evil.example/', views: 998 },
+            { pathname: '/a/../secret', views: 997 },
+            { pathname: '/_hypdriv/purge', views: 996 },
+            { pathname: '/ok', views: 50 },
+          ]) as never,
+        },
+      );
+      expect(warmed.sort()).toEqual(['https://shop.example.com/', 'https://shop.example.com/ok']);
+    });
+
+    it('still warms the configured routes when the query fails or credentials are missing', async () => {
+      for (const [env, fetchImpl, expected] of [
+        [creds, vi.fn(async () => new Response('nope', { status: 403 })), 'query failed'],
+        [{ HYPDRIV_INTERNAL_SECRET: SECRET }, vi.fn(), 'missing'],
+      ] as const) {
+        const { log, lines } = recordingLogger();
+        const warmed: string[] = [];
+        const result = await dispatchScheduled(
+          { cron: '*/30 * * * *', scheduledTime: 0 },
+          {
+            ...dispatchContext(
+              hotConfig,
+              async (request) => {
+                warmed.push(new URL(request.url).pathname);
+                return new Response('ok');
+              },
+              env,
+              log,
+            ),
+            fetch: fetchImpl as never,
+          },
+        );
+        expect(result.ran).toEqual(['warm']);
+        expect(warmed).toEqual(['/']);
+        expect(lines.find((l) => l.level === 'warn')?.message).toContain(
+          expected === 'missing' ? 'settings are missing' : 'query failed',
+        );
+        if (expected === 'missing') expect(fetchImpl).not.toHaveBeenCalled();
+      }
+    });
+
+    it('does nothing for hot pages when warm.hot is off', async () => {
+      const fetchSpy = vi.fn();
+      const warmed: string[] = [];
+      await dispatchScheduled(
+        { cron: '*/15 * * * *', scheduledTime: 0 },
+        {
+          ...dispatchContext(
+            config,
+            async (request) => {
+              warmed.push(new URL(request.url).pathname);
+              return new Response('ok');
+            },
+            creds,
+          ),
+          fetch: fetchSpy as never,
+        },
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(warmed).toContain('/pricing');
+    });
+  });
+
   it('reports failing jobs and rethrows so Cloudflare records the failure', async () => {
     const { log, lines } = recordingLogger();
     const invoke = vi.fn(async () => new Response('nope', { status: 500 }));

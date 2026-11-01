@@ -90,7 +90,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 ### `warm`
 
-`{ routes: [], onDeploy: false, cron?: '…', concurrency: 4 }`.
+`{ routes: [], onDeploy: false, cron?: '…', concurrency: 4, hot?: true | { limit: 25, days: 7, minViews: 20, dataset?, datasetEnv: 'HYPDRIV_ANALYTICS_DATASET', accountIdEnv: 'HYPDRIV_ANALYTICS_ACCOUNT_ID', apiTokenEnv: 'HYPDRIV_ANALYTICS_API_TOKEN' } }`. `hot` adds the busiest cacheable pages, learned from Web Vitals in Analytics Engine ([Hot pages](caching.md#hot-pages)).
 
 ## `performance`
 

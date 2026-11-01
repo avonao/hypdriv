@@ -316,6 +316,7 @@ export function resolveEdgeCachePolicy(
 function resolveCache(input: HypDrivConfig['cache'], experiments: readonly string[]): ResolvedCache {
   const c = input ?? {};
   const edge = c.edge === false ? null : c.edge === true || c.edge === undefined ? {} : c.edge;
+  const hot = c.warm?.hot === true ? {} : c.warm?.hot && typeof c.warm.hot === 'object' ? c.warm.hot : null;
   const sharedBypass = {
     cookies: arr(edge?.bypass?.cookies, []),
     headers: arr(edge?.bypass?.headers, []).map((h) => h.toLowerCase()),
@@ -360,6 +361,17 @@ function resolveCache(input: HypDrivConfig['cache'], experiments: readonly strin
       onDeploy: c.warm?.onDeploy ?? false,
       cron: c.warm?.cron ?? null,
       concurrency: c.warm?.concurrency ?? 4,
+      hot: hot
+        ? {
+            limit: hot.limit ?? 25,
+            days: hot.days ?? 7,
+            minViews: hot.minViews ?? 20,
+            dataset: hot.dataset ?? null,
+            datasetEnv: hot.datasetEnv ?? 'HYPDRIV_ANALYTICS_DATASET',
+            accountIdEnv: hot.accountIdEnv ?? 'HYPDRIV_ANALYTICS_ACCOUNT_ID',
+            apiTokenEnv: hot.apiTokenEnv ?? 'HYPDRIV_ANALYTICS_API_TOKEN',
+          }
+        : null,
     },
   };
 }

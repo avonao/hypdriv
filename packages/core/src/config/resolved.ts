@@ -190,7 +190,21 @@ export interface ResolvedCache {
     emitTagHeaders: boolean;
     debugHeader: boolean;
   };
-  warm: { routes: string[]; onDeploy: boolean; cron: string | null; concurrency: number };
+  warm: {
+    routes: string[];
+    onDeploy: boolean;
+    cron: string | null;
+    concurrency: number;
+    hot: null | {
+      limit: number;
+      days: number;
+      minViews: number;
+      dataset: string | null;
+      datasetEnv: string;
+      accountIdEnv: string;
+      apiTokenEnv: string;
+    };
+  };
 }
 
 export interface ResolvedSpeculation {

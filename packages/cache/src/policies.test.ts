@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeCtx, makeManifest, makeRoute } from './__fixtures__/fakes';
 import {
   cacheControlFor,
+  createCacheableTest,
   effectiveTags,
   inferPolicies,
   MAX_PATH_TAG_LENGTH,
@@ -47,6 +48,28 @@ describe('nextPathnameToPattern', () => {
     expect(routePatternSpecificity(['/shop', '/shop/:slug*'])).toBe(routePatternSpecificity('/shop'));
     // Core semantics: more literal characters rank first, wildcards and params cost a little.
     expect(routePatternSpecificity('/blog')).toBeLessThan(routePatternSpecificity('/blog/:slug'));
+  });
+});
+
+describe('createCacheableTest', () => {
+  it('accepts pages an inferred policy keeps and rejects dynamic pages, endpoints and unknown paths', () => {
+    const cacheable = createCacheableTest(resolveConfig({}), manifest);
+    for (const yes of ['/', '/blog', '/blog/hello', '/news/7', '/pricing'])
+      expect(cacheable(yes), yes).toBe(true);
+    for (const no of ['/account', '/dashboard', '/api/users/1', '/robots.txt', '/nowhere/at/all'])
+      expect(cacheable(no), no).toBe(false);
+  });
+
+  it('follows explicit policies, and says no everywhere when the edge cache is off', () => {
+    const explicit = createCacheableTest(
+      resolveConfig({ cache: { edge: { infer: false, policies: [{ match: '/account', ttl: 60 }] } } }),
+      manifest,
+    );
+    expect(explicit('/account')).toBe(true);
+    expect(explicit('/blog/hello')).toBe(false);
+    expect(createCacheableTest(resolveConfig({ cache: { edge: false } }), manifest)('/blog/hello')).toBe(
+      false,
+    );
   });
 });
 

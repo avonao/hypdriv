@@ -24,7 +24,7 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 
 | Suite | Scope | Result |
 | --- | --- | --- |
-| Unit and integration (Vitest, Node and workerd) | 27 packages | 1,840 tests in 175 files pass on Node 22 and 24; Node 20 runs the same suite except the vinext build test, which needs Node 22+ |
+| Unit and integration (Vitest, Node and workerd) | 27 packages | 1,862 tests in 176 files pass on Node 22 and 24; Node 20 runs the same suite except the vinext build test, which needs Node 22+ |
 | Lint, typecheck, build, `publint` | all packages | pass |
 | `e2e/cloudflare` | every capability on Cloudflare Workers | 41 pass · 0 fail · 2 skipped (inbound email, Turnstile pass flow) |
 | `e2e/vercel` | every capability that applies on Vercel | 39 pass · 0 fail · 2 skipped (103 Early Hints are not available on Vercel, Turnstile pass flow) |

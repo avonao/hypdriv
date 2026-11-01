@@ -109,6 +109,18 @@ cache: { warm: { routes: ['/', '/blog', '/pricing'], onDeploy: true, cron: '*/30
 
 `hypdriv warm --url https://www.example.com` fetches the routes (with `concurrency`); with `cron` the Worker's `scheduled` handler re-warms them.
 
+### Hot pages
+
+Let real traffic choose what to warm: with `hot`, the busiest pages are learned from the Web Vitals in Workers Analytics Engine and warmed next to `routes`.
+
+```ts
+cache: { warm: { routes: ['/'], cron: '*/30 * * * *', hot: { limit: 25, days: 7, minViews: 20 } } },
+observe: { vitals: { sink: 'analytics-engine' } },
+```
+
+Every navigation reports one `TTFB` with its pathname, so the sample-weighted rows per pathname are the page views. On each `cron` run the Worker queries the SQL API (`HYPDRIV_ANALYTICS_ACCOUNT_ID`, `HYPDRIV_ANALYTICS_API_TOKEN` with Account Analytics: Read, and the dataset from `hot.dataset`, `HYPDRIV_ANALYTICS_DATASET` or `observe.vitals.dashboard.dataset`) and warms the top `limit` pages of the last `days` days. Three guards keep a public beacon from steering the warm-up: pathnames must be plain absolute paths of this site (no `//host`, dot segments, query, control characters or internal `/_hypdriv`, `/__` paths), a page needs `minViews` measured views, and only pages the edge cache would keep (an explicit policy or an inferred static/ISR policy) are warmed. If the query fails or a secret is missing, the configured routes are still warmed and a warning is logged.
+
+`hypdriv warm --url … --hot [--days 7] [--limit 25] [--min-views 20] [--dataset <name>]` does the same from a terminal or CI (`CF_ACCOUNT_ID`, `CF_API_TOKEN`); `--hot --sql` prints the query. `hypdriv doctor` (`security.warm-hot`) checks the sink, the secrets and the schedule. Hot warming needs Analytics Engine, so it is a Cloudflare feature.
 ## Interaction with Cache Components
 
 `'use cache'` decides what is cacheable *inside* a render; the edge cache decides whether a render happens at all. Keep them aligned: use `cacheTag()` with the same tag names you purge (`revalidateTag` from `hypdriv/cache` clears both). For personalised shells, cache the shell only when the personalised parts stream after `connection()`/`cookies()` — `inferredShell` is off by default because many shells embed user-specific data in the resumed stream.
