@@ -92,6 +92,15 @@
     10
    ],
    "width": 161
+  },
+  "8": {
+   "height": 99,
+   "rgba": "Dxi1/0Qqw/93P6//bxi7/48Yhf+vGEv/0jVE/+xQV/8gVMn/7Mkh//nSE/+vhFD/kVFX/7l1ZP/MYEP/7UtD/yqKxP/20hX/+dIT/9C/Tf9jd7P/FTzj/xU84v/FcZL/DrO+/3zFcP+y1F3/eLgx/z1om/8TPOb/Ezzm/8WawP9F5qb/UOpm/0/mJ/9v5iH/d8pf/4G6nP+YucX/493a/w==",
+   "target": [
+    8,
+    5
+   ],
+   "width": 161
   }
  },
  "jpeg-420-progressive.jpg": {
@@ -225,6 +234,15 @@
     12
    ],
    "width": 160
+  },
+  "8": {
+   "height": 120,
+   "rgba": "DxS1/zEW2P9ZHdL/bxS8/48UhP+vFEv/0iU3//NRW/8SQdf/zbE///bOGP+YZWP/jz9L/7tcSv/ZZEz/7z9C/zd8uv/60hT/+tIU/8usJP+Kf43/W1ms/19Jn//QYov/F5e2/+DMIv/61Sf/ucJV/0Nimv8UPOb/FDzm/7t+xf8Pv4T/Xsto/4LQSP9vvyL/QXGf/xQ85v8UPOb/u5/f/0ruef9D7jj/T+oi/2/qQv+D3IT/mNO+/7PT3f/n5N7/",
+   "target": [
+    8,
+    6
+   ],
+   "width": 160
   }
  },
  "jpeg-gray-small.jpg": {
@@ -245,6 +263,15 @@
    "target": [
     16,
     10
+   ],
+   "width": 160
+  },
+  "8": {
+   "height": 100,
+   "rgba": "Jycn/0BAQP9YWFj/RUVF/0hISP9LS0v/ZmZm/4KCgv9RUVH/vr6+/8jIyP+Li4v/ZWVl/4qKiv9/f3//e3t7/3R0dP/Hx8f/yMjI/7q6uv95eXn/Q0ND/0NDQ/+Kior/g4OD/6ampv++vr7/lpaW/2NjY/9DQ0P/Q0ND/6ampv+wsLD/rq6u/6Ojo/+srKz/pqam/6Wlpf+wsLD/3Nzc/w==",
+   "target": [
+    8,
+    5
    ],
    "width": 160
   },

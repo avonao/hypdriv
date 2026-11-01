@@ -11,7 +11,7 @@ import {
  * Huffman JPEGs with 8-bit samples, any chroma subsampling, restart intervals, grayscale, YCbCr, RGB, CMYK
  * and YCCK. Arithmetic coding, lossless and 12-bit JPEGs are rejected with a clear error.
  *
- * When the target is at most 1/8 of the picture it decodes only the DC coefficients: a block's DC value is
+ * When the picture is at least 16× the target (a DC grid of at least twice the target) it decodes only the DC coefficients: a block's DC value is
  * the exact mean of its 8×8 pixels, so that is an 8× box downscale for free, and progressive files can skip
  * every AC scan. That is what libjpeg's reduced-size decoding (and therefore sharp's shrink-on-load) does too;
  * near sharp colour edges of chroma-subsampled pictures it is an approximation, so `exact` forces the full
@@ -73,6 +73,9 @@ function buildHuffman(counts: Uint8Array, symbols: Uint8Array): HuffmanTable {
 }
 
 /** Zero bytes the reader may pad in after the data ran out before a scan gives up (a few MCUs of slack). */
+/** The DC grid must hold at least this many cells per placeholder pixel, per axis, for the DC-only decode. */
+const DC_GRID_FACTOR = 2;
+
 const STARVED_AFTER = 16;
 
 /** More scans than any real progressive file has (libjpeg-turbo's own script has ten). */
@@ -674,13 +677,22 @@ function colourTransform(header: Header): 'gray' | 'ycbcr' | 'rgb' | 'cmyk' | 'y
   return ids[0] === 0x52 && ids[1] === 0x47 && ids[2] === 0x42 ? 'rgb' : 'ycbcr';
 }
 
-/** The decode reads only DC coefficients when the picture is at least 8× the target in both directions. */
+/**
+ * The decode reads only DC coefficients when the picture is at least 16× the target in both directions, which is
+ * a DC grid of at least twice the target. Closer to 1×, the chroma approximation of the grid shows (on real
+ * photographs the mean error against an exact decode is about 9 levels at 1-2× and about 1 at 2× and more),
+ * while decoding such a small picture completely takes a few milliseconds.
+ */
 export function jpegUsesDcOnly(
   info: Pick<JpegInfo, 'width' | 'height'>,
   target: { width: number; height: number },
   exact: boolean,
 ): boolean {
-  return !exact && Math.ceil(info.width / 8) >= target.width && Math.ceil(info.height / 8) >= target.height;
+  return (
+    !exact &&
+    Math.ceil(info.width / 8) >= DC_GRID_FACTOR * target.width &&
+    Math.ceil(info.height / 8) >= DC_GRID_FACTOR * target.height
+  );
 }
 
 /** Upper bound of the memory a decode holds: per component the coefficients (2 bytes) and the plane (1 byte). */
@@ -693,8 +705,8 @@ export function estimateJpegBytes(info: JpegInfo, dcOnly: boolean): number {
 }
 
 /**
- * Decodes a JPEG into `sink`. When the picture is at least 8× the size of the requested target in both
- * directions only the DC coefficients are decoded and the delivered grid is `ceil(width / 8) × ceil(height / 8)`;
+ * Decodes a JPEG into `sink`. When the picture is at least 16× the size of the requested target in both
+ * directions (a DC grid of at least twice the target) only the DC coefficients are decoded and the delivered grid is `ceil(width / 8) × ceil(height / 8)`;
  * otherwise the full picture is delivered. Check `scale` in the result.
  */
 export function decodeJpeg(

@@ -332,30 +332,51 @@ describe('JPEG decoder', () => {
     expect(mean).toBeLessThanOrEqual(0.6);
   });
 
-  // fast path: DC coefficients only. [file, max, mean] tolerances against the exact box average
-  const fast: Array<[string, number, number]> = [
-    ['jpeg-444-baseline.jpg', 14, 1.5],
-    ['jpeg-444-progressive-optimized.jpg', 14, 1.5],
-    ['jpeg-gray.jpg', 30, 4.5],
-    ['jpeg-wide.jpg', 10, 1.5],
-    ['jpeg-420-baseline.jpg', 45, 4],
-    ['jpeg-420-progressive.jpg', 45, 4],
-    ['jpeg-420-restart.jpg', 45, 4],
-    ['jpeg-422-baseline.jpg', 40, 3],
-    ['jpeg-440-baseline.jpg', 40, 3],
-    ['jpeg-420-odd-large.jpg', 105, 15],
-    ['jpeg-cmyk.jpg', 45, 6],
-    // small pictures take the full path anyway
-    ['jpeg-444-progressive-small.jpg', 3, 0.6],
-    ['jpeg-420-small-odd.jpg', 4, 0.6],
-    ['jpeg-tiny.jpg', 4, 0.6],
+  // fast path: DC coefficients only (a DC grid of at least twice the target).
+  // [file, target width, max, mean] tolerances against the exact box average. The pictures are synthetic scenes
+  // with hard colour edges, the worst case for the chroma approximation of subsampled files.
+  const fast: Array<[string, number, number, number]> = [
+    ['jpeg-444-baseline.jpg', 16, 14, 0.9],
+    ['jpeg-444-progressive-optimized.jpg', 16, 14, 0.9],
+    ['jpeg-wide.jpg', 16, 8, 0.9],
+    ['jpeg-420-baseline.jpg', 16, 45, 2.6],
+    ['jpeg-420-baseline.jpg', 8, 26, 1.6],
+    ['jpeg-420-progressive.jpg', 16, 45, 2.6],
+    ['jpeg-420-restart.jpg', 16, 45, 2.6],
+    ['jpeg-422-baseline.jpg', 16, 38, 1.8],
+    ['jpeg-440-baseline.jpg', 16, 32, 2.1],
+    ['jpeg-gray.jpg', 8, 12, 1.4],
+    ['jpeg-cmyk.jpg', 8, 20, 2.4],
+    ['jpeg-420-odd-large.jpg', 8, 52, 5.5],
   ];
-  it.each(fast)('%s: the DC-only fast path stays close to the box average', async (file, max, mean) => {
-    const out = await render(file);
-    const d = diff(out.bitmap, references[file]!['16']!);
-    expect(d.max).toBeLessThanOrEqual(max);
-    expect(d.mean).toBeLessThanOrEqual(mean);
-  });
+  it.each(fast)(
+    '%s at %i px: the DC-only fast path stays close to the box average',
+    async (file, size, max, mean) => {
+      const out = await render(file, size);
+      const d = diff(out.bitmap, references[file]![String(size)]!);
+      expect(d.max).toBeLessThanOrEqual(max);
+      expect(d.mean).toBeLessThanOrEqual(mean);
+    },
+  );
+
+  // pictures that are not at least 16× the target are decoded completely: the grid would be too coarse
+  const completely: Array<[string, number]> = [
+    ['jpeg-444-progressive-small.jpg', 16],
+    ['jpeg-420-small-odd.jpg', 16],
+    ['jpeg-tiny.jpg', 16],
+    ['jpeg-gray.jpg', 16],
+    ['jpeg-cmyk.jpg', 16],
+    ['jpeg-420-odd-large.jpg', 16],
+  ];
+  it.each(completely)(
+    '%s at %i px: small pictures take the full decode and match libjpeg',
+    async (file, size) => {
+      const out = await render(file, size);
+      const d = diff(out.bitmap, references[file]![String(size)]!);
+      expect(d.max).toBeLessThanOrEqual(4);
+      expect(d.mean).toBeLessThanOrEqual(0.7);
+    },
+  );
 
   it.each(['jpeg-gray.jpg', 'jpeg-444-baseline.jpg', 'jpeg-444-progressive-optimized.jpg'])(
     '%s: the DC grid is the exact 8×8 block means',
@@ -404,12 +425,12 @@ describe('JPEG decoder', () => {
         },
         push() {},
       },
-      { targetWidth: 16, targetHeight: 10 },
+      { targetWidth: 8, targetHeight: 5 },
     );
     expect(extents).toEqual([{ cell: 8, width: 161, height: 99 }]);
   });
 
-  it('uses the DC-only path only when the target is at most 1/8 of the picture (and never when exact)', () => {
+  it('uses the DC-only path only when the DC grid is at least twice the target (and never when exact)', () => {
     const grids: number[][] = [];
     const run = (name: string, target: number, exact = false) => {
       const bytes = fixture(name);
@@ -430,11 +451,15 @@ describe('JPEG decoder', () => {
       );
     };
     expect(run('jpeg-420-baseline.jpg', 16).scale).toBe(8); // 320×200 → 40×25 grid
+    expect(run('jpeg-420-baseline.jpg', 19).scale).toBe(8); // 19 × 12 target in a 40 × 25 grid
+    expect(run('jpeg-420-baseline.jpg', 20).scale).toBe(1); // 20 × 13: the grid is 25 high, 2 × 13 needs 26
     expect(run('jpeg-420-baseline.jpg', 64).scale).toBe(1); // 320/8 = 40 < 64
     expect(run('jpeg-420-baseline.jpg', 16, true).scale).toBe(1);
     expect(run('jpeg-420-small-odd.jpg', 16).scale).toBe(1);
     expect(grids).toEqual([
       [40, 25],
+      [40, 25],
+      [320, 200],
       [320, 200],
       [320, 200],
       [37, 23],

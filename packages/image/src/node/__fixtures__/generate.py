@@ -230,6 +230,9 @@ for f in files:
 for f in ("jpeg-420-baseline.jpg", "jpeg-444-baseline.jpg", "png-rgba8.png", "png-rgb8.png", "jpeg-wide.jpg"):
     ref[f]["32"] = reference(f, 32)
 ref["jpeg-420-baseline.jpg"]["8"] = reference("jpeg-420-baseline.jpg", 8)
+# 160-pixel-wide pictures only take the DC-only path (a grid of at least twice the target) at 8 pixels
+for f in ("jpeg-gray.jpg", "jpeg-cmyk.jpg", "jpeg-420-odd-large.jpg"):
+    ref[f]["8"] = reference(f, 8)
 
 
 def dc_grid(path):
