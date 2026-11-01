@@ -43,7 +43,9 @@ export default defineConfig({
           compatibilityDate: '2026-10-01',
           // Cloudflare: write `dist/analog/server/wrangler.json` from `wrangler.jsonc` (Durable Objects, flags).
           ...(target === 'cloudflare'
-            ? { cloudflare: { deployConfig: true, ...(accountWrangler ? { wrangler: accountWrangler } : {}) } }
+            ? {
+                cloudflare: { deployConfig: true, ...(accountWrangler ? { wrangler: accountWrangler } : {}) },
+              }
             : {}),
         },
       }),
