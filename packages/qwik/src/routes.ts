@@ -1,4 +1,4 @@
-import { relative } from 'node:path';
+import * as nodePath from 'node:path';
 import { createRouteMatcher } from '@hypdriv/core';
 import { type DiscoveredRoute, normalizePathname, toHypRoute } from '@hypdriv/vite';
 
@@ -34,9 +34,23 @@ function hasPartialSegment(route: QwikBuiltRoute): boolean {
   return (route.segments ?? []).some((segment) => segment.length > 1 && segment.some((part) => part.dynamic));
 }
 
+/** The part of `node:path` the source-page computation needs (`win32` / `posix` in tests). */
+type PathApi = Pick<typeof nodePath, 'relative' | 'sep'>;
+
+/**
+ * A route file relative to the project root, with forward slashes. Splits on the platform's own separator: on
+ * Windows both `C:\\proj` and `C:/proj` spellings of the same file (Vite's root is posix-style, Qwik's file paths
+ * may not be) resolve to one relative path, and on POSIX a backslash in a file name stays part of the name.
+ */
+export function sourcePageOf(root: string, file: string, api: PathApi = nodePath): string {
+  return api.relative(root, file).split(api.sep).join('/');
+}
+
 export interface DiscoverRoutesOptions {
   /** Project root, for the relative `sourcePage`. */
   root: string;
+  /** Path implementation; the platform's by default. */
+  path?: PathApi;
 }
 
 /**
@@ -57,7 +71,7 @@ export function discoverRoutes(routes: QwikBuiltRoute[], options: DiscoverRoutes
     out.push({
       pathname,
       kind,
-      sourcePage: relative(options.root, route.filePath).split('\\').join('/'),
+      sourcePage: sourcePageOf(options.root, route.filePath, options.path),
       frameworkId: route.id,
       ...(hasPartialSegment(route) && route.pattern ? { regex: route.pattern.source } : {}),
     });

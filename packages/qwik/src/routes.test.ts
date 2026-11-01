@@ -1,3 +1,4 @@
+import { posix, win32 } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   discoverRoutes,
@@ -5,6 +6,7 @@ import {
   mergeRoutes,
   promotePrerendered,
   type QwikBuiltRoute,
+  sourcePageOf,
 } from './routes';
 
 const built = (
@@ -20,6 +22,30 @@ describe('isPageExtension', () => {
   it('treats components and Markdown as pages, everything else as endpoints', () => {
     for (const ext of ['.tsx', '.jsx', '.md', '.mdx', '.TSX']) expect(isPageExtension(ext)).toBe(true);
     for (const ext of ['.ts', '.js', '.json', '']) expect(isPageExtension(ext)).toBe(false);
+  });
+});
+
+describe('sourcePageOf', () => {
+  it('gives the same forward-slash path whichever way Windows spells the file', () => {
+    // Vite's root is posix-style (`C:/proj`); Qwik may hand the route file over with either separator.
+    for (const file of ['C:\\proj\\src\\routes\\blog\\index.tsx', 'C:/proj/src/routes/blog/index.tsx'])
+      expect(sourcePageOf('C:/proj', file, win32)).toBe('src/routes/blog/index.tsx');
+    expect(sourcePageOf('C:\\proj', 'c:/proj/src/routes/index.tsx', win32)).toBe('src/routes/index.tsx');
+  });
+
+  it('keeps a backslash in a POSIX file name', () => {
+    expect(sourcePageOf('/app', '/app/src/routes/we\\ird/index.tsx', posix)).toBe(
+      'src/routes/we\\ird/index.tsx',
+    );
+    expect(sourcePageOf('/app', '/app/src/routes/index.tsx', posix)).toBe('src/routes/index.tsx');
+  });
+
+  it('is what discoverRoutes records, on either platform', () => {
+    const windows = discoverRoutes(
+      [built({ routeName: '/blog/', ext: '.tsx', filePath: 'C:\\proj\\src\\routes\\blog\\index.tsx' })],
+      { root: 'C:/proj', path: win32 },
+    );
+    expect(windows[0]?.sourcePage).toBe('src/routes/blog/index.tsx');
   });
 });
 
