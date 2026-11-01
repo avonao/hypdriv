@@ -401,7 +401,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | --- | --- |
 | Release | 0.1.0 Preview |
 | Implemented | Every capability in the [feature catalog](docs/feature-catalog.md) |
-| Unit and integration tests | 2,405 tests in 213 files on Node 22 and 24 |
+| Unit and integration tests | 2,472 tests in 216 files on Node 22 and 24 |
 | Live runs | Next.js on Cloudflare Workers and on Vercel; seven Vite hosts on Cloudflare Workers and on Vercel |
 | API stability | Not yet guaranteed. 1.0 will commit to the `defineConfig` schema, the manifest schema and semver |
 | Distribution | Source and release-bundle tarballs |

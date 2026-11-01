@@ -33,7 +33,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | **Package** | `hypdriv`, `@hypdriv/*` (30 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
 | **Node.js** | 20.9+ (some framework packages need 22+) | 22+ | 22+ |
 | **Runtime dependencies** | Platform services optional | None | None |
-| **Tests** | 2,405 in 213 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
+| **Tests** | 2,472 in 216 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
 | **Repository** | [avonao/hypdriv](https://github.com/avonao/hypdriv) | [avonao/purser](https://github.com/avonao/purser) | [avonao/squawkcode](https://github.com/avonao/squawkcode) |
 | **Homepage** | | [pursercss.dev](https://pursercss.dev) | |
 | **Status** | 0.1.0 Preview | 0.1.0 Preview | 0.1.0 Preview |
