@@ -203,7 +203,8 @@ function returnedObjectStart(source: string): number {
   if (source[arrowAt] !== '{') return -1;
   const blockEnd = matchClose(source, arrowAt);
   if (blockEnd === -1) return -1;
-  // The `return` at the top level of the function body.
+  // The `return` at the top level of the function body; the last one is the config (earlier ones are early exits).
+  let found = -1;
   let depth = 0;
   for (let i = arrowAt + 1; i < blockEnd; i++) {
     const c = source[i] as string;
@@ -218,10 +219,96 @@ function returnedObjectStart(source: string): number {
     else if (c === ')' || c === ']' || c === '}') depth--;
     else if (depth === 0 && source.startsWith('return', i) && !/[\w$]/.test(source[i - 1] ?? ' ')) {
       const object = /^return\s*\(?\s*\{/.exec(source.slice(i));
-      if (object) return i + object[0].length - 1;
+      if (object) found = i + object[0].length - 1;
     }
   }
-  return -1;
+  return found;
+}
+
+/** Index of the first character after whitespace and comments (and commas, unless `commas` is false), from `i`. */
+function skipTrivia(source: string, i: number, limit: number, commas = true): number {
+  let at = i;
+  while (at < limit) {
+    const c = source[at]!;
+    if (/\s/.test(c) || (commas && c === ',')) at++;
+    else if (c === '/' && source[at + 1] === '/') {
+      const nl = source.indexOf('\n', at);
+      at = nl === -1 ? limit : nl + 1;
+    } else if (c === '/' && source[at + 1] === '*') {
+      const end = source.indexOf('*/', at + 2);
+      at = end === -1 ? limit : end + 2;
+    } else break;
+  }
+  return at;
+}
+
+/** A property that belongs to an object literal itself (not to an object nested in it). */
+interface ObjectProperty {
+  name: string;
+  /** Start and end (exclusive) of the value expression; for a shorthand property, of the name. */
+  valueStart: number;
+  valueEnd: number;
+  shorthand: boolean;
+}
+
+/**
+ * The direct properties of the object literal between `open` (`{`) and `close` (`}`): `name: value`, `'name': value`
+ * and the shorthand `name`. Spreads, computed keys and methods are skipped; `null` when the object cannot be parsed.
+ */
+function objectProperties(source: string, open: number, close: number): ObjectProperty[] | null {
+  const props: ObjectProperty[] = [];
+  let i = skipTrivia(source, open + 1, close);
+  while (i < close) {
+    if (source.startsWith('...', i)) {
+      const end = expressionEnd(source, i + 3);
+      if (end === -1) return null;
+      i = skipTrivia(source, end, close);
+      continue;
+    }
+    let name: string | null = null;
+    let keyEnd = i;
+    const c = source[i]!;
+    if (c === '"' || c === "'" || c === '`') {
+      keyEnd = skipString(source, i) + 1;
+      name = source.slice(i + 1, keyEnd - 1);
+    } else if (c === '[') {
+      const end = matchClose(source, i);
+      if (end === -1) return null;
+      keyEnd = end + 1;
+    } else {
+      const word = /^(?:(?:async|get|set)\s+(?=[\w$'"[*]))?\*?\s*([\w$]+)/.exec(source.slice(i, close));
+      if (!word) return null;
+      keyEnd = i + word[0].length;
+      name = word[1] ?? null;
+    }
+    const next = skipTrivia(source, keyEnd, close, false);
+    const ch = source[next];
+    if (ch === '(') {
+      // A method (`plugins() { … }`): no value to edit.
+      const paramsEnd = matchClose(source, next);
+      const body = paramsEnd === -1 ? -1 : source.indexOf('{', paramsEnd);
+      const bodyEnd = body === -1 ? -1 : matchClose(source, body);
+      if (bodyEnd === -1) return null;
+      i = skipTrivia(source, bodyEnd + 1, close);
+      continue;
+    }
+    if (ch === ':') {
+      const valueStart = skipTrivia(source, next + 1, close, false);
+      const end = expressionEnd(source, valueStart);
+      if (end === -1 || end > close) return null;
+      if (name !== null) props.push({ name, valueStart, valueEnd: end, shorthand: false });
+      i = skipTrivia(source, end, close);
+      continue;
+    }
+    if (ch === ',' || next >= close) {
+      if (name !== null && /^[\w$]+$/.test(name))
+        props.push({ name, valueStart: i, valueEnd: keyEnd, shorthand: true });
+      i = skipTrivia(source, keyEnd, close);
+      continue;
+    }
+    return null;
+  }
+  return props;
 }
 
 /**
@@ -254,21 +341,50 @@ export function addToConfigArray(
     /** Insert right before the first element matching this (e.g. `/reactRouter\s*\(/`); falls back to `position`. */
     before?: RegExp;
     present?: RegExp;
+    /**
+     * The nested object that holds `property`, as a dotted path from the exported config object (`vite` for
+     * Waku's `vite.plugins`). Without it only the config object's own `property` counts: a `plugins` array of
+     * `css.postcss` is somebody else's.
+     */
+    within?: string;
   },
 ): ConfigEditResult {
-  const start = configObjectStart(source);
+  let start = configObjectStart(source);
   if (start === -1) return { changed: false, content: source, reason: 'no exported config object found' };
-  const end = matchClose(source, start);
+  let end = matchClose(source, start);
   if (end === -1) return { changed: false, content: source, reason: 'could not parse the config object' };
-  const object = source.slice(start, end + 1);
+  for (const key of options.within ? options.within.split('.') : []) {
+    const level = objectProperties(source, start, end)?.find((p) => p.name === key);
+    if (!level || source[level.valueStart] !== '{')
+      return { changed: false, content: source, reason: `no ${key} object` };
+    start = level.valueStart;
+    end = matchClose(source, start);
+    if (end === -1) return { changed: false, content: source, reason: `could not parse ${key}` };
+  }
   const callee = /^[\w$.]+/.exec(options.element)?.[0] ?? options.element;
   const present = options.present ?? new RegExp(`(^|[^\\w$.])${callee.replace(/[.$]/g, '\\$&')}\\s*\\(`);
 
   let out = source;
   let changed = false;
-  const prop = new RegExp(`(^|[\\s,{])${options.property}\\s*:\\s*\\[`).exec(object);
+  const properties = objectProperties(source, start, end);
+  if (!properties)
+    return { changed: false, content: source, reason: 'could not parse the config object properties' };
+  const prop = properties.find((p) => p.name === options.property);
+  if (prop && (prop.shorthand || source[prop.valueStart] !== '[')) {
+    // The property exists but is not an array literal (`plugins`, `plugins: makePlugins()`): keep it and spread it.
+    const value = source.slice(prop.valueStart, prop.valueEnd).trim();
+    if (present.test(value))
+      return { changed: false, content: source, reason: `${callee} already registered` };
+    const list =
+      options.position === 'last' ? `[...${value}, ${options.element}]` : `[${options.element}, ...${value}]`;
+    const replacement = prop.shorthand ? `${options.property}: ${list}` : list;
+    let spread = `${source.slice(0, prop.valueStart)}${replacement}${source.slice(prop.valueEnd)}`;
+    if (options.importLine && options.importFrom)
+      spread = ensureImportLine(spread, options.importLine, options.importFrom);
+    return { changed: true, content: spread, reason: `register ${callee} in ${options.property}` };
+  }
   if (prop) {
-    const open = start + prop.index + prop[0].length - 1;
+    const open = prop.valueStart;
     const close = matchClose(source, open);
     if (close === -1)
       return { changed: false, content: source, reason: `could not parse ${options.property}` };

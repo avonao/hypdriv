@@ -1178,21 +1178,17 @@ export function addWakuCloudflarePlugin(source: string): {
     content: insertImport(content, CLOUDFLARE_PLUGIN_IMPORT, 'esm'),
     reason: 'register cloudflare() in vite.plugins',
   });
-  if (/\bplugins\s*:\s*\[/.test(source)) {
-    const r = addToConfigArray(source, {
-      property: 'plugins',
-      element: WAKU_CLOUDFLARE_PLUGIN,
-      importLine: CLOUDFLARE_PLUGIN_IMPORT,
-      importFrom: '@cloudflare/vite-plugin',
-      position: 'first',
-    });
-    return { ...r, reason: r.changed ? 'register cloudflare() in vite.plugins' : r.reason };
-  }
-  const vite = /\bvite\s*:\s*\{/.exec(source);
-  if (vite) {
-    const at = vite.index + vite[0].length;
-    return done(`${source.slice(0, at)}\n      plugins: [${WAKU_CLOUDFLARE_PLUGIN}],${source.slice(at)}`);
-  }
+  // `vite.plugins` (created inside the `vite` object when it has none).
+  const inVite = addToConfigArray(source, {
+    property: 'plugins',
+    within: 'vite',
+    element: WAKU_CLOUDFLARE_PLUGIN,
+    importLine: CLOUDFLARE_PLUGIN_IMPORT,
+    importFrom: '@cloudflare/vite-plugin',
+    position: 'first',
+  });
+  if (inVite.changed || !/^no vite object$/.test(inVite.reason))
+    return { ...inVite, reason: inVite.changed ? 'register cloudflare() in vite.plugins' : inVite.reason };
   const start = configObjectStart(source);
   if (start !== -1)
     return done(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addToConfigArray,
+  configObjectStart,
   ensureImportLine,
   ensureNamedImports,
   importsName,
@@ -58,9 +59,13 @@ describe('ensureNamedImports', () => {
 
 describe('ensureImportLine', () => {
   it('imports the names of a named import line one by one', () => {
-    expect(ensureImportLine(`import { other } from '${MODULE}';\n`, `import { hypdriv } from '${MODULE}';`, MODULE)).toBe(
-      `import { other, hypdriv } from '${MODULE}';\n`,
-    );
+    expect(
+      ensureImportLine(
+        `import { other } from '${MODULE}';\n`,
+        `import { hypdriv } from '${MODULE}';`,
+        MODULE,
+      ),
+    ).toBe(`import { other, hypdriv } from '${MODULE}';\n`);
   });
 
   it('keeps the module-level check for any other form of import line', () => {
@@ -95,5 +100,81 @@ describe('config edits import what they use', () => {
     });
     expect(r.content).toContain("import { keep, hypdriv } from 'adapter-wrap';");
     expect(r.content).toContain('adapter: hypdriv(adapter())');
+  });
+});
+
+describe("addToConfigArray finds the config object's own property", () => {
+  const add = (source: string, extra: Record<string, unknown> = {}) =>
+    addToConfigArray(source, {
+      property: 'plugins',
+      element: 'hypdriv()',
+      importLine: `import { hypdriv } from '${MODULE}';`,
+      importFrom: MODULE,
+      ...extra,
+    });
+
+  it("does not take a nested plugins array (css.postcss.plugins) for the config's", () => {
+    const source = `export default defineConfig({\n  css: { postcss: { plugins: [autoprefixer()] } },\n  plugins: [react()],\n});\n`;
+    const r = add(source);
+    expect(r.content).toContain('css: { postcss: { plugins: [autoprefixer()] } }');
+    expect(r.content).toContain('plugins: [hypdriv(), react()]');
+  });
+
+  it('creates the property when only a nested one exists', () => {
+    const source = `export default defineConfig({\n  css: { postcss: { plugins: [autoprefixer()] } },\n});\n`;
+    const r = add(source);
+    expect(r.content).toContain('css: { postcss: { plugins: [autoprefixer()] } }');
+    expect(r.content).toMatch(/\n {2}plugins: \[hypdriv\(\)\],/);
+    expect(r.content.match(/plugins:/g)).toHaveLength(2);
+  });
+
+  it('does not take the key of a nested object or a string for the property', () => {
+    const source = `export default defineConfig({\n  define: { 'plugins': 'x' },\n  build: { rollupOptions: { plugins: [] } },\n  plugins: [],\n});\n`;
+    const r = add(source);
+    expect(r.content).toContain('build: { rollupOptions: { plugins: [] } }');
+    expect(r.content).toContain('plugins: [hypdriv()]');
+  });
+
+  it('keeps a property whose value is not an array literal and spreads it', () => {
+    const shorthand = add(`const plugins = [react()];\nexport default defineConfig({ plugins });\n`);
+    expect(shorthand.content).toContain('defineConfig({ plugins: [hypdriv(), ...plugins] })');
+    const call = add(`export default defineConfig({ plugins: makePlugins(), base: '/' });\n`);
+    expect(call.content).toContain("plugins: [hypdriv(), ...makePlugins()], base: '/'");
+    const last = add(`export default defineConfig({ plugins: makePlugins() });\n`, { position: 'last' });
+    expect(last.content).toContain('plugins: [...makePlugins(), hypdriv()]');
+    // Nothing is registered twice, and no second `plugins` key is created.
+    const again = add(call.content);
+    expect(again.changed).toBe(false);
+    expect(add(call.content).content.match(/plugins:/g)).toHaveLength(1);
+  });
+
+  it('skips spreads and methods while looking for the property', () => {
+    const source = `export default defineConfig({\n  ...base,\n  resolve() { return { plugins: [] }; },\n  plugins: [react()],\n});\n`;
+    expect(add(source).content).toContain('plugins: [hypdriv(), react()]');
+  });
+
+  it('reaches into a nested object on request', () => {
+    const source = `export default defineConfig({\n  vite: { plugins: [tailwind()] },\n  plugins: [top()],\n});\n`;
+    const r = add(source, { within: 'vite', position: 'first' });
+    expect(r.content).toContain('vite: { plugins: [hypdriv(), tailwind()] }');
+    expect(r.content).toContain('plugins: [top()]');
+    expect(add(`export default defineConfig({});\n`, { within: 'vite' })).toMatchObject({
+      changed: false,
+      reason: 'no vite object',
+    });
+  });
+});
+
+describe('configObjectStart for function configs', () => {
+  it('picks the final return of the function body, not an early exit', () => {
+    const source = `export default defineConfig(({ mode }) => {\n  if (mode === 'test') return { test: true };\n  const base = { a: 1 };\n  return { plugins: [react()] };\n});\n`;
+    const start = configObjectStart(source);
+    expect(source.slice(start, start + 22)).toBe('{ plugins: [react()] }');
+  });
+
+  it('ignores returns inside nested blocks and functions', () => {
+    const source = `export default defineConfig(() => {\n  const f = () => { return { nested: true }; };\n  return { plugins: [] };\n});\n`;
+    const start = configObjectStart(source);
+    expect(source.slice(start, start + 15)).toBe('{ plugins: [] }');
   });
 });
