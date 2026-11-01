@@ -25,6 +25,7 @@ import {
   nodeEnvironment,
   orderStages,
   type ResolvedConfig,
+  type RouteMatcher,
   runPipeline,
   type Stage,
   sanitizeInboundRequest,
@@ -132,6 +133,17 @@ function isLocalHost(hostname: string): boolean {
     hostname === '[::1]' ||
     hostname.endsWith('.localhost')
   );
+}
+
+/**
+ * Whether a request is for a static asset the Worker passes through untouched: everything under
+ * `/_next/static/`, and paths with an asset extension that no route of the manifest answers.
+ */
+function isStaticAssetRequest(matcher: RouteMatcher, pathname: string): boolean {
+  if (pathname.startsWith('/_next/static/')) return true;
+  if (!looksLikeStaticAsset(pathname) || pathname.startsWith('/api/')) return false;
+  const hit = matcher.match(pathname);
+  return hit === null || hit.route.kind === 'static-file';
 }
 
 /**
@@ -266,11 +278,9 @@ export function createWorker(options: CreateWorkerOptions): HypDrivWorker {
     if (handled) return handled;
 
     // Static assets are normally served before the Worker; when they do arrive (run_worker_first), skip the pipeline.
-    if (
-      platform.config.cloudflare.skipStaticAssets &&
-      (url.pathname.startsWith('/_next/static/') ||
-        (looksLikeStaticAsset(url.pathname) && !url.pathname.startsWith('/api/')))
-    ) {
+    // A path the application itself answers (`/feed.json`, `/sitemap.xml`, a Route Handler or endpoint of the
+    // manifest) only looks like an asset: it runs the stages (rate limits, shield, bots) like any other route.
+    if (platform.config.cloudflare.skipStaticAssets && isStaticAssetRequest(platform.matcher, url.pathname)) {
       return invokeNext(request, env, exec);
     }
 

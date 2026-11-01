@@ -122,6 +122,60 @@ describe('createWorker fetch', () => {
     expect(next.loader).toHaveBeenCalledTimes(1);
   });
 
+  it('skips the pipeline for static assets but runs it for routes the application answers', async () => {
+    const withFeed: HypManifest = emptyManifest({
+      ...manifest,
+      routes: [
+        ...manifest.routes,
+        {
+          id: 'route:/feed.json',
+          pathname: '/feed.json',
+          regex: routePatternToRegex('/feed.json'),
+          kind: 'app-route',
+          classification: 'route',
+          runtime: 'nodejs',
+          dynamic: false,
+          assets: { js: [], css: [], fonts: [] },
+        },
+        {
+          id: 'static:/logo.png',
+          pathname: '/logo.png',
+          regex: routePatternToRegex('/logo.png'),
+          kind: 'static-file',
+          classification: 'static',
+          runtime: 'nodejs',
+          dynamic: false,
+          assets: { js: [], css: [], fonts: [] },
+        },
+      ],
+    });
+    const next = fakeNext((req) => new Response(new URL(req.url).pathname));
+    const worker = createWorker({
+      config: { site: { name: 'shop' } },
+      next: next.loader,
+      manifest: withFeed,
+    });
+    const run = (path: string) => worker.fetch(request(path), {}, createFakeExecutionContext());
+
+    // Assets (declared or not) and Next's static files pass straight through.
+    for (const path of ['/logo.png', '/other.css', '/_next/static/chunks/a.js']) {
+      const response = await run(path);
+      expect(response.headers.get('x-hypdriv-request-id'), path).toBeNull();
+    }
+    // The application's own `.json` route is a route like any other.
+    const feed = await run('/feed.json');
+    expect(feed.headers.get('x-hypdriv-request-id')).toBeTruthy();
+    expect(await feed.text()).toBe('/feed.json');
+    // Unless the project turned the shortcut off for everything.
+    const noSkip = createWorker({
+      config: { site: { name: 'shop' }, cloudflare: { skipStaticAssets: false } },
+      next: fakeNext().loader,
+      manifest: withFeed,
+    });
+    const logo = await noSkip.fetch(request('/other.css'), {}, createFakeExecutionContext());
+    expect(logo.headers.get('x-hypdriv-request-id')).toBeTruthy();
+  });
+
   it('answers the health endpoint with build and capability information', async () => {
     const worker = createWorker({ config: { site: { name: 'shop' } }, next: fakeNext().loader, manifest });
     const response = await worker.fetch(

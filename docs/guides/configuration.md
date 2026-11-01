@@ -139,6 +139,8 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 `{ bindings: { kv: 'HYPDRIV_KV', tagIndex: 'HYPDRIV_INDEX', limiter: 'HYPDRIV_LIMITER', channel: 'HYPDRIV_CHANNEL', rateLimit: 'HYPDRIV_RATE_LIMIT', analyticsEngine: 'HYPDRIV_ANALYTICS', images: 'IMAGES', assets: 'ASSETS', queues: {}, ai: 'AI' }, smartPlacement: false, runWorkerFirst: false, internalPathPrefix: '/_hypdriv', skipStaticAssets: true, health: true }`.
 
+`skipStaticAssets` lets static files that reach the Worker (`run_worker_first`) bypass the pipeline: everything under `/_next/static/` and paths with an asset extension (`.js`, `.css`, `.json`, `.xml`, `.png`, …) that no application route answers. A path the manifest knows as a route (a Route Handler or endpoint such as `/feed.json` or `/sitemap.xml`) runs the stages like any other route, so rate limits, the shield and bot rules still apply to it.
+
 ## `devtools`, `i18n`, `redirects`, `maintenance`, `stages`
 
 - `devtools`: `{ enabled: 'development' | 'preview' | boolean, hotkey: 'Alt+Shift+H', position: 'bottom-right', endpoint: '/_hypdriv/dev' }`
