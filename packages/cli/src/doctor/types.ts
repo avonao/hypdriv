@@ -8,6 +8,7 @@ export type CheckCategory =
   | 'environment'
   | 'nextjs'
   | 'vite'
+  | 'waku'
   | 'hono'
   | 'opennext'
   | 'wrangler'
@@ -23,6 +24,7 @@ export const CHECK_CATEGORIES: CheckCategory[] = [
   'environment',
   'nextjs',
   'vite',
+  'waku',
   'hono',
   'opennext',
   'wrangler',
@@ -39,6 +41,7 @@ export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   environment: 'Environment',
   nextjs: 'Next.js',
   vite: 'Vite host',
+  waku: 'Waku host',
   hono: 'Hono app',
   opennext: 'OpenNext',
   wrangler: 'Wrangler',

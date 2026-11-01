@@ -1,0 +1,10 @@
+{
+  // The Durable Object re-export is typed against the Workers sources it re-exports, so it gets its own program:
+  // the package's code stays checked against DOM and Node types only (tsconfig.json excludes this file).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["src/durable-objects.ts"]
+}

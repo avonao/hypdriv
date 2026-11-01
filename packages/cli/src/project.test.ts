@@ -217,6 +217,45 @@ export default defineConfig({
   );
 });
 
+describe('Waku detection', () => {
+  it('detects Waku before Hono and Vite and finds waku.config', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({
+        name: 'wk',
+        dependencies: { waku: '1.0.0-rc.4', hono: '^4.12.14' },
+        devDependencies: { vite: '^8.3.5' },
+      }),
+      ...installed('waku', '1.0.0-rc.4'),
+      ...installed('@hypdriv/waku', '0.1.0'),
+      'waku.config.ts':
+        "import { withHypDriv } from '@hypdriv/waku';\nexport default defineConfig(withHypDriv({}));\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'waku',
+      version: '1.0.0-rc.4',
+      integration: '@hypdriv/waku',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.framework.configFile).toMatch(/waku\.config\.ts$/);
+    expect(info.hypdriv.packages['@hypdriv/waku']).toBe('0.1.0');
+  });
+
+  it('reports a Waku project whose config does not reference the integration as unregistered', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'wk', dependencies: { waku: '1.0.0-rc.4' } }),
+      ...installed('waku', '1.0.0-rc.4'),
+      'waku.config.mjs': 'export default {};\n',
+    });
+    expect(detectProject(p.dir, { env: {} }).framework).toMatchObject({
+      name: 'waku',
+      integrationInstalled: null,
+      registered: false,
+    });
+  });
+});
+
 describe('platform detection', () => {
   it('detects Vercel from vercel.json, the VERCEL env and @hypdriv/vercel', () => {
     const p = tempProject({

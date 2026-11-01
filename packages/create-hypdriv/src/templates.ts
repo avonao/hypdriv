@@ -15,7 +15,15 @@ export type Platform = 'cloudflare' | 'vercel' | 'node';
 
 /** Frameworks the scaffolder supports: Next.js and the Vite hosts (ADR 0019). */
 export type Framework = 'next' | AppHost;
-export type ViteHost = 'vite' | 'react-router' | 'tanstack-start' | 'astro' | 'sveltekit' | 'nuxt' | 'vinext';
+export type ViteHost =
+  | 'vite'
+  | 'react-router'
+  | 'tanstack-start'
+  | 'astro'
+  | 'sveltekit'
+  | 'nuxt'
+  | 'vinext'
+  | 'waku';
 export const VITE_HOSTS: readonly ViteHost[] = [
   'vite',
   'react-router',
@@ -24,6 +32,7 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'sveltekit',
   'nuxt',
   'vinext',
+  'waku',
 ];
 /** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
 export type ServerHost = 'hono';
@@ -50,6 +59,7 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   sveltekit: 'examples/sveltekit',
   nuxt: 'examples/nuxt',
   vinext: 'examples/vinext',
+  waku: 'examples/waku',
   hono: 'examples/hono',
 };
 

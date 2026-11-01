@@ -1,0 +1,7 @@
+# Waku, Hypdriv and platform build output
+dist/
+.hypdriv/
+.vercel/
+.wrangler/
+.dev.vars
+.env.local

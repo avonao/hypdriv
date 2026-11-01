@@ -1,11 +1,11 @@
 ---
 name: hypdriv
-description: Adopt, configure and operate Hypdriv (the Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext — on Cloudflare Workers, Vercel and Node) in an application — install, wire the framework integration/proxy/worker entry, tune caching, CSP, rate limits, flags, jobs, Purser CSS and observability, and verify with the hypdriv CLI.
+description: Adopt, configure and operate Hypdriv (the Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku — on Cloudflare Workers, Vercel and Node) in an application — install, wire the framework integration/proxy/worker entry, tune caching, CSP, rate limits, flags, jobs, Purser CSS and observability, and verify with the hypdriv CLI.
 ---
 
 # Hypdriv for coding agents
 
-Use this skill when a Next.js 16+ project or a Vite-based app (plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext) should run with Hypdriv on Cloudflare Workers, Vercel or Node, or when an existing Hypdriv setup needs configuration, diagnosis or verification. The deploy target comes from `hypdriv.config.ts#platform` (`auto` detects it; Vite hosts also read `HYPDRIV_TARGET` at build time); pass `--platform cloudflare|vercel|node` to CLI commands to override.
+Use this skill when a Next.js 16+ project or a Vite-based app (plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku 1) should run with Hypdriv on Cloudflare Workers, Vercel or Node, or when an existing Hypdriv setup needs configuration, diagnosis or verification. The deploy target comes from `hypdriv.config.ts#platform` (`auto` detects it; Vite hosts also read `HYPDRIV_TARGET` at build time); pass `--platform cloudflare|vercel|node` to CLI commands to override.
 
 ## 1. Detect the situation
 
@@ -34,13 +34,13 @@ pnpm add hypdriv && npx hypdriv init [--platform vercel]
 5. adds scripts: `hypdriv:doctor`, `hypdriv:analyze`, `hypdriv:audit`,
 6. optionally scaffolds the Purser bridge when `@avonao/purser` is installed.
 
-For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext|hono` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
-1. writes `hypdriv.config.ts` and adds the framework package (`@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt` or `@hypdriv/vinext`),
-2. registers the integration in the framework's config (Vite plugin, React Router preset, Astro integration, SvelteKit adapter wrapper, Nuxt module) and wires the request hook the framework owns (root `middleware`, `src/start.ts`, `handle`, `proxy.ts`),
+For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext|waku|hono` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
+1. writes `hypdriv.config.ts` and adds the framework package (`@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` or `@hypdriv/waku`),
+2. registers the integration in the framework's config (Vite plugin, React Router preset, Astro integration, SvelteKit adapter wrapper, Nuxt module, Waku `withHypDriv()` config wrapper) and wires the request hook the framework owns (root `middleware`, `src/start.ts`, `handle`, `proxy.ts`),
 3. on Cloudflare: writes the Worker entry and wrangler `main`, the assets binding and `run_worker_first` patterns (prerendered pages run the request stages through the Worker shell and are still served as built), plus the Durable Object exports; on Vercel the integration writes the Build Output with Hypdriv's Routing Middleware scoped to prerendered pages,
 4. prints the install commands for the framework's own adapter when one is missing.
 
-Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext,hono}.md`.
+Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext,waku,hono}.md`.
 
 Never hand-edit `.hypdriv/` — it is build output.
 

@@ -22,4 +22,5 @@
 | [0018](0018-tag-revalidated-prerenders.md) | Prerenders with explicit cache tags are classified `isr`                     | accepted |
 | [0019](0019-vite-hosts.md)             | Vite hosts: one runtime and one build engine for every framework                 | accepted |
 | [0020](0020-hono-host.md)              | Hono: a server-framework host without a build step                               | accepted |
+| [0021](0021-waku-host.md)              | Waku: a server-entry adapter for a Vite RSC framework                            | accepted |
 | [0022](0022-edge-experiments.md)       | Edge A/B experiments are flags with an `experiment` block                       | accepted |
