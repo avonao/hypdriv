@@ -1,6 +1,6 @@
 # @hypdriv/vite
 
-[Hypdriv](https://github.com/avonao/hypdriv) for Vite 8: the plugin for plain Vite apps and the toolkit behind `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` and `@hypdriv/waku`.
+[Hypdriv](https://github.com/avonao/hypdriv) for Vite 8: the plugin for plain Vite apps and the toolkit behind `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`, `@hypdriv/waku` and `@hypdriv/rwsdk`.
 
 ## Plain Vite apps
 

@@ -24,3 +24,4 @@
 | [0020](0020-hono-host.md)              | Hono: a server-framework host without a build step                               | accepted |
 | [0021](0021-waku-host.md)              | Waku: a server-entry adapter for a Vite RSC framework                            | accepted |
 | [0022](0022-edge-experiments.md)       | Edge A/B experiments are flags with an `experiment` block                       | accepted |
+| [0025](0025-rwsdk-host.md)             | RedwoodSDK: a Worker-entry wrapper for a Vite RSC framework on Workers           | accepted |
