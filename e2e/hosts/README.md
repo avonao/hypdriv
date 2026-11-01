@@ -1,6 +1,6 @@
 # Live checks for Hypdriv's Vite hosts
 
-One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku and Hono — on Cloudflare Workers, Vercel or a Node server. The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
+One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, SolidStart and Hono — on Cloudflare Workers, Vercel or a Node server. The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
 
 ```sh
 pnpm -F @hypdriv/e2e-hosts check --url https://<deployment> --framework vite \
@@ -55,6 +55,8 @@ VERCEL_AUTOMATION_BYPASS_SECRET=$(jq -r .VERCEL_AUTOMATION_BYPASS_SECRET acme-hy
 ```
 
 `provision vercel` creates the project when missing, turns on Vercel Authentication for every deployment (`ssoProtection: all`, available on Hobby) and stores an automation bypass in `<name>.vercel.secrets.local.json` (mode 600, git-ignored). Never put an account token into a deployment's environment.
+
+SolidStart (`--framework solid-start`; the health check matches `SolidStart`) builds on Cloudflare with `@cloudflare/vite-plugin` (its example reads `WRANGLER_CONFIG` like plain Vite) and on Vercel and Node through Nitro; its Vercel project needs no `--framework` preset because the prebuilt Build Output already carries Nitro's function. On Node and Vercel `--static / --static /about` are the Nitro-prerendered pages (hash-based CSP); on Cloudflare every page renders per request, so the pages check as nonce-based dynamic pages.
 
 ## Results
 

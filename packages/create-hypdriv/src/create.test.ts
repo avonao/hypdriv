@@ -68,6 +68,7 @@ describe('template sync', () => {
       'nuxt',
       'vinext',
       'waku',
+      'solid-start',
       'hono',
     ]) {
       const files = manifest.templates[host]!;
@@ -75,7 +76,9 @@ describe('template sync', () => {
       expect(files).toContain('.dev.vars.example');
       expect(files).toContain('.env.example');
       expect(
-        files.some((f) => /^(dist|build|\.svelte-kit|\.output|\.nuxt|\.astro|\.react-router)\//.test(f)),
+        files.some((f) =>
+          /^(dist|build|\.svelte-kit|\.output|\.nuxt|\.astro|\.react-router|\.nitro|\.solid)\//.test(f),
+        ),
       ).toBe(false);
       expect(files).not.toContain('biome.json');
     }
@@ -84,6 +87,10 @@ describe('template sync', () => {
     expect(manifest.templates.waku).toContain('waku.config.ts');
     expect(manifest.templates.waku).toContain('wrangler.jsonc');
     expect(manifest.templates.waku).toContain('src/pages/_api/api/hello.ts');
+    expect(manifest.templates['solid-start']).toContain('vite.config.ts');
+    expect(manifest.templates['solid-start']).toContain('wrangler.jsonc');
+    expect(manifest.templates['solid-start']).toContain('src/entry-server.tsx');
+    expect(manifest.templates['solid-start']).toContain('src/worker.ts');
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
     for (const files of Object.values(manifest.templates))
@@ -413,6 +420,35 @@ describe('cli', () => {
       expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
       expect(readFileSync(join(root, 'waku.config.ts'), 'utf8')).toContain('withHypDriv(');
       expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+    }
+  });
+
+  it('scaffolds a SolidStart app for every platform with the build and run steps of its target', async () => {
+    for (const [platform, expected] of [
+      ['node', 'build:node'],
+      ['cloudflare', 'deploy:cloudflare'],
+      ['vercel', 'build:vercel'],
+    ] as const) {
+      const t = io(['docs', '--framework', 'solid-start', '--platform', platform, '--no-git', '--json'], {
+        run: () => 0,
+      });
+      expect(await main(t.value)).toBe(0);
+      const out = JSON.parse(t.out.join('')) as { template: string; framework: string; next: string[] };
+      expect(out).toMatchObject({ template: 'solid-start', framework: 'solid-start' });
+      expect(out.next.join('\n')).toContain(expected);
+      const root = join(t.cwd, 'docs');
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+        name: string;
+        dependencies: Record<string, string>;
+      };
+      expect(pkg.name).toBe('docs');
+      expect(pkg.dependencies['@hypdriv/solid-start']).toMatch(/^\^0\./);
+      expect(pkg.dependencies['@solidjs/start']).toMatch(/^2\./);
+      expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+      expect(readFileSync(join(root, 'vite.config.ts'), 'utf8')).toContain('hypdriv(');
+      expect(readFileSync(join(root, 'wrangler.jsonc'), 'utf8')).toContain('"name": "docs"');
+      expect(existsSync(join(root, 'tsconfig.json'))).toBe(true);
+      expect(readFileSync(join(root, 'tsconfig.json'), 'utf8')).not.toContain('customConditions');
     }
   });
 

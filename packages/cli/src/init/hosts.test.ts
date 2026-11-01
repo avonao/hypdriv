@@ -6,6 +6,7 @@ import { canEvaluateCloudflareConfig } from '../cloudflare-config';
 import { runCommand } from '../main';
 import { parseJsonc } from '../wrangler-config';
 import { addToConfigArray, configObjectStart, importsModule } from './config-edit';
+import { addHypdrivStart } from './hosts';
 
 afterEach(cleanupProjects);
 
@@ -544,5 +545,169 @@ export default defineConfig({
     expect(wrangler.name).toBe('my-waku');
     expect(wrangler.main).toBe('./src/waku.server');
     expect(wrangler.durable_objects.bindings).toHaveLength(3);
+  });
+
+  const solid = {
+    'package.json': JSON.stringify({
+      name: 'sol',
+      dependencies: { '@solidjs/start': '^2.1.0', 'solid-js': '^1.9.18' },
+      devDependencies: { vite: '^8.3.5' },
+    }),
+    ...installed('@solidjs/start', '2.1.0'),
+  };
+  const solidEntry =
+    "import { createHandler, StartServer } from '@solidjs/start/server';\n\nexport default createHandler(() => (\n  <StartServer document={({ assets, children, scripts }) => <html><head>{assets}</head><body>{children}{scripts}</body></html>} />\n));\n";
+  const solidConfig =
+    "import { solidStart } from '@solidjs/start/config';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({\n  plugins: [solidStart()],\n});\n";
+
+  it('SolidStart: cloudflare() after solidStart(), hypdrivStart() in the server entry, the Worker shell and wrangler settings', async () => {
+    const { p, out } = await init(
+      { ...solid, 'vite.config.ts': solidConfig, 'src/entry-server.tsx': solidEntry },
+      'cloudflare',
+    );
+    const vite = p.read('vite.config.ts');
+    expect(vite).toContain("import { hypdriv } from '@hypdriv/solid-start/vite';");
+    expect(vite).toContain("import { cloudflare } from '@cloudflare/vite-plugin';");
+    expect(vite).toMatch(
+      /plugins: \[solidStart\(\), cloudflare\(\{ viteEnvironment: \{ name: 'ssr' \} \}\), hypdriv\(\)\]/,
+    );
+    const entry = p.read('src/entry-server.tsx');
+    expect(entry).toContain("import { hypdrivStart } from '@hypdriv/solid-start';");
+    expect(entry).toMatch(/\), hypdrivStart\(\)\);/);
+    const worker = p.read('src/worker.ts');
+    expect(worker).toContain('createSolidStartWorker');
+    expect(worker).toContain("entry: () => import('./entry-server')");
+    expect(worker).toContain('durable-objects');
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler).toMatchObject({
+      main: 'src/worker.ts',
+      assets: { binding: 'ASSETS', run_worker_first: ['/*', '!/_build/assets/*'] },
+    });
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+    const pkg = JSON.parse(p.read('package.json')) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies['@hypdriv/solid-start']).toBeDefined();
+    expect(pkg.dependencies['@hypdriv/cloudflare']).toBeDefined();
+    expect(pkg.scripts['hypdriv:audit']).toContain('8787');
+    expect(out.notes.join('\n')).toContain('cloudflare_module');
+  });
+
+  it('SolidStart: Vercel and Node register nitro() with an explicit preset right before hypdriv()', async () => {
+    const files = { ...solid, 'vite.config.ts': solidConfig, 'src/entry-server.tsx': solidEntry };
+    const vercel = await init(files, 'vercel');
+    expect(vercel.p.read('vite.config.ts')).toMatch(
+      /plugins: \[solidStart\(\), nitro\(\{ preset: 'vercel' \}\), hypdriv\(\)\]/,
+    );
+    expect(vercel.p.read('vite.config.ts')).toContain("import { nitro } from 'nitro/vite';");
+    expect(existsSync(join(vercel.p.dir, 'src', 'worker.ts'))).toBe(false);
+    expect(existsSync(join(vercel.p.dir, 'wrangler.jsonc'))).toBe(false);
+    expect(vercel.out.notes.join('\n')).toContain('prerender');
+
+    const node = await init(files, 'node');
+    expect(node.p.read('vite.config.ts')).toContain("nitro({ preset: 'node-server' }), hypdriv()");
+    expect(JSON.parse(node.p.read('package.json')).scripts.start).toBe('node .output/server/index.mjs');
+    expect(node.out.notes.join('\n')).toContain('.output/server/index.mjs');
+  });
+
+  it('SolidStart: a registration that is already there is not repeated', async () => {
+    const { p, out } = await init(
+      {
+        ...solid,
+        'vite.config.ts':
+          "import { hypdriv } from '@hypdriv/solid-start/vite';\nimport { solidStart } from '@solidjs/start/config';\nimport { nitro } from 'nitro/vite';\n\nexport default defineConfig({ plugins: [solidStart(), nitro({ preset: 'node-server' }), hypdriv()] });\n",
+        'src/entry-server.tsx': solidEntry.replace('));', '), hypdrivStart());'),
+      },
+      'node',
+    );
+    expect(p.read('vite.config.ts').match(/hypdriv\(\)/g)).toHaveLength(1);
+    expect(p.read('vite.config.ts').match(/nitro\(/g)).toHaveLength(1);
+    expect(out.plan.find((i) => i.path === 'vite.config.ts')?.action).toBe('skip');
+    expect(out.plan.find((i) => i.path === 'src/entry-server.tsx')?.action).toBe('skip');
+  });
+
+  it('SolidStart: a project without vite.config or server entry gets both', async () => {
+    const node = await init(solid, 'node');
+    expect(node.p.read('vite.config.ts')).toContain(
+      "plugins: [solidStart(), nitro({ preset: 'node-server' }), hypdriv()]",
+    );
+    expect(node.p.read('vite.config.ts')).toContain('prerender');
+    expect(node.p.read('src/entry-server.tsx')).toContain('hypdrivStart()');
+    const cf = await init(solid, 'cloudflare');
+    expect(cf.p.read('vite.config.ts')).toContain("cloudflare({ viteEnvironment: { name: 'ssr' } })");
+    expect(cf.p.read('vite.config.ts')).not.toContain('nitro');
+  });
+
+  it('SolidStart: render options the app already has, and SolidStart 1, are left for the developer', async () => {
+    const options = await init(
+      {
+        ...solid,
+        'vite.config.ts': solidConfig,
+        'src/entry-server.tsx': solidEntry.replace('));', '), { mode: "async" });'),
+      },
+      'node',
+    );
+    expect(options.out.plan.find((i) => i.path === 'src/entry-server.tsx')?.action).toBe('manual');
+    expect(options.p.read('src/entry-server.tsx')).not.toContain('hypdrivStart');
+
+    const v1 = await init(
+      {
+        'package.json': JSON.stringify({ name: 'old', dependencies: { '@solidjs/start': '^1.3.2' } }),
+        ...installed('@solidjs/start', '1.3.2'),
+        'app.config.ts':
+          "import { defineConfig } from '@solidjs/start/config';\nexport default defineConfig({});\n",
+      },
+      'node',
+    );
+    expect(v1.out.plan.find((i) => i.path === 'app.config.ts')?.action).toBe('manual');
+    expect(existsSync(join(v1.p.dir, 'vite.config.ts'))).toBe(false);
+  });
+
+  it('SolidStart: an existing wrangler config keeps its name and gets the missing settings', async () => {
+    const { p } = await init(
+      {
+        ...solid,
+        'vite.config.ts': solidConfig,
+        'src/entry-server.tsx': solidEntry,
+        'wrangler.jsonc':
+          '{\n  "name": "my-solid",\n  "main": "src/worker.ts",\n  "compatibility_date": "2026-10-01",\n  "compatibility_flags": ["nodejs_compat"]\n}\n',
+      },
+      'cloudflare',
+    );
+    const wrangler = parseJsonc(p.read('wrangler.jsonc')) as unknown as WranglerShape;
+    expect(wrangler.name).toBe('my-solid');
+    expect(wrangler.durable_objects.bindings).toHaveLength(3);
+    expect(wrangler.assets).toMatchObject({ run_worker_first: ['/*', '!/_build/assets/*'] });
+  });
+});
+
+describe('addHypdrivStart', () => {
+  it('adds the render options as the second argument of createHandler() and the import', () => {
+    const source =
+      "import { createHandler, StartServer } from '@solidjs/start/server';\n\nexport default createHandler(() => (\n  <StartServer document={() => <html />} />\n));\n";
+    const r = addHypdrivStart(source);
+    expect(r.changed).toBe(true);
+    expect(r.content).toContain("import { hypdrivStart } from '@hypdriv/solid-start';");
+    expect(r.content).toContain('<StartServer document={() => <html />} />\n), hypdrivStart());');
+    expect(addHypdrivStart(r.content)).toMatchObject({
+      changed: false,
+      reason: expect.stringContaining('already'),
+    });
+  });
+
+  it('puts it after a function with a trailing comma and leaves existing options alone', () => {
+    expect(addHypdrivStart('export default createHandler(() => <App />,\n);').content).toContain(
+      'createHandler(() => <App />, hypdrivStart(),\n)',
+    );
+    const withOptions = addHypdrivStart("export default createHandler(() => <App />, { mode: 'async' });");
+    expect(withOptions.changed).toBe(false);
+    expect(withOptions.reason).toContain('render options');
+  });
+
+  it('reports a file it cannot place it in', () => {
+    expect(addHypdrivStart('export default 1;').reason).toContain('no createHandler()');
+    expect(addHypdrivStart('export default createHandler();').reason).toContain('no render function');
+    expect(addHypdrivStart('export default createHandler(() => (').reason).toContain('could not parse');
   });
 });

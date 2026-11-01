@@ -23,7 +23,8 @@ export type ViteHost =
   | 'sveltekit'
   | 'nuxt'
   | 'vinext'
-  | 'waku';
+  | 'waku'
+  | 'solid-start';
 export const VITE_HOSTS: readonly ViteHost[] = [
   'vite',
   'react-router',
@@ -33,6 +34,7 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'nuxt',
   'vinext',
   'waku',
+  'solid-start',
 ];
 /** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
 export type ServerHost = 'hono';
@@ -60,6 +62,7 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   nuxt: 'examples/nuxt',
   vinext: 'examples/vinext',
   waku: 'examples/waku',
+  'solid-start': 'examples/solid-start',
   hono: 'examples/hono',
 };
 
@@ -104,6 +107,8 @@ const EXCLUDED = new Set([
   '.react-router',
   '.tanstack',
   '.vinext',
+  '.nitro',
+  '.solid',
   // Monorepo-only configuration (extends the repository's root config)
   'biome.json',
 ]);

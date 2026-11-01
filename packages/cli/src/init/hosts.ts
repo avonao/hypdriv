@@ -5,7 +5,14 @@ import type { LoadedConfig } from '../context';
 import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
 import { cloudflareConfigHint, defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
-import { addToConfigArray, configObjectStart, wrapCallArgument, wrapPropertyValue } from './config-edit';
+import {
+  addToConfigArray,
+  configObjectStart,
+  expressionEnd,
+  matchClose,
+  wrapCallArgument,
+  wrapPropertyValue,
+} from './config-edit';
 import { insertImport } from './next-config';
 import { editPackageJson } from './package-json';
 import { type InitOptions, type InitPlan, type InitPlatform, type PlanItem, planVercel } from './plan';
@@ -1290,6 +1297,233 @@ export const WAKU_SPEC: HostSpec = {
         : null,
 };
 
+const SOLID_START_CLOUDFLARE_PLUGIN = "cloudflare({ viteEnvironment: { name: 'ssr' } })";
+
+/** The Nitro plugin for a platform: Vercel and Node both build through Nitro, with an explicit preset. */
+const solidStartNitro = (platform: InitPlatform) =>
+  `nitro({ preset: '${platform === 'vercel' ? 'vercel' : 'node-server'}' })`;
+
+/** A new `vite.config.ts` for a SolidStart 2 project without one: SolidStart, its deployment plugin and Hypdriv. */
+export function solidStartConfigTemplate(platform: InitPlatform): string {
+  const cf = platform === 'cloudflare';
+  return `${cf ? `${CLOUDFLARE_PLUGIN_IMPORT}\n` : ''}import { hypdriv } from '@hypdriv/solid-start/vite';
+import { solidStart } from '@solidjs/start/config';
+${cf ? '' : "import { nitro } from 'nitro/vite';\n"}import { defineConfig } from 'vite';
+
+export default defineConfig({
+  // hypdriv() last: it finalises the manifest once Nitro has built and prerendered.
+  plugins: [solidStart(), ${cf ? SOLID_START_CLOUDFLARE_PLUGIN : solidStartNitro(platform)}, hypdriv()],${
+    cf
+      ? ''
+      : "\n  // SolidStart prerenders through Nitro only: pages listed here become static files with a hash-based CSP.\n  nitro: { prerender: { routes: ['/'] } },"
+  }
+});
+`;
+}
+
+/** SolidStart's default `src/entry-server.tsx` with Hypdriv's render options. */
+export function solidStartServerEntryTemplate(): string {
+  return `// @refresh reload
+import { hypdrivStart } from '@hypdriv/solid-start';
+import { createHandler, StartServer } from '@solidjs/start/server';
+
+// hypdrivStart() hands the request's CSP nonce to Solid, so the scripts it renders carry the nonce Hypdriv's policy allows.
+export default createHandler(
+  () => (
+    <StartServer
+      document={({ assets, children, scripts }) => (
+        <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <link rel="icon" href="/favicon.ico" />
+            {assets}
+          </head>
+          <body>
+            <div id="app">{children}</div>
+            {scripts}
+          </body>
+        </html>
+      )}
+    />
+  ),
+  hypdrivStart(),
+);
+`;
+}
+
+/** The Cloudflare Worker entry of a SolidStart app: Hypdriv's shell around SolidStart's server entry. */
+export function solidStartWorkerTemplate(): string {
+  return `/// <reference types="@hypdriv/solid-start/virtual" />
+import config from 'virtual:hypdriv/config';
+import { createSolidStartWorker } from '@hypdriv/solid-start/cloudflare';
+
+${DO_EXPORTS}
+
+// Hypdriv's Worker shell around SolidStart: the request stages and the CSP run here; scheduled/queue/email dispatch jobs.
+export default createSolidStartWorker({
+  config,
+  manifest: () => import('virtual:hypdriv/manifest'),
+  entry: () => import('./entry-server'),
+});
+`;
+}
+
+/**
+ * Passes `hypdrivStart()` as the render options of `createHandler(fn)` in SolidStart's server entry:
+ * `createHandler(fn)` → `createHandler(fn, hypdrivStart())`. An entry that already has options is left for the
+ * developer (they spread `hypdrivStart()` into theirs).
+ */
+export function addHypdrivStart(source: string): { changed: boolean; content: string; reason: string } {
+  if (/\bhypdrivStart\s*\(/.test(source))
+    return { changed: false, content: source, reason: 'createHandler() already uses hypdrivStart()' };
+  const call = /(^|[^\w$.])createHandler\s*\(/.exec(source);
+  if (!call) return { changed: false, content: source, reason: 'no createHandler() call found' };
+  const open = call.index + call[0].length - 1;
+  const close = matchClose(source, open);
+  if (close === -1) return { changed: false, content: source, reason: 'could not parse createHandler()' };
+  const inner = source.slice(open + 1, close);
+  if (!inner.trim())
+    return { changed: false, content: source, reason: 'createHandler() has no render function' };
+  const argStart = open + 1 + (inner.length - inner.trimStart().length);
+  const argEnd = expressionEnd(source, argStart);
+  if (argEnd === -1 || argEnd > close)
+    return { changed: false, content: source, reason: 'could not parse createHandler()' };
+  if (source.slice(argEnd, close).replace(/,/g, '').trim())
+    return {
+      changed: false,
+      content: source,
+      reason: 'createHandler() has render options of its own; spread hypdrivStart() into them',
+    };
+  const arg = source.slice(argStart, argEnd).replace(/\s+$/, '');
+  const out = `${source.slice(0, argStart)}${arg}, hypdrivStart()${source.slice(argStart + arg.length)}`;
+  return {
+    changed: true,
+    content: insertImport(out, "import { hypdrivStart } from '@hypdriv/solid-start';", 'esm'),
+    reason: 'pass hypdrivStart() to createHandler()',
+  };
+}
+
+export const SOLID_START_SPEC: HostSpec = {
+  framework: 'solid-start',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/solid-start', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/solid-start', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare'
+      ? { devDependencies: ['@cloudflare/vite-plugin', 'wrangler', '@cloudflare/workers-types'] }
+      : { dependencies: ['nitro'] },
+  register(ctx) {
+    const cf = ctx.platform === 'cloudflare';
+    const configured = ctx.project.framework.configFile;
+    const major = /(\d+)\./.exec(ctx.project.framework.version ?? '')?.[1];
+    if (major !== undefined && Number(major) < 2) {
+      ctx.items.push({
+        path: configured ? rel(ctx.project.root, configured) : 'app.config.ts',
+        action: 'manual',
+        reason: 'SolidStart 1 (Vinxi) is not supported; upgrade to SolidStart 2, which builds with Vite',
+        hint: 'Upgrade @solidjs/start to 2.x (vite.config.ts with solidStart() and a deployment plugin), then run `hypdriv init` again.',
+      });
+      return;
+    }
+    registerInConfig(
+      ctx,
+      [
+        {
+          element: 'hypdriv()',
+          importLine: "import { hypdriv } from '@hypdriv/solid-start/vite';",
+          from: '@hypdriv/solid-start/vite',
+        },
+        // The deployment plugin, right before hypdriv(): SolidStart 2 deploys through Nitro or @cloudflare/vite-plugin.
+        cf
+          ? {
+              element: SOLID_START_CLOUDFLARE_PLUGIN,
+              importLine: CLOUDFLARE_PLUGIN_IMPORT,
+              from: '@cloudflare/vite-plugin',
+              before: /hypdriv\s*\(/,
+              present: /(^|[^\w$.])(?:cloudflare|nitro)\s*\(/,
+            }
+          : {
+              element: solidStartNitro(ctx.platform),
+              importLine: "import { nitro } from 'nitro/vite';",
+              from: 'nitro/vite',
+              before: /hypdriv\s*\(/,
+              present: /(^|[^\w$.])(?:nitro|cloudflare)\s*\(/,
+            },
+      ],
+      {
+        file: /vite\.config\./,
+        property: 'plugins',
+        fallback: { path: 'vite.config.ts', content: solidStartConfigTemplate(ctx.platform) },
+      },
+    );
+    const vite = ctx.items.find((i) => /vite\.config\./.test(i.path) && i.action !== 'manual');
+    if (vite?.content && !/\bsolidStart\s*\(/.test(vite.content))
+      ctx.notes.push(
+        'vite.config: SolidStart 2 needs solidStart() from @solidjs/start/config as the first plugin.',
+      );
+    const entry = ['tsx', 'jsx', 'ts', 'js']
+      .map((ext) => `src/entry-server.${ext}`)
+      .find((f) => existsSync(join(ctx.project.root, f)));
+    planFileEdit(ctx, entry ?? 'src/entry-server.tsx', addHypdrivStart, {
+      fallback: solidStartServerEntryTemplate(),
+      done: /hypdrivStart/,
+      hint: "import { hypdrivStart } from '@hypdriv/solid-start';\nexport default createHandler(() => <StartServer … />, hypdrivStart());",
+    });
+    if (!cf)
+      ctx.notes.push(
+        "SolidStart prerenders only through Nitro: list static pages in `nitro: { prerender: { routes: ['/', '/about'] } }` in vite.config to serve them as files with a hash-based CSP (every other page renders per request with a nonce).",
+      );
+    if (ctx.platform === 'node')
+      ctx.notes.push(
+        'On Node, `vite build` writes .output/server/index.mjs; run it with `node .output/server/index.mjs` (PORT and HOST select the address). Behind a reverse proxy set `security.trustedProxies` in hypdriv.config.ts.',
+      );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare') {
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      const main = configured ?? 'src/worker.ts';
+      planWorkerEntry(ctx, main, solidStartWorkerTemplate(), /createSolidStartWorker|createWorker/);
+      const assets = { binding: 'ASSETS', run_worker_first: ['/*', '!/_build/assets/*'] };
+      planHostWrangler(ctx, {
+        main: configured ? null : main,
+        durableObjects: true,
+        assets: JSON.stringify(assets),
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main,
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            assets,
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+      ctx.notes.push(
+        "With @cloudflare/vite-plugin SolidStart renders every page per request (it prerenders only through Nitro); use Nitro's `cloudflare_module` preset instead of the Cloudflare plugin to ship prerendered pages as static assets.",
+      );
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "Nitro's `vercel` preset writes .vercel/output; Hypdriv adds its header routes, clean-URL overrides for prerendered pages and a Routing Middleware so the request stages run for them.",
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    ...(platform === 'node' ? { start: 'node .output/server/index.mjs' } : {}),
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev --config dist/server/wrangler.json' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'node .output/server/index.mjs' }
+        : null,
+};
+
 /** Specs per framework; frameworks without one get the generic plan (config + package + manual registration). */
 export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vite: VITE_SPEC,
@@ -1301,6 +1535,7 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   vinext: VINEXT_SPEC,
   hono: HONO_SPEC,
   waku: WAKU_SPEC,
+  'solid-start': SOLID_START_SPEC,
 };
 
 /** The init plan for a Vite host. */
