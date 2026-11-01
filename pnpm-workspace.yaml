@@ -31,6 +31,8 @@ catalog:
   tsx: ^4.23.15
   # Waku host (@hypdriv/waku)
   waku: 1.0.0-rc.4
+  # RedwoodSDK host (@hypdriv/rwsdk)
+  rwsdk: ^1.7.5
   # Vite hosts
   vite: ^8.3.5
   "@cloudflare/vite-plugin": ^1.66.0
