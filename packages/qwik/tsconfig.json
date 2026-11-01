@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "virtual.d.ts"],
+  // Workers-only re-export (its sources need @cloudflare/workers-types, which only the Workers packages reference).
+  "exclude": ["src/durable-objects.ts"]
+}

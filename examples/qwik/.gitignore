@@ -1,0 +1,9 @@
+# Qwik, Hypdriv and platform build output
+dist/
+server/
+.hypdriv/
+.vercel/
+.wrangler/
+.dev.vars
+.env.local
+tmp/

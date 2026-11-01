@@ -60,7 +60,10 @@ export async function sendWebResponse(
     headers[name] = value;
   });
   if (cookies.length) headers['set-cookie'] = cookies;
-  res.writeHead(response.status, response.statusText || undefined, headers);
+  // Without a status text the two-argument form: `on-headers` (behind Vite preview's `compression`) reads an
+  // `undefined` second argument as the headers and drops the real ones.
+  if (response.statusText) res.writeHead(response.status, response.statusText, headers);
+  else res.writeHead(response.status, headers);
   if (!response.body || method === 'HEAD' || response.status === 204 || response.status === 304) {
     res.end();
     void response.body?.cancel().catch(() => undefined);

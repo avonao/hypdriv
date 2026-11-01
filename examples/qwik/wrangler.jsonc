@@ -1,0 +1,27 @@
+{
+  // The Worker is dist/_worker.js (written by the Hypdriv Cloudflare adapter); the static client build in dist is the
+  // assets directory (`.assetsignore` keeps the Worker file out of the upload).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hypdriv-qwik",
+  "main": "./dist/_worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The Worker runs first for everything except Qwik's content-hashed build files, so every page, loader, action,
+  // endpoint and public file gets the full pipeline; the Worker serves prerendered pages from ASSETS itself.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/*", "!/build/*", "!/assets/*"]
+  },
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HYPDRIV_LIMITER", "class_name": "HypDrivLimiter" },
+      { "name": "HYPDRIV_INDEX", "class_name": "HypDrivIndex" },
+      { "name": "HYPDRIV_CHANNEL", "class_name": "HypDrivChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "hypdriv-v1", "new_sqlite_classes": ["HypDrivChannel", "HypDrivLimiter", "HypDrivIndex"] }
+  ]
+}
