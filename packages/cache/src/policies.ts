@@ -11,6 +11,7 @@ import {
   type RouteMatch,
   type RoutePattern,
   resolveEdgeCachePolicy,
+  runningExperiments,
   stripBasePath,
 } from '@hypdriv/core';
 
@@ -70,6 +71,7 @@ export function routePatternSpecificity(pattern: RoutePattern): number {
 export function inferPolicies(config: ResolvedConfig, manifest: HypManifest): ResolvedEdgeCachePolicy[] {
   const edge = config.cache.edge;
   if (!edge?.infer) return [];
+  const experiments = runningExperiments(config.flags.definitions);
   const out: Array<{ policy: ResolvedEdgeCachePolicy; specificity: number; index: number }> = [];
   manifest.routes.forEach((route, index) => {
     const durations = inferredDurations(route, edge);
@@ -87,6 +89,7 @@ export function inferPolicies(config: ResolvedConfig, manifest: HypManifest): Re
       index,
       'inferred',
       edge.bypass,
+      experiments,
     );
     out.push({ policy, specificity: routePatternSpecificity(match), index });
   });

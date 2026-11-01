@@ -110,6 +110,26 @@ export function Checkout() {
 
 Hooks are SSR-safe (no `window` access) and return the fallback outside a provider.
 
+## Experiments
+
+A flag with an `experiment` block is an A/B test: weighted variants, deterministic and sticky assignment (the `hyp_exp` cookie), an audience (`when`), a traffic share, `status: 'running' | 'paused' | 'concluded'` with a `winner`, and exposures reported once per visitor.
+
+```ts
+definitions: {
+  checkout: {
+    default: 'control',
+    experiment: { variants: { control: 50, express: 50 }, traffic: 80, when: { country: ['US'] }, expose: ['/checkout/**'] },
+  },
+}
+```
+
+- `evaluateExperiment(name, def, spec, { stableId, memberships, inAudience })` is the pure assignment (`{ variant, reason, member }`); `pickVariant(variants, bucket)` and `hasVariant(spec, v)` are its parts.
+- `flagsStage(config, provider, { onExposure })` reports exposures to an `ExposureSink`: `analyticsEngineExposureSink(binding)`, `logExposureSink(log)`, `multiExposureSink(sinks)`; `createHandler()` picks one from `flags.exposures`.
+- `EXPERIMENTS_KEY` holds the per-request outcomes in `ctx.state` for other stages.
+- `?hyp_flag_<name>=<variant>` forces one of the experiment's own variants for QA, uncounted and unstored.
+
+Read the result with `hypdriv experiments --results`. Full guide: [docs/guides/flags.md](../../docs/guides/flags.md#experiments-ab-tests).
+
 ## Providers
 
 | Provider | Source | Refresh | Notes |

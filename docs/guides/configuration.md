@@ -76,7 +76,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `policies[]` | `[]` | `{ id?, match, methods?, ttl, swr?, staleIfError?, tags?, vary?, bypass?, respectOrigin?: true, includeRsc?: true, statuses?, keyQuery? }` |
+| `policies[]` | `[]` | `{ id?, match, methods?, ttl, swr?, staleIfError?, tags?, vary?: { headers?, cookies?, geo?, flags?, experiments?: true, language?, device? }, bypass?, respectOrigin?: true, includeRsc?: true, statuses?, keyQuery? }` |
 | `infer` | `true` | Infer policies for static routes from the manifest |
 | `inferredStatic` | `{ ttl: '5m', swr: '1d', staleIfError: '7d' }` | |
 | `bypass` | `{ cookies: [], headers: [], query: [] }` | Applied to every policy, inferred ones too: a request carrying one skips the cache. The cache answers before `middleware.ts`, so list what the middleware gates on (a site gate's cookie). See the [caching guide](caching.md) |
@@ -115,7 +115,7 @@ See the [security guide](security.md) for behaviour; defaults are listed in `pac
 
 ## `flags`
 
-`{ definitions: { [name]: { description?, default, rules?: [{ when?: { country?, continent?, path?, cookie?, header?, device?, from?, until?, flag? }, percentage?, value }], serverOnly? } }, provider: 'static' | 'env' | 'kv' | 'openfeature', envVar: 'HYPDRIV_FLAGS', kvBinding: 'HYPDRIV_KV', kvKey: 'flags', idCookie: 'hyp_uid', header: 'x-hypdriv-flags', queryOverrides: 'development', refresh: '30s' }`.
+`{ definitions: { [name]: { description?, default, rules?: [{ when?: { country?, continent?, path?, cookie?, header?, device?, from?, until?, flag? }, percentage?, value }], experiment?: { variants: { [variant]: weight }, traffic?: 0–100, when?, salt?, status?: 'running' | 'paused' | 'concluded', winner?, expose?: [paths] }, serverOnly? } }, provider: 'static' | 'env' | 'kv' | 'openfeature', envVar: 'HYPDRIV_FLAGS', kvBinding: 'HYPDRIV_KV', kvKey: 'flags', idCookie: 'hyp_uid', experimentCookie: 'hyp_exp', exposures: 'auto' | 'log' | 'analytics-engine' | 'none', exposuresBinding: 'HYPDRIV_ANALYTICS', header: 'x-hypdriv-flags', queryOverrides: 'development', refresh: '30s' }`. An `experiment` block makes the flag an A/B test whose `default` is the control ([Experiments](flags.md#experiments-ab-tests)).
 
 ## `live`
 

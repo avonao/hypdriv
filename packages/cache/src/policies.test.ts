@@ -51,6 +51,21 @@ describe('nextPathnameToPattern', () => {
 });
 
 describe('inferPolicies / resolvePolicies', () => {
+  it('varies inferred policies on running experiments, so a cached page never shows another variant', () => {
+    const config = resolveConfig({
+      flags: {
+        definitions: {
+          checkout: { default: 'control', experiment: { variants: { control: 1, b: 1 } } },
+          hero: { default: 'a', experiment: { variants: { a: 1, b: 1 }, status: 'concluded', winner: 'b' } },
+        },
+      },
+    });
+    const inferred = inferPolicies(config, manifest);
+    expect(inferred.length).toBeGreaterThan(0);
+    for (const policy of inferred) expect(policy.vary.flags).toEqual(['checkout']);
+    for (const policy of inferPolicies(resolveConfig({}), manifest)) expect(policy.vary.flags).toEqual([]);
+  });
+
   it('infers static and ISR routes with inferredStatic durations, ordered by specificity', () => {
     const config = resolveConfig({
       cache: { edge: { inferredStatic: { ttl: 300, swr: 600, staleIfError: 900 } } },

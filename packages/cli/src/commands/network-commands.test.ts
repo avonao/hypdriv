@@ -11,6 +11,7 @@ import {
 } from '../__tests__/helpers';
 import { runCommand } from '../main';
 import { summarizeSamples } from './bench';
+import { configuredExperiments } from './experiments';
 import { rateVital, vitalsSql } from './vitals';
 import { warmPaths } from './warm';
 
@@ -406,6 +407,169 @@ describe('vitals', () => {
     const io3 = memoryIO(vercel.dir);
     expect(await runCommand('vitals', [], io3)).toBe(1);
     expect(io3.err).toContain('Speed Insights');
+  });
+});
+
+describe('experiments', () => {
+  const config = `export default {
+  flags: {
+    definitions: {
+      checkout: {
+        default: 'control',
+        description: 'New checkout',
+        experiment: { variants: { control: 50, b: 50 }, traffic: 80, when: { country: ['US'] } },
+      },
+      hero: { default: 'a', experiment: { variants: { a: 1, b: 1, c: 2 }, status: 'concluded', winner: 'c' } },
+      banner: { default: true },
+    },
+  },
+};
+`;
+  const wrangler =
+    '{ "analytics_engine_datasets": [{ "binding": "HYPDRIV_ANALYTICS", "dataset": "shop_events" }] }';
+
+  it('lists what the configuration defines', async () => {
+    const p = tempProject({ 'package.json': '{"name":"x"}', 'hypdriv.config.ts': config });
+    const io = memoryIO(p.dir);
+    expect(await runCommand('experiments', [], io)).toBe(0);
+    expect(io.out).toContain('checkout');
+    expect(io.out).toContain('control* 50% · b 50%');
+    expect(io.out).toContain('80%');
+    expect(io.out).toContain('concluded → c');
+    expect(io.out).not.toContain('banner');
+    const json = memoryIO(p.dir);
+    await runCommand('experiments', ['--json'], json);
+    const out = JSON.parse(json.out);
+    expect(out.experiments.map((e: { name: string }) => e.name)).toEqual(['checkout', 'hero']);
+    expect(out.experiments[0]).toMatchObject({
+      control: 'control',
+      traffic: 80,
+      audience: true,
+      status: 'running',
+    });
+    expect(out.experiments[1]).toMatchObject({ winner: 'c', control: 'a' });
+  });
+
+  it('says so when there are none, and rejects an unknown name', async () => {
+    const p = tempProject({ 'package.json': '{"name":"x"}', 'hypdriv.config.ts': 'export default {};\n' });
+    const io = memoryIO(p.dir);
+    expect(await runCommand('experiments', [], io)).toBe(0);
+    expect(io.out).toContain('None defined');
+    const named = tempProject({ 'package.json': '{"name":"x"}', 'hypdriv.config.ts': config });
+    const bad = memoryIO(named.dir);
+    expect(await runCommand('experiments', ['--name', 'nope'], bad)).toBe(1);
+    expect(bad.err).toContain('No experiment named "nope"');
+    const results = memoryIO(p.dir);
+    expect(await runCommand('experiments', ['--results'], results)).toBe(1);
+    expect(results.err).toContain('No experiments defined');
+  });
+
+  it('derives the control from the flag default', () => {
+    const list = configuredExperiments({
+      x: { default: 'zzz', experiment: { variants: { a: 1, b: 1 } } },
+      y: { default: false },
+    });
+    expect(list.map((e) => [e.name, e.control])).toEqual([['x', 'a']]);
+  });
+
+  it('prints the SQL without credentials', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    const io = memoryIO(p.dir);
+    expect(await runCommand('experiments', ['--sql', '--name', 'checkout', '--days', '30'], io)).toBe(0);
+    expect(io.out).toContain("blob1 = 'experiment.exposure'");
+    expect(io.out).toContain("INTERVAL '30' DAY");
+    expect(io.out).toContain("position('|checkout:b|' IN blob8) > 0");
+    expect(io.out).toContain('FROM shop_events');
+  });
+
+  it('queries visitors per variant and p75 vitals, and flags a sample ratio mismatch', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    const { fetch, calls } = fakeFetch((_url, init) => {
+      const sql = String(init?.body ?? '');
+      if (sql.includes('experiment.exposure')) {
+        return response(
+          JSON.stringify({
+            data: [
+              {
+                experiment: 'checkout',
+                variant: 'control',
+                visitors: 6200,
+                first_seen: '2026-10-20 00:00:00',
+                last_seen: '2026-10-31 12:00:00',
+              },
+              {
+                experiment: 'checkout',
+                variant: 'b',
+                visitors: 3800,
+                first_seen: '2026-10-20 00:00:00',
+                last_seen: '2026-10-31 12:00:00',
+              },
+            ],
+          }),
+        );
+      }
+      const b = sql.includes('|checkout:b|');
+      return response(
+        JSON.stringify({
+          data: [
+            { metric: 'LCP', p75: b ? 1800 : 2000, samples: 3000 },
+            { metric: 'CLS', p75: 0.04, samples: 3000 },
+          ],
+        }),
+      );
+    });
+    const env = { CF_ACCOUNT_ID: 'acc123', CF_API_TOKEN: 'tok' };
+    const io = memoryIO(p.dir, { fetch, env });
+    expect(await runCommand('experiments', ['--results', '--name', 'checkout'], io)).toBe(1);
+    expect(calls[0]!.url).toBe('https://api.cloudflare.com/client/v4/accounts/acc123/analytics_engine/sql');
+    expect(calls).toHaveLength(3);
+    expect(io.out).toContain('control (control)');
+    expect(io.out).toContain('6200');
+    expect(io.out).toContain('1.80 s');
+    expect(io.out).toContain('−10.0%');
+    expect(io.out).toContain('Sample ratio mismatch');
+
+    const json = memoryIO(p.dir, { fetch, env });
+    await runCommand('experiments', ['--results', '--json', '--name', 'checkout'], json);
+    const report = JSON.parse(json.out).experiments[0];
+    expect(report.visitors).toBe(10_000);
+    expect(report.sampleRatio.status).toBe('mismatch');
+    expect(report.variants[1].metrics.LCP.deltaVsControl).toBeCloseTo(-0.1);
+  });
+
+  it('degrades clearly without credentials, a dataset or on Vercel', async () => {
+    const p = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': wrangler,
+    });
+    const io = memoryIO(p.dir);
+    expect(await runCommand('experiments', ['--results'], io)).toBe(1);
+    expect(io.err).toContain('CF_ACCOUNT_ID and CF_API_TOKEN');
+    const none = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'wrangler.jsonc': '{}',
+    });
+    const io2 = memoryIO(none.dir);
+    expect(await runCommand('experiments', ['--results'], io2)).toBe(1);
+    expect(io2.err).toContain('No Analytics Engine dataset');
+    const vercel = tempProject({
+      'package.json': '{"name":"x"}',
+      'hypdriv.config.ts': config,
+      'vercel.json': '{}',
+    });
+    const io3 = memoryIO(vercel.dir);
+    expect(await runCommand('experiments', ['--results'], io3)).toBe(1);
+    expect(io3.err).toContain('experiment exposure');
   });
 });
 

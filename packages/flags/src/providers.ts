@@ -1,4 +1,5 @@
 import {
+  type ExperimentSpec,
   type FlagDefinition,
   type FlagRule,
   type FlagValue,
@@ -65,7 +66,37 @@ function normalizeDefinition(raw: unknown): FlagDefinition | null {
     }
     def.rules = rules;
   }
+  const experiment = normalizeExperiment(r.experiment, def.default);
+  if (experiment) def.experiment = experiment;
   return def;
+}
+
+/** A remote definition's `experiment` block, or `undefined` when it is missing or unusable (then it is a plain flag). */
+function normalizeExperiment(raw: unknown, control: FlagValue): ExperimentSpec | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!r.variants || typeof r.variants !== 'object' || Array.isArray(r.variants)) return undefined;
+  const variants: Record<string, number> = {};
+  for (const [variant, weight] of Object.entries(r.variants as Record<string, unknown>))
+    if (
+      /^[A-Za-z0-9_-]{1,48}$/.test(variant) &&
+      typeof weight === 'number' &&
+      Number.isFinite(weight) &&
+      weight > 0
+    )
+      variants[variant] = weight;
+  if (Object.keys(variants).length < 2 || typeof control !== 'string' || !(control in variants))
+    return undefined;
+  const spec: ExperimentSpec = { variants };
+  if (typeof r.traffic === 'number' && Number.isFinite(r.traffic))
+    spec.traffic = Math.min(Math.max(r.traffic, 0), 100);
+  if (r.when && typeof r.when === 'object' && !Array.isArray(r.when)) spec.when = r.when as FlagRule['when'];
+  if (typeof r.salt === 'string') spec.salt = r.salt.slice(0, 64);
+  if (r.status === 'running' || r.status === 'paused' || r.status === 'concluded') spec.status = r.status;
+  if (typeof r.winner === 'string' && r.winner in variants) spec.winner = r.winner;
+  if (Array.isArray(r.expose))
+    spec.expose = r.expose.filter((p): p is string => typeof p === 'string').slice(0, 32);
+  return spec;
 }
 
 /** Definitions from `hypdriv.config.ts` only. */
@@ -234,6 +265,12 @@ export function openFeatureProvider(
             reasons[name] = 'override';
             return;
           }
+          // Experiments are assigned at the edge (sticky, exposure-counted); OpenFeature does not see them.
+          if (local.experiments[name]) {
+            values[name] = local.values[name]!;
+            reasons[name] = local.reasons[name]!;
+            return;
+          }
           try {
             const type = flagType(def);
             const value =
@@ -253,7 +290,7 @@ export function openFeatureProvider(
           }
         }),
       );
-      return { values, reasons };
+      return { values, reasons, experiments: local.experiments };
     },
   };
 }

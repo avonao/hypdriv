@@ -294,6 +294,13 @@ export interface EdgeCacheVary {
   cookies?: string[];
   geo?: Array<'country' | 'region' | 'city' | 'continent' | 'timezone' | 'colo'>;
   flags?: string[];
+  /**
+   * Also vary on every running experiment (default true): each variant is cached and served separately, so a cached
+   * page never shows one visitor another's variant. Set `false` for a policy whose pages never depend on an
+   * experiment (assets, APIs) to keep one cached copy. Experiments that only a remote flag provider defines are not
+   * known at build time: list them in `flags`.
+   */
+  experiments?: boolean;
   /** Vary on negotiated locale (default false). */
   language?: boolean;
   /** Vary on device class (mobile/desktop) derived from client hints or UA (default false). */
@@ -569,10 +576,39 @@ export interface FlagRule {
   value: FlagValue;
 }
 
+/**
+ * An A/B (or A/B/n) experiment: a flag whose value is the visitor's variant. Give a flag definition an `experiment`
+ * block and it is assigned at the edge, deterministically per stable visitor id, kept sticky in the experiment
+ * cookie, forwarded like any flag (`getFlag('checkout')`, `?hyp_flag_checkout=b` for QA) and reported as an
+ * exposure. `default` is the control: what visitors outside the audience or traffic, and everyone while the
+ * experiment is paused, get.
+ */
+export interface ExperimentSpec {
+  /** Variant name → relative weight (any positive numbers, e.g. `{ control: 50, b: 50 }`). Needs two or more. */
+  variants: Record<string, number>;
+  /** Share of the audience (0–100, default 100) that takes part; the rest see the control and are not counted. */
+  traffic?: number;
+  /** Audience: only visitors matching these conditions take part (same conditions as a flag rule). */
+  when?: FlagRule['when'];
+  /** Changes every assignment without renaming the experiment (a restart). */
+  salt?: string;
+  /**
+   * `running` (default): assign and expose. `paused`: visitors who already have a variant keep it, new visitors get
+   * the control. `concluded`: everyone gets `winner` (or the control).
+   */
+  status?: 'running' | 'paused' | 'concluded';
+  /** The variant everyone gets once `status` is `concluded`. */
+  winner?: string;
+  /** Paths on which a visit counts as an exposure (default: every page view). */
+  expose?: string[];
+}
+
 export interface FlagDefinition {
   description?: string;
   default: FlagValue;
   rules?: FlagRule[];
+  /** Makes this flag an experiment (see {@link ExperimentSpec}); `default` must be one of its variants. */
+  experiment?: ExperimentSpec;
   /** Hide from client propagation (default false). */
   serverOnly?: boolean;
 }
@@ -586,6 +622,15 @@ export interface FlagsConfig {
   kvKey?: string;
   /** Cookie that carries the stable id for bucketing (default `hyp_uid`). */
   idCookie?: string;
+  /** Cookie that keeps each visitor's experiment variants sticky across weight changes (default `hyp_exp`). */
+  experimentCookie?: string;
+  /**
+   * Where experiment exposures go: `auto` (default: Analytics Engine when the binding exists, else the log), `log`,
+   * `analytics-engine` or `none`.
+   */
+  exposures?: 'auto' | 'log' | 'analytics-engine' | 'none';
+  /** Analytics Engine binding for exposures (default: the vitals/tracing binding, `HYPDRIV_ANALYTICS`). */
+  exposuresBinding?: string;
   header?: string;
   /** Allow `?hyp_flag_<name>=` overrides: `true`, `false` or `'development'` (default). */
   queryOverrides?: boolean | 'development';

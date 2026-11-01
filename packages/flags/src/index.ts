@@ -33,6 +33,23 @@ export {
   publicFlags,
 } from './evaluate';
 export {
+  type ExperimentInput,
+  type ExperimentOutcome,
+  type ExperimentReason,
+  evaluateExperiment,
+  exposesOn,
+  hasVariant,
+  pickVariant,
+} from './experiments';
+export {
+  analyticsEngineExposureSink,
+  EXPOSURE_METRIC,
+  type ExposureEvent,
+  type ExposureSink,
+  logExposureSink,
+  multiExposureSink,
+} from './exposure';
+export {
   type CreateFlagProviderOptions,
   createFlagProvider,
   envProvider,
@@ -47,6 +64,7 @@ export {
 } from './providers';
 export {
   detectDevice,
+  EXPERIMENTS_KEY,
   FLAG_ID_KEY,
   FLAG_REASONS_KEY,
   FLAGS_KEY,

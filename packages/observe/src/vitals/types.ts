@@ -19,6 +19,8 @@ export interface VitalsPayload {
   cache?: string;
   /** Client timestamp, epoch ms. */
   ts: number;
+  /** The visitor's experiment variants, set by the beacon route from the experiment cookie: `|checkout:b|hero:control|`. */
+  experiments?: string;
   [extra: string]: unknown;
 }
 

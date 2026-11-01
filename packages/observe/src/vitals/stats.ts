@@ -14,6 +14,9 @@ import type {
 /** The metrics the vitals sinks record, in display order. */
 export const VITAL_NAMES: readonly VitalName[] = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
 
+/** The metrics experiments are compared on: the three Core Web Vitals. */
+export const EXPERIMENT_METRICS: readonly VitalName[] = ['LCP', 'INP', 'CLS'];
+
 export const VITAL_LABELS: Record<VitalName, string> = {
   LCP: 'Largest Contentful Paint',
   INP: 'Interaction to Next Paint',

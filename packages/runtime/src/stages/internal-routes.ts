@@ -341,6 +341,7 @@ export function internalRoutes(
             ? analyticsEngineVitalsSink(platform.env[vitalsConfig.analyticsEngineBinding] as never)
             : logVitalsSink(platform.log)),
         sampleRate: vitalsConfig.sampleRate,
+        experimentCookie: platform.config.flags.experimentCookie,
         ...(platform.config.site.origin ? { allowOrigin: platform.config.site.origin } : {}),
       })
     : null;

@@ -19,6 +19,7 @@ All commands accept `--root <dir>` (project directory, default: nearest `package
 | `hypdriv manifest [--validate]` | Prints or validates `.hypdriv/manifest.json`. |
 | `hypdriv jobs run <name> --url <base>` / `hypdriv jobs list` | Sends a signed internal request to a job route (`HYPDRIV_INTERNAL_SECRET`; on Vercel cron jobs as `GET` with `CRON_SECRET`). |
 | `hypdriv vitals [--days 7] [--trend]` | p75 per route (or over time with `--trend`) from Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`). |
+| `hypdriv experiments [--results] [--name <experiment>] [--days 14] [--sql]` | Lists the edge A/B experiments in `flags.definitions`; with `--results`, visitors per variant against the weights (sample ratio check) and p75 LCP/INP/CLS per variant from Analytics Engine (`CF_ACCOUNT_ID`, `CF_API_TOKEN`). Exits `1` on a sample ratio mismatch. |
 | `hypdriv agent` | Prints agent guidance for this project (what is configured, what to run). |
 
 Add to CI:

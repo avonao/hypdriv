@@ -1,5 +1,6 @@
 import {
   bucketPercent,
+  type ExperimentMembership,
   type FlagDefinition,
   type FlagRule,
   type FlagValue,
@@ -7,6 +8,7 @@ import {
   matchesAny,
 } from '@hypdriv/core';
 import { isFlagValue } from './encoding';
+import { type ExperimentOutcome, evaluateExperiment, hasVariant } from './experiments';
 
 /** Device class used by `when.device` rules. */
 export type FlagDevice = 'mobile' | 'desktop' | 'bot';
@@ -25,6 +27,8 @@ export interface FlagEvalInput {
   now?: Date;
   /** Explicit overrides (QA query parameters, tests). They win over rules and defaults. */
   overrides?: Record<string, FlagValue>;
+  /** The visitor's experiment memberships (the experiment cookie): assignments that stay put. */
+  memberships?: Record<string, ExperimentMembership>;
 }
 
 export interface FlagEvalResult {
@@ -32,9 +36,12 @@ export interface FlagEvalResult {
   /**
    * Why each flag has its value: `default`, `rule:<index>`, `override`,
    * `percentage-miss:<index>` (a rule's conditions matched but the visitor fell outside its
-   * percentage and no later rule matched) or a provider-specific reason (`openfeature`).
+   * percentage and no later rule matched), `experiment:<reason>` (see `ExperimentReason`) or a provider-specific
+   * reason (`openfeature`).
    */
   reasons: Record<string, string>;
+  /** The outcome of every experiment (a definition with an `experiment` block), by flag name. */
+  experiments: Record<string, ExperimentOutcome>;
 }
 
 export type FlagType = 'boolean' | 'string' | 'number';
@@ -114,6 +121,7 @@ export function publicFlags(
 /** `true` when at least one definition needs the stable id (percentage rollouts). */
 export function needsStableId(definitions: Record<string, FlagDefinition>): boolean {
   for (const def of Object.values(definitions)) {
+    if (def.experiment && def.experiment.status !== 'concluded') return true;
     for (const rule of def.rules ?? []) if (rule.percentage !== undefined) return true;
   }
   return false;
@@ -132,6 +140,7 @@ type RuleOutcome = 'match' | 'no-match' | 'percentage-miss';
 export function evaluateFlags(input: FlagEvalInput): FlagEvalResult {
   const values: Record<string, FlagValue> = {};
   const reasons: Record<string, string> = {};
+  const experiments: Record<string, ExperimentOutcome> = {};
   const now = input.now ?? new Date();
   const { definitions } = input;
 
@@ -144,7 +153,8 @@ export function evaluateFlags(input: FlagEvalInput): FlagEvalResult {
     const override = input.overrides?.[name];
     if (override !== undefined) {
       const coerced = coerceFlagValue(override, flagType(def));
-      if (coerced !== undefined) {
+      // An experiment can only be forced to one of its own variants.
+      if (coerced !== undefined && (!def.experiment || hasVariant(def.experiment, coerced))) {
         values[name] = coerced;
         reasons[name] = 'override';
         return coerced;
@@ -152,6 +162,21 @@ export function evaluateFlags(input: FlagEvalInput): FlagEvalResult {
     }
 
     const nextStack = [...stack, name];
+    if (def.experiment) {
+      const spec = def.experiment;
+      const inAudience = spec.when
+        ? conditionsHold({ when: spec.when, value: '' }, input, now, (dep) => evaluate(dep, nextStack))
+        : true;
+      const outcome = evaluateExperiment(name, def, spec, {
+        stableId: input.stableId,
+        ...(input.memberships ? { memberships: input.memberships } : {}),
+        inAudience,
+      });
+      experiments[name] = outcome;
+      values[name] = outcome.variant;
+      reasons[name] = `experiment:${outcome.reason}`;
+      return outcome.variant;
+    }
     let percentageMiss = -1;
     const rules = def.rules ?? [];
     for (let index = 0; index < rules.length; index++) {
@@ -170,7 +195,7 @@ export function evaluateFlags(input: FlagEvalInput): FlagEvalResult {
   };
 
   for (const name of Object.keys(definitions)) evaluate(name, []);
-  return { values, reasons };
+  return { values, reasons, experiments };
 }
 
 /** Evaluates a single flag (convenience for tests and server helpers). */

@@ -124,7 +124,112 @@ describe('resolveConfig', () => {
   });
 });
 
+describe('experiments in the cache policies', () => {
+  const flags = {
+    definitions: {
+      checkout: { default: 'control', experiment: { variants: { control: 1, b: 1 } } },
+      hero: {
+        default: 'a',
+        experiment: { variants: { a: 1, b: 1 }, status: 'concluded' as const, winner: 'b' },
+      },
+      banner: { default: true },
+    },
+  };
+
+  it('varies every explicit policy on the experiments that still assign variants', () => {
+    const r = resolveConfig({
+      flags,
+      cache: {
+        edge: {
+          policies: [
+            { match: '/a', ttl: 10 },
+            { match: '/b', ttl: 10, vary: { flags: ['banner'] } },
+            { match: '/api/**', ttl: 10, vary: { experiments: false } },
+          ],
+        },
+      },
+    });
+    const [a, b, api] = r.cache.edge!.policies;
+    expect(a!.vary.flags).toEqual(['checkout']);
+    expect(a!.vary.experiments).toBe(true);
+    expect(b!.vary.flags).toEqual(['banner', 'checkout']);
+    expect(api!.vary.flags).toEqual([]);
+    expect(api!.vary.experiments).toBe(false);
+  });
+
+  it('leaves policies alone without experiments', () => {
+    const r = resolveConfig({ cache: { edge: { policies: [{ match: '/a', ttl: 10 }] } } });
+    expect(r.cache.edge!.policies[0]!.vary.flags).toEqual([]);
+  });
+});
+
 describe('validateConfig', () => {
+  it('validates experiments', () => {
+    const errorsOf = (definitions: Record<string, unknown>) =>
+      validateConfig({ flags: { definitions } })
+        .filter((x) => x.severity === 'error')
+        .map((x) => x.path);
+    expect(
+      errorsOf({ checkout: { default: 'control', experiment: { variants: { control: 50, b: 50 } } } }),
+    ).toEqual([]);
+    expect(errorsOf({ x: { default: 'a', experiment: { variants: { a: 1 } } } })).toContain(
+      'flags.definitions.x.experiment.variants',
+    );
+    expect(errorsOf({ x: { default: 'c', experiment: { variants: { a: 1, b: 1 } } } })).toContain(
+      'flags.definitions.x.default',
+    );
+    expect(errorsOf({ x: { default: 'a', experiment: { variants: { a: 1, 'b c': 0 } } } })).toEqual(
+      expect.arrayContaining(['flags.definitions.x.experiment.variants.b c']),
+    );
+    expect(
+      errorsOf({ x: { default: 'a', experiment: { variants: { a: 1, b: -2 }, traffic: 140 } } }),
+    ).toEqual(
+      expect.arrayContaining([
+        'flags.definitions.x.experiment.variants.b',
+        expect.stringContaining('traffic'),
+      ]),
+    );
+    expect(
+      errorsOf({
+        x: { default: 'a', experiment: { variants: { a: 1, b: 1 }, status: 'concluded', winner: 'z' } },
+      }),
+    ).toContain('flags.definitions.x.experiment.winner');
+    expect(errorsOf({ 'bad name': { default: 'a', experiment: { variants: { a: 1, b: 1 } } } })).toEqual(
+      expect.arrayContaining([expect.stringContaining('bad name')]),
+    );
+  });
+
+  it('warns about a concluded experiment without a winner and about ignored rules', () => {
+    const d = validateConfig({
+      flags: {
+        definitions: {
+          x: { default: 'a', experiment: { variants: { a: 1, b: 1 }, status: 'concluded' } },
+          y: {
+            default: 'a',
+            rules: [{ when: { country: ['US'] }, value: 'b' }],
+            experiment: { variants: { a: 1, b: 1 } },
+          },
+        },
+      },
+    });
+    const warnings = d.filter((x) => x.severity === 'warning').map((x) => x.path);
+    expect(warnings).toEqual(
+      expect.arrayContaining(['flags.definitions.x.experiment.winner', 'flags.definitions.y.rules']),
+    );
+  });
+
+  it('validates the experiment cookie and exposures settings', () => {
+    expect(
+      validateConfig({
+        flags: { experimentCookie: 'hyp_exp', exposures: 'log', exposuresBinding: 'AE' },
+      }).filter((x) => x.severity === 'error'),
+    ).toEqual([]);
+    const paths = validateConfig({ flags: { experimentCookie: 3, exposures: 'everywhere' } })
+      .filter((x) => x.severity === 'error')
+      .map((x) => x.path);
+    expect(paths).toEqual(expect.arrayContaining(['flags.experimentCookie', 'flags.exposures']));
+  });
+
   it('validates cache.edge.bypass', () => {
     const d = validateConfig({ cache: { edge: { bypass: { cookies: 'site_gate' } } } });
     expect(d.filter((x) => x.severity === 'error').map((x) => x.path)).toContain('cache.edge.bypass.cookies');

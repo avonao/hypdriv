@@ -1,3 +1,4 @@
+import { runningExperiments } from '../util/experiments';
 import { parseDuration, parseDurationMs, parseSize } from '../util/units';
 import {
   COOKIE,
@@ -275,7 +276,9 @@ export function resolveEdgeCachePolicy(
   index: number,
   source: 'explicit' | 'inferred' = 'explicit',
   shared?: { cookies: string[]; headers: string[]; query: string[] },
+  experiments: readonly string[] = [],
 ): ResolvedEdgeCachePolicy {
+  const varyExperiments = p.vary?.experiments ?? true;
   return {
     id: p.id ?? `policy-${index}`,
     match: p.match,
@@ -288,7 +291,8 @@ export function resolveEdgeCachePolicy(
       headers: arr(p.vary?.headers, []).map((h) => h.toLowerCase()),
       cookies: arr(p.vary?.cookies, []),
       geo: arr(p.vary?.geo, []),
-      flags: arr(p.vary?.flags, []),
+      flags: unique(arr(p.vary?.flags, []), varyExperiments ? [...experiments] : []),
+      experiments: varyExperiments,
       language: p.vary?.language ?? false,
       device: p.vary?.device ?? false,
     },
@@ -309,7 +313,7 @@ export function resolveEdgeCachePolicy(
   };
 }
 
-function resolveCache(input: HypDrivConfig['cache']): ResolvedCache {
+function resolveCache(input: HypDrivConfig['cache'], experiments: readonly string[]): ResolvedCache {
   const c = input ?? {};
   const edge = c.edge === false ? null : c.edge === true || c.edge === undefined ? {} : c.edge;
   const sharedBypass = {
@@ -321,7 +325,7 @@ function resolveCache(input: HypDrivConfig['cache']): ResolvedCache {
     edge: edge
       ? {
           policies: (edge.policies ?? []).map((p, i) =>
-            resolveEdgeCachePolicy(p, i, 'explicit', sharedBypass),
+            resolveEdgeCachePolicy(p, i, 'explicit', sharedBypass, experiments),
           ),
           bypass: sharedBypass,
           infer: edge.infer ?? true,
@@ -600,7 +604,7 @@ function resolveConfigShape(input: HypDrivConfig): ResolvedConfig {
       trailingSlash: input.site?.trailingSlash ?? null,
     },
     security: resolveSecurity(input.security),
-    cache: resolveCache(input.cache),
+    cache: resolveCache(input.cache, runningExperiments(flags.definitions ?? {})),
     performance: resolvePerformance(input.performance),
     observe: resolveObserve(input.observe, siteName),
     purser: resolvePurser(input.purser),
@@ -611,6 +615,9 @@ function resolveConfigShape(input: HypDrivConfig): ResolvedConfig {
       kvBinding: flags.kvBinding ?? 'HYPDRIV_KV',
       kvKey: flags.kvKey ?? 'flags',
       idCookie: flags.idCookie ?? COOKIE.flagsId,
+      experimentCookie: flags.experimentCookie ?? COOKIE.experiments,
+      exposures: flags.exposures ?? 'auto',
+      exposuresBinding: flags.exposuresBinding ?? 'HYPDRIV_ANALYTICS',
       header: flags.header ?? HEADER.flags,
       queryOverrides: flags.queryOverrides ?? 'development',
       refreshSeconds: parseDuration(flags.refresh, 30),

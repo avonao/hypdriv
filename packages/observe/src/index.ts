@@ -51,6 +51,19 @@ export {
   type VitalsDashboardView,
 } from './vitals/dashboard';
 export {
+  buildExperimentReport,
+  chiSquareSurvival,
+  type ExperimentDescription,
+  type ExperimentMetricResult,
+  type ExperimentReport,
+  type ExperimentRows,
+  type ExperimentVariantResult,
+  experimentExposuresSql,
+  experimentVitalsSql,
+  type SampleRatioCheck,
+  sampleRatioCheck,
+} from './vitals/experiments';
+export {
   normalizeVitalsPayload,
   rateVital,
   VITALS_THRESHOLDS,

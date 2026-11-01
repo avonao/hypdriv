@@ -297,6 +297,7 @@ const edgeCachePolicyCheck = checkObjectShape({
     cookies: checkStringArray,
     geo: arrayOf(checkEnum(['country', 'region', 'city', 'continent', 'timezone', 'colo'])),
     flags: checkStringArray,
+    experiments: checkBoolean,
     language: checkBoolean,
     device: checkBoolean,
   }),
@@ -639,6 +640,18 @@ const rootCheck = checkObjectShape({
             },
           }),
         ),
+        experiment: checkObjectShape({
+          variants: (v, p, o) => {
+            if (!v || typeof v !== 'object' || Array.isArray(v))
+              error(o, p, 'is required (an object of variant name → weight)');
+          },
+          traffic: checkNumber(0, 100),
+          when: () => {},
+          salt: checkString,
+          status: checkEnum(['running', 'paused', 'concluded']),
+          winner: checkString,
+          expose: checkStringArray,
+        }),
         serverOnly: checkBoolean,
       }),
     ),
@@ -647,6 +660,9 @@ const rootCheck = checkObjectShape({
     kvBinding: checkString,
     kvKey: checkString,
     idCookie: checkString,
+    experimentCookie: checkString,
+    exposures: checkEnum(['auto', 'log', 'analytics-engine', 'none']),
+    exposuresBinding: checkString,
     header: checkString,
     queryOverrides: (v, p, o) => {
       if (v !== undefined && typeof v !== 'boolean' && v !== 'development')
@@ -877,6 +893,7 @@ function semanticChecks(config: HypDrivConfig, out: ConfigDiagnostic[]) {
   for (const [name, def] of Object.entries(config.flags?.definitions ?? {})) {
     if (!/^[a-zA-Z][a-zA-Z0-9_.-]*$/.test(name))
       error(out, `config.flags.definitions.${name}`, 'flag names must be alphanumeric (plus _ . -)');
+    if (def.experiment) validateExperiment(out, `config.flags.definitions.${name}`, name, def);
     for (const [i, rule] of (def.rules ?? []).entries()) {
       if (typeof rule.value !== typeof def.default) {
         warning(
@@ -887,4 +904,55 @@ function semanticChecks(config: HypDrivConfig, out: ConfigDiagnostic[]) {
       }
     }
   }
+}
+
+/** Experiment names and variants travel in a cookie, so they stay URL-safe. */
+const EXPERIMENT_TOKEN = /^[A-Za-z0-9_-]{1,48}$/;
+
+function validateExperiment(
+  out: ConfigDiagnostic[],
+  path: string,
+  name: string,
+  def: NonNullable<NonNullable<HypDrivConfig['flags']>['definitions']>[string],
+): void {
+  const spec = def.experiment;
+  if (!spec) return;
+  if (!EXPERIMENT_TOKEN.test(name))
+    error(
+      out,
+      path,
+      'experiment names must be 1–48 letters, digits, "_" or "-" (they are stored in a cookie)',
+    );
+  const variants = Object.entries(spec.variants ?? {});
+  if (variants.length < 2) error(out, `${path}.experiment.variants`, 'needs at least two variants');
+  for (const [variant, weight] of variants) {
+    if (!EXPERIMENT_TOKEN.test(variant))
+      error(
+        out,
+        `${path}.experiment.variants.${variant}`,
+        'variant names must be 1–48 letters, digits, "_" or "-"',
+      );
+    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
+      error(out, `${path}.experiment.variants.${variant}`, 'the weight must be a positive number');
+  }
+  if (typeof def.default !== 'string' || !(def.default in (spec.variants ?? {})))
+    error(
+      out,
+      `${path}.default`,
+      `must be the control variant, one of: ${variants.map(([v]) => v).join(', ')}`,
+    );
+  if (spec.status === 'concluded' && spec.winner !== undefined && !(spec.winner in (spec.variants ?? {})))
+    error(out, `${path}.experiment.winner`, 'must be one of the variants');
+  if (spec.status === 'concluded' && spec.winner === undefined)
+    warning(
+      out,
+      `${path}.experiment.winner`,
+      'a concluded experiment without a winner serves the control to everyone',
+    );
+  if (def.rules?.length)
+    warning(
+      out,
+      `${path}.rules`,
+      'rules are ignored for an experiment; use experiment.when to pick the audience',
+    );
 }

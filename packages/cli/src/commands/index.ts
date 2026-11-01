@@ -7,6 +7,7 @@ import { cspCommand } from './csp';
 import { cssCommand } from './css';
 import { depsCommand } from './deps';
 import { doctorCommand } from './doctor';
+import { experimentsCommand } from './experiments';
 import { initCommand } from './init';
 import { jobsCommand } from './jobs';
 import { manifestCommand } from './manifest';
@@ -35,6 +36,7 @@ export const commands: Command[] = [
   manifestCommand,
   jobsCommand,
   vitalsCommand,
+  experimentsCommand,
   agentCommand,
 ];
 

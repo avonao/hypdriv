@@ -37,6 +37,7 @@ export { parseServerTiming, type ServerTimingMode, type TimingEntry, Timings } f
 export * from './runtime-registry';
 export * from './util/encoding';
 export * from './util/errors';
+export * from './util/experiments';
 export * from './util/hash';
 export * from './util/id';
 export { LRUCache } from './util/lru';

@@ -89,7 +89,9 @@ const handleVitals = vitalsHandler({
 
 Reading vitals back: `vitalsSql`, `vitalsOverallSql`, `vitalsTrendSql` and `vitalsDistributionSql` build the Analytics Engine SQL for the layout `analyticsEngineVitalsSink` writes; `queryAnalyticsEngine()` runs it; `analyticsEngineVitalsSource({ accountId, apiToken, dataset })` and `memoryVitals()` are `VitalsSource`s returning a `VitalsSnapshot` (site-wide and per-route p75, rating split, trend); `cachedVitalsSource()` shares and reuses queries; `renderVitalsDashboard()` renders a snapshot as the script-free HTML page behind `/_hypdriv/dash`.
 
-Sinks: `logVitalsSink(log)` (one `vitals` line per metric, no ip), `analyticsEngineVitalsSink(binding)` (indexes `[route]`, blobs `[name, rating, pathname, navigationType, buildId, cache, country]`, doubles `[value, ts]`), `multiVitalsSink(sinks)`, `functionVitalsSink(fn)`.
+Experiments: when `flags` runs experiments, `vitalsHandler({ experimentCookie })` tags each payload with the visitor's variants (`|checkout:b|`, from the cookie, never from the body) and `analyticsEngineVitalsSink` stores the tag as the eighth blob. `experimentExposuresSql` / `experimentVitalsSql` build the Analytics Engine SQL for exposures per variant and p75 LCP/INP/CLS per variant; `sampleRatioCheck(observed, weights)` is the χ² check of the observed split against the weights, and `buildExperimentReport(description, rows, { days })` assembles the report `hypdriv experiments` prints.
+
+Sinks: `logVitalsSink(log)` (one `vitals` line per metric, no ip), `analyticsEngineVitalsSink(binding)` (indexes `[route]`, blobs `[name, rating, pathname, navigationType, buildId, cache, country, experiments]`, doubles `[value, ts]`), `multiVitalsSink(sinks)`, `functionVitalsSink(fn)`.
 
 Client side (`@hypdriv/observe/client`, 3.5 kB minified, no runtime dependencies):
 

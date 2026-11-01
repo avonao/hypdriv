@@ -236,15 +236,22 @@ describe('sinks', () => {
     expect(points).toEqual([
       {
         indexes: ['app:/blog/[slug]'],
-        blobs: ['LCP', 'good', '/blog/x', 'navigate', 'b1', 'HIT', 'US'],
+        blobs: ['LCP', 'good', '/blog/x', 'navigate', 'b1', 'HIT', 'US', ''],
         doubles: [1234.5, NOW - 10],
       },
       {
         indexes: ['/blog/x'],
-        blobs: ['LCP', 'good', '/blog/x', '', '', '', ''],
+        blobs: ['LCP', 'good', '/blog/x', '', '', '', '', ''],
         doubles: [1234.5, NOW - 10],
       },
     ]);
+  });
+
+  it('stores the experiment tag next to the measurement', () => {
+    const points: Array<{ blobs?: Array<string | null> }> = [];
+    const sink = analyticsEngineVitalsSink({ writeDataPoint: (p) => void points.push(p) });
+    sink.write({ ...normalizeVitalsPayload(metric(), NOW)!, experiments: '|checkout:b|' }, {});
+    expect(points[0]?.blobs?.[7]).toBe('|checkout:b|');
   });
 
   it('fans out and wraps functions', async () => {
@@ -263,5 +270,32 @@ describe('sinks', () => {
     await multi.write(normalizeVitalsPayload(metric(), NOW)!, {});
     expect(a.writes).toHaveLength(1);
     expect(calls).toEqual(['LCP']);
+  });
+});
+
+describe('vitalsHandler with experiments', () => {
+  const post = (cookie: string | undefined, body: unknown) =>
+    new Request('https://example.com/_hypdriv/vitals', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify(body),
+    });
+
+  it('tags measurements with the visitor’s variants from the cookie, whatever the body claims', async () => {
+    const { writes, sink } = recordingSink();
+    const handler = vitalsHandler({ sink, now: () => NOW, experimentCookie: 'hyp_exp' });
+    const forged = metric({ experiments: '|checkout:control|' });
+    await handler(post('hyp_exp=hero%3Ab*.checkout%3Ab', [forged]));
+    expect(writes[0]?.payload.experiments).toBe('|checkout:b|hero:b|');
+    await handler(post(undefined, [forged]));
+    expect(writes[1]?.payload.experiments).toBeUndefined();
+    await handler(post('hyp_exp=garbage', [metric()]));
+    expect(writes[2]?.payload.experiments).toBeUndefined();
+  });
+
+  it('leaves the payload alone without a configured cookie', async () => {
+    const { writes, sink } = recordingSink();
+    await vitalsHandler({ sink, now: () => NOW })(post('hyp_exp=checkout%3Ab', [metric()]));
+    expect(writes[0]?.payload.experiments).toBeUndefined();
   });
 });

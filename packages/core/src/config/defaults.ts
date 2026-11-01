@@ -203,6 +203,7 @@ export const HEADER = {
 
 export const COOKIE = {
   flagsId: 'hyp_uid',
+  experiments: 'hyp_exp',
   csrf: 'hyp_csrf',
   session: 'hyp_session',
   locale: 'hyp_locale',

@@ -80,6 +80,17 @@ Where the numbers come from:
 
 The page runs no script, has its own strict `Content-Security-Policy` (one `<style>` carrying a per-request nonce), is never cached (`private, no-store`) and is marked `noindex`; the API token never reaches the page or the logs, and a failing query shows a `502` page with the reason (for example a token without the right permission). `hypdriv doctor` checks the token, the secrets and the sink, and `hypdriv vitals --trend` prints the same trend in the terminal.
 
+### Experiments
+
+When edge experiments run (`flags.definitions.<name>.experiment`, see [Flags](flags.md#experiments-ab-tests)), the vitals beacon route tags each measurement with the visitor's variants, read from the first-party experiment cookie — never from the beacon body, so a forged tag is ignored. The Analytics Engine sink stores the tag as the eighth blob (`|checkout:one_page|hero:control|`, empty outside experiments), so a variant's vitals are one `position('|checkout:one_page|' IN blob8) > 0` away. Exposures share the dataset:
+
+| Row | `blob1` | Other blobs | Doubles |
+| --- | --- | --- | --- |
+| Web Vital | `LCP`, `INP`, `CLS`, `FCP`, `TTFB` | rating, pathname, navigation type, build id, cache, country, experiment tag | value, timestamp |
+| Exposure | `experiment.exposure` | experiment, variant, pathname, route, country, build id | timestamp |
+
+`hypdriv experiments --results` runs both queries; `hypdriv vitals` is unaffected (its queries select vitals by `blob1`).
+
 ## Errors
 
 `instrumentation.ts`:

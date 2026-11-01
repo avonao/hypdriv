@@ -47,6 +47,7 @@ describe('evaluateFlags: rules', () => {
     expect(evaluateFlags(input({ definitions, geo: { country: 'US' } }))).toEqual({
       values: { banner: 'na' },
       reasons: { banner: 'rule:1' },
+      experiments: {},
     });
     expect(evaluateFlags(input({ definitions, geo: { country: 'DE', continent: 'EU' } })).values.banner).toBe(
       'eu',

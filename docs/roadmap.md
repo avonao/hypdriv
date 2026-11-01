@@ -12,7 +12,6 @@ Everything in `docs/feature-catalog.md` marked ✅ or 🧪, validated end to end
 
 ## 0.3
 
-- **Edge A/B experiments** on top of flags: assignment persistence, exposure events to the vitals sink, and a `hypdriv experiments` report.
 - **Smart warming**: learn hot routes from vitals/Analytics Engine data and warm them on a schedule.
 - **Image placeholders without sharp**: a pure-WASM decoder path for CI environments without native modules.
 

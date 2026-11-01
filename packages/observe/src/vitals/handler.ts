@@ -1,4 +1,11 @@
-import { clientIp, type Logger, toError } from '@hypdriv/core';
+import {
+  clientIp,
+  experimentTag,
+  type Logger,
+  parseCookies,
+  parseExperimentCookie,
+  toError,
+} from '@hypdriv/core';
 import type { VitalName, VitalRating, VitalsContext, VitalsPayload, VitalsSink } from './types';
 
 const NAMES: ReadonlySet<string> = new Set<VitalName>(['LCP', 'INP', 'CLS', 'FCP', 'TTFB']);
@@ -96,6 +103,11 @@ export interface VitalsHandlerOptions {
   maxMetrics?: number;
   /** `Access-Control-Allow-Origin` value (`*` or a comma-separated allow-list); enables CORS preflight. */
   allowOrigin?: string;
+  /**
+   * Name of the experiment cookie (`flags.experimentCookie`). When set, each measurement is tagged with the
+   * visitor's variants (`experiments`: `|checkout:b|`), whatever the beacon body claims.
+   */
+  experimentCookie?: string;
   log?: Logger;
   random?: () => number;
   now?: () => number;
@@ -196,6 +208,14 @@ export function vitalsHandler(
       .map((p) => normalizeVitalsPayload(p, t))
       .filter((p): p is VitalsPayload => p !== null);
     if (!payloads.length) return respond(400, cors, '{"error":"invalid_payload"}');
+    if (options.experimentCookie) {
+      const cookies = parseCookies(request.headers.get('cookie'));
+      const tag = experimentTag(parseExperimentCookie(cookies[options.experimentCookie]));
+      for (const payload of payloads) {
+        if (tag) payload.experiments = tag;
+        else delete payload.experiments;
+      }
+    }
 
     if (sampleRate > 0 && (sampleRate >= 1 || random() < sampleRate)) {
       const vctx: VitalsContext = {

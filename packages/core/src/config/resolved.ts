@@ -301,6 +301,9 @@ export interface ResolvedFlags {
   kvBinding: string;
   kvKey: string;
   idCookie: string;
+  experimentCookie: string;
+  exposures: 'auto' | 'log' | 'analytics-engine' | 'none';
+  exposuresBinding: string;
   header: string;
   queryOverrides: boolean | 'development';
   refreshSeconds: number;

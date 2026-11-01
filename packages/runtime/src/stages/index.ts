@@ -25,11 +25,14 @@ import {
   type Stage,
 } from '@hypdriv/core';
 import {
+  analyticsEngineExposureSink,
+  type ExposureSink,
   envProvider,
   FLAGS_KEY,
   type FlagProvider,
   flagsStage,
   kvProvider,
+  logExposureSink,
   staticProvider,
 } from '@hypdriv/flags';
 import {
@@ -113,6 +116,8 @@ export interface Platform {
   counterStores: Partial<Record<RateLimitStore, CounterStore>>;
   rateLimitBinding: RateLimitBindingLike | null;
   flagsProvider: FlagProvider;
+  /** Where experiment exposures go (`null` when `flags.exposures` is `none`). */
+  exposureSink: ExposureSink | null;
   tracer: Tracer | null;
   vitalsSink: VitalsSink | null;
   /** Where the vitals dashboard reads from (`null` when `observe.vitals.dashboard` is off). */
@@ -144,6 +149,7 @@ export interface CreatePlatformInput {
       | 'counterStores'
       | 'rateLimitBinding'
       | 'flagsProvider'
+      | 'exposureSink'
       | 'tracer'
       | 'vitalsSink'
       | 'vitalsSource'
@@ -151,6 +157,21 @@ export interface CreatePlatformInput {
       | 'capabilities'
     >
   >;
+}
+
+/** `flags.exposures`: Analytics Engine when asked for (or `auto` and bound), the log otherwise. */
+function exposureSinkFor(config: ResolvedConfig, env: HypDrivEnv, log: Logger): ExposureSink | null {
+  const f = config.flags;
+  if (f.exposures === 'none') return null;
+  const binding = env[f.exposuresBinding];
+  const bound = typeof (binding as { writeDataPoint?: unknown } | undefined)?.writeDataPoint === 'function';
+  if (f.exposures === 'analytics-engine' || (f.exposures === 'auto' && bound)) {
+    if (bound) return analyticsEngineExposureSink(binding as never);
+    log.warn('flags.exposures is analytics-engine but the binding is missing; exposures go to the log', {
+      binding: f.exposuresBinding,
+    });
+  }
+  return logExposureSink(log);
 }
 
 function flagsProviderFor(config: ResolvedConfig, env: HypDrivEnv, caps: Capabilities): FlagProvider {
@@ -255,6 +276,10 @@ export function createPlatform(input: CreatePlatformInput): Platform {
       : null) ??
     null;
   const flagsProvider = input.overrides?.flagsProvider ?? flagsProviderFor(config, env, capabilities);
+  const exposureSink =
+    input.overrides?.exposureSink !== undefined
+      ? input.overrides.exposureSink
+      : exposureSinkFor(config, env, log);
   const tracer =
     input.overrides?.tracer !== undefined
       ? input.overrides.tracer
@@ -313,6 +338,7 @@ export function createPlatform(input: CreatePlatformInput): Platform {
     counterStores,
     rateLimitBinding,
     flagsProvider,
+    exposureSink,
     tracer,
     // The dashboard's in-memory fallback is fed next to the configured sink.
     vitalsSink: dashboard.memory
@@ -353,7 +379,9 @@ export function buildDefaultStages(platform: Platform): Stage[] {
     geoStage(config),
     i18nStage(config),
     Object.keys(config.flags.definitions).length || config.flags.provider !== 'static'
-      ? flagsStage(config, platform.flagsProvider)
+      ? flagsStage(config, platform.flagsProvider, {
+          ...(platform.exposureSink ? { onExposure: platform.exposureSink } : {}),
+        })
       : null,
     redirectsStage(config, { kv, target: platform.target }),
     config.purser?.theme ? themeStage(config) : null,

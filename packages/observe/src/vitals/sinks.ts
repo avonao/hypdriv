@@ -16,8 +16,9 @@ export function logVitalsSink(log: Logger): VitalsSink {
 }
 
 /**
- * Analytics Engine sink: index `[route]`, blobs `[name, rating, pathname, navigationType, buildId, cache, country]`,
- * doubles `[value, ts]`. `hypdriv vitals` reads p75 per route from this layout.
+ * Analytics Engine sink: index `[route]`, blobs `[name, rating, pathname, navigationType, buildId, cache, country,
+ * experiments]`, doubles `[value, ts]`. `hypdriv vitals` reads p75 per route from this layout; `hypdriv experiments`
+ * slices it by variant (`experiments` is `|name:variant|…|`, empty outside experiments).
  */
 export function analyticsEngineVitalsSink(binding: AnalyticsEngineLike): VitalsSink {
   return {
@@ -32,6 +33,7 @@ export function analyticsEngineVitalsSink(binding: AnalyticsEngineLike): VitalsS
           p.buildId ?? '',
           p.cache ?? '',
           ctx.country ?? '',
+          p.experiments ?? '',
         ],
         doubles: [p.value, p.ts],
       });

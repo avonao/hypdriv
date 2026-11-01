@@ -39,7 +39,7 @@ cache: {
 
 ## Keys
 
-A key is the SHA-256 of: method · lowercase host · pathname (the trailing slash is kept as requested: `/legal` and `/legal/` are different entries, because with Next's `trailingSlash` one of them is a redirect to the other) · sorted query without tracking parameters (or `keyQuery` subset) · vary dimensions (headers, cookies, geo, flags, locale, device) · RSC markers (`rsc`, `next-router-state-tree`, `next-router-prefetch`, `next-url`) · build id. Deployments never serve each other's content.
+A key is the SHA-256 of: method · lowercase host · pathname (the trailing slash is kept as requested: `/legal` and `/legal/` are different entries, because with Next's `trailingSlash` one of them is a redirect to the other) · sorted query without tracking parameters (or `keyQuery` subset) · vary dimensions (headers, cookies, geo, flags — including every running A/B experiment unless the policy sets `vary.experiments: false` — locale, device) · RSC markers (`rsc`, `next-router-state-tree`, `next-router-prefetch`, `next-url`) · build id. Deployments never serve each other's content.
 
 Bypass conditions skip the cache entirely: `bypass.cookies` (e.g. a session cookie), `bypass.headers`, `bypass.query` (e.g. `preview`), `bypass.when(input)`; requests carrying `Cache-Control: no-cache` are also bypassed.
 

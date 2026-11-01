@@ -556,3 +556,99 @@ describe('vitals dashboard checks', () => {
     expect(check?.message).toContain('Speed Insights');
   });
 });
+
+describe('experiment checks', () => {
+  const ids = ['--only', 'experiments.cache,experiments.exposures,experiments.vitals'];
+  const AE = '"analytics_engine_datasets": [{ "binding": "HYPDRIV_ANALYTICS", "dataset": "shop_events" }]';
+  const wrangler = (extra = '') => WRANGLER_JSONC.replace(/\}\n$/, `${extra ? `${extra},\n` : ''}}\n`);
+  const experiment = (name: string, variants = '{ control: 1, b: 1 }', extra = '') =>
+    `${name}: { default: 'control', experiment: { variants: ${variants}${extra} } }`;
+  const project = (config: string, files: Record<string, string> = {}) =>
+    tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'wrangler.jsonc': wrangler(),
+      'hypdriv.config.ts': `export default ${config};\n`,
+      ...files,
+    });
+
+  it('stays out of the way without a running experiment', async () => {
+    const p = project(
+      `{ flags: { definitions: { ${experiment('hero', '{ control: 1, b: 1 }', ", status: 'concluded'")} } } }`,
+    );
+    const { byId } = await doctor(p.dir, ids);
+    for (const id of ['experiments.cache', 'experiments.exposures', 'experiments.vitals'])
+      expect(byId[id]?.status).toBe('skip');
+  });
+
+  it('reports the cached copies a running experiment creates, and warns when they multiply', async () => {
+    const one = project(`{ flags: { definitions: { ${experiment('checkout')} } } }`);
+    const pass = (await doctor(one.dir, ids)).byId['experiments.cache'];
+    expect(pass?.status).toBe('pass');
+    expect(pass?.message).toContain('vary on checkout');
+    expect(pass?.message).toContain('up to 2 cached copies');
+    const many = project(
+      `{ flags: { definitions: { ${['a', 'b', 'c'].map((n) => experiment(n, '{ control: 1, x: 1, y: 1 }')).join(', ')} } } }`,
+    );
+    const warned = (await doctor(many.dir, ids)).byId['experiments.cache'];
+    expect(warned?.status).toBe('warn');
+    expect(warned?.message).toContain('27 copies');
+    const off = project(`{ flags: { definitions: { ${experiment('checkout')} } }, cache: { edge: false } }`);
+    expect((await doctor(off.dir, ids)).byId['experiments.cache']?.message).toContain('Edge cache is off');
+  });
+
+  it('says where exposures go and what counting them needs', async () => {
+    const config = `{ flags: { definitions: { ${experiment('checkout')} } } }`;
+    const unbound = (await doctor(project(config).dir, ids)).byId['experiments.exposures'];
+    expect(unbound).toMatchObject({ status: 'pass', informational: true });
+    expect(unbound?.message).toContain('Exposures go to the log');
+    expect(unbound?.message).toContain('HYPDRIV_ANALYTICS');
+    const bound = project(config, { 'wrangler.jsonc': wrangler(AE) });
+    expect((await doctor(bound.dir, ids)).byId['experiments.exposures']?.message).toContain(
+      'Analytics Engine',
+    );
+    const forced = project(
+      `{ flags: { exposures: 'analytics-engine', definitions: { ${experiment('checkout')} } } }`,
+    );
+    const warned = (await doctor(forced.dir, ids)).byId['experiments.exposures'];
+    expect(warned?.status).toBe('warn');
+    expect(warned?.message).toContain('fall back to the log');
+    const none = project(`{ flags: { exposures: 'none', definitions: { ${experiment('checkout')} } } }`);
+    expect((await doctor(none.dir, ids)).byId['experiments.exposures']?.message).toContain(
+      'nobody is counted',
+    );
+  });
+
+  it('points Vercel at the log drain', async () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'site', dependencies: { next: '16.4.3' } }),
+      'vercel.json': '{}',
+      'hypdriv.config.ts': `export default { flags: { definitions: { ${experiment('checkout')} } } };\n`,
+    });
+    const check = (await doctor(p.dir, ids)).byId['experiments.exposures'];
+    expect(check).toMatchObject({ status: 'pass', informational: true });
+    expect(check?.message).toContain('log drain');
+  });
+
+  it('checks that vitals can be sliced by variant', async () => {
+    const flags = `flags: { definitions: { ${experiment('checkout')} } }`;
+    const off = (await doctor(project(`{ ${flags}, observe: { vitals: false } }`).dir, ids)).byId[
+      'experiments.vitals'
+    ];
+    expect(off?.message).toContain('observe.vitals is off');
+    const log = project(`{ ${flags}, observe: { vitals: true } }`, { 'wrangler.jsonc': wrangler(AE) });
+    expect((await doctor(log.dir, ids)).byId['experiments.vitals']?.message).toContain(
+      "'analytics-engine' sink",
+    );
+    const good = project(`{ ${flags}, observe: { vitals: { sink: 'analytics-engine' } } }`, {
+      'wrangler.jsonc': wrangler(AE),
+    });
+    expect((await doctor(good.dir, ids)).byId['experiments.vitals']?.status).toBe('pass');
+    const split = project(
+      `{ flags: { exposuresBinding: 'EXPOSURES', definitions: { ${experiment('checkout')} } }, observe: { vitals: { sink: 'analytics-engine' } } }`,
+      { 'wrangler.jsonc': wrangler(AE) },
+    );
+    const warned = (await doctor(split.dir, ids)).byId['experiments.vitals'];
+    expect(warned?.status).toBe('warn');
+    expect(warned?.message).toContain('one dataset');
+  });
+});

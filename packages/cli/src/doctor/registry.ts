@@ -1,6 +1,7 @@
 import type { DeployPlatform, ProjectFramework } from '../project';
 import { depsChecks } from './checks/deps';
 import { environmentChecks } from './checks/environment';
+import { experimentChecks } from './checks/experiments';
 import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
 import { nextjsChecks } from './checks/nextjs';
@@ -59,6 +60,7 @@ export const allChecks: Check[] = [
   ...scoped(onlyOn(['vercel'], vercelChecks)),
   ...scoped(onlyOn(['cloudflare'], workersCompatChecks)),
   ...scoped(hypdrivChecks),
+  ...experimentChecks,
   ...sizeChecks,
   ...securityChecks,
   ...purserChecks,
