@@ -1,6 +1,6 @@
 # Live checks for Hypdriv's Vite hosts
 
-One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku and Hono — on Cloudflare Workers, Vercel or a Node server. The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
+One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, Hono and Qwik — on Cloudflare Workers, Vercel or a Node server. The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
 
 ```sh
 pnpm -F @hypdriv/e2e-hosts check --url https://<deployment> --framework vite \
