@@ -392,6 +392,73 @@ describe('Qwik detection', () => {
   });
 });
 
+describe('Nitro and Analog detection', () => {
+  it('detects Analog before Nitro (Analog projects depend on nitropack too) and Vite', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({
+        name: 'an',
+        dependencies: { '@analogjs/platform': '^2.9.4', nitropack: '^2.13.5' },
+        devDependencies: { vite: '^8.3.5' },
+      }),
+      ...installed('@analogjs/platform', '2.9.4'),
+      ...installed('@hypdriv/analog', '0.1.0'),
+      'vite.config.ts':
+        "import { hypdriv, withHypDriv } from '@hypdriv/analog';\nexport default defineConfig({ plugins: [analog(withHypDriv({})), hypdriv()] });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'analog',
+      version: '2.9.4',
+      integration: '@hypdriv/analog',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.hypdriv.packages['@hypdriv/analog']).toBe('0.1.0');
+  });
+
+  it('detects Nitro 2 (nitropack) and Nitro 3 (nitro) before Vite and registers in nitro.config', () => {
+    const nitro2 = tempProject({
+      'package.json': JSON.stringify({ name: 'n2', dependencies: { nitropack: '^2.13.5' } }),
+      ...installed('nitropack', '2.13.5'),
+      'nitro.config.ts':
+        "import { hypdrivNitro } from '@hypdriv/nitro';\nexport default { modules: [hypdrivNitro()] };\n",
+    });
+    expect(detectProject(nitro2.dir, { env: {} }).framework).toMatchObject({
+      name: 'nitro',
+      version: '2.13.5',
+      integration: '@hypdriv/nitro',
+      registered: true,
+    });
+    const nitro3 = tempProject({
+      'package.json': JSON.stringify({
+        name: 'n3',
+        dependencies: { nitro: '3.0.261029-rc' },
+        devDependencies: { vite: '^8.3.5' },
+      }),
+      ...installed('nitro', '3.0.261029-rc'),
+      'vite.config.ts': 'export default defineConfig({ plugins: [nitro()] });\n',
+    });
+    expect(detectProject(nitro3.dir, { env: {} }).framework).toMatchObject({
+      name: 'nitro',
+      version: '3.0.261029-rc',
+      registered: false,
+    });
+  });
+
+  it('finds the Nitro 3 registration in vite.config when a nitro.config exists without it', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'n3', dependencies: { nitro: '3.0.261029-rc' } }),
+      ...installed('nitro', '3.0.261029-rc'),
+      'nitro.config.ts': 'export default {};\n',
+      'vite.config.ts':
+        "import { hypdriv } from '@hypdriv/nitro/vite';\nimport { nitro } from 'nitro/vite';\nexport default defineConfig({ plugins: [nitro(), hypdriv()] });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework.registered).toBe(true);
+    expect(info.framework.configFile).toMatch(/vite\.config\.ts$/);
+  });
+});
+
 describe('platform detection', () => {
   it('detects Vercel from vercel.json, the VERCEL env and @hypdriv/vercel', () => {
     const p = tempProject({

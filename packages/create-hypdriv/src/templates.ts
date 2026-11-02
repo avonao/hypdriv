@@ -26,7 +26,9 @@ export type ViteHost =
   | 'waku'
   | 'rwsdk'
   | 'solid-start'
-  | 'qwik';
+  | 'qwik'
+  | 'nitro'
+  | 'analog';
 export const VITE_HOSTS: readonly ViteHost[] = [
   'vite',
   'react-router',
@@ -39,6 +41,8 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'rwsdk',
   'solid-start',
   'qwik',
+  'nitro',
+  'analog',
 ];
 /** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
 export type ServerHost = 'hono';
@@ -69,6 +73,9 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   rwsdk: 'examples/rwsdk',
   'solid-start': 'examples/solid-start',
   qwik: 'examples/qwik',
+  // Nitro 2 (`nitropack`); the Nitro 3 / `nitro/vite` variant is `examples/nitro-vite`.
+  nitro: 'examples/nitro',
+  analog: 'examples/analog',
   hono: 'examples/hono',
 };
 
@@ -115,6 +122,7 @@ const EXCLUDED = new Set([
   '.vinext',
   '.nitro',
   '.solid',
+  '.angular',
   // Monorepo-only configuration (extends the repository's root config)
   'biome.json',
 ]);

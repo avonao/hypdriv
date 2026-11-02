@@ -318,6 +318,11 @@ function objectProperties(source: string, open: number, close: number): ObjectPr
 export function configObjectStart(source: string): number {
   const call = /export\s+default\s+(?:[\w$.]+\s*\(\s*)?\{/.exec(source);
   if (call) return call.index + call[0].length - 1;
+  const arrow =
+    /export\s+default\s+[\w$.]+\s*\(\s*(?:async\s*)?\([^()]*\)\s*(?::\s*[\w$.<>[\]]+\s*)?=>\s*\(\s*\{/.exec(
+      source,
+    );
+  if (arrow) return arrow.index + arrow[0].length - 1;
   const named = /(?:const|let)\s+(\w+)\s*(?::\s*[\w.<>]+\s*)?=\s*(?:[\w$.]+\s*\(\s*)?\{/.exec(source);
   if (named && new RegExp(`export\\s+default\\s+(?:[\\w$.]+\\s*\\(\\s*)?${named[1]}\\b`).test(source))
     return named.index + named[0].length - 1;

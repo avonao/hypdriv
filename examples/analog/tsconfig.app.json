@@ -1,0 +1,11 @@
+/* The Angular compiler program (Analog's Vite plugin reads it): the entries, the file router's pages and the server
+   middleware. Keep it free of Node-only files such as vite.config.ts. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/app",
+    "types": []
+  },
+  "files": ["src/main.ts", "src/main.server.ts"],
+  "include": ["src/**/*.d.ts", "src/app/pages/**/*.page.ts", "src/server/middleware/**/*.ts"]
+}

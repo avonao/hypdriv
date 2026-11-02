@@ -64,6 +64,10 @@ export default defineConfig({
     );
     expect(addToConfigArray("module.exports = require('./x')", plugin)).toMatchObject({ changed: false });
     expect(configObjectStart('export default defineNuxtConfig({ modules: [] })')).toBe(32);
+    // The function form that returns the config object (Analog's template).
+    const arrow = 'export default defineConfig(({ mode }) => ({ plugins: [analog()] }));';
+    expect(configObjectStart(arrow)).toBe(arrow.indexOf('({ plugins') + 1);
+    expect(addToConfigArray(arrow, plugin).content).toContain('plugins: [hypdriv(), analog()]');
     expect(importsModule("import x from '@hypdriv/vite'", '@hypdriv/vite')).toBe(true);
     expect(importsModule("import x from '@hypdriv/vite/worker'", '@hypdriv/vite')).toBe(false);
   });
@@ -1115,5 +1119,147 @@ export default defineConfig(({ command, mode }): UserConfig => {
     expect(p.read('vite.config.ts')).not.toContain('hypdriv');
     expect(existsSync(join(p.dir, 'adapters'))).toBe(false);
     expect(JSON.stringify(out.plan)).toContain('qwik migrate-v2');
+  });
+
+  const nitro2 = {
+    'package.json': JSON.stringify({ name: 'api', dependencies: { nitropack: '^2.13.5' } }),
+    ...installed('nitropack', '2.13.5'),
+  };
+
+  it('Nitro 2: hypdrivNitro() in the modules of nitro.config and Worker settings for the generated entry', async () => {
+    const { p, out } = await init(
+      {
+        ...nitro2,
+        'nitro.config.ts':
+          "import { defineNitroConfig } from 'nitropack/config';\n\nexport default defineNitroConfig({\n  srcDir: 'server',\n});\n",
+      },
+      'cloudflare',
+    );
+    const config = p.read('nitro.config.ts');
+    expect(config).toContain("import { hypdrivNitro } from '@hypdriv/nitro';");
+    expect(config).toContain('modules: [hypdrivNitro()]');
+    expect(parseJsonc(p.read('wrangler.jsonc'))).toMatchObject({
+      assets: { html_handling: 'drop-trailing-slash', run_worker_first: ['/*', '!/assets/*'] },
+      durable_objects: { bindings: expect.any(Array) },
+    });
+    expect(out.notes.join('\n')).toContain('cloudflare-module');
+    expect(JSON.parse(p.read('package.json')).dependencies['@hypdriv/nitro']).toBeDefined();
+
+    // Idempotent: nothing left to create or modify.
+    const again = memoryIO(p.dir);
+    await runCommand('init', ['--platform', 'cloudflare', '--skip-doctor', '--json'], again);
+    const plan = JSON.parse(again.out).plan as Array<{ action: string }>;
+    expect(plan.filter((i) => i.action === 'modify' || i.action === 'create')).toEqual([]);
+  });
+
+  it('Nitro: creates nitro.config for Nitro 2 or 3 and starts Node builds from .output', async () => {
+    const two = await init(nitro2, 'node');
+    expect(two.p.read('nitro.config.ts')).toContain("from 'nitropack/config'");
+    expect(two.p.read('nitro.config.ts')).toContain('modules: [hypdrivNitro()]');
+    expect(JSON.parse(two.p.read('package.json')).scripts.start).toBe('node .output/server/index.mjs');
+    expect(existsSync(join(two.p.dir, 'wrangler.jsonc'))).toBe(false);
+
+    const three = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api3', dependencies: { nitro: '3.0.261029-rc' } }),
+        ...installed('nitro', '3.0.261029-rc'),
+      },
+      'node',
+    );
+    expect(three.p.read('nitro.config.ts')).toContain("import { defineConfig } from 'nitro';");
+  });
+
+  it('Nitro 3 on Vite: the plugin from @hypdriv/nitro/vite after nitro() in vite.config', async () => {
+    const { p } = await init(
+      {
+        'package.json': JSON.stringify({
+          name: 'api3',
+          dependencies: { nitro: '3.0.261029-rc' },
+          devDependencies: { vite: '^8.3.5' },
+        }),
+        ...installed('nitro', '3.0.261029-rc'),
+        'vite.config.ts':
+          "import { nitro } from 'nitro/vite';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({ plugins: [nitro()] });\n",
+      },
+      'vercel',
+    );
+    const vite = p.read('vite.config.ts');
+    expect(vite).toContain("import { hypdriv } from '@hypdriv/nitro/vite';");
+    expect(vite).toContain('plugins: [nitro(), hypdriv()]');
+    expect(existsSync(join(p.dir, 'nitro.config.ts'))).toBe(false);
+  });
+
+  const analog = {
+    'package.json': JSON.stringify({
+      name: 'ng',
+      dependencies: { '@analogjs/platform': '^2.9.4', nitropack: '^2.13.5' },
+      devDependencies: { vite: '^8.3.5' },
+    }),
+    ...installed('@analogjs/platform', '2.9.4'),
+  };
+
+  it('Analog: withHypDriv() around analog(), hypdriv() plugin, provideHypDriv() in the server config', async () => {
+    const { p, out } = await init(
+      {
+        ...analog,
+        'vite.config.ts': `import analog from '@analogjs/platform';
+import { defineConfig } from 'vite';
+
+export default defineConfig(({ mode }) => ({
+  build: { target: ['es2020'] },
+  plugins: [analog()],
+  define: { 'import.meta.vitest': mode !== 'production' },
+}));
+`,
+        'src/app/app.config.server.ts': `import { mergeApplicationConfig, ApplicationConfig } from '@angular/core';
+import { provideServerRendering } from '@angular/platform-server';
+import { appConfig } from './app.config';
+
+const serverConfig: ApplicationConfig = {
+  providers: [provideServerRendering()],
+};
+
+export const config = mergeApplicationConfig(appConfig, serverConfig);
+`,
+      },
+      'cloudflare',
+    );
+    const vite = p.read('vite.config.ts');
+    expect(vite).toContain("import { hypdriv, withHypDriv } from '@hypdriv/analog';");
+    expect(vite).toContain('plugins: [analog(withHypDriv()), hypdriv()]');
+    expect(p.read('src/app/app.config.server.ts')).toContain(
+      'providers: [provideServerRendering(), provideHypDriv()]',
+    );
+    expect(p.read('src/app/app.config.server.ts')).toContain(
+      "import { provideHypDriv } from '@hypdriv/analog/angular/server';",
+    );
+    expect(parseJsonc(p.read('wrangler.jsonc'))).toMatchObject({
+      assets: { run_worker_first: ['/*', '!/assets/*'] },
+    });
+    const notes = out.notes.join('\n');
+    expect(notes).toContain('deployConfig: true');
+    expect(notes).toContain('TransferState');
+
+    // Idempotent.
+    const again = memoryIO(p.dir);
+    await runCommand('init', ['--platform', 'cloudflare', '--skip-doctor', '--json'], again);
+    const plan = JSON.parse(again.out).plan as Array<{ action: string }>;
+    expect(plan.filter((i) => i.action === 'modify' || i.action === 'create')).toEqual([]);
+  });
+
+  it('Analog: keeps the options of analog(), starts Node builds from dist/analog and hints when the server config is missing', async () => {
+    const { p, out } = await init(
+      {
+        ...analog,
+        'vite.config.ts':
+          "import analog from '@analogjs/platform';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [analog({ ssr: true, prerender: { routes: ['/'] } })] });\n",
+      },
+      'node',
+    );
+    expect(p.read('vite.config.ts')).toContain(
+      "analog(withHypDriv({ ssr: true, prerender: { routes: ['/'] } })), hypdriv()",
+    );
+    expect(JSON.parse(p.read('package.json')).scripts.start).toBe('node dist/analog/server/index.mjs');
+    expect(out.plan.find((i) => i.path === 'src/app/app.config.server.ts')?.action).toBe('manual');
   });
 });

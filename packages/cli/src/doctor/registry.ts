@@ -6,6 +6,7 @@ import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
 import { imageChecks } from './checks/images';
 import { nextjsChecks } from './checks/nextjs';
+import { nitroChecks } from './checks/nitro';
 import { opennextChecks } from './checks/opennext';
 import { openNextCacheChecks } from './checks/opennext-cache';
 import { purserChecks } from './checks/purser';
@@ -62,6 +63,7 @@ export const allChecks: Check[] = [
   ...rwsdkChecks,
   ...solidStartChecks,
   ...qwikChecks,
+  ...nitroChecks,
   ...honoChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),

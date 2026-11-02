@@ -56,6 +56,8 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   rwsdk: '@hypdriv/rwsdk',
   'solid-start': '@hypdriv/solid-start',
   qwik: '@hypdriv/qwik',
+  nitro: '@hypdriv/nitro',
+  analog: '@hypdriv/analog',
 };
 
 /** Display names. */
@@ -73,6 +75,8 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   rwsdk: 'RedwoodSDK',
   'solid-start': 'SolidStart',
   qwik: 'Qwik',
+  nitro: 'Nitro',
+  analog: 'Analog',
   unknown: 'an unknown framework',
 };
 
@@ -99,6 +103,8 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['astro', 'astro'],
   ['sveltekit', '@sveltejs/kit'],
   ['nuxt', 'nuxt'],
+  // Analog before Nitro: Analog builds on Nitro 2 and its projects depend on `nitropack` too.
+  ['analog', '@analogjs/platform'],
   // Waku before Hono: Waku's server is a Hono app and its projects often depend on `hono` themselves.
   ['waku', 'waku'],
   ['solid-start', '@solidjs/start'],
@@ -108,6 +114,9 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['hono', 'hono'],
   // RedwoodSDK before Vite: its projects depend on `vite` themselves.
   ['rwsdk', 'rwsdk'],
+  // Plain Nitro: the frameworks built on it are matched above.
+  ['nitro', 'nitropack'],
+  ['nitro', 'nitro'],
   ['vite', 'vite'],
 ];
 
@@ -146,6 +155,18 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
     'app.config.js',
   ],
   qwik: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
+  // `nitro.config.*` for Nitro 2 and Nitro 3; a Nitro 3 app on Vite (`nitro/vite`) registers in `vite.config.*`.
+  nitro: [
+    'nitro.config.ts',
+    'nitro.config.mts',
+    'nitro.config.js',
+    'nitro.config.mjs',
+    'vite.config.ts',
+    'vite.config.mts',
+    'vite.config.js',
+    'vite.config.mjs',
+  ],
+  analog: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
 };
 
 /** Detects the framework from the package's dependencies and its config file. */
@@ -163,14 +184,22 @@ export function detectFramework(root: string, pkg: PackageInfo | null): Framewor
     };
   const [name, dep] = found;
   const integration = FRAMEWORK_INTEGRATION[name];
-  const configFile = firstExisting(root, FRAMEWORK_CONFIG_FILES[name]);
-  const source = configFile ? (readText(configFile) ?? '') : '';
   const pattern =
     name === 'next'
       ? /\bwithHypDriv\b/
       : new RegExp(
           `['"](?:${integration.replace(/[/@.-]/g, (c) => `\\${c}`)}|hypdriv\\/${name})(?:\\/[\\w-]+)?['"]`,
         );
+  let configFile = firstExisting(root, FRAMEWORK_CONFIG_FILES[name]);
+  // Nitro registers in `nitro.config.*` (module) or, for Nitro 3 on Vite, in `vite.config.*` (plugin): the file that
+  // references the integration is the config file.
+  if (name === 'nitro') {
+    const registeredIn = FRAMEWORK_CONFIG_FILES.nitro
+      .map((f) => join(root, f))
+      .find((f) => exists(f) && pattern.test(readText(f) ?? ''));
+    if (registeredIn) configFile = registeredIn;
+  }
+  const source = configFile ? (readText(configFile) ?? '') : '';
   return {
     name,
     version: installedVersion(root, dep) ?? (deps[dep] as string | undefined) ?? null,
@@ -783,6 +812,8 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/rwsdk',
     '@hypdriv/solid-start',
     '@hypdriv/qwik',
+    '@hypdriv/nitro',
+    '@hypdriv/analog',
   ]) {
     const v = installedVersion(root, name);
     if (v) hypdrivPackages[name] = v;

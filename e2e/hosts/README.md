@@ -1,6 +1,6 @@
 # Live checks for Hypdriv's Vite hosts
 
-One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Hono and Qwik — on Cloudflare Workers, Vercel or a Node server (RedwoodSDK on Workers only; its health route names the framework "RedwoodSDK", so pass `--framework redwood`). The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
+One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik, Hono, Nitro (2 and 3) and Analog — on Cloudflare Workers, Vercel or a Node server (RedwoodSDK on Workers only; its health route names the framework "RedwoodSDK", so pass `--framework redwood`). The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
 
 ```sh
 pnpm -F @hypdriv/e2e-hosts check --url https://<deployment> --framework vite \
@@ -40,7 +40,7 @@ HYPDRIV_ACCESS_HEADERS="x-hypdriv-gate: $HYPDRIV_GATE" pnpm -F @hypdriv/e2e-host
   --rate-limit 60 --expect-runner worker
 ```
 
-`provision cloudflare` writes the git-ignored `wrangler.<prefix>.local.jsonc` (custom domain, `workers_dev` and preview URLs off, observability) and keeps the zone to **two rules for every host of the prefix**: one WAF custom rule that blocks HTTPS requests without the `x-hypdriv-gate` header or `hypdriv_gate` cookie (the Free plan allows five custom rules), and one Redirect Rule that sends plain HTTP for those hosts to https. The redirect matters: Workers Static Assets answer before the Worker (so before `redirects.forceHttps`), and an HTTP request cannot carry the gate safely. Run it before the first deploy, so the hostname is gated before it resolves. Frameworks whose build writes the Worker config elsewhere (Astro, SvelteKit, Nuxt) take the generated file through their adapter's config option; each example's README says how.
+`provision cloudflare` writes the git-ignored `wrangler.<prefix>.local.jsonc` (custom domain, `workers_dev` and preview URLs off, observability) and keeps the zone to **two rules for every host of the prefix**: one WAF custom rule that blocks HTTPS requests without the `x-hypdriv-gate` header or `hypdriv_gate` cookie (the Free plan allows five custom rules), and one Redirect Rule that sends plain HTTP for those hosts to https. The redirect matters: Workers Static Assets answer before the Worker (so before `redirects.forceHttps`), and an HTTP request cannot carry the gate safely. Run it before the first deploy, so the hostname is gated before it resolves. Frameworks whose build writes the Worker config elsewhere (Astro, SvelteKit, Nuxt, Nitro, Analog) take the generated file through their adapter's config option; each example's README says how.
 
 ### Vercel
 

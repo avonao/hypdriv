@@ -1,0 +1,10 @@
+.output
+.nitro
+.data
+.vercel
+.wrangler
+.hypdriv
+node_modules
+.dev.vars
+.env*.local
+wrangler.*.local.json*

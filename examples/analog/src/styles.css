@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light dark;
+  --accent: #1d4ed8;
+  --muted: color-mix(in srgb, currentColor 60%, transparent);
+  --code: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+body {
+  margin: 0 auto;
+  max-width: 44rem;
+  padding: 2rem 1rem;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  background: var(--code);
+  padding: 0 0.25rem;
+  border-radius: 0.2rem;
+}

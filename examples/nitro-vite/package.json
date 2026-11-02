@@ -1,0 +1,30 @@
+{
+  "name": "@hypdriv/example-nitro-vite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "build:cloudflare": "HYPDRIV_TARGET=cloudflare vite build",
+    "build:vercel": "HYPDRIV_TARGET=vercel vite build",
+    "build:node": "HYPDRIV_TARGET=node vite build",
+    "start": "node .output/server/index.mjs",
+    "preview:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "HYPDRIV_TARGET=cloudflare vite build && wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/nitro": "workspace:*",
+    "nitro": "catalog:",
+    "vite": "catalog:"
+  },
+  "devDependencies": {
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

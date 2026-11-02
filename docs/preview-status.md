@@ -16,7 +16,9 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 | Waku (React Server Components on Vite; 1.0 release candidates) | `@hypdriv/waku` | Preview (verified locally on Node, workerd and a real `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
 | RedwoodSDK (React Server Components on Vite and Cloudflare Workers) | `@hypdriv/rwsdk` | Preview (Cloudflare Workers only; verified locally with a real build in workerd and a browser run under the nonce CSP; live Cloudflare run pending) |
 | SolidStart 2 (Vite 8 and Nitro 3 deployment plugins) | `@hypdriv/solid-start` | Preview (verified locally on Node, workerd for the `@cloudflare/vite-plugin` and Nitro `cloudflare_module` builds, and a real offline `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
-| Qwik (Qwik Router, v2 release candidates, on Vite) | `@hypdriv/qwik` | Preview (verified locally on Node, `vite preview`, the dev server, workerd and a real `vercel build` with the function invoked in process and the Vercel routing emulated; no browser run of hydration; live Cloudflare and Vercel runs pending) |
+| Qwik (Qwik Router, v2 release candidates, on Vite) | `@hypdriv/qwik` | Preview (verified locally on Node, `vite preview`, the dev server, workerd, a real `vercel build` with the function invoked in process and the Vercel routing emulated; no browser run of hydration; live Cloudflare and Vercel runs pending) |
+| Nitro (Nitro 2 `nitropack` 2.13 and Nitro 3 `3.0.261029-rc` with `nitro/vite`) | `@hypdriv/nitro` | Preview (verified locally on Node, workerd and a real `vercel build` with the Vercel routing emulated, for both generations; live Cloudflare and Vercel runs pending; Nitro 3 is a release candidate) |
+| Analog (Angular on Vite and Nitro; Analog 2.9, Angular 22) | `@hypdriv/analog` | Preview (verified locally on Node, workerd and a real `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending; Analog 3 beta not exercised) |
 | Vite hosts: plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext | `@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext` | Preview |
 | Edge cache, security, observability | `@hypdriv/cache`, `@hypdriv/security`, `@hypdriv/observe` | Preview |
 | Flags, live channels, images, DevTools HUD, testing kit | `@hypdriv/flags`, `@hypdriv/live`, `@hypdriv/image`, `@hypdriv/devtools`, `@hypdriv/testing` | Preview |
@@ -27,7 +29,7 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 
 | Suite | Scope | Result |
 | --- | --- | --- |
-| Unit and integration (Vitest, Node and workerd) | 30 packages | 2,472 tests in 216 files pass on Node 22 and 24; Node 20 runs the same suite except the vinext build test, which needs Node 22+ |
+| Unit and integration (Vitest, Node and workerd) | 32 packages | 2,713 tests in 234 files pass on Node 22 (Node 24 and Node 20 were not re-run for this count; the previous 2,472 tests in 216 files also passed on Node 24, and Node 20 ran the same suite except the vinext build test, which needs Node 22+) |
 | Lint, typecheck, build, `publint` | all packages | pass |
 | `e2e/cloudflare` | every capability on Cloudflare Workers | 41 pass · 0 fail · 2 skipped (inbound email, Turnstile pass flow) |
 | `e2e/vercel` | every capability that applies on Vercel | 39 pass · 0 fail · 2 skipped (103 Early Hints are not available on Vercel, Turnstile pass flow) |
