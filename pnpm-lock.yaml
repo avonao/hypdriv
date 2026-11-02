@@ -1869,6 +1869,9 @@ importers:
       '@hypdriv/flags':
         specifier: workspace:*
         version: link:../flags
+      '@hypdriv/nitro':
+        specifier: workspace:*
+        version: link:../nitro
       '@hypdriv/runtime':
         specifier: workspace:*
         version: link:../runtime

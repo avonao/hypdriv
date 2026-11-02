@@ -60,6 +60,7 @@
     "@hypdriv/cloudflare": "workspace:*",
     "@hypdriv/core": "workspace:*",
     "@hypdriv/flags": "workspace:*",
+    "@hypdriv/nitro": "workspace:*",
     "@hypdriv/runtime": "workspace:*",
     "@hypdriv/vite": "workspace:*"
   },

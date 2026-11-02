@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import type { NitroConfig } from 'nitropack';
 
 type RollupExternal = NonNullable<NonNullable<NitroConfig['rollupConfig']>['external']>;
@@ -26,6 +27,18 @@ export function runtimePackages(from: string = import.meta.url): Record<string, 
     }
   }
   return out;
+}
+
+/**
+ * The build output of `@hypdriv/nitro` (`dist`), which holds the Nitro 2 engine the Nuxt runtime files re-export
+ * (capture response, hook, request helpers), or `null` when it cannot be resolved from here.
+ */
+export function nitroEngineDir(from: string = import.meta.url): string | null {
+  try {
+    return join(dirname(createRequire(from).resolve('@hypdriv/nitro/package.json')), 'dist');
+  } catch {
+    return null;
+  }
 }
 
 /** Escapes a string for use inside a regular expression. */

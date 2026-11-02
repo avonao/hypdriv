@@ -1,4 +1,4 @@
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import type { HypDrivConfig, HypManifest, Logger } from '@hypdriv/core';
 import {
   addVercelMiddleware,
@@ -33,7 +33,7 @@ import {
   finalizeNuxtManifest,
   type PrerenderedRoute,
 } from './build/finalize';
-import { escapeRegExp, runtimePackages, withExternal } from './build/nitro-config';
+import { escapeRegExp, nitroEngineDir, runtimePackages, withExternal } from './build/nitro-config';
 import { discoverRoutes, type NitroHandlerLike, type NuxtPageLike } from './build/routes';
 import { isStaticPreset, supportsWorkerEntry, targetOfPreset } from './build/targets';
 import { type NuxtRuntimeOptions, VIRTUAL_CLOUDFLARE_EXPORTS, VIRTUAL_OPTIONS } from './runtime/options';
@@ -124,6 +124,8 @@ export default defineNuxtModule<ModuleOptions>({
     const { resolve } = createResolver(import.meta.url);
     // The module's output directory: runtime files and the chunks they share are bundled into the application.
     const packageDir = resolve('.');
+    // The Nitro 2 engine the runtime files re-export (`@hypdriv/nitro`), bundled into the application the same way.
+    const engineDir = nitroEngineDir();
     const logger = useLogger('hypdriv');
     const log = toHypLogger(logger);
     const rootDir = nuxt.options.rootDir;
@@ -213,7 +215,7 @@ export default defineNuxtModule<ModuleOptions>({
       // Bundle the runtime and Hypdriv's packages: they import the virtual modules and Nitro's build constants.
       config.externals ||= {};
       config.externals.inline ||= [];
-      config.externals.inline.push(packageDir, '@hypdriv/');
+      config.externals.inline.push(packageDir, ...(engineDir ? [engineDir] : []), '@hypdriv/');
       // `@hypdriv/runtime` imports `cloudflare:workers` lazily, only inside workerd.
       config.rollupConfig ||= {};
       config.rollupConfig.external = withExternal(config.rollupConfig.external, /^cloudflare:/);
@@ -221,18 +223,23 @@ export default defineNuxtModule<ModuleOptions>({
       if (config.imports !== false) {
         config.imports ||= {};
         const exclude = config.imports.exclude;
-        const own = new RegExp(`^${escapeRegExp(packageDir)}`);
+        // The runtime files re-export the Nitro 2 engine of `@hypdriv/nitro`, which is no different.
+        const own = [packageDir, ...(engineDir ? [engineDir] : [])].map(
+          (dir) => new RegExp(`^${escapeRegExp(dir)}`),
+        );
         config.imports.exclude = [
           ...(exclude === undefined ? [] : Array.isArray(exclude) ? exclude : [exclude]),
-          own,
+          ...own,
         ];
       }
-      // `nuxt dev` loads server dependencies from disk instead of bundling them: point Hypdriv's packages at the
-      // files this module resolves (the application need not depend on them directly).
-      if (nuxt.options.dev) {
-        config.alias ||= {};
-        for (const [specifier, file] of Object.entries(runtimePackages())) config.alias[specifier] ??= file;
-      }
+      // Point Hypdriv's packages at the files this module resolves (the application need not depend on them
+      // directly): `nuxt dev` loads server dependencies from disk instead of bundling them, and the Nitro 2 engine
+      // in `@hypdriv/nitro` imports them from outside the application, where Nitro does not always resolve them
+      // (linked workspace packages). Aliases the application set win.
+      config.alias ||= {};
+      for (const [specifier, file] of Object.entries(runtimePackages())) config.alias[specifier] ??= file;
+      if (nuxt.options.dev && engineDir)
+        config.alias['@hypdriv/nitro/runtime'] ??= join(engineDir, 'runtime');
     });
 
     const finalize = async (): Promise<FinalizeResult> => {

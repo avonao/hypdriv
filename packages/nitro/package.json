@@ -48,6 +48,16 @@
       "types": "./dist/server.d.ts",
       "default": "./dist/server.js"
     },
+    "./runtime/nitro2/*": {
+      "source": "./src/runtime/nitro2/*.ts",
+      "types": "./dist/runtime/nitro2/*.d.ts",
+      "default": "./dist/runtime/nitro2/*.js"
+    },
+    "./runtime/prerendered": {
+      "source": "./src/runtime/prerendered.ts",
+      "types": "./dist/runtime/prerendered.d.ts",
+      "default": "./dist/runtime/prerendered.js"
+    },
     "./runtime/*": {
       "types": "./dist/runtime/*.d.ts",
       "default": "./dist/runtime/*.js"

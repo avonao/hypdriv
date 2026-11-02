@@ -345,7 +345,8 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/build`      | Node (manifest assembly, static header rules)          | core, runtime, security, purser                     |
 | `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, runtime, build, cache, security, observe, flags, purser, vercel |
 | `@hypdriv/vite`       | Node (plugin, toolkit, `/node` server) + Workers (`/worker`) + Vercel Routing Middleware (`/vercel-middleware`) | core, runtime, build, security, cloudflare |
-| `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`, `@hypdriv/waku` | framework integrations | vite, runtime, cloudflare |
+| `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/vinext`, `@hypdriv/waku` | framework integrations | vite, runtime, cloudflare |
+| `@hypdriv/nuxt` | framework integration (Nuxt module; Nitro 2 engine from `@hypdriv/nitro`) | vite, runtime, cloudflare, nitro |
 | `@hypdriv/nitro` | Node (module, build) + neutral (Nitro 2 and 3 request hooks, `/server`) + Workers (Worker entry) | core, runtime, build, flags, vite, cloudflare |
 | `@hypdriv/analog` | Node (Vite plugin, file-router discovery) + neutral (Angular `/angular`, `/angular/server`, `/server`) | core, runtime, vite, nitro |
 | `@hypdriv/hono` | Hono middleware and fetch wrapper, route manifest from `app.routes` | core, runtime |

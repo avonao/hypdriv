@@ -1,6 +1,6 @@
 # Nitro
 
-`@hypdriv/nitro` is a Nitro module. It runs the Hypdriv Drivetrain around every Nitro response — security headers, CSP (nonces for rendered pages, hashes for prerendered ones), rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, Early Hints, logging, tracing and Server-Timing, and the `/_hypdriv/*` routes — and it writes the build manifest and the platform's static headers. One module covers **Nitro 2** (`nitropack` 2.12+, h3 1.x) and **Nitro 3** (`nitro` 3.0 release candidates, h3 2) with the `cloudflare-module`, `vercel` and `node-server` presets. [Analog](analog.md) is built on it; Nuxt has its own module ([Nuxt](nuxt.md)).
+`@hypdriv/nitro` is a Nitro module. It runs the Hypdriv Drivetrain around every Nitro response — security headers, CSP (nonces for rendered pages, hashes for prerendered ones), rate limiting, the bot shield, geo, feature flags, i18n, redirects, maintenance mode, Early Hints, logging, tracing and Server-Timing, and the `/_hypdriv/*` routes — and it writes the build manifest and the platform's static headers. One module covers **Nitro 2** (`nitropack` 2.12+, h3 1.x) and **Nitro 3** (`nitro` 3.0 release candidates, h3 2) with the `cloudflare-module`, `vercel` and `node-server` presets. [Analog](analog.md) is built on it; Nuxt has its own module ([Nuxt](nuxt.md)) that runs on this package's Nitro 2 engine.
 
 ## Setup
 

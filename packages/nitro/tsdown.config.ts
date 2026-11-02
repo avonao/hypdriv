@@ -8,6 +8,12 @@ export default defineConfig({
     // Runtime files the module registers with Nitro; they are bundled into the application's server.
     'runtime/nitro2/plugin': 'src/runtime/nitro2/plugin.ts',
     'runtime/nitro2/cloudflare-worker': 'src/runtime/nitro2/cloudflare-worker.ts',
+    // The Nitro 2 engine other Nitro-based hosts (Nuxt) build their own plugin and Worker entry on.
+    'runtime/nitro2/hook': 'src/runtime/nitro2/hook.ts',
+    'runtime/nitro2/capture': 'src/runtime/nitro2/capture.ts',
+    'runtime/nitro2/emitter': 'src/runtime/nitro2/emitter.ts',
+    'runtime/nitro2/request': 'src/runtime/nitro2/request.ts',
+    'runtime/prerendered': 'src/runtime/prerendered.ts',
     'runtime/nitro3/plugin': 'src/runtime/nitro3/plugin.ts',
     'runtime/nitro3/cloudflare-worker': 'src/runtime/nitro3/cloudflare-worker.ts',
   },
