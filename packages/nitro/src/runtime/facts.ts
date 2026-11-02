@@ -7,7 +7,7 @@ export const FACTS_KEY = 'hypdriv';
 
 /**
  * Facts about the current request that are safe to render and to serialise into a page (no secrets, server-only
- * flags filtered out). Framework helpers (`useHyp()` in Nuxt, the `HYP_FACTS` token of `@hypdriv/analog`) return
+ * flags filtered out). Framework helpers (`useHyp()` in Nuxt, `injectHyp()` of `@hypdriv/analog`) return
  * them.
  */
 export interface HypFacts {
