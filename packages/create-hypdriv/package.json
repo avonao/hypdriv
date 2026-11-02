@@ -43,8 +43,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "sync-templates": "node scripts/sync-templates.ts",
-    "build": "node scripts/sync-templates.ts && tsdown",
+    "sync-templates": "node scripts/sync-templates.mjs",
+    "build": "tsdown && node scripts/sync-templates.mjs",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"

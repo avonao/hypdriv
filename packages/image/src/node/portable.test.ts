@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { deflateSync, inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { probeAvif } from './avif';
@@ -742,6 +744,11 @@ describe('hostile PNG files', () => {
     const bytes = pngFile(width, width, { colorType: 0, raw });
     expect(bytes.length).toBeLessThan(200_000);
 
+    // `arrayBuffers` counts garbage that has not been collected yet, which on Node 20 is every chunk the
+    // decode has already passed. Collect before each sample so the peak is what the decode still holds.
+    setFlagsFromString('--expose-gc');
+    const gc = runInNewContext('gc') as () => void;
+    gc();
     const base = process.memoryUsage().arrayBuffers;
     let peak = 0;
     let rows = 0;
@@ -750,7 +757,10 @@ describe('hostile PNG files', () => {
       begin: (w, h, extent) => scaler.begin(w, h, extent),
       push(y, rgba) {
         scaler.push(y, rgba);
-        if (++rows % 128 === 0) peak = Math.max(peak, process.memoryUsage().arrayBuffers - base);
+        if (++rows % 128 === 0) {
+          gc();
+          peak = Math.max(peak, process.memoryUsage().arrayBuffers - base);
+        }
       },
     });
     expect(rows).toBe(width);

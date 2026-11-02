@@ -106,7 +106,7 @@ function fixture(root: string, target: 'node' | 'vercel'): void {
       },
       include: ['src'],
     }),
-    'hypdriv.config.ts': [
+    'hypdriv.config.mjs': [
       "import { defineConfig } from '@hypdriv/core';",
       'export default defineConfig({',
       "  site: { name: 'fixture' },",

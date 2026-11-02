@@ -428,6 +428,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 - **Registry.** The packages are distributed as source and tarballs; a package-registry release follows the Preview.
 - **Purser CSS.** The Purser integration needs `@avonao/purser` 0.1+, which is installed separately.
 - **Node.js.** Several host packages require Node 22 or later (see [Requirements](#requirements)). The vinext build test is skipped on Node 20.
+- **Fixed in the Preview: Node 20.** The streaming-decode memory test counted uncollected garbage, so it failed on Node 20 although the decoder is bounded; it now collects before each sample. The Qwik build tests also load a `hypdriv.config.mjs` instead of `.ts`, because Node 20 cannot run a TypeScript config; the same applies to your own projects on Node < 22.18.
 - **Next.js versions.** Next.js 16.x is supported; Next.js 17 support is planned for 1.0 ([roadmap](docs/roadmap.md)).
 - **OpenNext.** Hypdriv builds on `@opennextjs/cloudflare`'s current output. The Adapter-API-based integration is planned for 0.2.
 - **Early Hints.** HTTP 103 responses are produced on Cloudflare; Vercel does not forward them.
@@ -458,7 +459,7 @@ pnpm lint               # Biome
 pnpm changeset          # record a user-visible change
 ```
 
-Continuous integration runs lint, build, typecheck, tests and `publint` on Node 20, 22 and 24. Layout, conventions and the end-to-end verification steps are in [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Continuous integration runs lint, build, typecheck and `publint` on Node 24, and the tests on Node 20, 22 and 24 against that build (building from source needs a Node with native TypeScript config loading). Layout, conventions and the end-to-end verification steps are in [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Feedback, security and contributing
 
