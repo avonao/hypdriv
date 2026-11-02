@@ -321,13 +321,7 @@ export async function decodePng(
 
   // Z_SYNC_FLUSH: a stream cut short ends quietly instead of failing
   const inflate = createInflate({ finishFlush: constants.Z_SYNC_FLUSH, chunkSize: 64 * 1024 });
-  // Small writes: zlib inflates a whole write before it honours backpressure (Node 20 buffers all of it),
-  // and deflate can expand ~1000x, so a 1 KiB slice keeps the window to about a megabyte.
-  for (const part of idat) {
-    for (let at = 0; at < part.length; at += INFLATE_WRITE) {
-      inflate.write(part.subarray(at, at + INFLATE_WRITE));
-    }
-  }
+  for (const part of idat) inflate.write(part);
   inflate.end();
   try {
     for await (const chunk of inflate) {
@@ -346,8 +340,6 @@ export async function decodePng(
   }
   return info;
 }
-
-const INFLATE_WRITE = 1024;
 
 let crcTable: Int32Array | null = null;
 function crc32(parts: Uint8Array[]): number {
