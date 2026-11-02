@@ -1,0 +1,25 @@
+{
+  "name": "@hypdriv/example-fastify",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/compress": "catalog:",
+    "@fastify/static": "catalog:",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/fastify": "workspace:*",
+    "fastify": "catalog:"
+  },
+  "devDependencies": {
+    "@hypdriv/cli": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

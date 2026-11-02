@@ -639,6 +639,9 @@ importers:
 
   examples/fastify:
     dependencies:
+      '@fastify/compress':
+        specifier: 'catalog:'
+        version: 9.3.0
       '@fastify/static':
         specifier: 'catalog:'
         version: 10.1.8
