@@ -260,6 +260,30 @@ export function bridgeRequest(req: IncomingMessage, options: RequestOriginOption
   return { request: new Request(url, init), body, abort: (reason) => controller.abort(reason) };
 }
 
+/** Request headers that let an application answer `304 Not Modified` from validators it computed. */
+const CONDITIONAL_HEADERS = [
+  'if-none-match',
+  'if-modified-since',
+  'if-match',
+  'if-unmodified-since',
+  'if-range',
+];
+
+/**
+ * The headers the application should see for a request the stages let through. A document rendered with a CSP
+ * nonce differs from request to request in the bytes the pipeline adds, while an application that computes
+ * validators from its own output (Express' ETag, a file's `Last-Modified`) sees the same bytes every time: its `304`
+ * would make the browser reuse a cached body whose nonce belongs to an earlier policy and block every inline script.
+ * Navigations (`Accept: text/html`) therefore reach the application unconditional whenever the request has a nonce;
+ * API and asset requests keep their conditional headers.
+ */
+export function appRequestHeaders(headers: Headers, nonce: string | undefined): Headers {
+  if (!nonce || !(headers.get('accept') ?? '').includes('text/html')) return headers;
+  const out = new Headers(headers);
+  for (const name of CONDITIONAL_HEADERS) out.delete(name);
+  return out;
+}
+
 /**
  * Makes the Node request carry the pipeline's headers: the client's `x-hypdriv-*` and nonce headers are gone, the
  * stages' own (`x-hypdriv-route`, the nonce header…) are in, so the application reads exactly what the other hosts'

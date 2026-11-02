@@ -191,6 +191,9 @@ catalogs:
     '@fastify/compress':
       specifier: ^9.3.0
       version: 9.3.0
+    '@fastify/etag':
+      specifier: ^6.2.1
+      version: 6.2.1
     '@fastify/formbody':
       specifier: ^9.0.1
       version: 9.0.1
@@ -608,6 +611,9 @@ importers:
       '@hypdriv/express':
         specifier: workspace:*
         version: link:../../packages/express
+      compression:
+        specifier: 'catalog:'
+        version: 1.8.2(supports-color@10.2.2)
       express:
         specifier: 'catalog:'
         version: 5.3.0(supports-color@10.2.2)
@@ -615,6 +621,9 @@ importers:
       '@hypdriv/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@types/compression':
+        specifier: 'catalog:'
+        version: 1.8.1
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
@@ -1583,6 +1592,9 @@ importers:
       '@fastify/compress':
         specifier: 'catalog:'
         version: 9.3.0
+      '@fastify/etag':
+        specifier: 'catalog:'
+        version: 6.2.1
       '@fastify/formbody':
         specifier: 'catalog:'
         version: 9.0.1
@@ -3548,6 +3560,9 @@ packages:
 
   '@fastify/error@4.2.1':
     resolution: {integrity: sha512-MYBumuIwP+5MIpXSyKm6/o1Eigcoij186lWUssX3LH5U8KWqU0ktZhzC4CErIX9EJeQeRGI+zJZQWakBlFbUcg==}
+
+  '@fastify/etag@6.2.1':
+    resolution: {integrity: sha512-Jz5FFgtDIEC6glecypaOYv7ALdPmSGwJBYnhbSnXrsdRVq3TkapLUuNhkzVV3s6i2JiALZea14V20K0P94TPoA==}
 
   '@fastify/fast-json-stringify-compiler@5.1.1':
     resolution: {integrity: sha512-pyxRKk7UpUnnrztP9pF4+ZYxusEQ4LifTyzRdiXmyql1QezNHxO02D25MVU2o4kMeAMYWAjG6RKRlojgkbiDAw==}
@@ -11856,6 +11871,10 @@ snapshots:
   '@fastify/deepmerge@3.2.4': {}
 
   '@fastify/error@4.2.1': {}
+
+  '@fastify/etag@6.2.1':
+    dependencies:
+      fastify-plugin: 6.0.1
 
   '@fastify/fast-json-stringify-compiler@5.1.1':
     dependencies:

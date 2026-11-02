@@ -10,7 +10,13 @@ import {
   REVALIDATE_HEADER,
   nonce as requestNonce,
 } from '@hypdriv/runtime';
-import { bridgeRequest, remoteAddress, syncRequestHeaders, withAssetHeaders } from '@hypdriv/runtime/node';
+import {
+  appRequestHeaders,
+  bridgeRequest,
+  remoteAddress,
+  syncRequestHeaders,
+  withAssetHeaders,
+} from '@hypdriv/runtime/node';
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods } from 'fastify';
 import fp from 'fastify-plugin';
 import { applyResponse, HOP_BY_HOP, payloadResponse } from './response';
@@ -250,8 +256,9 @@ export const hypdriv = fp<HypDrivFastifyOptions>(
             // Fastify's content-type parsers read the body from the Node request: put back whatever a stage took from
             // it, and let the route see the pipeline's request headers (the client's x-hypdriv-* gone, the stages' in).
             bridged.body?.release();
-            syncRequestHeaders(request.raw, forwarded.headers);
-            request.hypdrivNonce = requestNonce() ?? null;
+            const current = requestNonce();
+            syncRequestHeaders(request.raw, appRequestHeaders(forwarded.headers, current));
+            request.hypdrivNonce = current ?? null;
             flow.phase = 'proceeded';
             // From here on Fastify runs the route inside this request's Drivetrain context (`hyp()`, `nonce()`).
             done();

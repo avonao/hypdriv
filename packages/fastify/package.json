@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@fastify/compress": "catalog:",
+    "@fastify/etag": "catalog:",
     "@fastify/formbody": "catalog:",
     "@fastify/static": "catalog:",
     "@fastify/websocket": "catalog:",

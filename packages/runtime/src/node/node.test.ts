@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { resolveConfig } from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  appRequestHeaders,
   bridgeRequest,
   NodeRequestBody,
   nodeHeaders,
@@ -450,5 +451,41 @@ describe('withAssetHeaders()', () => {
     const response = withAssetHeaders(config, new Request('https://shop.example/a.css'), original);
     expect(response).toBe(original);
     expect(response.headers.get('x-powered-by')).toBe('Express');
+  });
+});
+
+describe('appRequestHeaders()', () => {
+  const conditional = () =>
+    new Headers({
+      accept: 'text/html,application/xhtml+xml',
+      'if-none-match': 'W/"abc"',
+      'if-modified-since': 'Sun, 01 Nov 2026 00:00:00 GMT',
+      'if-match': '"abc"',
+      'if-unmodified-since': 'Sun, 01 Nov 2026 00:00:00 GMT',
+      'if-range': '"abc"',
+      'x-keep': '1',
+    });
+
+  it('sends a document request with a nonce to the app without conditional headers', () => {
+    const out = appRequestHeaders(conditional(), 'nonce-value');
+    for (const name of ['if-none-match', 'if-modified-since', 'if-match', 'if-unmodified-since', 'if-range'])
+      expect(out.has(name), name).toBe(false);
+    expect(out.get('accept')).toContain('text/html');
+    expect(out.get('x-keep')).toBe('1');
+  });
+
+  it('leaves the original headers alone', () => {
+    const original = conditional();
+    appRequestHeaders(original, 'nonce-value');
+    expect(original.has('if-none-match')).toBe(true);
+  });
+
+  it('keeps conditional headers without a nonce and for requests that are not navigations', () => {
+    const headers = conditional();
+    expect(appRequestHeaders(headers, undefined)).toBe(headers);
+    const api = new Headers({ accept: 'application/json', 'if-none-match': 'W/"abc"' });
+    expect(appRequestHeaders(api, 'nonce-value')).toBe(api);
+    const bare = new Headers({ 'if-none-match': 'W/"abc"' });
+    expect(appRequestHeaders(bare, 'nonce-value').has('if-none-match')).toBe(true);
   });
 });

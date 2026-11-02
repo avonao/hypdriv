@@ -24,6 +24,7 @@ const BROWSER = {
   accept: 'text/html,application/xhtml+xml',
   'accept-language': 'en-US',
 };
+const SUBRESOURCE = { ...BROWSER, accept: '*/*' };
 
 const options = (overrides: Partial<HypDrivExpressOptions> = {}): HypDrivExpressOptions => ({
   config: { site: { name: 'express-test' } },
@@ -292,14 +293,15 @@ describe('streaming', () => {
     const { url } = await boot({}, (app) => {
       app.get('/big', (_req, res) => res.sendFile(join(dir, 'big.bin')));
     });
-    const response = await fetch(`${url}/big`, { headers: BROWSER });
+    // A subresource request (`Accept: */*`): navigations that carry a nonce never get a validator-based 304.
+    const response = await fetch(`${url}/big`, { headers: SUBRESOURCE });
     expect(response.status).toBe(200);
     expect(new Uint8Array(await response.arrayBuffer()).length).toBe(3 * 1024 * 1024);
     const etag = response.headers.get('etag');
     expect(etag).toBeTruthy();
     // fetch adds `Cache-Control: no-cache` to conditional requests unless one is given; that would defeat freshness.
     const conditional = await fetch(`${url}/big`, {
-      headers: { ...BROWSER, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
+      headers: { ...SUBRESOURCE, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
     });
     expect(conditional.status).toBe(304);
     expect(await conditional.text()).toBe('');
@@ -672,6 +674,48 @@ describe('failures', () => {
     });
     const response = await fetch(`${url}/partial`, { headers: BROWSER });
     await expect(response.text()).rejects.toThrow();
+  });
+});
+
+describe('documents rendered with a nonce', () => {
+  it('are never answered 304 from the validators the app computed: the cached body would carry an earlier nonce', async () => {
+    const { url } = await boot({}, (app) => {
+      // The same bytes on every request: Express' ETag matches, and the pipeline injects a different nonce each time.
+      app.get(
+        '/constant',
+        (_req, res) =>
+          void res.type('html').send('<!doctype html><html><body><script>x()</script></body></html>'),
+      );
+    });
+    const first = await fetch(`${url}/constant`, { headers: BROWSER });
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    const nonceOf = (response: Response) =>
+      /'nonce-([^']+)'/.exec(response.headers.get('content-security-policy') ?? '')?.[1];
+    expect(await first.text()).toContain(`<script nonce="${nonceOf(first)}">x()</script>`);
+    const again = await fetch(`${url}/constant`, {
+      headers: { ...BROWSER, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
+    });
+    expect(again.status).toBe(200);
+    expect(await again.text()).toContain(`<script nonce="${nonceOf(again)}">x()</script>`);
+    expect(nonceOf(again)).not.toBe(nonceOf(first));
+  });
+
+  it('keep answering conditional requests for JSON', async () => {
+    const { url } = await boot();
+    const first = await fetch(`${url}/api/time`, { headers: BROWSER });
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    await first.text();
+    const again = await fetch(`${url}/api/time`, {
+      headers: {
+        ...BROWSER,
+        accept: 'application/json',
+        'if-none-match': etag!,
+        'cache-control': 'max-age=0',
+      },
+    });
+    expect(again.status).toBe(304);
   });
 });
 

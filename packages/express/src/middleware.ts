@@ -10,6 +10,7 @@ import {
   nonce as requestNonce,
 } from '@hypdriv/runtime';
 import {
+  appRequestHeaders,
   bridgeRequest,
   remoteAddress,
   syncRequestHeaders,
@@ -172,8 +173,8 @@ export function hypdriv(options: HypDrivExpressOptions): HypDrivExpressMiddlewar
           // The application reads the body from the Node request: put back whatever a stage took from it, and let
           // the app see the pipeline's request headers (the client's x-hypdriv-* gone, the stages' own in).
           body?.release();
-          syncRequestHeaders(req, forwarded.headers);
           const current = requestNonce();
+          syncRequestHeaders(req, appRequestHeaders(forwarded.headers, current));
           const locals = (res as ServerResponse & { locals?: HypDrivExpressLocals }).locals;
           if (current && locals) locals.hypdrivNonce = current;
           capture = new ResponseCapture(req, res);

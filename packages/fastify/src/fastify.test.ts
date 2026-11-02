@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import fastifyCompress from '@fastify/compress';
+import fastifyEtag from '@fastify/etag';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
@@ -19,6 +20,7 @@ const BROWSER = {
   accept: 'text/html,application/xhtml+xml',
   'accept-language': 'en-US',
 };
+const SUBRESOURCE = { ...BROWSER, accept: '*/*' };
 
 const options = (overrides: Partial<HypDrivFastifyOptions> = {}): HypDrivFastifyOptions => ({
   config: { site: { name: 'fastify-test' } },
@@ -325,7 +327,7 @@ describe('streaming', () => {
     const { url } = await boot({}, async (app) => {
       await app.register(fastifyStatic, { root: dir, prefix: '/assets/', immutable: true, maxAge: '1y' });
     });
-    const asset = await fetch(`${url}/assets/app.js`, { headers: BROWSER });
+    const asset = await fetch(`${url}/assets/app.js`, { headers: SUBRESOURCE });
     expect(asset.status).toBe(200);
     expect(await asset.text()).toBe('console.log(1)');
     expect(asset.headers.get('x-content-type-options')).toBe('nosniff');
@@ -333,12 +335,12 @@ describe('streaming', () => {
     // No stages ran: no request id, no CSP.
     expect(asset.headers.get('x-request-id')).toBeNull();
     expect(asset.headers.get('content-security-policy')).toBeNull();
-    const big = await fetch(`${url}/assets/big.bin`, { headers: BROWSER });
+    const big = await fetch(`${url}/assets/big.bin`, { headers: SUBRESOURCE });
     expect(new Uint8Array(await big.arrayBuffer()).length).toBe(3 * 1024 * 1024);
     const etag = big.headers.get('etag');
     expect(etag).toBeTruthy();
     const conditional = await fetch(`${url}/assets/big.bin`, {
-      headers: { ...BROWSER, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
+      headers: { ...SUBRESOURCE, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
     });
     expect(conditional.status).toBe(304);
     expect(await conditional.text()).toBe('');
@@ -470,6 +472,47 @@ describe('request bodies', () => {
       }),
     });
     expect(response.status).toBeLessThan(300);
+  });
+});
+
+describe('documents rendered with a nonce', () => {
+  it('are never answered 304 from validators the app computed: the cached body would carry an earlier nonce', async () => {
+    // @fastify/etag hashes the app's payload, so it is registered before Hypdriv (whose onSend then rewrites it).
+    const app = Fastify({ forceCloseConnections: true });
+    await app.register(fastifyEtag);
+    await app.register(hypdriv, options());
+    // The same bytes on every request: the ETag matches, and the pipeline injects a different nonce each time.
+    app.get('/constant', async (_request, reply) =>
+      reply.type('text/html').send('<!doctype html><html><body><script>x()</script></body></html>'),
+    );
+    app.get('/data', async () => ({ ok: true }));
+    const url = await listen(app);
+    const first = await fetch(`${url}/constant`, { headers: BROWSER });
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    const nonceOf = (response: Response) =>
+      /'nonce-([^']+)'/.exec(response.headers.get('content-security-policy') ?? '')?.[1];
+    expect(await first.text()).toContain(`<script nonce="${nonceOf(first)}">x()</script>`);
+    const again = await fetch(`${url}/constant`, {
+      headers: { ...BROWSER, 'if-none-match': etag!, 'cache-control': 'max-age=0' },
+    });
+    expect(again.status).toBe(200);
+    expect(await again.text()).toContain(`<script nonce="${nonceOf(again)}">x()</script>`);
+    expect(nonceOf(again)).not.toBe(nonceOf(first));
+    // JSON keeps its conditional requests.
+    const json = await fetch(`${url}/data`, { headers: SUBRESOURCE });
+    const jsonEtag = json.headers.get('etag');
+    expect(jsonEtag).toBeTruthy();
+    await json.text();
+    const cached = await fetch(`${url}/data`, {
+      headers: {
+        ...SUBRESOURCE,
+        accept: 'application/json',
+        'if-none-match': jsonEtag!,
+        'cache-control': 'max-age=0',
+      },
+    });
+    expect(cached.status).toBe(304);
   });
 });
 
