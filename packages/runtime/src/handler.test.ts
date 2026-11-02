@@ -243,21 +243,44 @@ describe('createHandler', () => {
     expect(await response.text()).toContain('<p>worker</p>');
   });
 
-  it('applies Vercel CDN headers on function responses for every page policy', async () => {
-    vi.stubEnv('VERCEL', '1');
-    const handler = createHandler({
-      config: {
-        cache: {
-          edge: { policies: [{ id: 'pages', match: '/account', ttl: 60, vary: { headers: ['x-tenant'] } }] },
+  describe('Vercel CDN headers on function responses', () => {
+    const policies = (extra: Record<string, unknown> = {}) => ({
+      cache: {
+        edge: {
+          policies: [{ id: 'pages', match: '/account', ttl: 60, vary: { headers: ['x-tenant'] }, ...extra }],
         },
       },
-      manifest,
     });
-    const response = await handler(new Request('https://example.com/account'), {
-      upstream: async () => html('ok'),
+    const get = (config: Parameters<typeof createHandler>[0]['config']) =>
+      createHandler({ config, manifest })(new Request('https://example.com/account'), {
+        upstream: async () => html('ok'),
+      });
+
+    it('applies for every page policy', async () => {
+      vi.stubEnv('VERCEL', '1');
+      const response = await get({ ...policies(), security: { csp: { mode: 'off' } } });
+      expect(response.headers.get('vercel-cdn-cache-control')).toContain('s-maxage=60');
+      expect(response.headers.get('vary')?.toLowerCase()).toContain('x-tenant');
     });
-    expect(response.headers.get('vercel-cdn-cache-control')).toContain('s-maxage=60');
-    expect(response.headers.get('vary')?.toLowerCase()).toContain('x-tenant');
+
+    it('keeps a document with a per-request CSP nonce out of the CDN', async () => {
+      vi.stubEnv('VERCEL', '1');
+      // /account is dynamic, so the default CSP gives it a per-request nonce: one visitor's nonce must not be
+      // replayed to the next, so an origin-respecting policy leaves the page uncached.
+      const response = await get(policies());
+      expect(response.headers.get('x-hypdriv-csp')).toBe('nonce');
+      expect(response.headers.get('vercel-cdn-cache-control')).toBeNull();
+      expect(response.headers.get('cdn-cache-control')).toBeNull();
+      expect(response.headers.get('cache-control') ?? '').not.toMatch(/s-maxage|public/);
+    });
+
+    it('caches a forced-cache policy with the unsafe-inline script fallback instead of a nonce', async () => {
+      vi.stubEnv('VERCEL', '1');
+      const response = await get(policies({ respectOrigin: false }));
+      expect(response.headers.get('x-hypdriv-csp')).toBe('unsafe-inline-fallback');
+      expect(response.headers.get('content-security-policy')).not.toMatch(/'nonce-/);
+      expect(response.headers.get('vercel-cdn-cache-control')).toContain('s-maxage=60');
+    });
   });
 });
 
