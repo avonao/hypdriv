@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Keeps pinned action SHAs current. npm updates are handled separately.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
