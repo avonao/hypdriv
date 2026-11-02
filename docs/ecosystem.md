@@ -30,7 +30,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | **Touches your source** | Through the framework's documented extension points | Reads it statically, writes one stylesheet | Never: works on a copy |
 | **Output** | Responses with cache, CSP, security headers, rate limits, traces; `.hypdriv/manifest.json` | One generated stylesheet in cascade layers, class names | A hashed copy of the site, `squawkcode-map.json`, a pass or fail with every differing element |
 | **Command** | `hypdriv` (17 commands) | `purser` (`build`, `check`) | `squawkcode` (`init`, `transform`, `compare`, `gate`) |
-| **Package** | `hypdriv`, `@hypdriv/*` (27 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
+| **Package** | `hypdriv`, `@hypdriv/*` (29 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
 | **Node.js** | 20.9+ (some framework packages need 22+) | 22+ | 22+ |
 | **Runtime dependencies** | Platform services optional | None | None |
 | **Tests** | 1,543 in 156 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
@@ -240,7 +240,7 @@ Every `purser.*` option maps onto Purser's build options (`projectDir`, `src`, `
 
 ### Which pieces work on which framework
 
-| Piece | Next.js | Vite hosts (Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku) |
+| Piece | Next.js | Vite hosts (Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, Nitro, Analog) |
 | --- | --- | --- |
 | Generate the stylesheet | Automatic inside `withHypDriv` (build and dev watch) | Run `purser build` or `hypdriv css build` as a build step |
 | Unstyled-atom guard and atom usage report | Yes | Yes, when `purser` is configured: the build engine verifies the built pages |
@@ -297,7 +297,7 @@ They do not overlap: one stops a visual regression from shipping, the other conf
 | An existing Next.js app on Cloudflare or Vercel | `hypdriv init`, then `hypdriv doctor` | Purser when you want guaranteed no-override CSS |
 | An existing site with its own CSS that you want on Purser | Purser with a `legacy` layer, one component at a time | SquawkCode `compare` to prove each step; Hypdriv `audit css` on the deployment |
 | Any site whose class names you want short and stable | SquawkCode `gate` | Hypdriv for the serving side |
-| A Vite-based framework (Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku) | The framework's Hypdriv integration | Purser with `hypdriv css build` as a build step |
+| A Vite-based framework (Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, Nitro, Analog) | The framework's Hypdriv integration | Purser with `hypdriv css build` as a build step |
 | A site that only needs a visual regression check between two versions | SquawkCode `compare` | Nothing |
 
 ## An end-to-end pipeline
@@ -346,9 +346,9 @@ For a deployment, run the same `hypdriv audit` commands against the deployed URL
 | | Hypdriv | Purser | SquawkCode |
 | --- | --- | --- | --- |
 | Version | 0.1.0 | 0.1.0 | 0.1.0 |
-| Node.js | 20.9+ (Vite 20.19+; Astro, TanStack Start 22.12+; SvelteKit 22.17+; React Router 22.22+; vinext 22+; Waku 22.15+) | 22+ | 22+ |
+| Node.js | 20.9+ (Vite 20.19+; Astro, TanStack Start 22.12+; SvelteKit 22.17+; React Router 22.22+; vinext 22+; Waku 22.15+; Nitro and Analog 20.19+) | 22+ | 22+ |
 | TypeScript | 5.9 to 7 in host apps; 5.x or 6.x when Purser is used | 5.0+ in the project (5.x or 6.x: needs the programmatic API) | 5+ in the project being processed |
-| Frameworks | Next.js 16+, Vite 8, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku 1 | None (works with any framework that imports a CSS file and accepts a `className` string); guide for Next.js 16 | Any site with a build command and a serve command; verified on Next.js 16 |
+| Frameworks | Next.js 16+, Vite 8, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku 1, Nitro 2 and 3, Analog 2 | None (works with any framework that imports a CSS file and accepts a `className` string); guide for Next.js 16 | Any site with a build command and a serve command; verified on Next.js 16 |
 | Platforms | Cloudflare Workers, Vercel, Node | Wherever the CSS file is served | Local (build, serve and compare happen on your machine or CI) |
 | Browsers or tools | Headless Chrome for `audit css` | Chrome 111+, Edge 111+, Firefox 113+, Safari 15.4+ for the output | Chrome or Chromium for the comparison |
 | Cross-product contract | Uses `@avonao/purser` 0.1+ through `@avonao/purser/build` and `scripts/strike-count.js` | Public build API and the strike-count script are what Hypdriv consumes | None required |

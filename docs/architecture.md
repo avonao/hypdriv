@@ -1,6 +1,6 @@
 # Hypdriv architecture
 
-> **Hypdriv** is a Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext and Waku: a sidecar that attaches to an application through its framework's public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, on Vercel and on Node, without forking a framework, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
+> **Hypdriv** is a Hyper-Extension for Next.js 16+ and the Vite frameworks — plain Vite apps, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, Nitro and Analog: a sidecar that attaches to an application through its framework's public contracts and makes it faster, safer and more observable, out of the box on Cloudflare Workers, on Vercel and on Node, without forking a framework, OpenNext or Vercel's builder and without requiring any infrastructure beyond the platform itself.
 
 This document is the source of truth for the design. Package READMEs and guides elaborate; they never contradict it.
 
@@ -28,7 +28,7 @@ This document is the source of truth for the design. Package READMEs and guides 
 | Bundler                           | Turbopack (default) and `next build --webpack`                                                                   |
 | TypeScript in host apps           | 5.9, 6.x, 7.x                                                                                                    |
 | Purser CSS                        | 0.1+ (`@avonao/purser/build` API)                                                                                |
-| Vite hosts (ADR 0019)             | Vite 8; React Router 8, TanStack Start 1.169+, Astro 7, SvelteKit 3, Nuxt 4.6, vinext 1.4, Waku 1.0 (release candidates), plain Vite apps — on Cloudflare (`@cloudflare/vite-plugin` / framework adapters), Vercel (Build Output API) and Node |
+| Vite hosts (ADR 0019)             | Vite 8; React Router 8, TanStack Start 1.169+, Astro 7, SvelteKit 3, Nuxt 4.6, vinext 1.4, Waku 1.0 (release candidates), Nitro 2.13 and 3 (release candidate), Analog 2.9, plain Vite apps — on Cloudflare (`@cloudflare/vite-plugin` / framework adapters), Vercel (Build Output API) and Node |
 
 Deprecated Next.js features (`middleware.ts`, Edge runtime route segments) are detected by `hypdriv doctor` and reported with the migration path; Hypdriv does not add support for them.
 
@@ -153,6 +153,8 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 | Nuxt 4 | module (`@hypdriv/nuxt`) | Nitro middleware and render hooks |
 | vinext | Vite plugin (`@hypdriv/vinext`) | `proxy.ts` (`createProxy`) |
 | Waku 1 | `withHypDriv()` config wrapper + Vite plugin (`@hypdriv/waku`) | the server-entry adapter (`@hypdriv/waku/adapters/node\|vercel\|cloudflare` wrap Waku's own; `createHandler`, `runner: 'host'`) |
+| Nitro 2 and 3 | Nitro module (`hypdrivNitro()`, or the `hypdriv()` Vite plugin carrying it for `nitro/vite`; `@hypdriv/nitro`, ADR 0027) | a Nitro plugin around the request handler (Nitro 2: the h3 app; Nitro 3: `fetch`), with the Worker shell around `cloudflare-module` (`createHandler`, `runner: 'host'`) |
+| Analog 2 | `analog(withHypDriv({...}))` + Vite plugin (`@hypdriv/analog`) on top of `@hypdriv/nitro` | the same Nitro plugin around Analog's Nitro server; Angular gets `provideHypDriv()` (nonce, request context) |
 | Hono | none (no build step): `useHypDriv(app)` middleware or `wrapHono(app)` (`@hypdriv/hono`) | the app's own `fetch` (`createHandler`, `runner: 'host'`) |
 
 **Prerendered pages.** The platform's static layer serves them (`HypRoute.servedStatically`): their posture is the static header rule (security preset, the document's hash CSP, Early Hints), and neither the build nor the runtime infers an edge-cache policy for them. To run the request stages (rate limits, bot shield, maintenance, flags) for them as well:
@@ -344,6 +346,8 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/next`       | Node (config/adapter/proxy) + neutral (server/client) | core, runtime, build, cache, security, observe, flags, purser, vercel |
 | `@hypdriv/vite`       | Node (plugin, toolkit, `/node` server) + Workers (`/worker`) + Vercel Routing Middleware (`/vercel-middleware`) | core, runtime, build, security, cloudflare |
 | `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`, `@hypdriv/waku` | framework integrations | vite, runtime, cloudflare |
+| `@hypdriv/nitro` | Node (module, build) + neutral (Nitro 2 and 3 request hooks, `/server`) + Workers (Worker entry) | core, runtime, build, flags, vite, cloudflare |
+| `@hypdriv/analog` | Node (Vite plugin, file-router discovery) + neutral (Angular `/angular`, `/angular/server`, `/server`) | core, runtime, vite, nitro |
 | `@hypdriv/hono` | Hono middleware and fetch wrapper, route manifest from `app.routes` | core, runtime |
 | `@hypdriv/cloudflare` | Workers                                               | core, runtime, cache, security, observe, flags, live, purser |
 | `@hypdriv/vercel`     | neutral (Vercel Functions, Routing Middleware)        | core, cache, security                               |

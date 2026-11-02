@@ -8,7 +8,7 @@ It is the shared Nitro layer of the hosts built on Nitro: [`@hypdriv/analog`](..
 pnpm add @hypdriv/nitro @hypdriv/core
 ```
 
-## Nitro 2 or Nitro 3 (`nitropack`)
+## Nitro 2 (`nitropack`), or Nitro 3 without Vite
 
 ```ts
 // nitro.config.ts
