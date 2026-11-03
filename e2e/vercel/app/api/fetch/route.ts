@@ -38,6 +38,8 @@ async function signalProbe(origin: string) {
   return Response.json({ init, request: requestInput }, { headers: { 'cache-control': 'no-store' } });
 }
 
+const NET_PROBE_HOSTS = new Set(['example.com', 'www.cloudflare.com', 'vercel.com']);
+
 /**
  * `?mode=net&host=`: DNS answers and a raw fetch to an external host (both capped at 8 s), plus how late a
  * 100 ms timer fires meanwhile — tells a slow network from a blocked event loop.
@@ -91,7 +93,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('mode');
   if (mode === 'signal') return signalProbe(url.origin);
-  if (mode === 'net') return netProbe(url.searchParams.get('host') ?? 'example.com');
+  if (mode === 'net') {
+    const host = url.searchParams.get('host') ?? 'example.com';
+    // a fixed list: the probe must not become an open proxy for DNS lookups and requests
+    if (!NET_PROBE_HOSTS.has(host)) return Response.json({ error: 'host not allowed' }, { status: 400 });
+    return netProbe(host);
+  }
   const timeoutMode = mode === 'timeout';
   const target = timeoutMode ? `${url.origin}/api/slow?ms=8000` : 'https://www.cloudflare.com/cdn-cgi/trace';
   const attempts: number[] = [];
