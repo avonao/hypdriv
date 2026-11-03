@@ -58,11 +58,18 @@ export function normalizeUrl(input: URL | string, options: NormalizeUrlOptions =
   return url;
 }
 
+/** Removes trailing slashes in linear time (a `/\/+$/` regex is quadratic on a path with many slashes). */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 /** Applies Next.js trailing-slash semantics to a pathname. Files with extensions are never slashed. */
 export function normalizeTrailingSlash(pathname: string, trailingSlash: boolean | null): string {
   if (pathname === '/' || pathname === '') return '/';
   const hasExt = /\.[A-Za-z0-9]{1,8}$/.test(pathname);
-  const stripped = pathname.replace(/\/+$/, '') || '/';
+  const stripped = trimTrailingSlashes(pathname) || '/';
   if (trailingSlash && !hasExt && stripped !== '/') return `${stripped}/`;
   return stripped;
 }
@@ -115,7 +122,7 @@ export function safeDecodePath(pathname: string): string | null {
 
 /** Joins a base path and a pathname without duplicate slashes. */
 export function joinPath(base: string | null | undefined, pathname: string): string {
-  const b = (base ?? '').replace(/\/+$/, '');
+  const b = trimTrailingSlashes(base ?? '');
   const p = pathname.startsWith('/') ? pathname : `/${pathname}`;
   return `${b}${p}` || '/';
 }

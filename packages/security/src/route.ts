@@ -76,7 +76,8 @@ let defaultLimiter: RateLimiter | undefined;
 
 /** `URLSearchParams` → object; repeated keys become arrays. */
 export function parseQuery(params: URLSearchParams): Record<string, string | string[]> {
-  const out: Record<string, string | string[]> = {};
+  // no prototype: a `__proto__` key is data, not a way to replace the object's prototype
+  const out = Object.create(null) as Record<string, string | string[]>;
   for (const [key, value] of params.entries()) {
     const existing = out[key];
     if (existing === undefined) out[key] = value;

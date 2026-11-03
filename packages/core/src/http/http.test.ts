@@ -15,7 +15,14 @@ import {
   withoutHeaders,
 } from './headers';
 import { json, peekText, problem } from './response';
-import { isTrackingParam, normalizeTrailingSlash, normalizeUrl, safeDecodePath, stripBasePath } from './url';
+import {
+  isTrackingParam,
+  normalizeTrailingSlash,
+  normalizeUrl,
+  safeDecodePath,
+  stripBasePath,
+  trimTrailingSlashes,
+} from './url';
 
 describe('cookies', () => {
   it('parses and serialises', () => {
@@ -154,6 +161,10 @@ describe('url', () => {
     expect(normalizeUrl('https://x.test/p?b=1&a=2', { keepQuery: 'none' }).search).toBe('');
   });
   it('applies trailing slash rules', () => {
+    expect(trimTrailingSlashes('/a///')).toBe('/a');
+    expect(trimTrailingSlashes('///')).toBe('');
+    expect(trimTrailingSlashes('/a/b')).toBe('/a/b');
+    expect(trimTrailingSlashes(`${'/'.repeat(200_000)}x`)).toBe(`${'/'.repeat(200_000)}x`);
     expect(normalizeTrailingSlash('/a/', null)).toBe('/a');
     expect(normalizeTrailingSlash('/a', true)).toBe('/a/');
     expect(normalizeTrailingSlash('/a.txt', true)).toBe('/a.txt');

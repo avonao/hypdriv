@@ -206,6 +206,13 @@ describe('defineRoute', () => {
     expect(empty.status).toBe(204);
   });
 
+  it('parseQuery treats __proto__ as an ordinary key', () => {
+    const query = parseQuery(new URLSearchParams('__proto__=a&__proto__=b&x=1'));
+    expect(Object.getPrototypeOf(query)).toBeNull();
+    expect(query.__proto__).toEqual(['a', 'b']);
+    expect(query.x).toBe('1');
+  });
+
   it('helpers: parseQuery, weakEtag, etagMatches', async () => {
     expect(parseQuery(new URLSearchParams('a=1&a=2&b=x'))).toEqual({ a: ['1', '2'], b: 'x' });
     const etag = await weakEtag('{"a":1}');

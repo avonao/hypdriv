@@ -7,14 +7,16 @@ on:
 concurrency: release-${{ github.ref }}
 
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 jobs:
   release:
     name: Version or publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     # Publishing is enabled per repository: set the repository variable NPM_PUBLISH to 'true' once packages are released to a registry.
     if: github.repository == 'avonao/hypdriv' && vars.NPM_PUBLISH == 'true'
     steps:
