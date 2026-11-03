@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { formatFindings, isCandidateEnvValue, scanSecrets } from './index';
 
+// assembled at run time so the fixture never appears as a literal in the source
+const STRIPE_LIKE = ['sk', 'live', '51Hx9AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'].join('_');
+
 let dir: string;
 
 beforeAll(async () => {
@@ -14,7 +17,7 @@ beforeAll(async () => {
     join(dir, 'assets', 'chunks', 'app.js'),
     [
       'const a = "nothing to see";',
-      'const stripe = "sk_live_51Hx9AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";',
+      `const stripe = "${STRIPE_LIKE}";`,
       'fetch(url, { headers: { Authorization: "Bearer " + "super-secret-database-password-42" } });',
       'const pub = "public-value-that-is-allowed";',
     ].join('\n'),
@@ -28,10 +31,10 @@ beforeAll(async () => {
     join(dir, 'assets', 'image.png'),
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0x73, 0x6b, 0x5f]),
   );
-  await writeFile(join(dir, 'assets', 'notes.md'), 'sk_live_51Hx9AbCdEfGhIjKlMnOpQrStUvWxYz0123456789');
+  await writeFile(join(dir, 'assets', 'notes.md'), STRIPE_LIKE);
   await writeFile(
     join(dir, 'assets', 'node_modules', 'dep.js'),
-    'sk_live_51Hx9AbCdEfGhIjKlMnOpQrStUvWxYz0123456789',
+    STRIPE_LIKE,
   );
   await symlink(join(dir, 'assets', 'chunks', 'app.js'), join(dir, 'assets', 'link.js'));
 });

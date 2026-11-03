@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createConsoleLogger, redactFields } from './logger';
 
+// assembled at run time so the fixture never appears as a literal in the source
+const STRIPE_LIKE = ['sk', 'live', '51HxAbCdEfGhIjKlMnOpQrStUvWxYz0123456789'].join('_');
+
 describe('redactFields', () => {
   it('redacts secret-looking keys and opaque credential values', () => {
     const out = redactFields({
       password: 'hunter2',
       apiKey: 'abc',
-      nested: { authorization: 'Bearer x', note: 'sk_live_51HxAbCdEfGhIjKlMnOpQrStUvWxYz0123456789' },
+      nested: { authorization: 'Bearer x', note: STRIPE_LIKE },
       list: ['plain', 'ghp_0123456789abcdefghijABCDEFGHIJ0123456789'],
     });
     expect(out.password).toBe('[redacted]');
