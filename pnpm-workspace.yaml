@@ -146,3 +146,13 @@ allowBuilds:
   '@parcel/watcher': false
   lmdb: false
   msgpackr-extract: false
+
+# Patched floors for transitive dependencies of framework tooling and examples (known advisories).
+overrides:
+  "path-to-regexp@>=4.0.0 <6.3.0": ^6.3.0
+  "sharp@<0.35.5": ^0.35.5
+  "zod@<4.6.6": ^4.6.7
+  "ajv@>=7.0.0-alpha.0 <8.18.0": ^8.20.0
+  "fflate@>=0.7.0 <0.7.5": ^0.7.5
+  "esbuild@>=0.27.3 <0.28.1": ^0.28.2
+  "glob@>=10.2.0 <10.5.0": ^10.5.0
