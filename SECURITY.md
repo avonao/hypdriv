@@ -13,7 +13,7 @@ Hypdriv ships security features (CSP generation, security headers, rate limiting
 
 ## Reporting a vulnerability
 
-Please **do not** open a public issue. Report the vulnerability privately through GitHub's private vulnerability reporting (the **Report a vulnerability** button on the repository's *Security* tab) with:
+Please **do not** open a public issue. Report the vulnerability privately through GitHub's private vulnerability reporting ([report a vulnerability](https://github.com/avonao/hypdriv/security/advisories/new), also the **Report a vulnerability** button on the repository's *Security* tab) with:
 
 - the affected package(s) and version(s),
 - a description of the issue and its impact,
