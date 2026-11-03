@@ -209,7 +209,7 @@ describe('defineRoute', () => {
   it('parseQuery treats __proto__ as an ordinary key', () => {
     const query = parseQuery(new URLSearchParams('__proto__=a&__proto__=b&x=1'));
     expect(Object.getPrototypeOf(query)).toBeNull();
-    expect(query.__proto__).toEqual(['a', 'b']);
+    expect(Object.getOwnPropertyDescriptor(query, '__proto__')?.value).toEqual(['a', 'b']);
     expect(query.x).toBe('1');
   });
 

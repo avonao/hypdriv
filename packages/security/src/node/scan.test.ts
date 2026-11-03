@@ -32,10 +32,7 @@ beforeAll(async () => {
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0x73, 0x6b, 0x5f]),
   );
   await writeFile(join(dir, 'assets', 'notes.md'), STRIPE_LIKE);
-  await writeFile(
-    join(dir, 'assets', 'node_modules', 'dep.js'),
-    STRIPE_LIKE,
-  );
+  await writeFile(join(dir, 'assets', 'node_modules', 'dep.js'), STRIPE_LIKE);
   await symlink(join(dir, 'assets', 'chunks', 'app.js'), join(dir, 'assets', 'link.js'));
 });
 
