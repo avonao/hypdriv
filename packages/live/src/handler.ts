@@ -1,9 +1,10 @@
-import type {
-  DurableObjectNamespaceLike,
-  DurableObjectStubLike,
-  HypDrivEnv,
-  LiveConfig,
-  ResolvedConfig,
+import {
+  type DurableObjectNamespaceLike,
+  type DurableObjectStubLike,
+  type HypDrivEnv,
+  type LiveConfig,
+  type ResolvedConfig,
+  trimTrailingSlashes,
 } from '@hypdriv/core';
 import {
   isValidChannelName,
@@ -52,7 +53,7 @@ export function parseLivePath(
 ): { channel: string; action: 'subscribe' | 'events' | 'stats' | 'unknown' } | null {
   const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
   if (!pathname.startsWith(`${base}/`)) return null;
-  const rest = pathname.slice(base.length + 1).replace(/\/+$/, '');
+  const rest = trimTrailingSlashes(pathname.slice(base.length + 1));
   if (!rest) return null;
   const [rawChannel, sub, ...more] = rest.split('/');
   let channel: string;

@@ -14,6 +14,7 @@ import {
   resolveEdgeCachePolicy,
   runningExperiments,
   stripBasePath,
+  trimTrailingSlashes,
 } from '@hypdriv/core';
 
 /** Prefix of inferred policy ids (`inferred:app:/blog/[slug]`). */
@@ -227,7 +228,7 @@ export const MAX_PATH_TAG_LENGTH = 512;
  * longer than {@link MAX_PATH_TAG_LENGTH}.
  */
 export function pathTag(pathname: string): string | null {
-  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') || '/' : pathname || '/';
+  const normalized = pathname.length > 1 ? trimTrailingSlashes(pathname) || '/' : pathname || '/';
   return normalized.length > MAX_PATH_TAG_LENGTH ? null : `path:${normalized}`;
 }
 

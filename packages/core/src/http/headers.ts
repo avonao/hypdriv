@@ -143,9 +143,12 @@ function needsQuote(v: string): boolean {
   return /[\s,;"()<>@:\\/[\]?={}]/.test(v);
 }
 
+/** Longer Link headers are ignored: the parser's pattern is not linear on hostile input. */
+const MAX_LINK_HEADER = 16 * 1024;
+
 /** Parses a Link header value into entries. Tolerant of quoting and whitespace. */
 export function parseLink(header: string | null | undefined): LinkEntry[] {
-  if (!header) return [];
+  if (!header || header.length > MAX_LINK_HEADER) return [];
   const out: LinkEntry[] = [];
   const re = /<([^>]*)>\s*((?:;\s*[^,;=]+(?:=(?:"[^"]*"|[^,;]*))?\s*)*)/g;
   for (const m of header.matchAll(re)) {

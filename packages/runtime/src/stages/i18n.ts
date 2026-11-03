@@ -12,6 +12,7 @@ import {
   redirect,
   type Stage,
   stateKey,
+  trimTrailingSlashes,
 } from '@hypdriv/core';
 import { GEO_KEY } from './geo';
 
@@ -25,7 +26,7 @@ export function splitLocale(pathname: string, locales: string[]): { locale: stri
   const [, first = '', ...rest] = pathname.split('/');
   const hit = locales.find((l) => l.toLowerCase() === first.toLowerCase());
   if (!hit) return { locale: null, rest: pathname };
-  return { locale: hit, rest: `/${rest.join('/')}`.replace(/\/+$/, '') || '/' };
+  return { locale: hit, rest: trimTrailingSlashes(`/${rest.join('/')}`) || '/' };
 }
 
 /** Negotiates the locale for a request. */

@@ -5,6 +5,7 @@ import {
   isRscRequest,
   normalizeUrl,
   parseCookies,
+  trimTrailingSlashes,
 } from '@hypdriv/core';
 import type { CacheKeyInput } from './types';
 
@@ -126,5 +127,5 @@ export async function buildCacheKey(
 
 /** Synthetic URL for a key, usable as a Cache API request. */
 export function cacheKeyUrl(key: string, origin: string = CACHE_KEY_ORIGIN): string {
-  return `${origin.replace(/\/+$/, '')}/${key}`;
+  return `${trimTrailingSlashes(origin)}/${key}`;
 }
