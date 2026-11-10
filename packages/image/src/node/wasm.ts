@@ -9,6 +9,11 @@ import { pathToFileURL } from 'node:url';
  *
  * jSquash is not an ESM-friendly Node citizen (its default `init()` fetches the `.wasm` file), so the module
  * is compiled from disk and handed to `init()` explicitly.
+ *
+ * The encoder skips jSquash's `encode.js` and drives the Emscripten module directly: `encode.js` picks its glue
+ * with `wasm-feature-detect`, whose 1.10 release contains `import.source(…)`, a syntax Node before 24 cannot
+ * parse, so importing it fails on Node 20 and 22 although the codec itself runs there. Loading each glue file
+ * with its own `.wasm` also keeps the SIMD and baseline builds from being mixed.
  */
 
 export interface RawImage {
@@ -29,6 +34,26 @@ export interface WasmCodecs {
 interface JsquashModule {
   init(module?: WebAssembly.Module): Promise<unknown>;
   default(input: unknown, options?: unknown): Promise<unknown>;
+}
+
+/** The Emscripten module of `@jsquash/webp`'s encoder (`codec/enc/webp_enc*.js`). */
+interface WebpEncoderModule {
+  encode(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+    options: Record<string, unknown>,
+  ): Uint8Array | null;
+}
+
+interface EmscriptenFactory<T> {
+  default(options: {
+    noInitialRun: boolean;
+    instantiateWasm: (
+      imports: WebAssembly.Imports,
+      callback: (instance: WebAssembly.Instance) => void,
+    ) => WebAssembly.Exports;
+  }): Promise<T>;
 }
 
 function resolvePackage(name: string, projectDir: string): string | null {
@@ -81,27 +106,38 @@ async function loadDecoder(
 async function loadWebpEncoder(
   dir: string,
 ): Promise<(image: RawImage, quality: number) => Promise<Uint8Array>> {
-  const mod = (await import(pathToFileURL(join(dir, 'encode.js')).href)) as JsquashModule;
-  const variants = hasSimd() ? ['webp_enc_simd.wasm', 'webp_enc.wasm'] : ['webp_enc.wasm'];
+  const { defaultOptions } = (await import(pathToFileURL(join(dir, 'meta.js')).href)) as {
+    defaultOptions: Record<string, unknown>;
+  };
+  const variants = hasSimd() ? ['webp_enc_simd', 'webp_enc'] : ['webp_enc'];
   let lastError: unknown;
   for (const variant of variants) {
     try {
-      await mod.init(await compile(join(dir, 'codec', 'enc', variant)));
-      // prove the module works before promising it
-      const probe = new Uint8ClampedArray(4 * 4 * 4).fill(255);
-      await mod.default({ data: probe, width: 4, height: 4, colorSpace: 'srgb' }, { quality: 40 });
-      return async (image, quality) => {
-        const out = (await mod.default(
-          {
-            data: new Uint8ClampedArray(image.data),
-            width: image.width,
-            height: image.height,
-            colorSpace: 'srgb',
-          },
-          { quality },
-        )) as ArrayBuffer;
+      const glue = (await import(
+        pathToFileURL(join(dir, 'codec', 'enc', `${variant}.js`)).href
+      )) as EmscriptenFactory<WebpEncoderModule>;
+      const wasm = await compile(join(dir, 'codec', 'enc', `${variant}.wasm`));
+      const module = await glue.default({
+        // the same settings as jSquash's initEmscriptenModule(): no main(), the module compiled above
+        noInitialRun: true,
+        instantiateWasm(imports, callback) {
+          const instance = new WebAssembly.Instance(wasm, imports);
+          callback(instance);
+          return instance.exports;
+        },
+      });
+      const encode = (image: RawImage, quality: number): Uint8Array => {
+        const out = module.encode(new Uint8ClampedArray(image.data), image.width, image.height, {
+          ...defaultOptions,
+          quality,
+        });
+        if (!out) throw new Error('@jsquash/webp could not encode the image');
+        // a copy, so the result never aliases WebAssembly memory
         return new Uint8Array(out);
       };
+      // prove the module works before promising it
+      encode({ data: new Uint8ClampedArray(4 * 4 * 4).fill(255), width: 4, height: 4 }, 40);
+      return async (image, quality) => encode(image, quality);
     } catch (error) {
       lastError = error;
     }

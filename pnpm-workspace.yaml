@@ -7,27 +7,27 @@ packages:
 catalog:
   # Toolchain
   typescript: ^6.0.3
-  tsdown: ^0.23.4
+  tsdown: ^0.23.7
   vitest: ^4.1.12
-  "@biomejs/biome": ^2.6.4
+  "@biomejs/biome": ^2.6.6
   "@changesets/cli": ^3.0.3
   "@types/node": ^26.6.6
   publint: ^0.3.25
   # Runtime typings
-  "@cloudflare/workers-types": ^5.20261101.1
-  "@cloudflare/vitest-plugin": ^1.4.11
-  wrangler: ^4.156.0
+  "@cloudflare/workers-types": ^5.20261109.1
+  "@cloudflare/vitest-plugin": ^1.6.1
+  wrangler: ^4.159.0
   miniflare: ^4.20260730.0
   # Framework peers
-  next: ^16.4.3
+  next: ^16.4.6
   react: ^19.3.1
   react-dom: ^19.3.1
   "@types/react": ^19.3.0
   "@types/react-dom": ^19.3.0
-  "@opennextjs/cloudflare": ^1.20.15
+  "@opennextjs/cloudflare": ^1.20.16
   # Hono host (@hypdriv/hono)
-  hono: ^4.13.16
-  "@hono/node-server": ^2.1.5
+  hono: ^4.13.17
+  "@hono/node-server": ^2.1.6
   tsx: ^4.23.15
   # Express host (@hypdriv/express): Express 5
   express: ^5.3.0
@@ -35,12 +35,12 @@ catalog:
   compression: ^1.8.2
   "@types/compression": ^1.8.1
   # Fastify host (@hypdriv/fastify): Fastify 5
-  fastify: ^5.12.7
+  fastify: ^5.12.8
   fastify-plugin: ^6.0.1
-  "@fastify/static": ^10.1.8
+  "@fastify/static": ^10.1.10
   "@fastify/compress": ^9.3.0
-  "@fastify/etag": ^6.2.1
-  "@fastify/websocket": ^11.3.6
+  "@fastify/etag": ^6.2.2
+  "@fastify/websocket": ^11.3.7
   "@fastify/formbody": ^9.0.1
   # Waku host (@hypdriv/waku)
   waku: 1.0.0-rc.4
@@ -50,15 +50,15 @@ catalog:
   "@qwik.dev/core": 2.0.0-rc.4
   "@qwik.dev/router": 2.0.0-rc.4
   # Vite hosts
-  vite: ^8.3.5
-  "@cloudflare/vite-plugin": ^1.66.0
-  "@vitejs/plugin-react": ^6.1.2
+  vite: ^8.3.7
+  "@cloudflare/vite-plugin": ^1.68.0
+  "@vitejs/plugin-react": ^6.3.0
   babel-plugin-react-compiler: ^1.0.0
   # Astro host (@hypdriv/astro)
-  astro: ^7.4.4
-  "@astrojs/cloudflare": ^14.4.3
-  "@astrojs/node": ^11.1.9
-  "@astrojs/vercel": ^11.0.17
+  astro: ^7.4.8
+  "@astrojs/cloudflare": ^14.4.6
+  "@astrojs/node": ^11.1.11
+  "@astrojs/vercel": ^11.0.20
   # SvelteKit
   "@sveltejs/kit": ^3.1.1
   "@sveltejs/vite-plugin-svelte": ^7.3.1
@@ -67,13 +67,13 @@ catalog:
   "@sveltejs/adapter-node": ^6.0.1
   svelte: ^5.57.3
   # TanStack Start (React). @tanstack/react-start pins @tanstack/react-router exactly: keep them in step.
-  "@tanstack/react-start": ^1.169.4
+  "@tanstack/react-start": ^1.169.5
   "@tanstack/react-router": 1.170.46
-  "@tanstack/router-generator": ^1.167.46
+  "@tanstack/router-generator": ^1.168.0
   # vinext (Cloudflare's Vite implementation of the Next.js API)
-  vinext: ^1.4.0
-  "@vinext/cloudflare": ^1.3.0
-  "@vitejs/plugin-rsc": ^0.5.38
+  vinext: ^1.4.4
+  "@vinext/cloudflare": ^1.3.3
+  "@vitejs/plugin-rsc": ^0.5.39
   react-server-dom-webpack: ^19.3.1
   nitro: 3.0.261029-rc
   # Image placeholders without sharp (@hypdriv/image: optional WebAssembly codecs)
@@ -84,34 +84,34 @@ catalog:
   "@react-router/dev": ^8.5.1
   "@react-router/node": ^8.5.1
   "@react-router/serve": ^8.5.1
-  isbot: ^5.2.2
+  isbot: ^5.2.3
   "@vercel/react-router": ^1.3.7
-  "@vercel/nft": ^1.11.0
+  "@vercel/nft": ^1.11.1
   # SolidStart 2 (Vite 8 + Nitro 3 or @cloudflare/vite-plugin; @hypdriv/solid-start)
-  "@solidjs/start": 2.1.0
-  "@solidjs/router": ^0.16.3
+  "@solidjs/start": 2.2.2
+  "@solidjs/router": ^1.0.1
   solid-js: ^1.9.18
   # Nuxt (Nuxt 4.6 runs on Nitro 2 / h3 1.x)
-  nuxt: ^4.6.3
-  nitropack: ^2.13.5
+  nuxt: ^4.6.4
+  nitropack: ^2.13.6
   h3: ^1.15.11
-  vue: ^3.5.44
+  vue: ^3.5.45
   vue-router: ^5.4.0
   # Analog (Angular on Vite + Nitro 2): @hypdriv/analog
-  "@analogjs/content": 2.9.4
-  "@analogjs/platform": 2.9.4
-  "@analogjs/router": 2.9.4
-  "@analogjs/vite-plugin-angular": 2.9.4
-  "@angular/build": ^22.2.4
-  "@angular/common": ^22.2.4
-  "@angular/compiler": ^22.2.4
-  "@angular/compiler-cli": ^22.2.4
-  "@angular/core": ^22.2.4
-  "@angular/platform-browser": ^22.2.4
-  "@angular/platform-server": ^22.2.4
-  "@angular/router": ^22.2.4
+  "@analogjs/content": 2.9.6
+  "@analogjs/platform": 2.9.6
+  "@analogjs/router": 2.9.6
+  "@analogjs/vite-plugin-angular": 2.9.6
+  "@angular/build": ^22.2.6
+  "@angular/common": ^22.2.5
+  "@angular/compiler": ^22.2.5
+  "@angular/compiler-cli": ^22.2.5
+  "@angular/core": ^22.2.5
+  "@angular/platform-browser": ^22.2.5
+  "@angular/platform-server": ^22.2.5
+  "@angular/router": ^22.2.5
   rxjs: ~7.8.2
-  tslib: ^2.8.1
+  tslib: ^2.9.1
   # Small, standards-based deps
   "@standard-schema/spec": ^1.1.0
   web-vitals: ^6.2.3
@@ -134,12 +134,6 @@ minimumReleaseAgeExclude:
   - "@vinext/cloudflare@1.3.0"
   - "@vinext/types@1.0.2"
   - react-server-dom-webpack@19.3.1
-  - hono@4.13.16
-  - "@analogjs/content@2.9.4"
-  - "@analogjs/platform@2.9.4"
-  - "@analogjs/router@2.9.4"
-  - "@analogjs/vite-plugin-angular@2.9.4"
-  - "@analogjs/vite-plugin-nitro@2.9.4"
 
 # @vercel/react-router 1.3.7 still declares React Router 7 peers; its preset works with React Router 8
 # (Hypdriv's React Router integration reads its server bundles).
@@ -168,4 +162,10 @@ overrides:
   "ajv@>=7.0.0-alpha.0 <8.18.0": ^8.20.0
   "fflate@>=0.7.0 <0.7.5": ^0.7.5
   "esbuild@>=0.27.3 <0.28.1": ^0.28.2
-  "glob@>=10.2.0 <10.5.0": ^10.5.0
+  # GHSA-3g3m-2fjr-6pw4 (glob >=9 <=14.0.1) and GHSA-g3hv-75wg-m249 (minimatch >=7 <11.0.1): the callers
+  # (OpenNext, @node-minify, @vercel/nft, rwsdk, ts-morph, @vercel/queue, readdir-glob) only use glob()/globSync()
+  # and minimatch()/Minimatch, which glob 14 and minimatch 11 keep.
+  "glob@>=9.0.0 <14.0.2": ^14.0.2
+  "minimatch@>=7.0.0 <11.0.1": ^11.0.1
+  # GHSA-w5hq-g745-h8pq (uuid <11.1.1), through @qwik.dev/router > @azure/functions, which only calls v4().
+  "uuid@<11.1.1": ^11.1.1
