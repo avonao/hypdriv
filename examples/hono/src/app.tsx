@@ -1,7 +1,7 @@
 import { flag, geo, type HypDrivHonoVariables, hyp, nonce, useHypDriv } from '@hypdriv/hono';
 import { Hono } from 'hono';
 import { html } from 'hono/html';
-import config from '../hypdriv.config';
+import config from '../hypdriv.config.js';
 
 /** The app behind Hypdriv: the same module runs on Workers, Vercel Functions and Node. */
 const app = new Hono<{ Variables: HypDrivHonoVariables }>();
