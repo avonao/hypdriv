@@ -1,10 +1,10 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import compression from 'compression';
 import express from 'express';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   checkOrder,
   expressFetch,
@@ -14,6 +14,17 @@ import {
   hypdriv,
   ResponseCapture,
 } from './index';
+
+/** Temporary directories the tests create, removed when the file's tests are done. */
+const tempDirs: string[] = [];
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+afterAll(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 const noop = () => undefined;
 const options = { config: { site: { name: 'express-units' } }, target: 'node' as const, development: false };
@@ -206,7 +217,7 @@ describe('checkOrder()', () => {
     const middleware = hypdriv(options);
     app.use(compression());
     app.use(middleware);
-    app.use(express.static(mkdtempSync(join(tmpdir(), 'hypdriv-order-'))));
+    app.use(express.static(tempDir('hypdriv-order-')));
     app.get('/', handler);
     expect(checkOrder(app, middleware)).toEqual([]);
   });
@@ -216,7 +227,7 @@ describe('checkOrder()', () => {
     const middleware = hypdriv(options);
     app.get('/early', handler);
     app.use('/api', express.Router());
-    app.use(express.static(mkdtempSync(join(tmpdir(), 'hypdriv-order-'))));
+    app.use(express.static(tempDir('hypdriv-order-')));
     app.use(middleware);
     const [problem, ...rest] = checkOrder(app, middleware);
     expect(rest).toEqual([]);

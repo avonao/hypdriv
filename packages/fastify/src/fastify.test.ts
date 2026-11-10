@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -11,8 +11,19 @@ import fastifyFormbody from '@fastify/formbody';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { flag, type HypDrivFastifyOptions, hyp, hypdriv, jobHandler, nonce, webRoute } from './index';
+
+/** Temporary directories the tests create, removed when the file's tests are done. */
+const tempDirs: string[] = [];
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+afterAll(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 const BROWSER = {
   'user-agent':
@@ -321,7 +332,7 @@ describe('streaming', () => {
   });
 
   it('streams a file with @fastify/static with asset headers, outside the stages, and answers conditional requests', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-fastify-static-'));
+    const dir = tempDir('hypdriv-fastify-static-');
     writeFileSync(join(dir, 'app.js'), 'console.log(1)');
     writeFileSync(join(dir, 'big.bin'), Buffer.alloc(3 * 1024 * 1024, 7));
     const { url } = await boot({}, async (app) => {
@@ -347,7 +358,7 @@ describe('streaming', () => {
   });
 
   it('can leave static files alone', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-fastify-static-'));
+    const dir = tempDir('hypdriv-fastify-static-');
     writeFileSync(join(dir, 'app.css'), 'a{}');
     const { url } = await boot({ staticHeaders: false }, async (app) => {
       await app.register(fastifyStatic, { root: dir });
@@ -768,7 +779,7 @@ describe('ecosystem plugins', () => {
 
 describe('platform facts', () => {
   it('upgrades plain HTTP before anything answers, internal routes and assets included', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-fastify-https-'));
+    const dir = tempDir('hypdriv-fastify-https-');
     writeFileSync(join(dir, 'logo.png'), 'png');
     const { url } = await boot(
       { config: { site: { name: 'fastify-test', origin: 'https://shop.example' } } },

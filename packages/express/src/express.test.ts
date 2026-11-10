@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import compression from 'compression';
 import express, { type Express } from 'express';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   flag,
   type HypDrivExpressOptions,
@@ -17,6 +17,17 @@ import {
   useHypDriv,
   webHandler,
 } from './index';
+
+/** Temporary directories the tests create, removed when the file's tests are done. */
+const tempDirs: string[] = [];
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+afterAll(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 const BROWSER = {
   'user-agent':
@@ -288,7 +299,7 @@ describe('streaming', () => {
   });
 
   it('streams a file with res.sendFile and conditional requests', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-express-'));
+    const dir = tempDir('hypdriv-express-');
     writeFileSync(join(dir, 'big.bin'), Buffer.alloc(3 * 1024 * 1024, 7));
     const { url } = await boot({}, (app) => {
       app.get('/big', (_req, res) => res.sendFile(join(dir, 'big.bin')));
@@ -440,7 +451,7 @@ describe('request bodies', () => {
 
 describe('static files and compression', () => {
   it('serves express.static files with the security header preset, outside the stages', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-express-static-'));
+    const dir = tempDir('hypdriv-express-static-');
     writeFileSync(join(dir, 'app.js'), 'console.log(1)');
     const { url } = await boot({}, (app) => {
       app.use('/assets', express.static(dir, { immutable: true, maxAge: '1y' }));
@@ -457,7 +468,7 @@ describe('static files and compression', () => {
   });
 
   it('can leave static files alone', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-express-static-'));
+    const dir = tempDir('hypdriv-express-static-');
     writeFileSync(join(dir, 'app.css'), 'a{}');
     const { url } = await boot({ staticHeaders: false }, (app) => {
       app.use(express.static(dir));
@@ -485,6 +496,30 @@ describe('static files and compression', () => {
     const found = /'nonce-([^']+)'/.exec(response.headers.get('content-security-policy') ?? '')?.[1];
     // fetch decoded the gzip body: the nonce injection happened before compression.
     expect(await response.text()).toContain(`<script nonce="${found}">late()</script>`);
+  });
+
+  it('works when the app is mounted below compression() and express.static of an outer app (examples/express)', async () => {
+    const dir = tempDir('hypdriv-express-outer-');
+    writeFileSync(join(dir, 'robots.txt'), 'User-agent: *\n');
+    const inner = express();
+    useHypDriv(inner, options());
+    routes(inner);
+    const outer = express();
+    outer.use(compression({ threshold: 0 }));
+    outer.use(inner);
+    outer.use(express.static(dir));
+    const url = await listen(outer);
+    const page = await fetch(`${url}/`, { headers: { ...BROWSER, 'accept-encoding': 'gzip' } });
+    expect(page.headers.get('content-encoding')).toBe('gzip');
+    const found = /'nonce-([^']+)'/.exec(page.headers.get('content-security-policy') ?? '')?.[1];
+    expect(await page.text()).toContain(`<script nonce="${found}">late()</script>`);
+    // A path the inner app does not answer falls through to the outer app's static files, with the security headers.
+    const file = await fetch(`${url}/robots.txt`, { headers: SUBRESOURCE });
+    expect(file.status).toBe(200);
+    expect(await file.text()).toBe('User-agent: *\n');
+    expect(file.headers.get('x-content-type-options')).toBe('nosniff');
+    const missing = await fetch(`${url}/nope.txt`, { headers: SUBRESOURCE });
+    expect(missing.status).toBe(404);
   });
 });
 
@@ -516,7 +551,7 @@ describe('mounting and platform facts', () => {
   });
 
   it('upgrades plain HTTP before anything answers, internal routes and assets included', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hypdriv-express-https-'));
+    const dir = tempDir('hypdriv-express-https-');
     writeFileSync(join(dir, 'logo.png'), 'png');
     const { url } = await boot(
       { config: { site: { name: 'express-test', origin: 'https://shop.example' } } },
