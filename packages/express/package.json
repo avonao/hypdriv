@@ -1,7 +1,7 @@
 {
   "name": "@hypdriv/express",
   "version": "0.1.0",
-  "description": "Hypdriv for Express 5 on Node and Vercel Functions: the Drivetrain (security headers, CSP with per-request nonces, rate limiting, bot shield, geo, flags, redirects, Early Hints, logging, Server-Timing, /_hypdriv/*) as Express middleware that streams the application's response through the pipeline, plus a route manifest read from the app's router stack.",
+  "description": "Hypdriv for Express 5 on Node, Vercel Functions and Cloudflare Workers (nodejs_compat): the Drivetrain (security headers, CSP with per-request nonces, rate limiting, bot shield, geo, flags, redirects, Early Hints, logging, Server-Timing, /_hypdriv/*) as Express middleware that streams the application's response through the pipeline, plus a route manifest read from the app's router stack.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://hypdriv.dev",

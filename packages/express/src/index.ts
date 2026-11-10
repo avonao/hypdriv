@@ -1,5 +1,5 @@
 /**
- * `@hypdriv/express` — Hypdriv for Express 5 on Node and Vercel Functions.
+ * `@hypdriv/express` — Hypdriv for Express 5 on Node, Vercel Functions and Cloudflare Workers (`nodejs_compat`).
  *
  * ```ts
  * import express from 'express';

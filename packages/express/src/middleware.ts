@@ -49,6 +49,11 @@ export interface HypDrivExpressOptions extends Omit<CreateHandlerOptions, 'confi
   /** More route patterns for the derived manifest (`useHypDriv`): see `expressManifest`. */
   routes?: readonly string[];
   /**
+   * The Express version the derived manifest reports (`useHypDriv`). Default: read from `express/package.json`, which
+   * bundled deployments (a Worker, a traced Vercel Function) may not carry; the health route then says `unknown`.
+   */
+  version?: string;
+  /**
    * The Express app behind the middleware (`useHypDriv(app)` sets it). Background revalidation
    * (stale-while-revalidate) renders through it, because the request that served the stale entry is long finished.
    */
@@ -106,6 +111,7 @@ export function hypdriv(options: HypDrivExpressOptions): HypDrivExpressMiddlewar
     host,
     app,
     routes: _routes,
+    version: _version,
     trustProxy,
     origin,
     staticHeaders = true,
@@ -241,7 +247,11 @@ export type ExpressAppLike = ExpressRoutesSource & ExpressHandler & { use(...han
  */
 export function useHypDriv(app: ExpressAppLike, options: HypDrivExpressOptions): HypDrivExpressMiddleware {
   const middleware = hypdriv({
-    manifest: () => expressManifest(app, options.routes ? { routes: options.routes } : {}),
+    manifest: () =>
+      expressManifest(app, {
+        ...(options.routes ? { routes: options.routes } : {}),
+        ...(options.version ? { version: options.version } : {}),
+      }),
     app,
     ...options,
   });

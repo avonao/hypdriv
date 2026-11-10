@@ -200,6 +200,12 @@ describe('hypdriv() middleware', () => {
     const text = await response.text();
     expect(text).toContain('Express');
     expect(text).toContain('"runner":"host"');
+    // A bundled deployment cannot read express/package.json: the version option names it.
+    const named = await boot({ version: '5.9.1' });
+    const health = (await (await fetch(`${named.url}/_hypdriv/health`, { headers: BROWSER })).json()) as {
+      framework: string;
+    };
+    expect(health.framework).toBe('Express 5.9.1');
   });
 
   it('gives the routes of the app route ids', async () => {
