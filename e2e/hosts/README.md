@@ -1,6 +1,8 @@
 # Live checks for Hypdriv's Vite hosts
 
-One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Hono and Qwik — on Cloudflare Workers, Vercel or a Node server (RedwoodSDK on Workers only; its health route names the framework "RedwoodSDK", so pass `--framework redwood`). The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
+One runner that verifies a deployed example of any host — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Hono, Qwik, Express and Fastify — on Cloudflare Workers, Vercel or a Node server (RedwoodSDK on Workers only; its health route names the framework "RedwoodSDK", so pass `--framework redwood`; Fastify on Vercel and Node only). The Next.js suites live in `e2e/cloudflare` and `e2e/vercel`.
+
+The server framework examples have no prerendered pages and no build: check them with `--dynamic / --api /api/time --rate-limit 60` against `pnpm start` (Node), `pnpm dev:cloudflare` (Express on workerd) or the deployment. Their hashed asset is the content-hashed stylesheet the app serves itself.
 
 ```sh
 pnpm -F @hypdriv/e2e-hosts check --url https://<deployment> --framework vite \

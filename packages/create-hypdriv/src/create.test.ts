@@ -71,6 +71,7 @@ describe('template sync', () => {
       'solid-start',
       'qwik',
       'hono',
+      'express',
     ]) {
       const files = manifest.templates[host]!;
       expect(files).toContain('hypdriv.config.ts');
@@ -113,6 +114,26 @@ describe('template sync', () => {
     expect(manifest.templates.qwik!.some((f) => f.startsWith('server/'))).toBe(false);
     expect(manifest.templates.hono).toContain('src/app.tsx');
     expect(manifest.templates.hono).toContain('src/index.ts');
+    for (const file of [
+      'src/app.ts',
+      'src/server.ts',
+      'src/worker.ts',
+      'wrangler.jsonc',
+      'public/robots.txt',
+    ])
+      expect(manifest.templates.express).toContain(file);
+    // Fastify runs on Vercel and Node only: no Worker files, no .dev.vars.
+    const fastify = manifest.templates.fastify ?? [];
+    for (const file of [
+      'hypdriv.config.ts',
+      '.env.example',
+      'src/server.ts',
+      'src/routes.ts',
+      'public/robots.txt',
+    ])
+      expect(fastify).toContain(file);
+    expect(fastify).not.toContain('wrangler.jsonc');
+    expect(fastify).not.toContain('.dev.vars.example');
     for (const files of Object.values(manifest.templates))
       expect(files.filter((f) => /\.local\.|^\.dev\.vars\./.test(f) && f !== '.dev.vars.example')).toEqual(
         [],
@@ -567,6 +588,40 @@ describe('cli', () => {
       expect(readFileSync(join(root, 'src/app.tsx'), 'utf8')).toContain('useHypDriv(app, { config })');
       expect(readFileSync(join(root, 'hypdriv.config.ts'), 'utf8')).toContain("name: 'api'");
     }
+  });
+
+  it('scaffolds Express and Fastify apps without a build step, Fastify on Vercel and Node only', async () => {
+    for (const [framework, platform, expected, unexpected] of [
+      ['express', 'node', 'start', 'build:node'],
+      ['express', 'cloudflare', 'dev:cloudflare', 'build:cloudflare'],
+      ['express', 'vercel', 'vercel deploy', 'build:vercel'],
+      ['fastify', 'node', 'start', 'build:node'],
+      ['fastify', 'vercel', 'vercel deploy', 'build:vercel'],
+    ] as const) {
+      const t = io(['api', '--framework', framework, '--platform', platform, '--no-git', '--json'], {
+        run: () => 0,
+      });
+      expect(await main(t.value)).toBe(0);
+      const out = JSON.parse(t.out.join('')) as { template: string; framework: string; next: string[] };
+      expect(out).toMatchObject({ template: framework, framework });
+      expect(out.next.join('\n')).toContain(expected);
+      expect(out.next.join('\n')).not.toContain(unexpected);
+      const root = join(t.cwd, 'api');
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+        dependencies: Record<string, string>;
+      };
+      expect(pkg.dependencies[`@hypdriv/${framework}`]).toMatch(/^\^0\./);
+      expect(JSON.stringify(pkg)).not.toMatch(/catalog:|workspace:/);
+      expect(readFileSync(join(root, 'hypdriv.config.ts'), 'utf8')).toContain("name: 'api'");
+      expect(existsSync(join(root, platform === 'cloudflare' ? '.dev.vars' : '.env.local'))).toBe(true);
+    }
+    const workers = io(['api', '--framework', 'fastify', '--platform', 'cloudflare', '--no-git', '--json']);
+    expect(await main(workers.value)).toBe(2);
+    expect(workers.err.join('')).toContain('node, vercel');
+    // Without --platform, Fastify defaults to Node.
+    const fallback = io(['api', '--framework', 'fastify', '--no-git', '--json', '--yes'], { run: () => 0 });
+    expect(await main(fallback.value)).toBe(0);
+    expect(JSON.parse(fallback.out.join(''))).toMatchObject({ platform: 'node' });
   });
 
   it('reports a failed install without failing the scaffold', async () => {

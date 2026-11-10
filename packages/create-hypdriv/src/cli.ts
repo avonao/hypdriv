@@ -35,17 +35,17 @@ export interface CliIO {
 const HELP = `create-hypdriv ${VERSION}
 
 Scaffold an app with Hypdriv: Next.js 16 on Cloudflare Workers (OpenNext) or Vercel, or a Vite framework
-(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik) and Hono on Cloudflare Workers, Vercel or Node
-(RedwoodSDK: Cloudflare Workers only).
+(plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik), Hono and Express on
+Cloudflare Workers, Vercel or Node (RedwoodSDK: Cloudflare Workers only), or Fastify on Vercel or Node.
 
 Usage
   npm create hypdriv@latest [directory] -- [options]
   pnpm create hypdriv [directory] [options]
 
 Options
-  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, rwsdk, solid-start, qwik, hono
+  --framework <name>              next (default), vite, react-router, tanstack-start, astro, sveltekit, nuxt, vinext, waku, rwsdk, solid-start, qwik, hono, express, fastify
   --platform <cloudflare|vercel|node>
-                                  Deploy target (default: cloudflare; node for Vite frameworks and Hono)
+                                  Deploy target (default: cloudflare; node for Fastify, which does not run on Workers)
   --purser                        Style the app with Purser CSS (Next.js; zero-override atomic CSS, flashless themes)
   --pm <pnpm|npm|yarn|bun>        Package manager (default: the one running create-hypdriv)
   --name <package-name>           package.json name (default: from the directory)
@@ -159,13 +159,17 @@ export async function main(io: CliIO): Promise<number> {
   const framework: Framework =
     (frameworkArg as Framework | undefined) ??
     (prompt ? await askChoice(ask, 'Framework', FRAMEWORKS, 'next') : 'next');
-  // RedwoodSDK builds a Cloudflare Worker and has no other target.
+  // RedwoodSDK builds a Cloudflare Worker and has no other target; Fastify cannot run on Workers (its router
+  // compiles handlers with new Function(), which workerd refuses).
   const platforms =
     framework === 'next'
       ? (['cloudflare', 'vercel'] as const)
       : framework === 'rwsdk'
         ? (['cloudflare'] as const)
-        : (['cloudflare', 'vercel', 'node'] as const);
+        : framework === 'fastify'
+          ? (['node', 'vercel'] as const)
+          : (['cloudflare', 'vercel', 'node'] as const);
+  const defaultPlatform: Platform = platforms[0];
   const platformArg = values.platform?.toLowerCase();
   if (platformArg && !(platforms as readonly string[]).includes(platformArg)) {
     io.stderr.write(
@@ -176,8 +180,8 @@ export async function main(io: CliIO): Promise<number> {
   const platform: Platform =
     (platformArg as Platform | undefined) ??
     (prompt && platforms.length > 1
-      ? await askChoice(ask, 'Deploy to', platforms, 'cloudflare')
-      : 'cloudflare');
+      ? await askChoice(ask, 'Deploy to', platforms, defaultPlatform)
+      : defaultPlatform);
   if (values.purser && framework !== 'next') {
     io.stderr.write('create-hypdriv: --purser is available for Next.js apps only\n');
     return 2;
@@ -271,12 +275,29 @@ export async function main(io: CliIO): Promise<number> {
       : platform === 'vercel'
         ? ['vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)']
         : [`${runScript(packageManager, 'start')}              # Node server behind the Hypdriv pipeline`];
+  // Express and Fastify have no build step either: `dev` runs the Node server (Express on Workers: `dev:cloudflare`).
+  const serverSteps =
+    platform === 'cloudflare'
+      ? [`${runScript(packageManager, 'deploy:cloudflare')}   # wrangler deploy`]
+      : platform === 'vercel'
+        ? ['vercel deploy   # or connect the repository in the Vercel dashboard (region iad1)']
+        : [`${runScript(packageManager, 'start')}              # Node server behind the Hypdriv pipeline`];
+  const server = framework === 'express' || framework === 'fastify';
+  const devScript =
+    framework === 'hono' && platform === 'node'
+      ? 'dev:node'
+      : server && platform === 'cloudflare'
+        ? 'dev:cloudflare'
+        : 'dev';
   const steps = [
     relative(io.cwd, result.root) ? `cd ${relative(io.cwd, result.root)}` : null,
     installed ? null : `${packageManager} install`,
-    runScript(packageManager, framework === 'hono' && platform === 'node' ? 'dev:node' : 'dev'),
-    ...(framework === 'hono'
-      ? [...honoSteps, `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`]
+    runScript(packageManager, devScript),
+    ...(framework === 'hono' || server
+      ? [
+          ...(server ? serverSteps : honoSteps),
+          `${packageManager === 'npm' ? 'npx' : packageManager} hypdriv doctor`,
+        ]
       : framework === 'next'
         ? [
             platform === 'cloudflare'

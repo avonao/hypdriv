@@ -52,6 +52,8 @@ export const FRAMEWORK_INTEGRATION: Record<FrameworkName, string> = {
   nuxt: '@hypdriv/nuxt',
   vite: '@hypdriv/vite',
   hono: '@hypdriv/hono',
+  express: '@hypdriv/express',
+  fastify: '@hypdriv/fastify',
   waku: '@hypdriv/waku',
   rwsdk: '@hypdriv/rwsdk',
   'solid-start': '@hypdriv/solid-start',
@@ -69,6 +71,8 @@ export const FRAMEWORK_LABEL: Record<ProjectFramework, string> = {
   nuxt: 'Nuxt',
   vite: 'Vite',
   hono: 'Hono',
+  express: 'Express',
+  fastify: 'Fastify',
   waku: 'Waku',
   rwsdk: 'RedwoodSDK',
   'solid-start': 'SolidStart',
@@ -106,6 +110,9 @@ const FRAMEWORK_DEPENDENCIES: Array<[FrameworkName, string]> = [
   ['qwik', '@qwik.dev/router'],
   ['qwik', '@builder.io/qwik-city'],
   ['hono', 'hono'],
+  // Express and Fastify count only as declared dependencies (see DECLARED_ONLY).
+  ['express', 'express'],
+  ['fastify', 'fastify'],
   // RedwoodSDK before Vite: its projects depend on `vite` themselves.
   ['rwsdk', 'rwsdk'],
   ['vite', 'vite'],
@@ -123,6 +130,27 @@ export const HONO_ENTRY_FILES = [
   'app.ts',
 ];
 
+/**
+ * Frameworks detected only when the package declares them: Express and Fastify sit in many trees as a dependency of
+ * a tool (a dev server, a test runner, an SDK), which says nothing about the app.
+ */
+const DECLARED_ONLY: ReadonlySet<FrameworkName> = new Set(['express', 'fastify']);
+
+/**
+ * Where an Express or Fastify app is created and its server starts, in the order the wizard and the doctor look:
+ * the names Vercel's zero-config Express and Fastify presets look for (`app`, `index`, `server`, at the root or in
+ * `src/`), plus `src/main`.
+ */
+export const SERVER_ENTRY_FILES = [
+  'src/app',
+  'src/server',
+  'src/index',
+  'src/main',
+  'app',
+  'server',
+  'index',
+].flatMap((base) => ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'].map((ext) => `${base}${ext}`));
+
 const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   next: ['next.config.ts', 'next.config.mts', 'next.config.mjs', 'next.config.js', 'next.config.cjs'],
   vinext: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
@@ -134,6 +162,9 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
   vite: ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'],
   // A Hono app has no framework config: its entry is where the middleware is registered.
   hono: HONO_ENTRY_FILES,
+  // Express and Fastify have no framework config either: the entry that registers Hypdriv is the one reported.
+  express: SERVER_ENTRY_FILES,
+  fastify: SERVER_ENTRY_FILES,
   waku: ['waku.config.ts', 'waku.config.mts', 'waku.config.js', 'waku.config.mjs'],
   rwsdk: ['vite.config.mts', 'vite.config.ts', 'vite.config.js', 'vite.config.mjs'],
   // SolidStart 2 configures through Vite; the Vinxi-era app.config.* of SolidStart 1 is found so the doctor can say so.
@@ -151,7 +182,9 @@ const FRAMEWORK_CONFIG_FILES: Record<FrameworkName, string[]> = {
 /** Detects the framework from the package's dependencies and its config file. */
 export function detectFramework(root: string, pkg: PackageInfo | null): FrameworkInfo {
   const deps = { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
-  const found = FRAMEWORK_DEPENDENCIES.find(([, dep]) => dep in deps || installedVersion(root, dep) !== null);
+  const found = FRAMEWORK_DEPENDENCIES.find(
+    ([name, dep]) => dep in deps || (!DECLARED_ONLY.has(name) && installedVersion(root, dep) !== null),
+  );
   if (!found)
     return {
       name: 'unknown',
@@ -163,14 +196,22 @@ export function detectFramework(root: string, pkg: PackageInfo | null): Framewor
     };
   const [name, dep] = found;
   const integration = FRAMEWORK_INTEGRATION[name];
-  const configFile = firstExisting(root, FRAMEWORK_CONFIG_FILES[name]);
-  const source = configFile ? (readText(configFile) ?? '') : '';
   const pattern =
     name === 'next'
       ? /\bwithHypDriv\b/
       : new RegExp(
           `['"](?:${integration.replace(/[/@.-]/g, (c) => `\\${c}`)}|hypdriv\\/${name})(?:\\/[\\w-]+)?['"]`,
         );
+  // An Express or Fastify app is often split (the app in one module, the server in another): the entry that
+  // registers Hypdriv is the one to report, else the first that exists.
+  const candidates = FRAMEWORK_CONFIG_FILES[name];
+  const configFile = DECLARED_ONLY.has(name)
+    ? (candidates
+        .map((file) => join(root, file))
+        .find((file) => exists(file) && pattern.test(readText(file) ?? '')) ??
+      firstExisting(root, candidates))
+    : firstExisting(root, candidates);
+  const source = configFile ? (readText(configFile) ?? '') : '';
   return {
     name,
     version: installedVersion(root, dep) ?? (deps[dep] as string | undefined) ?? null,
@@ -779,6 +820,8 @@ export function detectProject(start: string, options: DetectOptions = {}): Proje
     '@hypdriv/nuxt',
     '@hypdriv/vinext',
     '@hypdriv/hono',
+    '@hypdriv/express',
+    '@hypdriv/fastify',
     '@hypdriv/waku',
     '@hypdriv/rwsdk',
     '@hypdriv/solid-start',

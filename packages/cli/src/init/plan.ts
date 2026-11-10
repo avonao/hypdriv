@@ -71,6 +71,8 @@ export function initPlatform(project: ProjectInfo, explicit?: InitPlatform): Ini
   if (explicit) return explicit;
   if (project.platform === 'vercel') return 'vercel';
   if (project.platform === 'node' && project.platformDetection.explicit) return 'node';
+  // Fastify cannot run on Workers (its router compiles handlers with new Function()): Node is its default.
+  if (project.framework.name === 'fastify' && project.platform !== 'cloudflare') return 'node';
   return 'cloudflare';
 }
 

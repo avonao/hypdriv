@@ -437,6 +437,83 @@ describe('hypdriv init for framework hosts', () => {
     expect(created).not.toContain('durable-objects');
   });
 
+  it('Express: useHypDriv() before the routes, the Worker entry around app.listen() and the wrangler settings', async () => {
+    const { p, out } = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', type: 'module', dependencies: { express: '^5.2.1' } }),
+        ...installed('express', '5.3.0'),
+        'src/app.ts':
+          "import express from 'express';\n\nconst app = express();\n\napp.get('/', (_req, res) => res.send('hi'));\n\nexport default app;\n",
+      },
+      'cloudflare',
+    );
+    const entry = p.read('src/app.ts');
+    expect(entry).toContain("import { useHypDriv } from '@hypdriv/express';");
+    expect(entry).toContain("import config from '../hypdriv.config.js';");
+    expect(entry.indexOf('useHypDriv(app, { config });')).toBeLessThan(entry.indexOf("app.get('/'"));
+    const worker = p.read('src/worker.ts');
+    expect(worker).toContain("import { httpServerHandler } from 'cloudflare:node';");
+    expect(worker).toContain("import app from './app.js';");
+    expect(worker).toContain('export default httpServerHandler({ port: 8080 });');
+    expect(worker).toContain("from '@hypdriv/cloudflare/durable-objects';");
+    expect(parseJsonc(p.read('wrangler.jsonc'))).toMatchObject({
+      main: 'src/worker.ts',
+      compatibility_flags: ['nodejs_compat'],
+    });
+    expect(out.plan.find((i) => i.path === 'src/app.ts')?.action).toBe('modify');
+  });
+
+  it('Express: a CommonJS entry is left to the user, a new project gets an app module and no build step', async () => {
+    const cjs = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', dependencies: { express: '^5.2.1' } }),
+        ...installed('express', '5.3.0'),
+        'server.js': "const express = require('express');\nconst app = express();\napp.listen(3000);\n",
+      },
+      'node',
+    );
+    expect(cjs.out.plan.find((i) => i.path === 'server.js')?.action).toBe('manual');
+    expect(cjs.p.read('server.js')).not.toContain('useHypDriv');
+
+    const fresh = await init(
+      {
+        'package.json': JSON.stringify({ name: 'api', type: 'module', dependencies: { express: '^5.2.1' } }),
+        ...installed('express', '5.3.0'),
+      },
+      'vercel',
+    );
+    const created = fresh.p.read('src/app.ts');
+    expect(created).toContain('useHypDriv(app, { config });');
+    expect(created).toContain('export default app;');
+    expect(fresh.out.notes.join('\n')).toContain('zero-config Express');
+    const steps = (fresh.out as unknown as { nextSteps: string[] }).nextSteps.join('\n');
+    expect(steps).not.toContain('vite build');
+  });
+
+  it('Fastify: the plugin after Fastify(), Node by default, and no Worker files on Cloudflare', async () => {
+    const files = {
+      'package.json': JSON.stringify({ name: 'api', type: 'module', dependencies: { fastify: '^5.8.0' } }),
+      ...installed('fastify', '5.12.7'),
+      'src/server.ts':
+        "import Fastify from 'fastify';\n\nconst app = Fastify({ logger: true });\n\napp.get('/', async () => 'hi');\n\napp.listen({ port: 3000 });\n",
+    };
+    const p = tempProject(files);
+    const io = memoryIO(p.dir);
+    expect(await runCommand('init', ['--skip-doctor', '--json'], io)).toBe(0);
+    const out = JSON.parse(io.out) as { platform: string; notes: string[] };
+    expect(out.platform).toBe('node');
+    const server = p.read('src/server.ts');
+    expect(server).toContain("import { hypdriv } from '@hypdriv/fastify';");
+    expect(server).toContain("import config from '../hypdriv.config.js';");
+    expect(server.indexOf('app.register(hypdriv, { config });')).toBeLessThan(server.indexOf("app.get('/'"));
+
+    const cf = await init(files, 'cloudflare');
+    const refused = cf.out.plan.find((i) => i.path === 'wrangler.jsonc');
+    expect(refused?.action).toBe('manual');
+    expect(refused?.hint).toContain('new Function()');
+    expect(existsSync(join(cf.p.dir, 'src/worker.ts'))).toBe(false);
+  });
+
   it.skipIf(!canEvaluateCloudflareConfig())(
     'Hono on a cf CLI project: reads cloudflare.config.ts, never edits it, and prints the missing settings',
     async () => {

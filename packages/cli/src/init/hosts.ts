@@ -3,7 +3,7 @@ import { join, posix } from 'node:path';
 import type { FrameworkName } from '@hypdriv/core';
 import type { LoadedConfig } from '../context';
 import { maskSource } from '../doctor/checks/hono';
-import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo } from '../project';
+import { FRAMEWORK_LABEL, HONO_ENTRY_FILES, type ProjectInfo, SERVER_ENTRY_FILES } from '../project';
 import { cloudflareConfigHint, defaultCompatibilityDate, workerName } from '../templates';
 import { rel } from '../util/fs';
 import {
@@ -52,8 +52,8 @@ export interface HostSpec {
   /** Platform files (Worker entry, wrangler settings, Vercel config). */
   platform?: (ctx: HostContext) => void;
   scripts: (platform: InitPlatform) => Record<string, string>;
-  /** The production build command (default `vite build`), or one per platform. */
-  buildCommand?: string | ((platform: InitPlatform) => string);
+  /** The production build command (default `vite build`), or one per platform; `null` when the app has no build. */
+  buildCommand?: string | ((platform: InitPlatform) => string) | null;
   /** How to run the build locally for `hypdriv audit` (default: `vite preview` on Cloudflare, `hypdriv serve` on Node). */
   preview?: (platform: InitPlatform) => { url: string; via: string } | null;
 }
@@ -1144,6 +1144,240 @@ export const HONO_SPEC: HostSpec = {
   }),
 };
 
+/** The first server entry (`src/app.ts`, `src/server.ts`…) that imports or requires `module`, or `null`. */
+function serverEntryImporting(ctx: HostContext, module: string): string | null {
+  const required = new RegExp(`\\brequire\\s*\\(\\s*['"]${module}['"]\\s*\\)`);
+  return (
+    SERVER_ENTRY_FILES.find((f) => {
+      const file = join(ctx.project.root, f);
+      if (!existsSync(file)) return false;
+      const source = ctx.read(file);
+      return importsModule(source, module) || required.test(source);
+    }) ?? null
+  );
+}
+
+/** `../hypdriv.config.js` as the file at `path` imports it (with `.js`: Vercel compiles each file to ESM as is). */
+const configImportJs = (path: string) => `${configImportPath(path)}.js`;
+
+/**
+ * Inserts `line` after the one-line declaration `const <app> = <factory>(…);` and the imports `imports`. `null`
+ * when the declaration is not found (a manual step then shows the snippet).
+ */
+function registerAfterDeclaration(
+  source: string,
+  factory: string,
+  line: (app: string) => string,
+  imports: string[],
+): { changed: boolean; content: string; reason: string } {
+  if (!/^\s*import\s/m.test(source))
+    return {
+      changed: false,
+      content: source,
+      reason: 'a CommonJS entry (require); Hypdriv packages are ES modules, register Hypdriv by hand',
+    };
+  const declaration = new RegExp(
+    `^([ \\t]*)(?:export\\s+)?(?:const|let)\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=\\n]+)?=\\s*(?:await\\s+)?${factory}\\s*\\([^\\n]*;[ \\t]*$`,
+    'm',
+  ).exec(source);
+  if (!declaration)
+    return {
+      changed: false,
+      content: source,
+      reason: `could not find a one-line \`const app = ${factory}(…);\`; register Hypdriv by hand`,
+    };
+  const app = declaration[2] as string;
+  const end = (declaration.index ?? 0) + declaration[0].length;
+  let content = `${source.slice(0, end)}\n\n${line(app)}${source.slice(end)}`;
+  for (const statement of imports) content = insertImport(content, statement, 'esm');
+  return { changed: true, content, reason: 'register Hypdriv before the routes' };
+}
+
+/** A new Express app module for a project without one: the app behind Hypdriv, exported for every platform. */
+export function expressAppTemplate(path: string): string {
+  return `import { useHypDriv } from '@hypdriv/express';
+import express from 'express';
+import config from '${configImportJs(path)}';
+
+const app = express();
+
+// Hypdriv's request stages around everything the app answers (security headers, CSP nonce, rate limiting,
+// bot shield, /_hypdriv/*). Express runs middleware in registration order: register it before the routes.
+useHypDriv(app, { config });
+
+app.get('/', (_req, res) => {
+  res.send('Hello from Express behind Hypdriv');
+});
+
+// Node: \`app.listen(Number(process.env.PORT ?? 3000))\` in a server module; Vercel deploys this default export.
+export default app;
+`;
+}
+
+/** The Worker entry for an Express app: workerd's nodejs_compat HTTP server hands requests to \`app.listen()\`. */
+export function expressWorkerTemplate(appImport: string): string {
+  return `// Express on Cloudflare Workers: httpServerHandler() (nodejs_compat) hands each request to the server
+// app.listen() starts. The Durable Objects back Hypdriv's rate limiter, tag index and live channels.
+import { httpServerHandler } from 'cloudflare:node';
+import app from '${appImport}';
+
+${DO_EXPORTS}
+
+app.listen(8080);
+export default httpServerHandler({ port: 8080 });
+`;
+}
+
+export const EXPRESS_SPEC: HostSpec = {
+  framework: 'express',
+  packages: (platform) =>
+    platform === 'cloudflare'
+      ? ['@hypdriv/express', '@hypdriv/core', '@hypdriv/cloudflare']
+      : ['@hypdriv/express', '@hypdriv/core'],
+  install: (platform) =>
+    platform === 'cloudflare' ? { devDependencies: ['wrangler', '@cloudflare/workers-types'] } : {},
+  register(ctx) {
+    const path = serverEntryImporting(ctx, 'express') ?? 'src/app.ts';
+    planFileEdit(
+      ctx,
+      path,
+      (source) =>
+        registerAfterDeclaration(
+          source,
+          'express',
+          (app) =>
+            `// Hypdriv's request stages around everything the app answers. Register it before the routes.\nuseHypDriv(${app}, { config });`,
+          ["import { useHypDriv } from '@hypdriv/express';", `import config from '${configImportJs(path)}';`],
+        ),
+      {
+        done: /@hypdriv\/express/,
+        fallback: expressAppTemplate(path),
+        hint: `import { useHypDriv } from '@hypdriv/express';\nimport config from '${configImportJs(path)}';\n\nconst app = express();\nuseHypDriv(app, { config }); // before routes, routers and static files; after compression()`,
+      },
+    );
+  },
+  platform(ctx) {
+    const entry = serverEntryImporting(ctx, 'express') ?? 'src/app.ts';
+    if (ctx.platform === 'cloudflare') {
+      const configured = ctx.project.wrangler.config?.main ?? null;
+      const main = configured ?? 'src/worker.ts';
+      const appImport =
+        `./${posix.relative(posix.dirname(main), entry.replace(/\.[cm]?[jt]s$/, '.js'))}`.replace(
+          /^\.\/\.\.\//,
+          '../',
+        );
+      planWorkerEntry(ctx, main, expressWorkerTemplate(appImport), /httpServerHandler/);
+      planHostWrangler(ctx, {
+        main: configured ? null : main,
+        durableObjects: true,
+        template: () =>
+          wranglerJson({
+            $schema: 'node_modules/wrangler/config-schema.json',
+            name: ctx.name,
+            main,
+            compatibility_date: defaultCompatibilityDate(ctx.now),
+            compatibility_flags: ['nodejs_compat'],
+            observability: { enabled: true },
+            durable_objects: { bindings: HYPDRIV_DO },
+            migrations: HYPDRIV_MIGRATION,
+          }),
+      });
+      ctx.notes.push(
+        `${main} imports the app as the default export of ${entry}. Keep compression() and express.static out of the app on Workers: Cloudflare compresses at the edge, and static files belong in Workers Static Assets.`,
+      );
+    } else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        `On Vercel an Express app is one Function: zero-config Express deploys the first of app, index, server (at the root or in src/) that imports express, which must \`export default app\` or call \`app.listen()\`. Relative imports need \`.js\` (Vercel compiles each file to ESM as is); express.static is ignored (public/** is served by the CDN).`,
+      );
+    else
+      ctx.notes.push(
+        'On Node, register compression() before useHypDriv() (it then compresses the finished response) and start the app with app.listen().',
+      );
+  },
+  scripts: (platform) => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    'hypdriv:audit': `hypdriv audit all --url http://localhost:${platform === 'cloudflare' ? '8787' : '3000'}`,
+  }),
+  buildCommand: null,
+  preview: (platform) =>
+    platform === 'cloudflare'
+      ? { url: 'http://localhost:8787', via: 'wrangler dev' }
+      : platform === 'node'
+        ? { url: 'http://localhost:3000', via: 'your server (node or tsx)' }
+        : null,
+};
+
+/** A new Fastify server for a project without one: the plugin first, the server started for Node and Vercel. */
+export function fastifyServerTemplate(path: string): string {
+  return `import { hypdriv } from '@hypdriv/fastify';
+import Fastify from 'fastify';
+import config from '${configImportJs(path)}';
+
+const app = Fastify();
+
+// Hypdriv's request stages around every route, in every plugin context (security headers, CSP nonce, rate
+// limiting, bot shield, /_hypdriv/*). Register @fastify/compress after it.
+app.register(hypdriv, { config });
+
+app.get('/', async () => 'Hello from Fastify behind Hypdriv');
+
+// Not awaited: on Vercel the runtime captures the server in listen() and starts it after this module has loaded.
+app.listen({ port: Number(process.env.PORT ?? 3000), host: process.env.HOST ?? '0.0.0.0' }).catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+`;
+}
+
+export const FASTIFY_SPEC: HostSpec = {
+  framework: 'fastify',
+  packages: () => ['@hypdriv/fastify', '@hypdriv/core'],
+  register(ctx) {
+    const path = serverEntryImporting(ctx, 'fastify') ?? 'src/server.ts';
+    planFileEdit(
+      ctx,
+      path,
+      (source) =>
+        registerAfterDeclaration(
+          source,
+          'Fastify',
+          (app) =>
+            `// Hypdriv's request stages around every route, in every plugin context. Register @fastify/compress after it.\n${app}.register(hypdriv, { config });`,
+          ["import { hypdriv } from '@hypdriv/fastify';", `import config from '${configImportJs(path)}';`],
+        ),
+      {
+        done: /@hypdriv\/fastify/,
+        fallback: fastifyServerTemplate(path),
+        hint: `import { hypdriv } from '@hypdriv/fastify';\nimport config from '${configImportJs(path)}';\n\nconst app = Fastify();\napp.register(hypdriv, { config }); // before @fastify/compress`,
+      },
+    );
+  },
+  platform(ctx) {
+    if (ctx.platform === 'cloudflare')
+      ctx.items.push({
+        path: 'wrangler.jsonc',
+        action: 'manual',
+        reason: 'Fastify does not run on Cloudflare Workers',
+        hint: "Fastify's router (find-my-way) compiles handlers with new Function(), which workerd refuses ('Code generation from strings disallowed'). Deploy the Fastify app to Node or Vercel (hypdriv init --platform node|vercel), or move the Workers part to Hono with @hypdriv/hono.",
+      });
+    else if (ctx.platform === 'vercel')
+      ctx.notes.push(
+        "On Vercel a Fastify app is one Function: zero-config Fastify deploys the first of app, index, server (at the root or in src/) that imports fastify and serves the server its listen() starts, so call app.listen() without a top-level await. Relative imports need `.js`; the Fastify preset does not publish public/** to the CDN (serve it with @fastify/static from new URL('../public/', import.meta.url)).",
+      );
+    else
+      ctx.notes.push(
+        'On Node, register @fastify/compress after the Hypdriv plugin (it then compresses the finished response).',
+      );
+  },
+  scripts: () => ({
+    'hypdriv:doctor': 'hypdriv doctor',
+    'hypdriv:audit': 'hypdriv audit all --url http://localhost:3000',
+  }),
+  buildCommand: null,
+  preview: (platform) =>
+    platform === 'node' ? { url: 'http://localhost:3000', via: 'your server (node or tsx)' } : null,
+};
+
 const WAKU_CLOUDFLARE_PLUGIN = "cloudflare({ viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] } })";
 const CLOUDFLARE_PLUGIN_IMPORT = "import { cloudflare } from '@cloudflare/vite-plugin';";
 
@@ -1896,6 +2130,8 @@ export const HOST_SPECS: Partial<Record<FrameworkName, HostSpec>> = {
   nuxt: NUXT_SPEC,
   vinext: VINEXT_SPEC,
   hono: HONO_SPEC,
+  express: EXPRESS_SPEC,
+  fastify: FASTIFY_SPEC,
   waku: WAKU_SPEC,
   rwsdk: RWSDK_SPEC,
   'solid-start': SOLID_START_SPEC,
@@ -2000,9 +2236,10 @@ export function buildHostPlan(
   ctx.nextSteps.push(`Install the dependencies: ${pm === 'npm' ? 'npm install' : `${pm} install`}`);
   if (install.dependencies?.length) ctx.nextSteps.push(`${add} ${install.dependencies.join(' ')}`);
   if (install.devDependencies?.length) ctx.nextSteps.push(`${add} -D ${install.devDependencies.join(' ')}`);
-  ctx.nextSteps.push(
-    `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}${typeof spec?.buildCommand === 'function' ? spec.buildCommand(options.platform) : (spec?.buildCommand ?? 'vite build')} or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
-  );
+  if (spec?.buildCommand !== null)
+    ctx.nextSteps.push(
+      `Build once (${options.platform === 'vercel' ? 'VERCEL=1 ' : `HYPDRIV_TARGET=${options.platform} `}${typeof spec?.buildCommand === 'function' ? spec.buildCommand(options.platform) : (spec?.buildCommand ?? 'vite build')} or your build script) so the integration writes .hypdriv/manifest.json and the platform configuration.`,
+    );
   if (options.platform === 'cloudflare')
     ctx.nextSteps.push(
       'Set production secrets: `wrangler secret put HYPDRIV_SESSION_SECRET`, `wrangler secret put HYPDRIV_INTERNAL_SECRET`.',

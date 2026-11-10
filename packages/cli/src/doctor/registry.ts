@@ -2,6 +2,8 @@ import type { DeployPlatform, ProjectFramework } from '../project';
 import { depsChecks } from './checks/deps';
 import { environmentChecks } from './checks/environment';
 import { experimentChecks } from './checks/experiments';
+import { expressChecks } from './checks/express';
+import { fastifyChecks } from './checks/fastify';
 import { honoChecks } from './checks/hono';
 import { hypdrivChecks } from './checks/hypdriv';
 import { imageChecks } from './checks/images';
@@ -63,6 +65,8 @@ export const allChecks: Check[] = [
   ...solidStartChecks,
   ...qwikChecks,
   ...honoChecks,
+  ...expressChecks,
+  ...fastifyChecks,
   ...onlyFor(['next'], onlyOn(['cloudflare'], opennextChecks)),
   ...onlyFor(['next'], onlyOn(['cloudflare'], openNextCacheChecks)),
   ...scoped(onlyOn(['cloudflare'], wranglerChecks)),

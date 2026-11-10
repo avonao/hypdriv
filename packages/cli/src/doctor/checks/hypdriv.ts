@@ -103,6 +103,11 @@ export const hypdrivChecks: Check[] = [
     severity: 'warn',
     run(ctx) {
       const m = ctx.project.manifest;
+      const framework = ctx.project.framework.name;
+      if (!m && (framework === 'express' || framework === 'fastify'))
+        return info(
+          `${framework === 'express' ? 'Express' : 'Fastify'} has no build step: the route manifest is derived from the app's router when the handler starts (/_hypdriv/health reports the route count).`,
+        );
       if (!m)
         return warn(
           'No .hypdriv/manifest.json; run the production build (`next build` with withHypDriv, or `vite build` with the Hypdriv plugin) so routes, CSP hashes and weights are known.',

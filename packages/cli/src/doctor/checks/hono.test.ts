@@ -63,6 +63,21 @@ describe('honoRegistration', () => {
     expect(honoRegistration("const a = 'open;\nuseHypDriv(app); app.get('/', h);")).toBeNull();
   });
 
+  it('masks regular expression literals and tells them from divisions', () => {
+    const source = `const esc = (v) => v.replace(/[&<>"']/g, (c) => \`&#\${c};\`);\nuseHypDriv(app, { config });`;
+    const masked = maskSource(source);
+    expect(masked).not.toBeNull();
+    expect(masked?.length).toBe(source.length);
+    expect(masked).toContain('/_______/g');
+    expect(honoRegistration(`${source}\napp.get('/', h);`)).toEqual({ wrapped: false, routesBefore: null });
+    // Divisions stay code: the quote after them still opens a string.
+    expect(maskSource("const half = total / 2; const s = 'a/b';")).toBe(
+      "const half = total / 2; const s = '___';",
+    );
+    expect(maskSource('return /x\\/y[/]/.test(s);')).toBe('return /_______/.test(s);');
+    expect(maskSource('const r = /open')).toBeNull();
+  });
+
   it('keeps indices when masking', () => {
     const source = `a('x\\'y'); // tail\n\`t\${1}\`;`;
     expect(maskSource(source)?.length).toBe(source.length);

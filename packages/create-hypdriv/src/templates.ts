@@ -40,15 +40,15 @@ export const VITE_HOSTS: readonly ViteHost[] = [
   'solid-start',
   'qwik',
 ];
-/** Hosts that are not Vite based: a plain server framework (Hono) with its own request hook. */
-export type ServerHost = 'hono';
+/** Hosts that are not Vite based: server frameworks (Hono, Express, Fastify) with their own request hook. */
+export type ServerHost = 'hono' | 'express' | 'fastify';
 export type AppHost = ViteHost | ServerHost;
-export const SERVER_HOSTS: readonly ServerHost[] = ['hono'];
+export const SERVER_HOSTS: readonly ServerHost[] = ['hono', 'express', 'fastify'];
 export const FRAMEWORKS: readonly Framework[] = ['next', ...VITE_HOSTS, ...SERVER_HOSTS];
 
 /**
- * Template ids: Next.js has one per platform, with or without Purser CSS; every Vite host and Hono has one app that
- * builds or runs on Cloudflare, Vercel and Node.
+ * Template ids: Next.js has one per platform, with or without Purser CSS; every Vite host and server framework has
+ * one app that builds or runs on each platform it supports.
  */
 export type TemplateId = 'cloudflare' | 'cloudflare-purser' | 'vercel' | 'vercel-purser' | AppHost;
 
@@ -70,6 +70,8 @@ export const TEMPLATE_SOURCES: Record<TemplateId, string> = {
   'solid-start': 'examples/solid-start',
   qwik: 'examples/qwik',
   hono: 'examples/hono',
+  express: 'examples/express',
+  fastify: 'examples/fastify',
 };
 
 export function templateFor(platform: Platform, purser: boolean, framework: Framework = 'next'): TemplateId {

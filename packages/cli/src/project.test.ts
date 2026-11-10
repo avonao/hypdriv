@@ -217,6 +217,56 @@ export default defineConfig({
   );
 });
 
+describe('Express and Fastify detection', () => {
+  it('detects a declared Express dependency and reports the entry that registers Hypdriv', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'api', type: 'module', dependencies: { express: '^5.2.1' } }),
+      ...installed('express', '5.3.0'),
+      ...installed('@hypdriv/express', '0.1.0'),
+      // The server module comes first in the search order but does not register Hypdriv.
+      'src/server.ts': "import app from './app.js';\napp.listen(3000);\n",
+      'src/index.ts':
+        "import express from 'express';\nimport { useHypDriv } from '@hypdriv/express';\nconst app = express();\nuseHypDriv(app, { config });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'express',
+      version: '5.3.0',
+      integration: '@hypdriv/express',
+      integrationInstalled: '0.1.0',
+      registered: true,
+    });
+    expect(info.framework.configFile).toMatch(/src\/index\.ts$/);
+    expect(info.hypdriv.packages['@hypdriv/express']).toBe('0.1.0');
+  });
+
+  it('ignores Express or Fastify that is only installed (a tool dependency) and falls through to Vite', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'site', devDependencies: { vite: '^8.3.5' } }),
+      ...installed('vite', '8.3.5'),
+      ...installed('express', '5.3.0'),
+      ...installed('fastify', '5.12.7'),
+    });
+    expect(detectProject(p.dir, { env: {} }).framework.name).toBe('vite');
+  });
+
+  it('detects Fastify and reports an entry without the plugin as unregistered', () => {
+    const p = tempProject({
+      'package.json': JSON.stringify({ name: 'api', dependencies: { fastify: '^5.8.0' } }),
+      ...installed('fastify', '5.12.7'),
+      'server.js': "import Fastify from 'fastify';\nconst app = Fastify();\napp.listen({ port: 3000 });\n",
+    });
+    const info = detectProject(p.dir, { env: {} });
+    expect(info.framework).toMatchObject({
+      name: 'fastify',
+      integration: '@hypdriv/fastify',
+      integrationInstalled: null,
+      registered: false,
+    });
+    expect(info.framework.configFile).toMatch(/server\.js$/);
+  });
+});
+
 describe('Waku detection', () => {
   it('detects Waku before Hono and Vite and finds waku.config', () => {
     const p = tempProject({
