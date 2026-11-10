@@ -67,7 +67,7 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 | **Observability** | Tracing (OTLP/HTTP, console, Analytics Engine) · structured logs with redaction · `Server-Timing` for every stage · Web Vitals with route and cache attribution · `onRequestError` hooks · an in-app DevTools HUD |
 | **Cloudflare-native** | Worker shell around OpenNext with `scheduled`, `queue`, `email` and `tail` handlers dispatched to Route Handlers · geo and locale negotiation · live channels (Durable Objects with SSE and WebSocket, polling fallback) · edge feature flags · KV-managed redirects · maintenance mode · typed bindings in server code |
 | **Vercel-native** | Edge-cache policies expressed as `Vercel-CDN-Cache-Control` and `Vercel-Cache-Tag` (route headers, `withVercelCdn`) with tag purge on Vercel's CDN · Upstash Redis for exact global rate limits · Global Config for flags, redirects and maintenance · Vercel WAF rate-limit rules · BotID guards for Server Actions · Vercel Cron with `CRON_SECRET` · Vercel Queues for `enqueue()` · Vercel geo headers |
-| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku, RedwoodSDK, SolidStart 2 and Qwik (plus Hono as a plain server framework) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
+| **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku, RedwoodSDK, SolidStart 2 and Qwik (plus Hono, Express 5 and Fastify 5 as server frameworks) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
 | **Purser CSS** | In-process build and watch inside `withHypDriv` · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
 | **Operations** | Signed operator purge (`hypdriv purge`, `POST /_hypdriv/purge`) that clears every cache tier · signed audit tokens so audits pass your own bot shield · a production implementation guide for Cloudflare |
 | **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for thirteen frameworks · a testing kit · an agent skill |
@@ -91,6 +91,8 @@ The full list, with baseline and upgrade behaviour per feature, is in [`docs/fea
 | SolidStart 2 | `@hypdriv/solid-start` | Worker shell (`@cloudflare/vite-plugin`) or Nitro | Routing Middleware | Nitro |
 | Qwik 2 (Qwik Router) | `@hypdriv/qwik` | Worker shell around Qwik Router | Routing Middleware | Node server |
 | Hono 4 | `@hypdriv/hono` | Worker (`export default app`) | Function (`export default app`) | `@hono/node-server` |
+| Express 5 | `@hypdriv/express` | Worker (`httpServerHandler()`, `nodejs_compat`) | Function (`export default app`) | `app.listen()` |
+| Fastify 5 | `@hypdriv/fastify` | — (Fastify's router needs `new Function()`, which Workers refuse) | Function (the server `listen()` starts) | `app.listen()` |
 
 Cloudflare and Vercel are the two first-class platforms ([ADR 0013](docs/adr/0013-deploy-targets.md)). Node is supported for local development, containers and self-hosting; capabilities that need a platform service report their baseline behaviour there.
 
@@ -196,7 +198,7 @@ npx hypdriv doctor
 pnpm build                       # writes .hypdriv/manifest.json, CSP hashes and static headers for the target
 ```
 
-Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md).
+Guides: [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md) · [Express](docs/guides/express.md) · [Fastify](docs/guides/fastify.md).
 
 ## How it attaches
 
@@ -353,6 +355,8 @@ Twenty-eight packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`@hypdriv/solid-start`](packages/solid-start) | SolidStart 2 | ≥ 22.12 |
 | [`@hypdriv/qwik`](packages/qwik) | Qwik (Qwik Router, v2) | ≥ 20.19 |
 | [`@hypdriv/hono`](packages/hono) | Hono | ≥ 22.12 |
+| [`@hypdriv/express`](packages/express) | Express 5 | ≥ 22.12 |
+| [`@hypdriv/fastify`](packages/fastify) | Fastify 5 | ≥ 22.12 |
 | [`@hypdriv/cli`](packages/cli) | The `hypdriv` command | ≥ 20.9 |
 | [`create-hypdriv`](packages/create-hypdriv) | Scaffolder | ≥ 20.9 |
 
@@ -376,6 +380,8 @@ Twenty-eight packages, all at 0.1.0 (Preview). The `hypdriv` umbrella package re
 | [`examples/solid-start`](examples/solid-start) | SolidStart 2 | Cloudflare, Vercel, Node | Nitro runtime plugin or Worker shell, `hypdrivStart()` nonce, Nitro-prerendered pages, `hyp()` in a server function, rate-limited API route |
 | [`examples/qwik`](examples/qwik) | Qwik 2 | Cloudflare, Vercel, Node | Router adapters and server entries, prerendered and dynamic pages, `onStaticGenerate` paths, endpoint |
 | [`examples/hono`](examples/hono) | Hono 4 | Cloudflare, Vercel, Node | `useHypDriv(app)` middleware, nonce in JSX, Durable Objects |
+| [`examples/express`](examples/express) | Express 5 | Cloudflare, Vercel, Node | `useHypDriv(app)` middleware, `compression()` and `express.static` around the app on Node, `httpServerHandler()` Worker with Durable Objects, streaming, a content-hashed asset |
+| [`examples/fastify`](examples/fastify) | Fastify 5 | Vercel, Node | `hypdriv` plugin with `@fastify/compress` after it, one `src/server.ts` for Node and Vercel, `@fastify/static`, streaming |
 
 The end-to-end suites in [`e2e/`](e2e) (`cloudflare`, `vercel`, `hosts`) run every capability against a real account.
 
@@ -435,7 +441,7 @@ Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
 - **Concepts:** [Architecture](docs/architecture.md) · [Ecosystem: Purser CSS and SquawkCode](docs/ecosystem.md) · [Feature catalog](docs/feature-catalog.md) · [Decision records](docs/adr/README.md) · [Package contracts](docs/contracts.md) · [Preview status](docs/preview-status.md) · [Roadmap](docs/roadmap.md)
 - **Start:** [Getting started](docs/guides/getting-started.md) · [Configuration reference](docs/guides/configuration.md) · [CLI](docs/guides/cli.md)
 - **Platforms:** [Cloudflare](docs/guides/cloudflare.md) · [Production on Cloudflare](docs/guides/production-cloudflare.md) · [Vercel](docs/guides/vercel.md)
-- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md)
+- **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Hono](docs/guides/hono.md) · [Express](docs/guides/express.md) · [Fastify](docs/guides/fastify.md)
 - **Capabilities:** [Caching](docs/guides/caching.md) · [Security](docs/guides/security.md) · [Observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [Flags](docs/guides/flags.md) · [Live channels](docs/guides/live.md) · [Jobs](docs/guides/jobs.md)
 - **Test reports:** [`docs/testing`](docs/testing)
 - **Coding agents:** [`AGENTS.md`](AGENTS.md) and [`skills/hypdriv`](skills/hypdriv/SKILL.md)

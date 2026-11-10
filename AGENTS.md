@@ -1,6 +1,6 @@
 # Hypdriv — guidance for coding agents
 
-Hypdriv is the Hyper-Extension for Next.js 16+ and Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
+Hypdriv is the Hyper-Extension for Next.js 16+, Vite-based frameworks (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik) and server frameworks (Hono, Express, Fastify) on Cloudflare Workers, Vercel and Node: a sidecar monorepo of `@hypdriv/*` packages plus the `hypdriv` CLI. Read `docs/architecture.md` before changing anything structural; it is the source of truth. `docs/feature-catalog.md` lists every capability and its status; `docs/adr/` records the decisions behind the design.
 
 ## Posture
 
@@ -32,6 +32,8 @@ packages/core        kernel: config schema, pipeline, manifest types + matcher, 
 packages/runtime     framework-neutral stages, platform wiring, createHandler (hosts), createProxyHandler, hyp()
 packages/build       framework-neutral manifest assembly + static header rules (_headers, Build Output routes)
 packages/vite        Vite plugin for plain Vite apps + the toolkit every Vite framework integration uses
+packages/express     Express 5 middleware (Node, Vercel, Workers through nodejs_compat) on the Node bridge of @hypdriv/runtime/node (ADR 0028)
+packages/fastify     Fastify 5 plugin on the request lifecycle hooks (Node, Vercel; no Workers) (ADR 0029)
 packages/next        withHypDriv, adapter chain, proxy composables, server/client helpers
 packages/cloudflare  Worker shell (createWorker), handlers, Durable Objects, bindings
 packages/vercel      Vercel CDN headers + purge, Upstash/Global Config stores, WAF, BotID, Queues
@@ -48,7 +50,8 @@ packages/cli         the `hypdriv` command
 packages/create-hypdriv  scaffolder
 packages/hypdriv     umbrella
 examples/            runnable Next 16 apps: basic, with-purser (Cloudflare); vercel, vercel-purser (Vercel); the create-hypdriv templates;
-                     one app per Vite host (vite, …) that builds for Cloudflare, Vercel and Node (rwsdk: Cloudflare only)
+                     one app per Vite host (vite, …) that builds for Cloudflare, Vercel and Node (rwsdk: Cloudflare only),
+                     and per server framework (hono, express; fastify: Vercel and Node only)
 e2e/cloudflare       live suite: an app with every capability on + a runner that verifies it on a real Cloudflare account
 e2e/vercel           live suite for Vercel (Hobby plan): app + runner (runtime-logs stream) + provisioning script
 e2e/hosts            live checks for every Vite host example on Cloudflare, Vercel or Node + private-deployment provisioning
@@ -60,7 +63,7 @@ skills/hypdriv       agent skill for adopting Hypdriv in an application
 ## Conventions
 
 - Strict TypeScript, ESM only, extensionless relative imports inside a package (bundler resolution), `.js`-free.
-- Runtime packages must not import Node built-ins outside `/node` entry points (`@hypdriv/build` and the Vite plugin entries are build-time Node code; `@hypdriv/runtime` loads `node:async_hooks` lazily); Workers-specific types come from `@cloudflare/workers-types` and only `packages/cloudflare`, `packages/live` and `packages/testing` may reference them.
+- Runtime packages must not import Node built-ins outside `/node` entry points (`@hypdriv/build` and the Vite plugin entries are build-time Node code; `@hypdriv/express` and `@hypdriv/fastify` are Node server packages; `@hypdriv/runtime` loads `node:async_hooks` lazily); Workers-specific types come from `@cloudflare/workers-types` and only `packages/cloudflare`, `packages/live` and `packages/testing` may reference them.
 - Tests: `*.test.ts` next to the code; Workers-runtime tests as `*.workers.test.ts` (run by `@cloudflare/vitest-pool-workers`).
 - Public API changes need: tests, README/guide updates, a changeset, and an entry in `docs/feature-catalog.md`.
 - Every CLI command supports `--json` and `--root`.

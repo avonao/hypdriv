@@ -157,6 +157,8 @@ Frameworks built on Vite attach through their own contracts (ADR 0019). The neut
 | SolidStart 2 | Vite plugin after `solidStart()` and the deployment plugin (`@hypdriv/solid-start/vite`) | a Nitro runtime plugin wrapping `nitroApp.fetch` (Node, Vercel, Nitro-built Workers), or `createSolidStartWorker()` around the server entry with `@cloudflare/vite-plugin` (`createHandler`, `runner: 'host'`; `hypdrivStart()` hands the nonce to Solid) |
 | Qwik 2 | Vite plugin + Qwik Router adapters (`@hypdriv/qwik`) | the server entry (`@hypdriv/qwik/middleware/node\|vercel\|cloudflare` replace Qwik's `createQwikRouter`; `@hypdriv/qwik/adapters/node\|vercel\|cloudflare` are `viteAdapter` plugins; `createHandler`, `runner: 'host'`) |
 | Hono | none (no build step): `useHypDriv(app)` middleware or `wrapHono(app)` (`@hypdriv/hono`) | the app's own `fetch` (`createHandler`, `runner: 'host'`) |
+| Express 5 | none (no build step): `useHypDriv(app)` middleware (`@hypdriv/express`) | the Node response, captured and streamed (`createHandler`, `runner: 'host'`; `@hypdriv/runtime/node` bridges Node and Web requests and responses; ADR 0028) |
+| Fastify 5 | none (no build step): `app.register(hypdriv)` plugin (`@hypdriv/fastify`) | the `onRequest` and `onSend` hooks (`createHandler`, `runner: 'host'`; Node and Vercel only; ADR 0029) |
 
 **Prerendered pages.** The platform's static layer serves them (`HypRoute.servedStatically`): their posture is the static header rule (security preset, the document's hash CSP, Early Hints), and neither the build nor the runtime infers an edge-cache policy for them. To run the request stages (rate limits, bot shield, maintenance, flags) for them as well:
 
@@ -348,6 +350,8 @@ Every command accepts `--json` and `--root <dir>`.
 | `@hypdriv/vite`       | Node (plugin, toolkit, `/node` server) + Workers (`/worker`) + Vercel Routing Middleware (`/vercel-middleware`) | core, runtime, build, security, cloudflare |
 | `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`, `@hypdriv/waku`, `@hypdriv/rwsdk`, `@hypdriv/solid-start`, `@hypdriv/qwik` | framework integrations | vite, runtime, cloudflare |
 | `@hypdriv/hono` | Hono middleware and fetch wrapper, route manifest from `app.routes` | core, runtime |
+| `@hypdriv/express` | Node (Express middleware, response capture, route manifest from the router stack) | core, runtime |
+| `@hypdriv/fastify` | Node (Fastify plugin on the request lifecycle hooks, route manifest from `onRoute` and the router tree) | core, runtime |
 | `@hypdriv/cloudflare` | Workers                                               | core, runtime, cache, security, observe, flags, live, purser |
 | `@hypdriv/vercel`     | neutral (Vercel Functions, Routing Middleware)        | core, cache, security                               |
 | `@hypdriv/devtools`   | browser + neutral                                     | core                                                |
