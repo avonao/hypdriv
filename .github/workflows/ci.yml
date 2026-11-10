@@ -26,7 +26,8 @@ jobs:
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       # Source builds need a Node with native TypeScript config loading, so lint,
       # build and typecheck always run on the current Node. The matrix then runs
-      # the tests on every supported runtime against that build.
+      # the tests on every supported runtime against that build; the root
+      # vitest.config.ts leaves out packages whose engines.node excludes it.
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
