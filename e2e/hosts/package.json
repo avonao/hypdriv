@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Live checks for Hypdriv's Vite hosts: one runner that verifies a deployed example of any framework (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik, Nitro, Analog) on Cloudflare, Vercel or Node.",
+  "description": "Live checks for Hypdriv's Vite hosts: one runner that verifies a deployed example of any framework (plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik, Nitro, Analog) or server framework (Hono, Express, Fastify) on Cloudflare, Vercel or Node.",
   "scripts": {
     "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/check.ts",
     "provision": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/provision.ts",

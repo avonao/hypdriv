@@ -1,0 +1,65 @@
+{
+  "name": "@hypdriv/express",
+  "version": "0.1.0",
+  "description": "Hypdriv for Express 5 on Node, Vercel Functions and Cloudflare Workers (nodejs_compat): the Drivetrain (security headers, CSP with per-request nonces, rate limiting, bot shield, geo, flags, redirects, Early Hints, logging, Server-Timing, /_hypdriv/*) as Express middleware that streams the application's response through the pipeline, plus a route manifest read from the app's router stack.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://hypdriv.dev",
+  "bugs": "https://github.com/avonao/hypdriv/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/hypdriv.git",
+    "directory": "packages/express"
+  },
+  "keywords": [
+    "express",
+    "node",
+    "vercel",
+    "csp",
+    "security",
+    "rate-limiting",
+    "middleware",
+    "hypdriv"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*"
+  },
+  "peerDependencies": {
+    "express": ">=5.0.0 <6"
+  },
+  "devDependencies": {
+    "@types/compression": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "compression": "catalog:",
+    "express": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

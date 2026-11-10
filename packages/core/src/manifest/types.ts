@@ -30,7 +30,9 @@ export type FrameworkName =
   | 'solid-start'
   | 'qwik'
   | 'nitro'
-  | 'analog';
+  | 'analog'
+  | 'express'
+  | 'fastify';
 
 /** The framework (and bundler) that produced a build. */
 export interface ManifestFramework {
@@ -259,6 +261,8 @@ const FRAMEWORK_LABELS: Record<FrameworkName, string> = {
   qwik: 'Qwik',
   nitro: 'Nitro',
   analog: 'Analog',
+  express: 'Express',
+  fastify: 'Fastify',
 };
 
 /** The framework of a manifest (`{ name: 'next' }` for manifests written by the Next.js adapter). */

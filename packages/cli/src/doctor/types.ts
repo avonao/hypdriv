@@ -14,6 +14,8 @@ export type CheckCategory =
   | 'qwik'
   | 'nitro'
   | 'hono'
+  | 'express'
+  | 'fastify'
   | 'opennext'
   | 'wrangler'
   | 'vercel'
@@ -34,6 +36,8 @@ export const CHECK_CATEGORIES: CheckCategory[] = [
   'qwik',
   'nitro',
   'hono',
+  'express',
+  'fastify',
   'opennext',
   'wrangler',
   'vercel',
@@ -55,6 +59,8 @@ export const CATEGORY_TITLES: Record<CheckCategory, string> = {
   qwik: 'Qwik host',
   nitro: 'Nitro and Analog host',
   hono: 'Hono app',
+  express: 'Express app',
+  fastify: 'Fastify app',
   opennext: 'OpenNext',
   wrangler: 'Wrangler',
   vercel: 'Vercel',

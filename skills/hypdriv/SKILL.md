@@ -34,13 +34,15 @@ pnpm add hypdriv && npx hypdriv init [--platform vercel]
 5. adds scripts: `hypdriv:doctor`, `hypdriv:analyze`, `hypdriv:audit`,
 6. optionally scaffolds the Purser bridge when `@avonao/purser` is installed.
 
-For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext|waku|rwsdk|solid-start|qwik|nitro|analog|hono` (`--platform cloudflare|vercel|node`), and `hypdriv init` in an existing app detects the framework and:
+For a Vite framework, `create-hypdriv` takes `--framework vite|react-router|tanstack-start|astro|sveltekit|nuxt|vinext|waku|rwsdk|solid-start|qwik|nitro|analog|hono|express|fastify` (`--platform cloudflare|vercel|node`; Fastify: `vercel|node` only, its router needs `new Function()`, which Workers refuse), and `hypdriv init` in an existing app detects the framework and:
 1. writes `hypdriv.config.ts` and adds the framework package (`@hypdriv/vite`, `@hypdriv/react-router`, `@hypdriv/tanstack-start`, `@hypdriv/astro`, `@hypdriv/sveltekit`, `@hypdriv/nuxt`, `@hypdriv/vinext`, `@hypdriv/waku`, `@hypdriv/rwsdk`, `@hypdriv/solid-start`, `@hypdriv/qwik`, `@hypdriv/nitro` or `@hypdriv/analog`),
 2. registers the integration in the framework's config (Vite plugin, React Router preset, Astro integration, SvelteKit adapter wrapper, Nuxt module, Waku `withHypDriv()` config wrapper, RedwoodSDK `hypdriv()` Vite plugin, SolidStart `hypdriv()` Vite plugin and `hypdrivStart()`, Qwik `hypdriv()` plugin with a Hypdriv adapter and server entry, Nitro module or `nitro/vite` plugin, Analog `withHypDriv()` around the `analog()` options) and wires the request hook the framework owns (root `middleware`, `src/start.ts`, `handle`, `proxy.ts`; for RedwoodSDK `export default withHypDriv(defineApp([hypdrivMiddleware(), …]))` in the Worker entry, where `hypdrivMiddleware()` must stay first so RedwoodSDK renders with the CSP nonce, and Cloudflare is the only platform),
 3. on Cloudflare: writes the Worker entry and wrangler `main`, the assets binding and `run_worker_first` patterns (prerendered pages run the request stages through the Worker shell and are still served as built), plus the Durable Object exports; on Vercel the integration writes the Build Output with Hypdriv's Routing Middleware scoped to prerendered pages,
 4. prints the install commands for the framework's own adapter when one is missing.
 
-Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext,waku,rwsdk,solid-start,qwik,nitro,analog,hono}.md`.
+For a server framework without a build step (Hono, Express 5, Fastify 5), `hypdriv init` registers the request hook in the app's entry: `useHypDriv(app, { config })` right after `const app = new Hono()` / `const app = express()` (before the routes; for Express after `compression()`), or `app.register(hypdriv, { config })` right after `const app = Fastify()` (before `@fastify/compress`). On Cloudflare it writes the Worker entry (Express: `app.listen(8080)` plus `export default httpServerHandler({ port: 8080 })` from `cloudflare:node`) with the Durable Object exports and wrangler settings. On Vercel, relative imports in these apps need `.js` and a Fastify entry must call `app.listen()` without a top-level `await`. `hypdriv doctor` checks `hono.*`, `express.*` and `fastify.*`.
+
+Per-framework guides: `docs/guides/{vite,react-router,tanstack-start,astro,sveltekit,nuxt,vinext,waku,rwsdk,solid-start,qwik,nitro,analog,hono,express,fastify}.md`.
 
 Never hand-edit `.hypdriv/` — it is build output.
 

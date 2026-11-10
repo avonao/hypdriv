@@ -13,6 +13,8 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 | Cloudflare Workers (OpenNext, Worker shell, Durable Objects, handlers) | `@hypdriv/cloudflare` | Preview |
 | Vercel (CDN cache and purge, Upstash, Global Config, WAF, BotID, Queues) | `@hypdriv/vercel` | Preview |
 | Hono (a plain server framework, no build step) | `@hypdriv/hono` | Preview (verified locally on Node and workerd; live Cloudflare and Vercel runs pending) |
+| Express 5 (a Node server framework, no build step) | `@hypdriv/express` | Preview (verified locally on Node, workerd with the Durable Objects and a real `vercel build` with the function invoked in process; live Cloudflare and Vercel runs pending) |
+| Fastify 5 (a Node server framework, no build step; Node and Vercel only) | `@hypdriv/fastify` | Preview (verified locally on Node and a real `vercel build` with the function invoked in process; does not run on Cloudflare Workers; live Vercel run pending) |
 | Waku (React Server Components on Vite; 1.0 release candidates) | `@hypdriv/waku` | Preview (verified locally on Node, workerd and a real `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
 | RedwoodSDK (React Server Components on Vite and Cloudflare Workers) | `@hypdriv/rwsdk` | Preview (Cloudflare Workers only; verified locally with a real build in workerd and a browser run under the nonce CSP; live Cloudflare run pending) |
 | SolidStart 2 (Vite 8 and Nitro 3 deployment plugins) | `@hypdriv/solid-start` | Preview (verified locally on Node, workerd for the `@cloudflare/vite-plugin` and Nitro `cloudflare_module` builds, and a real offline `vercel build` with the Vercel routing emulated; live Cloudflare and Vercel runs pending) |
@@ -29,7 +31,7 @@ Hypdriv 0.1.0 is a Preview release. Every capability in [`feature-catalog.md`](f
 
 | Suite | Scope | Result |
 | --- | --- | --- |
-| Unit and integration (Vitest, Node and workerd) | 32 packages | 2,713 tests in 234 files pass on Node 22 (Node 24 and Node 20 were not re-run for this count; the previous 2,472 tests in 216 files also passed on Node 24, and Node 20 ran the same suite except the vinext build test, which needs Node 22+) |
+| Unit and integration (Vitest, Node and workerd) | 34 packages | 2,939 tests in 241 files pass on Node 22 (Node 24 and Node 20 were not re-run for this count; the previous 2,472 tests in 216 files also passed on Node 24, and Node 20 ran the same suite except the vinext build test, which needs Node 22+) |
 | Lint, typecheck, build, `publint` | all packages | pass |
 | `e2e/cloudflare` | every capability on Cloudflare Workers | 41 pass · 0 fail · 2 skipped (inbound email, Turnstile pass flow) |
 | `e2e/vercel` | every capability that applies on Vercel | 39 pass · 0 fail · 2 skipped (103 Early Hints are not available on Vercel, Turnstile pass flow) |

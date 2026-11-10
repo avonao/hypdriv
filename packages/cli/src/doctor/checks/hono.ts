@@ -6,8 +6,24 @@ const REGISTRATION =
   "useHypDriv(app, { config }) from '@hypdriv/hono' (or `export default wrapHono(app, { config })`)";
 
 /**
- * The source with comments removed and the inside of string and template literals blanked (same length, so indices
- * hold). Returns `null` when a literal or comment is left open, i.e. the source is not something to reason about.
+ * Whether a `/` that follows `before` (the masked source so far) starts a regular expression literal rather than a
+ * division: it does after an operator, an opening bracket, a separator, the start of the source or a keyword that
+ * takes an expression (`return /x/`), and not after a value (`a / b`, `f() / 2`, `x[0] / y`).
+ */
+function regexAllowed(before: string): boolean {
+  const tail = before.replace(/\s+$/, '');
+  if (!tail) return true;
+  const last = tail[tail.length - 1] as string;
+  if ('(,=:[!&|?{};+-*%<>~^'.includes(last)) return true;
+  return /(?:^|[^\w$])(?:return|typeof|case|do|else|in|of|void|yield|await|delete|new|throw|instanceof)$/.test(
+    tail,
+  );
+}
+
+/**
+ * The source with comments removed and the inside of string, template and regular expression literals blanked (same
+ * length, so indices hold). Returns `null` when a literal or comment is left open, i.e. the source is not something
+ * to reason about.
  */
 export function maskSource(source: string): string | null {
   let out = '';
@@ -25,6 +41,24 @@ export function maskSource(source: string): string | null {
       if (close === -1) return null;
       out += source.slice(i, close + 2).replace(/[^\n]/g, ' ');
       i = close + 2;
+    } else if (c === '/' && regexAllowed(out)) {
+      // A regular expression literal (`/["']/g`): its quotes are not strings. Masked like a literal, flags kept.
+      let j = i + 1;
+      let inClass = false;
+      for (; j < source.length; j++) {
+        const d = source[j] as string;
+        if (d === '\n') return null;
+        if (d === '\\') {
+          j += 1;
+          continue;
+        }
+        if (d === '[') inClass = true;
+        else if (d === ']') inClass = false;
+        else if (d === '/' && !inClass) break;
+      }
+      if (j >= source.length) return null;
+      out += `/${'_'.repeat(j - i - 1)}/`;
+      i = j + 1;
     } else if (c === "'" || c === '"' || c === '`') {
       out += c;
       i += 1;

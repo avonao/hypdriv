@@ -1,6 +1,6 @@
 # create-hypdriv
 
-Scaffold a production-ready application with [Hypdriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), or a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik, Nitro or Analog — on **Cloudflare Workers**, **Vercel** or **Node** (RedwoodSDK on Workers only).
+Scaffold a production-ready application with [Hypdriv](https://github.com/avonao/hypdriv): Next.js 16 on **Cloudflare Workers** (OpenNext) or **Vercel**, optionally styled with [Purser CSS](https://github.com/avonao/purser), a Vite framework — plain Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Waku, RedwoodSDK, SolidStart, Qwik, Nitro or Analog — or a server framework — Hono, Express or Fastify — on **Cloudflare Workers**, **Vercel** or **Node** (RedwoodSDK on Workers only, Fastify on Vercel and Node only).
 
 > **Preview install.** The 0.1.0 packages are not on a package registry. Run the scaffolder from a release bundle or a source build with `--no-install` (`node dist/index.js my-app --no-install`), then run the bundle's `install.sh my-app`. The commands below show the registry form that applies once the packages are published.
 
@@ -19,8 +19,8 @@ Without options on a terminal, it asks for the directory, the framework, the pla
 | Option | Default | Description |
 | --- | --- | --- |
 | `[directory]` | `hypdriv-app` | Target directory; must be empty or missing. |
-| `--framework <name>` | `next` | `next`, `vite`, `react-router`, `tanstack-start`, `astro`, `sveltekit`, `nuxt`, `vinext`, `waku`, `rwsdk`, `solid-start`, `qwik`, `nitro`, `analog` or `hono`. |
-| `--platform <cloudflare\|vercel\|node>` | `cloudflare` | Deploy target (`node` for Vite frameworks). |
+| `--framework <name>` | `next` | `next`, `vite`, `react-router`, `tanstack-start`, `astro`, `sveltekit`, `nuxt`, `vinext`, `waku`, `rwsdk`, `solid-start`, `qwik`, `nitro`, `analog`, `hono`, `express` or `fastify`. |
+| `--platform <cloudflare\|vercel\|node>` | `cloudflare` (`node` for Fastify) | Deploy target. Fastify runs on Vercel and Node only: its router compiles handlers with `new Function()`, which Workers refuse. |
 | `--purser` | off | Next.js: Purser CSS — zero-override atomic CSS, the unstyled-atom build guard, flashless themes. |
 | `--pm <pnpm\|npm\|yarn\|bun>` | the package manager running it | Used to install and in the printed commands. |
 | `--name <package-name>` | from the directory | `package.json` name; Workers names are derived from it. |
@@ -52,8 +52,11 @@ Every template is one of the repository's example apps, built and audited end to
 | `qwik` | `examples/qwik` | Qwik v2 with Qwik Router: Vite plugin, Hypdriv adapters and server entries for Workers, Vercel and Node, prerendered and dynamic pages, endpoint |
 | `nitro` | `examples/nitro` | A Nitro 2 server (`nitropack`): the `hypdrivNitro()` module, prerendered and server-rendered pages, API routes, Worker entry around Nitro (Nitro 3 on Vite: `examples/nitro-vite`) |
 | `analog` | `examples/analog` | Analog 2 (Angular on Vite and Nitro): `withHypDriv()` around `analog()`, `provideHypDriv()` and `injectHyp()`, prerendered and server-rendered routes, Nitro API routes |
+| `hono` | `examples/hono` | Hono with `useHypDriv()`: one app on Workers (with the Durable Objects), Vercel Functions and Node (`@hono/node-server`) |
+| `express` | `examples/express` | Express 5 with `useHypDriv()`: the app module for Vercel, `compression()` and `express.static` around it on Node, `httpServerHandler()` on Workers with the Durable Objects; streaming, a content-hashed asset |
+| `fastify` | `examples/fastify` | Fastify 5 with the `hypdriv` plugin and `@fastify/compress` after it: one `src/server.ts` for Node and Vercel (zero-config Fastify), `@fastify/static` for `public/`, streaming |
 
-Vite framework templates build for every platform (`build:cloudflare`, `build:vercel`, `build:node`); `--platform` picks the local secrets file (`.dev.vars` for Workers, `.env.local` otherwise) and the printed next steps. The RedwoodSDK template builds for Workers only (`build:cloudflare`; `--platform vercel|node` is refused).
+Vite framework templates build for every platform (`build:cloudflare`, `build:vercel`, `build:node`); `--platform` picks the local secrets file (`.dev.vars` for Workers, `.env.local` otherwise) and the printed next steps. The RedwoodSDK template builds for Workers only (`build:cloudflare`; `--platform vercel|node` is refused). The server framework templates (Hono, Express, Fastify) have no build step: they run as they are (`dev`, `start`, `wrangler deploy`, `vercel deploy`); the Fastify template refuses `--platform cloudflare`.
 
 The scaffolder also:
 

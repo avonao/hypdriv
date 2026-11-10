@@ -1,0 +1,31 @@
+{
+  "name": "@hypdriv/example-express",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:cloudflare": "wrangler dev",
+    "start": "tsx src/server.ts",
+    "deploy:cloudflare": "wrangler deploy",
+    "hypdriv:audit": "hypdriv audit all --url http://localhost:3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hypdriv/cloudflare": "workspace:*",
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/express": "workspace:*",
+    "compression": "catalog:",
+    "express": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@hypdriv/cli": "workspace:*",
+    "@types/compression": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

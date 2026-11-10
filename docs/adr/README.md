@@ -29,3 +29,5 @@
 | [0025](0025-rwsdk-host.md)             | RedwoodSDK: a Worker-entry wrapper for a Vite RSC framework on Workers           | accepted |
 | [0026](0026-portable-image-engine.md)  | Placeholders have a portable engine: built-in decoders, optional WASM codecs    | accepted |
 | [0027](0027-nitro-and-analog-hosts.md) | Nitro and Analog: one shared Nitro layer (Nitro 2 and 3), one Angular host      | accepted |
+| [0028](0028-express-host.md)           | Express: a Node response bridge for a callback middleware framework             | accepted |
+| [0029](0029-fastify-host.md)           | Fastify: lifecycle hooks around a plugin framework, Node and Vercel only        | accepted |

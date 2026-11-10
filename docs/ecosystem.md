@@ -30,10 +30,10 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | **Touches your source** | Through the framework's documented extension points | Reads it statically, writes one stylesheet | Never: works on a copy |
 | **Output** | Responses with cache, CSP, security headers, rate limits, traces; `.hypdriv/manifest.json` | One generated stylesheet in cascade layers, class names | A hashed copy of the site, `squawkcode-map.json`, a pass or fail with every differing element |
 | **Command** | `hypdriv` (17 commands) | `purser` (`build`, `check`) | `squawkcode` (`init`, `transform`, `compare`, `gate`) |
-| **Package** | `hypdriv`, `@hypdriv/*` (32 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
+| **Package** | `hypdriv`, `@hypdriv/*` (34 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
 | **Node.js** | 20.9+ (some framework packages need 22+) | 22+ | 22+ |
 | **Runtime dependencies** | Platform services optional | None | None |
-| **Tests** | 2,713 in 234 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
+| **Tests** | 2,939 in 241 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
 | **Repository** | [avonao/hypdriv](https://github.com/avonao/hypdriv) | [avonao/purser](https://github.com/avonao/purser) | [avonao/squawkcode](https://github.com/avonao/squawkcode) |
 | **Homepage** | | [pursercss.dev](https://pursercss.dev) | |
 | **Status** | 0.1.0 Preview | 0.1.0 Preview | 0.1.0 Preview |
@@ -348,7 +348,7 @@ For a deployment, run the same `hypdriv audit` commands against the deployed URL
 | Version | 0.1.0 | 0.1.0 | 0.1.0 |
 | Node.js | 20.9+ (Vite 20.19+; Astro, TanStack Start 22.12+; SvelteKit 22.17+; React Router 22.22+; vinext 22+; Waku 22.15+; RedwoodSDK 22.12+; SolidStart 22.12+; Qwik 20.19+; Nitro and Analog 20.19+) | 22+ | 22+ |
 | TypeScript | 5.9 to 7 in host apps; 5.x or 6.x when Purser is used | 5.0+ in the project (5.x or 6.x: needs the programmatic API) | 5+ in the project being processed |
-| Frameworks | Next.js 16+, Vite 8, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku 1, RedwoodSDK 1, SolidStart 2, Qwik 2, Nitro 2 and 3, Analog 2 | None (works with any framework that imports a CSS file and accepts a `className` string); guide for Next.js 16 | Any site with a build command and a serve command; verified on Next.js 16 |
+| Frameworks | Next.js 16+, Vite 8, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku 1, RedwoodSDK 1, SolidStart 2, Qwik 2, Nitro 2 and 3, Analog 2, Hono 4, Express 5, Fastify 5 | None (works with any framework that imports a CSS file and accepts a `className` string); guide for Next.js 16 | Any site with a build command and a serve command; verified on Next.js 16 |
 | Platforms | Cloudflare Workers, Vercel, Node | Wherever the CSS file is served | Local (build, serve and compare happen on your machine or CI) |
 | Browsers or tools | Headless Chrome for `audit css` | Chrome 111+, Edge 111+, Firefox 113+, Safari 15.4+ for the output | Chrome or Chromium for the comparison |
 | Cross-product contract | Uses `@avonao/purser` 0.1+ through `@avonao/purser/build` and `scripts/strike-count.js` | Public build API and the strike-count script are what Hypdriv consumes | None required |
