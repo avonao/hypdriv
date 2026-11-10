@@ -13,7 +13,7 @@
  * registerVercelSdk({ checkRateLimit, checkBotId, queue: { send, sendBatch, handleCallback } });
  * ```
  *
- * The signatures below mirror `@vercel/firewall` 1.2, `botid` 1.5 and `@vercel/queue` 0.10.
+ * The signatures below mirror `@vercel/firewall` 1.2, `botid` 1.5 and `@vercel/queue` 0.11.
  */
 
 /** Options of `checkRateLimit` from `@vercel/firewall`. */

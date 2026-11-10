@@ -89,7 +89,7 @@ catalog:
   "@vercel/nft": ^1.11.1
   # SolidStart 2 (Vite 8 + Nitro 3 or @cloudflare/vite-plugin; @hypdriv/solid-start)
   "@solidjs/start": 2.2.2
-  "@solidjs/router": ^0.16.3
+  "@solidjs/router": ^1.0.1
   solid-js: ^1.9.18
   # Nuxt (Nuxt 4.6 runs on Nitro 2 / h3 1.x)
   nuxt: ^4.6.4

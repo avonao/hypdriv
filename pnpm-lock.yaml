@@ -267,8 +267,8 @@ catalogs:
       specifier: ^8.5.1
       version: 8.5.1
     '@solidjs/router':
-      specifier: ^0.16.3
-      version: 0.16.3
+      specifier: ^1.0.1
+      version: 1.0.1
     '@solidjs/start':
       specifier: 2.2.2
       version: 2.2.2
@@ -533,8 +533,8 @@ importers:
         specifier: ^1.2.6
         version: 1.2.6
       '@vercel/queue':
-        specifier: ^0.10.0
-        version: 0.10.0
+        specifier: ^0.11.0
+        version: 0.11.0
       botid:
         specifier: ^1.5.13
         version: 1.5.13(next@16.4.6(@babel/core@8.0.5)(@types/node@26.6.6)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(sass@1.104.1))(react@19.3.1)
@@ -1090,10 +1090,10 @@ importers:
         version: link:../../packages/solid-start
       '@solidjs/router':
         specifier: 'catalog:'
-        version: 0.16.3(solid-js@1.9.18)
+        version: 1.0.1(solid-js@1.9.18)
       '@solidjs/start':
         specifier: 'catalog:'
-        version: 2.2.2(@solidjs/router@0.16.3(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 2.2.2(@solidjs/router@1.0.1(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
       solid-js:
         specifier: 'catalog:'
         version: 1.9.18
@@ -1236,8 +1236,8 @@ importers:
   examples/vercel:
     dependencies:
       '@vercel/queue':
-        specifier: ^0.10.0
-        version: 0.10.0
+        specifier: ^0.11.0
+        version: 0.11.0
       hypdriv:
         specifier: workspace:*
         version: link:../../packages/hypdriv
@@ -2543,10 +2543,10 @@ importers:
     devDependencies:
       '@solidjs/router':
         specifier: 'catalog:'
-        version: 0.16.3(solid-js@1.9.18)
+        version: 1.0.1(solid-js@1.9.18)
       '@solidjs/start':
         specifier: 'catalog:'
-        version: 2.2.2(@solidjs/router@0.16.3(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 2.2.2(@solidjs/router@1.0.1(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -6516,8 +6516,8 @@ packages:
     peerDependencies:
       solid-js: ^1.8.4
 
-  '@solidjs/router@0.16.3':
-    resolution: {integrity: sha512-WWQkmSmSpl+15HgUktGPbeXkgWmonj4XwPOcZVHJz1EQV3dz5qWHIyQ/BKXFevor6u/0dKvC9FlUmKmDwE1QHw==}
+  '@solidjs/router@1.0.1':
+    resolution: {integrity: sha512-JxY0+Y8RMZZjk3pATfY5f9ANbFa26+aOf3X7KtpRC9yCuy7f2UWDL8ukx6pVot2OYOJyUfTH7LYG2bbMPZ3WDw==}
     peerDependencies:
       solid-js: ^1.8.6
 
@@ -7003,8 +7003,8 @@ packages:
     resolution: {integrity: sha512-8wcmhuhrEsQlgTvPfRIeE4Y2geSaid0a1DP+um1PfNK4ETjqnfGTL5k5l7vS2T8A2gOx/MV7yNGxUJTs+0tqPQ==}
     engines: {node: '>= 20'}
 
-  '@vercel/queue@0.10.0':
-    resolution: {integrity: sha512-GKrt5p+D/drm5bkDr8j2EqEkYs29AMLAtun18iXA4PLorVzaHk39YorQ8TdCCeN9H5CDQV4ElMnfxDrbxou8Aw==}
+  '@vercel/queue@0.11.0':
+    resolution: {integrity: sha512-kdf7oOrVphPW2+eNk7KdwkjNnnWPR0/N/Ih4OvUG3/ocDWp7OwpraaW6uFhitVEQehpSt+iJsjOaZ2pH3DqbqQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@opentelemetry/api': ^1.0.0
@@ -15791,11 +15791,11 @@ snapshots:
     dependencies:
       solid-js: 1.9.18
 
-  '@solidjs/router@0.16.3(solid-js@1.9.18)':
+  '@solidjs/router@1.0.1(solid-js@1.9.18)':
     dependencies:
       solid-js: 1.9.18
 
-  '@solidjs/start@2.2.2(@solidjs/router@0.16.3(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))':
+  '@solidjs/start@2.2.2(@solidjs/router@1.0.1(solid-js@1.9.18))(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
       '@babel/core': 7.29.13(supports-color@10.2.2)
       '@babel/traverse': 7.29.13(supports-color@10.2.2)
@@ -15824,7 +15824,7 @@ snapshots:
       vite: 8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1)
       vite-plugin-solid: 2.11.15(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
     optionalDependencies:
-      '@solidjs/router': 0.16.3(solid-js@1.9.18)
+      '@solidjs/router': 1.0.1(solid-js@1.9.18)
     transitivePeerDependencies:
       - '@testing-library/jest-dom'
       - crossws
@@ -16424,7 +16424,7 @@ snapshots:
       '@vercel/cli-exec': 1.0.1
       jose: 5.10.0
 
-  '@vercel/queue@0.10.0':
+  '@vercel/queue@0.11.0':
     dependencies:
       '@vercel/oidc': 3.8.10
       minimatch: 11.0.5

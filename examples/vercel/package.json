@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vercel/queue": "^0.10.0",
+    "@vercel/queue": "^0.11.0",
     "hypdriv": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
