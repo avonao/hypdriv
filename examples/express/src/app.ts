@@ -1,25 +1,20 @@
-import { fileURLToPath } from 'node:url';
 import { flag, geo, hyp, nonce, useHypDriv } from '@hypdriv/express';
-import compression from 'compression';
 import express from 'express';
-import config from '../hypdriv.config';
-import { stylesheet } from './assets';
+import config from '../hypdriv.config.js';
+import { stylesheet } from './assets.js';
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** The app behind Hypdriv: this module runs on Node (`src/server.ts`) and as a Vercel Function (`export default`). */
+/**
+ * The app behind Hypdriv. One module for every platform: Node (`src/server.ts` adds compression and static files),
+ * a Vercel Function (`export default`) and a Cloudflare Worker (`src/worker.ts`).
+ */
 const app = express();
 
-// Compression first: it then compresses the finished response (with the CSP nonce already in the HTML).
-app.use(compression());
-
 // Hypdriv's request stages around everything below: security headers, the CSP nonce, rate limits (`/api/**`),
-// the bot shield, Early Hints, logs and `/_hypdriv/*`. Register it before the routes, routers and static files:
-// Express runs middleware in registration order.
+// the bot shield, Early Hints, logs and `/_hypdriv/*`. Register it before the routes and routers: Express runs
+// middleware in registration order.
 useHypDriv(app, { config });
-
-// Static files (Node: Vercel serves `public/**` from its CDN and ignores express.static).
-app.use(express.static(fileURLToPath(new URL('../public', import.meta.url)), { maxAge: '1h' }));
 
 // A content-hashed asset: its URL changes with its content, so it is cached for a year.
 app.get(stylesheet.path, (_req, res) => {
