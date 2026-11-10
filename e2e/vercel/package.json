@@ -14,7 +14,7 @@
   "dependencies": {
     "@vercel/firewall": "^1.2.6",
     "@vercel/queue": "^0.10.0",
-    "botid": "^1.5.12",
+    "botid": "^1.5.13",
     "hypdriv": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
