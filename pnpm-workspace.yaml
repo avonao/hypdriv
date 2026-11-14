@@ -55,7 +55,7 @@ catalog:
   "@vitejs/plugin-react": ^6.1.2
   babel-plugin-react-compiler: ^1.0.0
   # Astro host (@hypdriv/astro)
-  astro: ^7.4.4
+  astro: ^7.4.7
   "@astrojs/cloudflare": ^14.4.3
   "@astrojs/node": ^11.1.9
   "@astrojs/vercel": ^11.0.17
