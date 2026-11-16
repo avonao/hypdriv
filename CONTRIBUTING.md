@@ -19,7 +19,7 @@ pnpm typecheck      # tsc --noEmit per package
 pnpm lint           # biome
 ```
 
-Node 20.9+ and pnpm 10+ are required (`corepack enable` picks the pinned pnpm).
+Node 20.9+ and pnpm 10+ are required (`corepack enable` picks the pinned pnpm). Building from source and the host packages that declare `engines.node >= 22` need Node 22 or later: `pnpm test` on an older Node leaves those packages out and lists them (`HYPDRIV_TEST_ALL_ENGINES=1` runs them anyway).
 
 Workspace packages resolve each other through the `source` export condition, so tests and type checks run against `src/` without a prior build. Published consumers get `dist/`.
 
