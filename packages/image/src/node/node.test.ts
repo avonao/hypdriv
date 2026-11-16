@@ -1,4 +1,5 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -658,5 +659,46 @@ describe('@jsquash WebAssembly codecs', () => {
     // a decoded placeholder is the picture, only smaller: the red ramp of the source scene survives
     const hero = await codecs.decodeWebp!(Buffer.from(file.placeholders['/a.jpg']!.split(',')[1]!, 'base64'));
     expect(hero.data[0]!).toBeLessThan(hero.data[(hero.width - 1) * 4]!);
+  });
+
+  it("encodes WebP without jSquash's encode.js (wasm-feature-detect 1.10 does not parse before Node 24)", async () => {
+    // the project's own @jsquash/webp: a copy of the real one whose encode.js cannot be loaded, the way
+    // `import.source(…)` in wasm-feature-detect 1.10 breaks it on Node 20 and 22
+    const real = dirname(createRequire(import.meta.url).resolve('@jsquash/webp/package.json'));
+    const copy = join(root, 'node_modules', '@jsquash', 'webp');
+    await cp(real, copy, { recursive: true, dereference: true });
+    await writeFile(join(copy, 'encode.js'), 'throw new SyntaxError("Unexpected identifier \'source\'");\n');
+    const codecs = await loadWasmCodecs(root);
+    expect(codecs.problems).toEqual({});
+    const image = { data: new Uint8ClampedArray(8 * 8 * 4).fill(200), width: 8, height: 8 };
+    const webp = await codecs.encodeWebp!(image, 50);
+    expect(Buffer.from(webp.subarray(0, 4)).toString('latin1')).toBe('RIFF');
+    expect(Buffer.from(webp.subarray(8, 12)).toString('latin1')).toBe('WEBP');
+    const decoded = await codecs.decodeWebp!(webp);
+    expect([decoded.width, decoded.height]).toEqual([8, 8]);
+    // every call returns its own bytes, never a view of WebAssembly memory that the next call overwrites
+    const second = await codecs.encodeWebp!(
+      { ...image, data: new Uint8ClampedArray(8 * 8 * 4).fill(10) },
+      50,
+    );
+    expect(Buffer.compare(Buffer.from(webp), Buffer.from(second))).not.toBe(0);
+    expect(webp.byteLength).toBe(webp.buffer.byteLength);
+  });
+
+  it('reports why the encoder is unavailable when the WebAssembly module does not load', async () => {
+    const real = dirname(createRequire(import.meta.url).resolve('@jsquash/webp/package.json'));
+    const copy = join(root, 'node_modules', '@jsquash', 'webp');
+    await cp(real, copy, { recursive: true, dereference: true });
+    for (const variant of ['webp_enc_simd.wasm', 'webp_enc.wasm']) {
+      await writeFile(
+        join(copy, 'codec', 'enc', variant),
+        new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 255]),
+      );
+    }
+    const codecs = await loadWasmCodecs(root);
+    expect(codecs.encodeWebp).toBeNull();
+    expect(codecs.problems['@jsquash/webp (encoder)']).toMatch(/\S/);
+    // the decoder has its own module and still works
+    expect(codecs.decodeWebp).toBeTypeOf('function');
   });
 });
