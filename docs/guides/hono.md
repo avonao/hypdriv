@@ -43,7 +43,7 @@ Both forms produce the same response for the pipeline-managed headers (tested). 
 | Platform | Entry | Notes |
 | --- | --- | --- |
 | Cloudflare Workers | `export default app` (or the wrapper) plus `export { HypDrivChannel, HypDrivIndex, HypDrivLimiter } from '@hypdriv/cloudflare/durable-objects'` | Bindings come from `c.env`, `waitUntil` from `c.executionCtx`. Durable Objects give exact rate limits, tag purges and live channels; without them the memory/Cache API tier applies. `compatibility_flags: ["nodejs_compat"]`. |
-| Vercel | `export default app` from `src/index.ts` (zero-config Hono) | The Vercel stage applies page cache policies; `waitUntil` comes from Vercel's request context. |
+| Vercel | `export default app` from `src/index.ts` (zero-config Hono) | The Vercel stage applies page cache policies; `waitUntil` comes from Vercel's request context. Vercel compiles each file to ESM without rewriting import specifiers, so relative imports need `.js` (`./app.js`, `../hypdriv.config.js`); TypeScript, tsx and Wrangler resolve them to the `.ts`/`.tsx` files. |
 | Node | `serve({ fetch: app.fetch })` from `@hono/node-server` | The socket address is the client IP unless `security.trustedProxies` says the server sits behind proxies (then the forwarded headers decide). |
 | Bun, Deno | `Bun.serve({ fetch })`, `Deno.serve(handler)` | Forwarded headers decide the client IP; set `security.trustedProxies` to match your proxy chain. |
 
