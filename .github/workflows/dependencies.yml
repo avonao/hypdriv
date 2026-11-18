@@ -25,6 +25,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build the hypdriv CLI
+        run: pnpm -F @hypdriv/cli... build
       - name: Report outdated dependencies
         id: report
         run: |
