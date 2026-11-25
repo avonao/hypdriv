@@ -46,10 +46,14 @@ export {
   createPurserBridge,
   formatPurserDiagnostic,
   loadPurserBuildModule,
+  PURSER_LOADER,
   type PurserBridge,
   type PurserBridgeOptions,
+  type PurserCompile,
   type PurserDevDiagnostics,
   purserBuildOptions,
+  purserLoaderOptions,
+  purserTwoOptions,
   type StylesheetInfo,
   type WatchOptions,
 } from './bridge';
@@ -63,6 +67,7 @@ export {
   resolvePackageJson,
   TOKENS_FILE_CANDIDATES,
   TYPESCRIPT6_ALIAS_HINT,
+  versionAtLeast,
 } from './detect';
 export {
   type CollectPrerenderedOptions,

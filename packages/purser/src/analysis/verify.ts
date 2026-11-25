@@ -1,17 +1,21 @@
 import { extractHtmlClasses } from './html';
-import { extractAtomClasses } from './stylesheet';
+import { type AtomNamingInput, atomNamesAreDistinct, extractAtomClasses } from './stylesheet';
 
 export interface VerifyAtomsInput {
   /** Route id (or pathname) → prerendered HTML / RSC payload text. */
   html: Record<string, string>;
   /** The generated Purser stylesheet. */
   css: string;
-  /** Class prefix (`config.purser.prefix`, default `x`). */
-  prefix: string;
+  /** Class prefix (`config.purser.prefix`, default `x`), or the whole naming (prefix, names, atoms layer). */
+  prefix: AtomNamingInput;
 }
 
 export interface VerifyAtomsResult {
-  /** Route → classes referenced by the document but absent from the stylesheet. Only routes with problems. */
+  /**
+   * Route → classes referenced by the document but absent from the stylesheet. Only routes with problems.
+   * Always empty when Purser's classes cannot be told from other classes by name (short names, minimal
+   * names without a prefix): a class the stylesheet lacks could be anyone's.
+   */
   missing: Record<string, string[]>;
   /** Route → declared atoms the document references (sorted). Every input route is present. */
   used: Record<string, string[]>;
@@ -32,11 +36,12 @@ export function verifyAtoms(input: VerifyAtomsInput): VerifyAtomsResult {
 export function verifyAtomsAgainst(
   declared: ReadonlySet<string>,
   html: Record<string, string>,
-  prefix: string,
+  prefix: AtomNamingInput,
 ): VerifyAtomsResult {
   const missing: Record<string, string[]> = {};
   const used: Record<string, string[]> = {};
   const referenced = new Set<string>();
+  const distinct = atomNamesAreDistinct(prefix);
   for (const route of Object.keys(html).sort()) {
     const classes = extractHtmlClasses(html[route] ?? '', prefix);
     const routeUsed: string[] = [];
@@ -44,7 +49,7 @@ export function verifyAtomsAgainst(
     for (const cls of classes) {
       referenced.add(cls);
       if (declared.has(cls)) routeUsed.push(cls);
-      else routeMissing.push(cls);
+      else if (distinct) routeMissing.push(cls);
     }
     used[route] = routeUsed.sort();
     if (routeMissing.length) missing[route] = routeMissing.sort();

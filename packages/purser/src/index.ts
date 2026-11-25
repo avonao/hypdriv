@@ -7,8 +7,12 @@
 
 export { extractHtmlClasses } from './analysis/html';
 export {
+  type AtomNaming,
+  type AtomNamingInput,
   analyzeStylesheet,
   atomClassPattern,
+  atomNamesAreDistinct,
+  atomNaming,
   extractAtomClasses,
   extractLayerStatement,
   isPurserStylesheet,

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { PurserManifest, ResolvedPurser } from '@hypdriv/core';
 import { sha256Hex } from '@hypdriv/core';
-import { analyzeStylesheet } from '../analysis/stylesheet';
+import { analyzeStylesheet, atomNaming } from '../analysis/stylesheet';
 import { verifyAtomsAgainst } from '../analysis/verify';
 import { buildThemeScript, themeScriptHash } from '../theme/script';
 
@@ -102,7 +102,8 @@ export async function verifyBuild(options: VerifyBuildOptions): Promise<VerifyBu
   }
 
   const css = await readFile(stylesheetFile, 'utf8');
-  const analysis = analyzeStylesheet(css, config.prefix);
+  const naming = atomNaming(config);
+  const analysis = analyzeStylesheet(css, naming);
   manifest.stylesheetHash = (await sha256Hex(css)).slice(0, 16);
   manifest.atoms = analysis.atoms.size;
   if (analysis.layerStatement && analysis.layerStatement.length === 3) {
@@ -118,7 +119,7 @@ export async function verifyBuild(options: VerifyBuildOptions): Promise<VerifyBu
     }
   }
 
-  const result = verifyAtomsAgainst(analysis.atoms, html, config.prefix);
+  const result = verifyAtomsAgainst(analysis.atoms, html, naming);
   manifest.missingAtoms = result.missing;
   if (config.usageReport) {
     manifest.atomsByRoute = result.used;

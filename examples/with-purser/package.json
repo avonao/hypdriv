@@ -27,7 +27,7 @@
     "react-dom": "catalog:"
   },
   "optionalDependencies": {
-    "@avonao/purser": "^0.1.0"
+    "@avonao/purser": "^0.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

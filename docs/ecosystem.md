@@ -2,7 +2,7 @@
 
 Hypdriv has two sister products from Avonao. [Purser CSS](https://github.com/avonao/purser) changes how a site is styled. [SquawkCode](https://github.com/avonao/squawkcode) proves that a change to the CSS did not change how the site looks. Hypdriv serves, protects and observes the result. Each one works on its own. Together they cover the life of a stylesheet from the first line of component code to the audit of the live deployment.
 
-All three are 0.1.0 Preview releases under the MIT license, distributed as source and tarballs, and none of them requires the others.
+All three are Preview releases (Hypdriv 0.1.0, Purser 0.2.0, SquawkCode 0.2.0) under the MIT license, distributed as source and tarballs, and none of them requires the others.
 
 ## Contents
 
@@ -24,19 +24,19 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 
 | | **Hypdriv** | **Purser CSS** | **SquawkCode** |
 | --- | --- | --- | --- |
-| **What it is** | A sidecar for performance, security and observability | A compiler for atomic CSS in which overrides cannot happen | A proof tool for CSS changes: class-name hashing plus a computed-style comparison |
+| **What it is** | A sidecar for performance, security and observability | A compiler for atomic CSS in which overrides cannot happen | A proof tool for CSS changes: class renaming plus a computed-style comparison |
 | **One-line promise** | The same Drivetrain pipeline in front of Next.js and Vite hosts on Cloudflare Workers, Vercel and Node | No overridden declaration, no `!important`, no raw color, ever | Not one computed style changed, proven in headless Chrome |
-| **Runs when** | At build time (manifest, CSP hashes) and on every request | At build time; the runtime only joins class names | Before deploy, on a copy of the site |
+| **Runs when** | At build time (manifest, CSP hashes) and on every request | At build time. With its compiler the browser runs no style code; without it the runtime only joins class names | Before deploy, on a copy of the site |
 | **Touches your source** | Through the framework's documented extension points | Reads it statically, writes one stylesheet | Never: works on a copy |
-| **Output** | Responses with cache, CSP, security headers, rate limits, traces; `.hypdriv/manifest.json` | One generated stylesheet in cascade layers, class names | A hashed copy of the site, `squawkcode-map.json`, a pass or fail with every differing element |
-| **Command** | `hypdriv` (17 commands) | `purser` (`build`, `check`) | `squawkcode` (`init`, `transform`, `compare`, `gate`) |
-| **Package** | `hypdriv`, `@hypdriv/*` (34 packages) | `@avonao/purser` (one package, three entry points) | `squawkcode` (one package, no build step) |
+| **Output** | Responses with cache, CSP, security headers, rate limits, traces; `.hypdriv/manifest.json` | One generated stylesheet in cascade layers, class names | A renamed copy of the site, `squawkcode-map.json`, a pass or fail with every differing element |
+| **Command** | `hypdriv` (17 commands) | `purser` (`build`, `check`) | `squawkcode` (`init`, `transform`, `compare`, `gate`, `explain`) |
+| **Package** | `hypdriv`, `@hypdriv/*` (34 packages) | `@avonao/purser` (one package: the runtime, the build, the compiler and bundler plugins) | `squawkcode` (one package, no build step) |
 | **Node.js** | 20.9+ (some framework packages need 22+) | 22+ | 22+ |
-| **Runtime dependencies** | Platform services optional | None | None |
-| **Tests** | 2,939 in 241 files | 88 in 14 files, including headless Chrome | 12 in 2 files |
+| **Runtime dependencies** | Platform services optional | None in the browser; `typescript` for the build | None in the site; `postcss` and `typescript` for the tool |
+| **Tests** | 2,956 in 241 files | 160 in 21 files, including headless Chrome | 29 in 4 files, including headless Chrome |
 | **Repository** | [avonao/hypdriv](https://github.com/avonao/hypdriv) | [avonao/purser](https://github.com/avonao/purser) | [avonao/squawkcode](https://github.com/avonao/squawkcode) |
 | **Homepage** | | [pursercss.dev](https://pursercss.dev) | |
-| **Status** | 0.1.0 Preview | 0.1.0 Preview | 0.1.0 Preview |
+| **Status** | 0.1.0 Preview | 0.2.0 Preview | 0.2.0 Preview |
 | **License** | MIT | MIT | MIT |
 
 ## How the three work together
@@ -71,7 +71,7 @@ flowchart LR
 | Write | **Purser** | Styles sit next to components. Values are static. Colors are tokens. | Type errors for raw colors and unsafe shorthands |
 | Compile | **Purser** | The build proves that no two rules for one property can match one element, then writes one stylesheet. `purser check` does the same without writing. | A deterministic stylesheet; `file:line:column` diagnostics; a failing CI step |
 | Build | **Hypdriv** | `withHypDriv` awaits the Purser build before Turbopack or webpack starts. The chained adapter writes the route manifest and CSP hashes and checks that every Purser class the prerendered HTML uses exists in the stylesheet. | `.hypdriv/manifest.json` with atoms per route and unused atoms; a build that fails on a stale stylesheet |
-| Prove | **SquawkCode** | The project is copied, class names are hashed in the copy, both copies are built and served, and headless Chrome compares every element's computed style in every configured page, viewport, state and action. | Exit 0 only when identical; the hashed tree to deploy |
+| Prove | **SquawkCode** | The project is copied, class names are renamed in the copy (to the shortest names, or to hashes), both copies are built and served, and headless Chrome compares every element's computed style in every configured page, viewport, state and action. | Exit 0 only when identical; the renamed tree to deploy |
 | Serve | **Hypdriv** | The Drivetrain runs in front of the application: edge cache, CSP nonces and hashes, security headers, rate limits, bot shield, flags, flashless themes, Early Hints, tracing. | Responses with `Server-Timing` per stage |
 | Verify | **Hypdriv** | `hypdriv audit css` crawls the routes in the manifest in headless Chrome at three widths and in default, hover and focus states, running Purser's `strike-count.js`. | A failing CI step if any declaration is struck through |
 
@@ -91,7 +91,7 @@ flowchart LR
 ### What each one does not do
 
 - **Purser** does not serve, cache or secure anything, has no bundler plugin and does not compare two versions of a site. It guarantees there are no overrides only inside its own stylesheet.
-- **SquawkCode** is not a security feature: hashed class names hide nothing a browser cannot read. It checks only the pages, states and actions you configure, and only in Chrome.
+- **SquawkCode** is not a security feature: renamed class names hide nothing a browser cannot read. It checks only the pages, states and actions you configure, and only in Chrome.
 - **Hypdriv** does not compile CSS and never modifies Purser (ADR 0009). It consumes Purser's build API and its strike-count script, and degrades to a clear diagnostic when Purser is not installed.
 
 ## Purser CSS

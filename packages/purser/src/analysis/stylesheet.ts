@@ -10,13 +10,72 @@ export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** `^<prefix>[0-9a-z]{7}$`: Purser class names are the prefix plus seven base-36 characters. */
-export function atomClassPattern(prefix: string): RegExp {
-  return new RegExp(`^${escapeRegExp(prefix)}[0-9a-z]{7}$`);
+/**
+ * How a project's Purser classes are named, which is what tells them apart from other classes:
+ * `legacy` (the default) is the prefix plus seven base-36 characters, `short` is four characters
+ * (a letter, then three of `A-Za-z0-9_-`), and `min` is the prefix (an underscore unless set) plus
+ * one to four characters the build handed out in sequence (`_a`, `_b`, … `_aa`, …).
+ */
+export interface AtomNaming {
+  prefix: string;
+  names?: 'legacy' | 'short' | 'min';
+  /** Name of the atoms cascade layer (default `purser.atoms`). */
+  atomsLayer?: string;
+}
+
+/** A prefix alone means legacy names, as before Purser 0.2. */
+export type AtomNamingInput = string | AtomNaming;
+
+/** The naming of a resolved `purser` configuration. */
+export function atomNaming(config: {
+  prefix: string;
+  names?: 'legacy' | 'short' | 'min';
+  layers?: { atoms: string };
+}): AtomNaming {
+  return {
+    prefix: config.prefix,
+    names: config.names ?? 'legacy',
+    atomsLayer: config.layers?.atoms ?? 'purser.atoms',
+  };
+}
+
+function resolveNaming(input: AtomNamingInput): Required<AtomNaming> {
+  const n = typeof input === 'string' ? { prefix: input } : input;
+  return { prefix: n.prefix, names: n.names ?? 'legacy', atomsLayer: n.atomsLayer ?? 'purser.atoms' };
+}
+
+/** The class-name body for a naming, as RegExp source (no anchors). */
+function classSource(naming: Required<AtomNaming>): string {
+  if (naming.names === 'short') return '[A-Za-z][A-Za-z0-9_-]{3}';
+  // Minimal names are handed out in sequence, shortest first: four characters after the prefix name seventeen
+  // million classes. The bound keeps other underscore names out (a bundler's CSS-module names such as
+  // `_title_1x2y3_7` are longer).
+  if (naming.names === 'min')
+    return naming.prefix ? `${escapeRegExp(naming.prefix)}[A-Za-z0-9_-]{1,4}` : '[A-Za-z][A-Za-z0-9_-]{0,3}';
+  return `${escapeRegExp(naming.prefix)}[0-9a-z]{7}`;
+}
+
+/**
+ * A pattern for one whole class name under a naming. With legacy names (`^<prefix>[0-9a-z]{7}$`) a
+ * match is almost certainly a Purser class; with short or prefix-less minimal names other classes
+ * match too (see {@link atomNamesAreDistinct}).
+ */
+export function atomClassPattern(naming: AtomNamingInput): RegExp {
+  return new RegExp(`^${classSource(resolveNaming(naming))}$`);
+}
+
+/**
+ * Can a class be recognised as Purser's by its name alone? Yes for legacy names and for minimal
+ * names with a prefix; no for short names (any four-character class looks the same) and for
+ * minimal names without a prefix. Where it cannot, only the stylesheet says which classes are atoms.
+ */
+export function atomNamesAreDistinct(naming: AtomNamingInput): boolean {
+  const n = resolveNaming(naming);
+  return n.names === 'legacy' || (n.names === 'min' && n.prefix !== '');
 }
 
 export interface StylesheetAnalysis {
-  /** Classes matching the prefix pattern that are the subject of at least one rule. */
+  /** Classes that are the subject of at least one rule (with short or minimal names: inside the atoms layer). */
   atoms: Set<string>;
   /** Classes matching the pattern that appear only inside `:not(…)` groups. */
   exclusions: Set<string>;
@@ -140,10 +199,16 @@ function collectSelectorClasses(
  * Scans a stylesheet once and reports its atoms, keyframes, layers and rule counts. With `prefix`
  * `null` only structure is reported (no class collection).
  */
-export function analyzeStylesheet(css: string, prefix: string | null): StylesheetAnalysis {
+export function analyzeStylesheet(css: string, prefix: AtomNamingInput | null): StylesheetAnalysis {
   const src = stripCssComments(css);
-  const classRe =
-    prefix === null ? null : new RegExp(`\\.(${escapeRegExp(prefix)}[0-9a-z]{7})(?![A-Za-z0-9_-])`, 'y');
+  const naming = prefix === null ? null : resolveNaming(prefix);
+  const classRe = naming === null ? null : new RegExp(`\\.(${classSource(naming)})(?![A-Za-z0-9_-])`, 'y');
+  // Legacy names are recognised anywhere. Short and minimal names look like other classes (`.dark`
+  // is four characters), so a class only counts as an atom where atoms are: inside the atoms layer.
+  const scoped = naming !== null && naming.names !== 'legacy';
+  /** Layer names of the open blocks (`''` for a block that is not a layer). */
+  const layerPath: string[] = [];
+  const inAtomsLayer = () => layerPath.filter(Boolean).join('.') === naming?.atomsLayer;
   const result: StylesheetAnalysis = {
     atoms: new Set(),
     exclusions: new Set(),
@@ -160,6 +225,7 @@ export function analyzeStylesheet(css: string, prefix: string | null): Styleshee
     const ch = src[i]!;
     if (ch === '}') {
       stack.pop();
+      layerPath.pop();
       i++;
       continue;
     }
@@ -200,19 +266,29 @@ export function analyzeStylesheet(css: string, prefix: string | null): Styleshee
         if (name === 'keyframes' || name.endsWith('-keyframes')) {
           if (rest) result.keyframes.push(rest.replace(/^["']|["']$/g, ''));
           stack.push('keyframes');
+          layerPath.push('');
         } else if (DECLARATION_AT_RULES.has(name)) {
           stack.push('declarations');
+          layerPath.push('');
         } else {
           if (name === 'layer' && stack.length === 0 && rest) result.layerBlocks.push(rest);
           if (name !== 'layer') result.groups++;
           stack.push('group');
+          layerPath.push(name === 'layer' ? rest : '');
         }
       } else if (parent === 'keyframes' || parent === 'declarations') {
         stack.push('declarations');
+        layerPath.push('');
       } else {
         result.rules++;
-        if (classRe) collectSelectorClasses(text, classRe, result.atoms, result.exclusions);
+        if (classRe) {
+          if (!scoped || inAtomsLayer())
+            collectSelectorClasses(text, classRe, result.atoms, result.exclusions);
+          // outside the atoms layer only the exclusions of globals are of interest: `body:not(._a, ._b)`
+          else collectSelectorClasses(text, classRe, new Set(), result.exclusions);
+        }
         stack.push('rule');
+        layerPath.push('');
       }
     } else if (terminator === ';') {
       i++;
@@ -230,7 +306,7 @@ export function analyzeStylesheet(css: string, prefix: string | null): Styleshee
  * subject (not inside `:not(…)`), inside any nesting of `@layer`, `@media`, `@supports` and
  * `@container`. Keyframes names and declarations are ignored.
  */
-export function extractAtomClasses(css: string, prefix: string): Set<string> {
+export function extractAtomClasses(css: string, prefix: AtomNamingInput): Set<string> {
   return analyzeStylesheet(css, prefix).atoms;
 }
 

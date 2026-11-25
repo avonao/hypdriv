@@ -57,6 +57,7 @@ examples/            runnable Next 16 apps: basic, with-purser (Cloudflare); ver
 e2e/cloudflare       live suite: an app with every capability on + a runner that verifies it on a real Cloudflare account
 e2e/vercel           live suite for Vercel (Hobby plan): app + runner (runtime-logs stream) + provisioning script
 e2e/hosts            live checks for every Vite host example on Cloudflare, Vercel or Node + private-deployment provisioning
+benchmarks/          what the pipeline costs a request and what the edge cache saves one, on the built packages (writes docs/benchmarks.md)
 scripts/             repo tooling (tsdown 'use client' boundary plugin, size/deps reports)
 docs/                architecture, catalog, ADRs, guides
 skills/hypdriv       agent skill for adopting Hypdriv in an application

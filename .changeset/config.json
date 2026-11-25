@@ -12,5 +12,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@hypdriv/example-*", "@hypdriv/e2e-*"]
+  "ignore": ["@hypdriv/example-*", "@hypdriv/e2e-*", "@hypdriv/benchmarks"]
 }

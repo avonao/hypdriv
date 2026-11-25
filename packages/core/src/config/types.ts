@@ -558,6 +558,28 @@ export interface PurserConfig {
   packageName?: string;
   cssModule?: string;
   layers?: { tokens?: string; globals?: string; atoms?: string };
+  /**
+   * Class names (anything but `legacy` needs `@avonao/purser` 0.2 or later): `legacy` (default: the prefix and
+   * 7 characters), `short` (4 characters) or `min` (the shortest there are, given by the build to the most used
+   * classes first; the modules must then be compiled, see `compile`).
+   */
+  names?: 'legacy' | 'short' | 'min';
+  /** One class per property of a style (default) or one per generated rule, so styles share rules. Purser 0.2. */
+  granularity?: 'property' | 'rule';
+  /** Write the stylesheet without whitespace and merge rules that write the same declaration. Purser 0.2. */
+  minify?: boolean;
+  /**
+   * With `names: 'min'`: give classes that are applied together one class (`exact`, `balanced` or `max`). Used in
+   * production builds; the dev server keeps one name per class. Purser 0.2.
+   */
+  fuse?: false | 'exact' | 'balanced' | 'max';
+  /** With `names: 'min'`: the file that keeps the names (default `node_modules/.cache/purser/names.json`). */
+  namesFile?: string;
+  /**
+   * Compile the modules with Purser's compiler, so the browser runs no style code (default: on with
+   * `names: 'min'`, off otherwise). On Next.js Hypdriv adds Purser's loader for webpack and Turbopack. Purser 0.2.
+   */
+  compile?: boolean;
   /** Unstyled-atom guard after `next build` (default `error`). */
   verify?: 'error' | 'warn' | 'off';
   usageReport?: boolean;

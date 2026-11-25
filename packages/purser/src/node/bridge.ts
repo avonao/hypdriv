@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HypDrivError, type Logger, type ResolvedPurser, sha256Hex, silentLogger } from '@hypdriv/core';
 import { MANIFEST_DIR } from '@hypdriv/core/node';
-import { analyzeStylesheet } from '../analysis/stylesheet';
+import { analyzeStylesheet, atomNaming } from '../analysis/stylesheet';
 import {
   detectPurser,
   hostRequire,
@@ -81,6 +81,8 @@ export interface PurserBridge {
   readonly outFile: string | null;
   /** Absolute tokens module path (configured or auto-detected), or `null`. */
   readonly tokensFile: string | null;
+  /** With `purser.compile`: the loader the bundler runs on source modules; `null` when modules keep the runtime. */
+  readonly compile: PurserCompile | null;
   /** `build()` from `@avonao/purser/build`: writes `out` when the content changed. */
   build(): Promise<PurserBuildResult>;
   /** `check()`: validates without writing. */
@@ -183,7 +185,65 @@ export function purserBuildOptions(
   const tokens = config.tokens ?? detectedTokens;
   if (tokens) options.tokens = tokens;
   if (config.cssModule) options.cssModule = config.cssModule;
+  // Purser 0.2 options, passed only when they are set: a 0.1 build is given exactly what it was given before.
+  if (config.names !== 'legacy') options.names = config.names;
+  if (config.granularity !== 'property') options.granularity = config.granularity;
+  if (config.minify) options.minify = true;
+  if (config.fuse) options.fuse = config.fuse;
+  if (config.namesFile) options.namesFile = config.namesFile;
   return options;
+}
+
+/** The loader a bundler runs on source modules so that the browser runs no style code (`purser.compile`). */
+export interface PurserCompile {
+  /** Module specifier of Purser's loader (webpack, Rspack, Turbopack). */
+  loader: string;
+  /** The loader's options: plain values only, because Turbopack passes them between processes. */
+  options: Record<string, string | number | boolean>;
+  /** The import specifier a module that uses Purser contains. */
+  packageName: string;
+  /** `true` when a custom `css` module is configured: modules that use it need not name the package. */
+  customCss: boolean;
+}
+
+/** Module specifier of Purser's loader for webpack, Rspack and Turbopack. */
+export const PURSER_LOADER = '@avonao/purser/webpack-loader';
+
+/**
+ * The options of Purser's loader for a build: what names a class has must be what the stylesheet build decided,
+ * so the loader gets the same naming options and the same names file. `fuse` is not among them: the loader reads the
+ * build's plan from the cache directory.
+ */
+export function purserLoaderOptions(
+  purserProjectDir: string,
+  build: PurserBuildOptions,
+): Record<string, string | number | boolean> {
+  const options: Record<string, string | number | boolean> = { projectDir: purserProjectDir };
+  for (const key of [
+    'tokens',
+    'prefix',
+    'salt',
+    'packageName',
+    'cssModule',
+    'names',
+    'granularity',
+    'namesFile',
+  ] as const) {
+    const value = build[key];
+    if (value !== undefined) options[key] = value;
+  }
+  return options;
+}
+
+/** The `purser.*` options that need `@avonao/purser` 0.2, as set in a configuration (for the error that names them). */
+export function purserTwoOptions(config: ResolvedPurser): string[] {
+  const set: string[] = [];
+  if (config.names !== 'legacy') set.push(`names: '${config.names}'`);
+  if (config.granularity !== 'property') set.push(`granularity: '${config.granularity}'`);
+  if (config.minify) set.push('minify');
+  if (config.fuse) set.push(`fuse: '${config.fuse}'`);
+  if (config.compile) set.push('compile');
+  return set;
 }
 
 function relativeTo(root: string, file: string | null | undefined): string | null {
@@ -231,9 +291,17 @@ export async function createPurserBridge(options: PurserBridgeOptions): Promise<
     throw new HypDrivError(
       'E_UNSUPPORTED',
       detection.typescriptVersion
-        ? `Purser cannot run with typescript ${detection.typescriptVersion}. ${TYPESCRIPT6_ALIAS_HINT}`
-        : `Purser needs the "typescript" package installed in ${purserProjectDir} (it parses your source with it). ${PURSER_INSTALL_HINT}`,
+        ? `Purser ${detection.version ?? '0.1'} cannot run with typescript ${detection.typescriptVersion}. ${TYPESCRIPT6_ALIAS_HINT}`
+        : `@avonao/purser ${detection.version ?? '0.1'} needs the "typescript" package installed in ${purserProjectDir} (it parses your source with it); 0.2 and later bring their own parser. ${PURSER_INSTALL_HINT}`,
       { projectDir: purserProjectDir, typescriptVersion: detection.typescriptVersion, detection },
+    );
+  }
+  const needsTwo = purserTwoOptions(config);
+  if (needsTwo.length && !detection.compiler) {
+    throw new HypDrivError(
+      'E_UNSUPPORTED',
+      `purser.${needsTwo.join(', purser.')} in hypdriv.config.ts ${needsTwo.length === 1 ? 'needs' : 'need'} @avonao/purser 0.2 or later; ${detection.version ?? 'an older version'} is installed in ${purserProjectDir}.`,
+      { projectDir: purserProjectDir, version: detection.version, options: needsTwo },
     );
   }
   const mod = await (options.loadModule ?? loadPurserBuildModule)(purserProjectDir);
@@ -262,7 +330,7 @@ export async function createPurserBridge(options: PurserBridgeOptions): Promise<
   };
 
   const stylesheetInfo = async (css: string): Promise<StylesheetInfo> => {
-    const analysis = analyzeStylesheet(css, config.prefix);
+    const analysis = analyzeStylesheet(css, atomNaming(config));
     return {
       hash: (await sha256Hex(css)).slice(0, 16),
       atoms: analysis.atoms.size,
@@ -388,6 +456,14 @@ export async function createPurserBridge(options: PurserBridgeOptions): Promise<
     detection,
     outFile,
     tokensFile,
+    compile: config.compile
+      ? {
+          loader: PURSER_LOADER,
+          options: purserLoaderOptions(purserProjectDir, buildOptions),
+          packageName: buildOptions.packageName ?? '@avonao/purser',
+          customCss: Boolean(buildOptions.cssModule),
+        }
+      : null,
     build,
     check,
     watch,

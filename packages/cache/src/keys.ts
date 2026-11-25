@@ -121,9 +121,30 @@ export async function buildCacheKey(
   input: CacheKeyInput,
 ): Promise<{ key: string; vary: string[]; url: string }> {
   const { material, vary } = serializeCacheKey(input);
-  const key = base64UrlEncode(await digest(material, 'SHA-256'));
+  let key = hashed.get(material);
+  if (key === undefined) {
+    key = base64UrlEncode(await digest(material, 'SHA-256'));
+    if (material.length <= HASHED_MAX_LENGTH) {
+      if (hashed.size >= HASHED_MAX_ENTRIES) hashed.delete(hashed.keys().next().value as string);
+      hashed.set(material, key);
+    }
+  } else {
+    // asked for again: the last to be dropped
+    hashed.delete(material);
+    hashed.set(material, key);
+  }
   return { key, vary, url: cacheKeyUrl(key) };
 }
+
+/**
+ * The keys of the materials hashed last. A page that is asked for again and again has the same material every
+ * time, and hashing it is the one step of a cache hit that has to wait (SHA-256 is asynchronous on every
+ * platform): it is done once. Bounded in entries and in the length of what is kept, so requests for URLs nobody
+ * links to cannot grow it.
+ */
+const HASHED_MAX_ENTRIES = 2048;
+const HASHED_MAX_LENGTH = 512;
+const hashed = new Map<string, string>();
 
 /** Synthetic URL for a key, usable as a Cache API request. */
 export function cacheKeyUrl(key: string, origin: string = CACHE_KEY_ORIGIN): string {

@@ -2,7 +2,13 @@ import { join } from 'node:path';
 import { HypDrivError } from '@hypdriv/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFakeProject, type FakeProject } from './__fixtures__/project';
-import { detectPurser, findTokensFile, readStrikeScript, TOKENS_FILE_CANDIDATES } from './detect';
+import {
+  detectPurser,
+  findTokensFile,
+  readStrikeScript,
+  TOKENS_FILE_CANDIDATES,
+  versionAtLeast,
+} from './detect';
 
 const projects: FakeProject[] = [];
 const project = (...args: Parameters<typeof createFakeProject>) => {
@@ -50,12 +56,41 @@ describe('detectPurser', () => {
       typescriptCompatible: false,
     });
     expect(none.message).toContain('@avonao/purser is not installed');
-    expect(none.message).toContain('typescript is not installed');
+    // the Purser that gets installed brings its own parser: a missing typescript is no problem of its own
+    expect(none.message).not.toContain('typescript is not installed');
+    const old = detectPurser(project({ typescript: null }).dir);
+    expect(old.message).toContain('typescript is not installed');
+    expect(old.message).toContain('0.2 and later bring their own parser');
 
     const noTokens = detectPurser(project({ typescript: '6.0.3' }).dir);
     expect(noTokens.typescriptCompatible).toBe(true);
     expect(noTokens.tokensFile).toBeNull();
     expect(noTokens.message).toContain('No tokens module found');
+  });
+
+  it('knows Purser 0.2: its own parser, the compiler and the naming options', () => {
+    const files = { 'lib/tokens.ts': '' };
+    const onSeven = detectPurser(project({ purser: { version: '0.2.0' }, typescript: '7.0.2', files }).dir);
+    expect(onSeven).toMatchObject({
+      version: '0.2.0',
+      compiler: true,
+      typescriptCompatible: true,
+      message: null,
+    });
+    const bare = detectPurser(project({ purser: { version: '0.3.1' }, typescript: null, files }).dir);
+    expect(bare).toMatchObject({
+      compiler: true,
+      typescriptCompatible: true,
+      typescriptVersion: null,
+      message: null,
+    });
+    expect(detectPurser(project({ files }).dir).compiler).toBe(false);
+    expect(versionAtLeast('0.2.0', 0, 2)).toBe(true);
+    expect(versionAtLeast('0.2.0-preview.1', 0, 2)).toBe(true);
+    expect(versionAtLeast('1.0.0', 0, 2)).toBe(true);
+    expect(versionAtLeast('0.1.9', 0, 2)).toBe(false);
+    expect(versionAtLeast(null, 0, 2)).toBe(false);
+    expect(versionAtLeast('next', 0, 2)).toBe(false);
   });
 
   it('follows the documented tokens candidate order', () => {

@@ -23,6 +23,16 @@ export interface PurserBuildOptions {
   cssModule?: string;
   /** Names of the three cascade layers. */
   layers?: { tokens?: string; globals?: string; atoms?: string };
+  /** Purser 0.2: class names (`legacy` by default). */
+  names?: 'legacy' | 'short' | 'min';
+  /** Purser 0.2: one class per property (default) or per rule. */
+  granularity?: 'property' | 'rule';
+  /** Purser 0.2: a minified stylesheet. */
+  minify?: boolean;
+  /** Purser 0.2, with names `min`: fuse classes that are applied together. */
+  fuse?: false | 'exact' | 'balanced' | 'max';
+  /** Purser 0.2, with names `min`: the file that keeps the names, relative to projectDir. */
+  namesFile?: string;
 }
 
 export interface PurserDiagnostic {
@@ -39,6 +49,15 @@ export interface PurserBuildStats {
   rules: number;
   keyframes: number;
   tokens: number;
+  /** Purser 0.2 with `fuse`: classes before (`ids`) and after (`classes`) fusion. */
+  fused?: {
+    level: string;
+    contexts: number;
+    ids: number;
+    classes: number;
+    references: number;
+    selectors: number;
+  };
 }
 
 export interface PurserBuildResult {
@@ -49,6 +68,8 @@ export interface PurserBuildResult {
   /** True when the output file changed on disk. */
   written: boolean;
   outFile: string | null;
+  /** Purser 0.2 with names `min`: the name of every class. */
+  names?: Record<string, string> | null;
 }
 
 export interface PurserWatchHandle {
