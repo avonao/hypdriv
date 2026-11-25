@@ -1,0 +1,139 @@
+{
+  "date": "2026-11-25",
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "cores": 2,
+    "node": "v22.23.4",
+    "platform": "linux x64"
+  },
+  "page": {
+    "bytes": 28087
+  },
+  "seconds": 3,
+  "overhead": {
+    "application": {
+      "requests": 123781,
+      "meanUs": 24,
+      "p50Us": 18,
+      "p99Us": 98,
+      "perSecond": 41595
+    },
+    "hypdriv": {
+      "requests": 4514,
+      "meanUs": 664,
+      "p50Us": 609,
+      "p99Us": 1313,
+      "perSecond": 1506
+    },
+    "hypdrivQuiet": {
+      "requests": 5290,
+      "meanUs": 566,
+      "p50Us": 518,
+      "p99Us": 1337,
+      "perSecond": 1766
+    },
+    "addedUs": 640,
+    "addedQuietUs": 542,
+    "linesPerRequest": 2,
+    "headers": [
+      "cache-control",
+      "content-security-policy",
+      "content-type",
+      "cross-origin-opener-policy",
+      "cross-origin-resource-policy",
+      "link",
+      "origin-agent-cluster",
+      "permissions-policy",
+      "referrer-policy",
+      "reporting-endpoints",
+      "server-timing",
+      "strict-transport-security",
+      "x-content-type-options",
+      "x-dns-prefetch-control",
+      "x-frame-options",
+      "x-hypdriv-cache",
+      "x-hypdriv-csp",
+      "x-hypdriv-request-id",
+      "x-permitted-cross-domain-policies",
+      "x-request-id"
+    ],
+    "csp": "nonce"
+  },
+  "cache": [
+    {
+      "renderMs": 2,
+      "application": {
+        "requests": 1442,
+        "meanUs": 2080,
+        "p50Us": 2064,
+        "p99Us": 2454,
+        "perSecond": 481
+      },
+      "hypdrivNoCache": {
+        "requests": 1076,
+        "meanUs": 2787,
+        "p50Us": 2742,
+        "p99Us": 3483,
+        "perSecond": 359
+      },
+      "hypdrivCached": {
+        "requests": 4287,
+        "meanUs": 699,
+        "p50Us": 668,
+        "p99Us": 1378,
+        "perSecond": 1430
+      },
+      "speedup": 3
+    },
+    {
+      "renderMs": 8,
+      "application": {
+        "requests": 371,
+        "meanUs": 8090,
+        "p50Us": 8076,
+        "p99Us": 8371,
+        "perSecond": 124
+      },
+      "hypdrivNoCache": {
+        "requests": 343,
+        "meanUs": 8769,
+        "p50Us": 8716,
+        "p99Us": 9364,
+        "perSecond": 114
+      },
+      "hypdrivCached": {
+        "requests": 4563,
+        "meanUs": 657,
+        "p50Us": 615,
+        "p99Us": 1320,
+        "perSecond": 1522
+      },
+      "speedup": 12.3
+    },
+    {
+      "renderMs": 25,
+      "application": {
+        "requests": 120,
+        "meanUs": 25109,
+        "p50Us": 25092,
+        "p99Us": 25555,
+        "perSecond": 40
+      },
+      "hypdrivNoCache": {
+        "requests": 116,
+        "meanUs": 25907,
+        "p50Us": 25892,
+        "p99Us": 26612,
+        "perSecond": 39
+      },
+      "hypdrivCached": {
+        "requests": 4296,
+        "meanUs": 698,
+        "p50Us": 661,
+        "p99Us": 1379,
+        "perSecond": 1433
+      },
+      "speedup": 36
+    }
+  ]
+}

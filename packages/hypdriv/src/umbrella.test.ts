@@ -8,6 +8,16 @@ const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.jso
 };
 
 describe('hypdriv umbrella', () => {
+  it('names every export of the client entry: a Client Component boundary cannot `export *`', async () => {
+    const source = readFileSync(join(import.meta.dirname, 'client.tsx'), 'utf8');
+    expect(source).toMatch(/^'use client';/);
+    expect(source).not.toMatch(/^\s*export\s*\*/m);
+    // and none is left out
+    const [umbrella, next] = await Promise.all([import('./client'), import('@hypdriv/next/client')]);
+    expect(Object.keys(umbrella).sort()).toEqual(Object.keys(next).sort());
+    expect(umbrella.VitalsReporter).toBe(next.VitalsReporter);
+  });
+
   it('exposes the documented entry points', async () => {
     const root = await import('./index');
     expect(typeof root.defineConfig).toBe('function');

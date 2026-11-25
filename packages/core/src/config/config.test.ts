@@ -20,6 +20,56 @@ describe('resolveConfig', () => {
     expect(r.i18n).toBeNull();
   });
 
+  it('resolves the Purser 0.2 options: minimal names bring their prefix, a names file and compiled modules', () => {
+    const plain = resolveConfig({}).purser;
+    expect(plain).toMatchObject({
+      prefix: 'x',
+      names: 'legacy',
+      granularity: 'property',
+      minify: false,
+      fuse: false,
+      namesFile: null,
+      compile: false,
+    });
+    const min = resolveConfig({
+      purser: { names: 'min', fuse: 'exact', granularity: 'rule', minify: true },
+    }).purser;
+    expect(min).toMatchObject({
+      prefix: '_',
+      names: 'min',
+      granularity: 'rule',
+      minify: true,
+      fuse: 'exact',
+      namesFile: 'node_modules/.cache/purser/names.json',
+      compile: true,
+    });
+    expect(
+      resolveConfig({ purser: { names: 'min', prefix: 'p', namesFile: 'purser.names.json' } }).purser,
+    ).toMatchObject({
+      prefix: 'p',
+      namesFile: 'purser.names.json',
+    });
+    // hashed names can be compiled too; nothing else turns it on
+    expect(resolveConfig({ purser: { names: 'short', compile: true } }).purser).toMatchObject({
+      prefix: 'x',
+      compile: true,
+      namesFile: null,
+    });
+    const errors = (purser: Record<string, unknown>) =>
+      validateConfig({ purser })
+        .filter((x) => x.severity === 'error')
+        .map((x) => x.path);
+    expect(
+      errors({ names: 'min', fuse: 'balanced', granularity: 'rule', minify: true, namesFile: 'n.json' }),
+    ).toEqual([]);
+    expect(errors({ names: 'tiny' })).toEqual(['purser.names']);
+    expect(errors({ fuse: 'exact' })).toEqual(['purser.fuse']);
+    expect(errors({ names: 'min', fuse: 'all' })).toEqual(['purser.fuse']);
+    expect(errors({ names: 'min', compile: false })).toEqual(['purser.compile']);
+    expect(errors({ namesFile: 'n.json' })).toEqual(['purser.namesFile']);
+    expect(errors({ granularity: 'atom' })).toEqual(['purser.granularity']);
+  });
+
   it('keeps the vitals dashboard off unless asked, with defaults when on', () => {
     expect(resolveConfig({}).observe.vitals?.dashboard).toBeNull();
     expect(resolveConfig({ observe: { vitals: true } }).observe.vitals?.dashboard).toBeNull();

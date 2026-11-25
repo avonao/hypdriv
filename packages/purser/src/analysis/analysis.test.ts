@@ -3,6 +3,8 @@ import { extractHtmlClasses } from './html';
 import {
   analyzeStylesheet,
   atomClassPattern,
+  atomNamesAreDistinct,
+  atomNaming,
   extractAtomClasses,
   extractLayerStatement,
   isPurserStylesheet,
@@ -250,6 +252,61 @@ describe('verifyAtoms', () => {
     });
     expect(result.missing).toEqual({});
     expect(result.unused).toEqual([]);
+  });
+});
+
+describe('namings of Purser 0.2', () => {
+  // A minified stylesheet with minimal names: selector lists, a fused class, a global that excludes atoms.
+  const MIN = `@layer purser.tokens,purser.globals,purser.atoms;@layer purser.tokens{:root{--c:lab(9 0 0)}:root.dark{--c:lab(98 0 0)}}@layer purser.globals{body:not(._a,._b){margin:0}.prose a{color:var(--c)}}@layer purser.atoms{._a,._c{display:flex}._b{color:var(--c)}@media (width>=768px){._d:hover{gap:8px}}._aa{padding:4px}}`;
+  const min = { prefix: '_', names: 'min' as const };
+
+  it('with minimal names every class in the atoms layer is an atom, and nothing outside it is', () => {
+    const analysis = analyzeStylesheet(MIN, min);
+    expect([...analysis.atoms].sort()).toEqual(['_a', '_aa', '_b', '_c', '_d']);
+    // `.dark` and `.prose` are classes of other layers; legacy analysis of the same sheet finds no atoms at all
+    expect(analysis.atoms.has('dark')).toBe(false);
+    expect(extractAtomClasses(MIN, 'x').size).toBe(0);
+  });
+
+  it('knows which namings tell a Purser class from any other by its name', () => {
+    expect(atomNamesAreDistinct('x')).toBe(true);
+    expect(atomNamesAreDistinct(min)).toBe(true);
+    expect(atomNamesAreDistinct({ prefix: '', names: 'min' })).toBe(false);
+    expect(atomNamesAreDistinct({ prefix: 'x', names: 'short' })).toBe(false);
+    expect(atomNaming({ prefix: '_', names: 'min', layers: { atoms: 'app.atoms' } })).toEqual({
+      prefix: '_',
+      names: 'min',
+      atomsLayer: 'app.atoms',
+    });
+    const pattern = atomClassPattern(min);
+    for (const name of ['_a', '_Z', '_-', '_a9', '_ab_', '_abcd'])
+      expect(pattern.test(name), name).toBe(true);
+    // a bundler's CSS-module names start with an underscore too, and are longer than any name handed out
+    for (const name of ['_title_1x2y3_7', '_abcde', 'a', '_', 'x_a'])
+      expect(pattern.test(name), name).toBe(false);
+  });
+
+  it('guards minimal names: a class the stylesheet lacks is missing, other underscore classes are not looked at', () => {
+    const result = verifyAtoms({
+      html: { '/': '<main class="_a _b layout _title_1x2y3_7"><p class="_zz"></p></main>' },
+      css: MIN,
+      prefix: min,
+    });
+    expect(result.missing).toEqual({ '/': ['_zz'] });
+    expect(result.used).toEqual({ '/': ['_a', '_b'] });
+    expect(result.unused).toEqual(['_aa', '_c', '_d']);
+  });
+
+  it('with names that look like any class, reports use but never a missing atom', () => {
+    const css = '@layer purser.atoms{.aB3_{color:red}.q-9z{margin:0}}';
+    const result = verifyAtoms({
+      html: { '/': '<i class="aB3_ dark card"></i>' },
+      css,
+      prefix: { prefix: 'x', names: 'short' },
+    });
+    expect(result.missing).toEqual({});
+    expect(result.used).toEqual({ '/': ['aB3_'] });
+    expect(result.unused).toEqual(['q-9z']);
   });
 });
 

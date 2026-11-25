@@ -147,6 +147,8 @@ The same stages, manifest and CLI for Vite-based frameworks ([ADR 0019](adr/0019
 | Feature                        | What it does                                                                      | Package                | Status |
 | ------------------------------ | --------------------------------------------------------------------------------- | ---------------------- | ------ |
 | In-process build/watch         | Purser runs inside `withHypDriv`; diagnostics surface in build output and the HUD | `purser`, `next`       | ✅     |
+| Compiled modules               | `purser.compile`: Purser's loader for Turbopack and webpack from `withHypDriv`; the browser runs no style code (Purser ≥ 0.2) | `purser`, `next` | ✅ |
+| Minimal names, fused classes   | `purser.names`, `granularity`, `minify`, `fuse`, `namesFile` passed to the build and the loader; naming-aware atom analysis | `purser`, `core` | ✅ |
 | Unstyled-atom guard            | Build fails if prerendered HTML references classes missing from the stylesheet    | `purser`, `next`       | ✅     |
 | Atom usage report              | Atoms per route, unused atoms, CSS weight per route                               | `purser`, `cli`        | ✅     |
 | Flashless themes               | Edge-pinned theme classes; hashed inline fallback                                 | `purser`, `cloudflare` | ✅     |

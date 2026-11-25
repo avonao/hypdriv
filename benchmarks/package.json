@@ -1,0 +1,14 @@
+{
+  "name": "@hypdriv/benchmarks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "What Hypdriv costs a request and what it saves one: the pipeline and the edge cache, measured on the built packages.",
+  "scripts": {
+    "bench": "node run.mjs --json results/pipeline.json && node report.mjs"
+  },
+  "dependencies": {
+    "@hypdriv/core": "workspace:*",
+    "@hypdriv/runtime": "workspace:*"
+  }
+}

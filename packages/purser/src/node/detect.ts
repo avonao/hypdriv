@@ -13,11 +13,22 @@ export const TOKENS_FILE_CANDIDATES = [
 ] as const;
 
 /** Install hint used in diagnostics and errors. */
-export const PURSER_INSTALL_HINT = 'pnpm add -D @avonao/purser typescript@^6 (or npm/yarn/bun equivalents)';
+export const PURSER_INSTALL_HINT = 'pnpm add -D @avonao/purser (or npm/yarn/bun equivalents)';
 
-/** Hint for TypeScript 7 hosts: Purser needs the programmatic compiler API that only TS ≤ 6 ships. */
+/**
+ * Hint for TypeScript 7 hosts on Purser 0.1, which parses with the project's TypeScript and needs the
+ * programmatic compiler API that only TS ≤ 6 ships. Purser 0.2 brings its own parser.
+ */
 export const TYPESCRIPT6_ALIAS_HINT =
-  'TypeScript 7 has no programmatic compiler API, which Purser needs to parse your source. Install TypeScript 6 under the "typescript" name, e.g. "typescript": "npm:@typescript/typescript6@^6" in package.json (keep tsgo / @typescript/native-preview for type checking), or pin typescript@^6.';
+  'TypeScript 7 has no programmatic compiler API, which @avonao/purser 0.1 needs to parse your source. Update to @avonao/purser 0.2 or later (it brings its own parser), or install TypeScript 6 under the "typescript" name, e.g. "typescript": "npm:@typescript/typescript6@^6" in package.json (keep tsgo / @typescript/native-preview for type checking).';
+
+/** `true` when `version` (x.y.z, pre-release tags ignored) is at least `major.minor`. */
+export function versionAtLeast(version: string | null, major: number, minor: number): boolean {
+  const m = /^(\d+)\.(\d+)/.exec(version ?? '');
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a > major || (a === major && b >= minor);
+}
 
 export interface PurserDetection {
   /** `@avonao/purser` resolves from the project. */
@@ -28,8 +39,13 @@ export interface PurserDetection {
   /** Absolute path of `scripts/strike-count.js` when installed. */
   strikeScriptFile: string | null;
   typescriptVersion: string | null;
-  /** `true` when the project's `typescript` major is below 7 (Purser needs the TS compiler API). */
+  /**
+   * `true` when Purser can parse the project: always from `@avonao/purser` 0.2 on (it brings its own parser for
+   * a project without TypeScript or on TypeScript 7); with 0.1, when the project's `typescript` major is below 7.
+   */
   typescriptCompatible: boolean;
+  /** `true` from `@avonao/purser` 0.2 on: the compiler, `names`, `granularity`, `minify` and `fuse` exist. */
+  compiler: boolean;
   /** First existing tokens module from {@link TOKENS_FILE_CANDIDATES}, relative to `projectDir`, or `null`. */
   tokensFile: string | null;
   /** Human-readable status: what is missing and how to fix it; `null` when everything is in place. */
@@ -89,16 +105,21 @@ export function detectPurser(projectDir: string): PurserDetection {
   const tsPkg = resolvePackageJson(dir, 'typescript');
   const typescriptVersion = tsPkg ? readVersion(tsPkg) : null;
   const tsMajor = typescriptVersion ? Number.parseInt(typescriptVersion.split('.')[0] ?? '', 10) : Number.NaN;
-  const typescriptCompatible = Number.isFinite(tsMajor) && tsMajor < 7;
+  const compiler = versionAtLeast(version, 0, 2);
+  const typescriptCompatible = compiler || (Number.isFinite(tsMajor) && tsMajor < 7);
   const tokensFile = findTokensFile(dir);
 
   const problems: string[] = [];
   if (!purserPkg)
     problems.push(`@avonao/purser is not installed in ${dir}. Install it with: ${PURSER_INSTALL_HINT}`);
-  if (!typescriptVersion)
-    problems.push(`typescript is not installed in ${dir}; Purser parses your source with it.`);
-  else if (!typescriptCompatible)
-    problems.push(`typescript ${typescriptVersion} found. ${TYPESCRIPT6_ALIAS_HINT}`);
+  if (purserPkg && !compiler) {
+    if (!typescriptVersion)
+      problems.push(
+        `typescript is not installed in ${dir}; @avonao/purser ${version ?? '0.1'} parses your source with it (0.2 and later bring their own parser).`,
+      );
+    else if (!typescriptCompatible)
+      problems.push(`typescript ${typescriptVersion} found. ${TYPESCRIPT6_ALIAS_HINT}`);
+  }
   if (purserPkg && !tokensFile)
     problems.push(
       `No tokens module found (looked for ${TOKENS_FILE_CANDIDATES.join(', ')}); set purser.tokens in hypdriv.config.ts.`,
@@ -111,6 +132,7 @@ export function detectPurser(projectDir: string): PurserDetection {
     strikeScriptFile: strikeScriptFile && existsSync(strikeScriptFile) ? strikeScriptFile : null,
     typescriptVersion,
     typescriptCompatible,
+    compiler,
     tokensFile,
     message: problems.length ? problems.join(' ') : null,
   };

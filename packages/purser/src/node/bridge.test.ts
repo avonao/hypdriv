@@ -13,7 +13,10 @@ import {
   closeAllPurserWatchers,
   createPurserBridge,
   formatPurserDiagnostic,
+  PURSER_LOADER,
   purserBuildOptions,
+  purserLoaderOptions,
+  purserTwoOptions,
 } from './bridge';
 import type { PurserBuildResult } from './purser-types';
 
@@ -61,6 +64,71 @@ describe('createPurserBridge', () => {
       ),
     ).toMatchObject({ projectDir: join('/root', 'web'), tokens: 'design/tokens.ts' });
     expect(purserBuildOptions('/root', purserConfig(), null).tokens).toBeUndefined();
+  });
+
+  it('passes the Purser 0.2 options to the build and describes the loader for compiled modules', async () => {
+    const p = project({ purser: { version: '0.2.0' }, files: { 'lib/tokens.ts': '' } });
+    const config = purserConfig({ names: 'min', granularity: 'rule', minify: true, fuse: 'exact' });
+    expect(config.compile).toBe(true);
+    const bridge = await createPurserBridge({ projectDir: p.dir, config });
+    expect(bridge.options).toMatchObject({
+      prefix: '_',
+      names: 'min',
+      granularity: 'rule',
+      minify: true,
+      fuse: 'exact',
+      namesFile: 'node_modules/.cache/purser/names.json',
+    });
+    // the loader names classes as the build does; what only the stylesheet needs stays out of its options
+    expect(bridge.compile).toEqual({
+      loader: PURSER_LOADER,
+      options: purserLoaderOptions(p.dir, bridge.options),
+      packageName: '@avonao/purser',
+      customCss: false,
+    });
+    expect(bridge.compile?.options).toMatchObject({
+      projectDir: p.dir,
+      tokens: 'lib/tokens.ts',
+      prefix: '_',
+      names: 'min',
+      granularity: 'rule',
+      namesFile: 'node_modules/.cache/purser/names.json',
+    });
+    for (const key of ['fuse', 'minify', 'src', 'out', 'layers'])
+      expect(bridge.compile?.options).not.toHaveProperty(key);
+    for (const value of Object.values(bridge.compile?.options ?? {}))
+      expect(['string', 'number', 'boolean']).toContain(typeof value);
+    // a custom css module: modules that use it need not name the package
+    const custom = await createPurserBridge({
+      projectDir: p.dir,
+      config: purserConfig({ names: 'min', cssModule: 'lib/css.ts' }),
+    });
+    expect(custom.compile).toMatchObject({ customCss: true, options: { cssModule: 'lib/css.ts' } });
+  });
+
+  it('leaves a 0.1 build exactly as it was, and says which option needs Purser 0.2', async () => {
+    const p = project({ files: { 'lib/tokens.ts': '' } });
+    const plain = await createPurserBridge({ projectDir: p.dir, config: purserConfig() });
+    expect(plain.compile).toBeNull();
+    for (const key of ['names', 'granularity', 'minify', 'fuse', 'namesFile'])
+      expect(plain.options).not.toHaveProperty(key);
+    expect(purserTwoOptions(purserConfig())).toEqual([]);
+    expect(purserTwoOptions(purserConfig({ names: 'min', fuse: 'max', minify: true }))).toEqual([
+      "names: 'min'",
+      'minify',
+      "fuse: 'max'",
+      'compile',
+    ]);
+    expect(purserTwoOptions(purserConfig({ compile: true }))).toEqual(['compile']);
+    const failed = await createPurserBridge({
+      projectDir: p.dir,
+      config: purserConfig({ granularity: 'rule' }),
+    }).catch((err: unknown) => err);
+    expect(failed).toBeInstanceOf(HypDrivError);
+    expect((failed as HypDrivError).code).toBe('E_UNSUPPORTED');
+    expect((failed as HypDrivError).message).toMatch(
+      /purser\.granularity: 'rule'.*needs @avonao\/purser 0\.2 or later; 0\.1\.0 is installed/,
+    );
   });
 
   it('runs build() and check() through the host module', async () => {

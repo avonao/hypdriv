@@ -68,11 +68,13 @@ Hypdriv needs **no infrastructure beyond the platform itself**. Platform service
 | **Cloudflare-native** | Worker shell around OpenNext with `scheduled`, `queue`, `email` and `tail` handlers dispatched to Route Handlers · geo and locale negotiation · live channels (Durable Objects with SSE and WebSocket, polling fallback) · edge feature flags · KV-managed redirects · maintenance mode · typed bindings in server code |
 | **Vercel-native** | Edge-cache policies expressed as `Vercel-CDN-Cache-Control` and `Vercel-Cache-Tag` (route headers, `withVercelCdn`) with tag purge on Vercel's CDN · Upstash Redis for exact global rate limits · Global Config for flags, redirects and maintenance · Vercel WAF rate-limit rules · BotID guards for Server Actions · Vercel Cron with `CRON_SECRET` · Vercel Queues for `enqueue()` · Vercel geo headers |
 | **Vite hosts** | One integration per framework at its documented hook: plain Vite, React Router 8, TanStack Start, Astro 7, SvelteKit 3, Nuxt 4, vinext, Waku, RedwoodSDK, SolidStart 2, Qwik, Nitro 2 and 3 and Analog (plus Hono, Express 5 and Fastify 5 as server frameworks) · route manifest with CSP hashes of prerendered pages · static headers for Cloudflare, Vercel and Node · Cloudflare Worker entries that answer static files first · Vercel prerender-scoped Routing Middleware · Node servers |
-| **Purser CSS** | In-process build and watch inside `withHypDriv` · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
+| **Purser CSS** | In-process build and watch inside `withHypDriv` · compiled modules, minimal names and fused classes of Purser 0.2 set up for Turbopack and webpack (`purser.compile`, `names`, `fuse`) · unstyled-atom guard (a stale stylesheet fails the build) · atom usage reports · flashless themes · zero-override audits with headless Chrome |
 | **Operations** | Signed operator purge (`hypdriv purge`, `POST /_hypdriv/purge`) that clears every cache tier · signed audit tokens so audits pass your own bot shield · a production implementation guide for Cloudflare |
 | **Tooling** | The `hypdriv` CLI (17 commands, 100+ doctor checks, `--json` everywhere) · `create-hypdriv` scaffolder for seventeen frameworks · a testing kit · an agent skill |
 
 The full list, with baseline and upgrade behaviour per feature, is in [`docs/feature-catalog.md`](docs/feature-catalog.md).
+
+What it costs and what it saves is measured in [`docs/benchmarks.md`](docs/benchmarks.md): on Node, with the built packages, the pipeline adds 0.64 ms of processor time to a request, and a page answered from the edge cache serves 3 times the requests a second of an application that renders in 2 ms, 36 times at 25 ms.
 
 ## Supported frameworks and platforms
 
@@ -414,7 +416,7 @@ All three are 0.1.0 Preview releases under the MIT license, distributed as sourc
 | --- | --- |
 | Release | 0.1.0 Preview |
 | Implemented | Every capability in the [feature catalog](docs/feature-catalog.md) |
-| Unit and integration tests | 2,939 tests in 241 files on Node 22 |
+| Unit and integration tests | 2,956 tests in 241 files on Node 22 |
 | Live runs | Next.js on Cloudflare Workers and on Vercel; seven Vite hosts on Cloudflare Workers and on Vercel |
 | API stability | Not yet guaranteed. 1.0 will commit to the `defineConfig` schema, the manifest schema and semver |
 | Distribution | Source and release-bundle tarballs |
@@ -451,6 +453,7 @@ Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
 - **Platforms:** [Cloudflare](docs/guides/cloudflare.md) · [Production on Cloudflare](docs/guides/production-cloudflare.md) · [Vercel](docs/guides/vercel.md)
 - **Frameworks:** [Vite](docs/guides/vite.md) · [React Router](docs/guides/react-router.md) · [TanStack Start](docs/guides/tanstack-start.md) · [Astro](docs/guides/astro.md) · [SvelteKit](docs/guides/sveltekit.md) · [Nuxt](docs/guides/nuxt.md) · [vinext](docs/guides/vinext.md) · [Waku](docs/guides/waku.md) · [RedwoodSDK](docs/guides/rwsdk.md) · [SolidStart](docs/guides/solid-start.md) · [Qwik](docs/guides/qwik.md) · [Nitro](docs/guides/nitro.md) · [Analog](docs/guides/analog.md) · [Hono](docs/guides/hono.md) · [Express](docs/guides/express.md) · [Fastify](docs/guides/fastify.md)
 - **Capabilities:** [Caching](docs/guides/caching.md) · [Security](docs/guides/security.md) · [Observability](docs/guides/observability.md) · [Purser CSS](docs/guides/purser.md) · [Flags](docs/guides/flags.md) · [Live channels](docs/guides/live.md) · [Jobs](docs/guides/jobs.md)
+- **Measurements:** [Benchmarks](docs/benchmarks.md)
 - **Test reports:** [`docs/testing`](docs/testing)
 - **Coding agents:** [`AGENTS.md`](AGENTS.md) and [`skills/hypdriv`](skills/hypdriv/SKILL.md)
 

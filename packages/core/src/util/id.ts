@@ -1,9 +1,39 @@
 import { base64UrlEncode } from './encoding';
 
+/**
+ * A request needs several random values (its id, a nonce, a trace id, a span id), and a call into the platform's
+ * generator costs far more than the bytes it returns: on Node every call is a system call. So the bytes come from a
+ * pool that is filled a kilobyte at a time. A byte is handed out once and then cleared.
+ *
+ * The pool is filled on first use, never when the module loads: Workers allow no randomness in the global scope.
+ */
+const POOL_SIZE = 1024;
+let pool: Uint8Array<ArrayBuffer> | null = null;
+let used = POOL_SIZE;
+
 function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  globalThis.crypto.getRandomValues(bytes);
+  if (length > POOL_SIZE / 4) {
+    const bytes = new Uint8Array(length);
+    globalThis.crypto.getRandomValues(bytes);
+    return bytes;
+  }
+  if (pool === null || used + length > POOL_SIZE) {
+    pool ??= new Uint8Array(POOL_SIZE);
+    globalThis.crypto.getRandomValues(pool);
+    used = 0;
+  }
+  const bytes = pool.slice(used, used + length);
+  pool.fill(0, used, used + length);
+  used += length;
   return bytes;
+}
+
+const HEX = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+
+function hex(bytes: Uint8Array): string {
+  let out = '';
+  for (const b of bytes) out += HEX[b];
+  return out;
 }
 
 /** Random base64url token of `bytes` random bytes (default 16 → 22 chars). */
@@ -22,17 +52,16 @@ export function createNonce(): string {
  */
 export function uuidv7(now: number = Date.now()): string {
   const bytes = randomBytes(16);
-  const ts = BigInt(now);
-  bytes[0] = Number((ts >> 40n) & 0xffn);
-  bytes[1] = Number((ts >> 32n) & 0xffn);
-  bytes[2] = Number((ts >> 24n) & 0xffn);
-  bytes[3] = Number((ts >> 16n) & 0xffn);
-  bytes[4] = Number((ts >> 8n) & 0xffn);
-  bytes[5] = Number(ts & 0xffn);
+  // 48 bits of milliseconds, high byte first (a number holds them exactly; bit operators would cut them to 32)
+  let ts = Math.max(0, Math.floor(now));
+  for (let i = 5; i >= 0; i--) {
+    bytes[i] = ts % 256;
+    ts = Math.floor(ts / 256);
+  }
   bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70;
   bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  const h = hex(bytes);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 /** Request id: short, time-ordered, URL-safe. */
@@ -42,9 +71,9 @@ export function createRequestId(): string {
 
 /** 16-byte trace id / 8-byte span id as lowercase hex (W3C Trace Context). */
 export function createTraceId(): string {
-  return Array.from(randomBytes(16), (b) => b.toString(16).padStart(2, '0')).join('');
+  return hex(randomBytes(16));
 }
 
 export function createSpanId(): string {
-  return Array.from(randomBytes(8), (b) => b.toString(16).padStart(2, '0')).join('');
+  return hex(randomBytes(8));
 }

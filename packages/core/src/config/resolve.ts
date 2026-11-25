@@ -531,7 +531,8 @@ function resolvePurser(input: HypDrivConfig['purser']): ResolvedPurser | null {
     src: arr(p.src, ['app', 'components', 'lib']),
     tokens: p.tokens ?? null,
     out: p.out ?? 'app/purser.css',
-    prefix: p.prefix ?? 'x',
+    // Minimal names carry their own prefix (an underscore unless set); hashed names start with `x`.
+    prefix: p.prefix ?? (p.names === 'min' ? '_' : 'x'),
     salt: p.salt ?? '',
     packageName: p.packageName ?? '@avonao/purser',
     cssModule: p.cssModule ?? null,
@@ -540,6 +541,13 @@ function resolvePurser(input: HypDrivConfig['purser']): ResolvedPurser | null {
       globals: p.layers?.globals ?? 'purser.globals',
       atoms: p.layers?.atoms ?? 'purser.atoms',
     },
+    names: p.names ?? 'legacy',
+    granularity: p.granularity ?? 'property',
+    minify: p.minify ?? false,
+    fuse: p.fuse ?? false,
+    namesFile: p.names === 'min' ? (p.namesFile ?? 'node_modules/.cache/purser/names.json') : null,
+    // Minimal names exist only in the build, so the modules that use them have to be compiled.
+    compile: p.compile ?? p.names === 'min',
     verify: p.verify ?? 'error',
     usageReport: p.usageReport ?? true,
     theme: theme

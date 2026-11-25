@@ -642,6 +642,15 @@ const rootCheck = checkObjectShape({
       packageName: checkString,
       cssModule: checkString,
       layers: checkObjectShape({ tokens: checkString, globals: checkString, atoms: checkString }),
+      names: checkEnum(['legacy', 'short', 'min']),
+      granularity: checkEnum(['property', 'rule']),
+      minify: checkBoolean,
+      fuse: (v2, p2, o2) => {
+        if (v2 !== undefined && v2 !== false && !['exact', 'balanced', 'max'].includes(v2 as string))
+          error(o2, p2, 'must be false, "exact", "balanced" or "max"');
+      },
+      namesFile: checkString,
+      compile: checkBoolean,
       verify: checkEnum(['error', 'warn', 'off']),
       usageReport: checkBoolean,
       theme: checkObjectShape({
@@ -675,6 +684,19 @@ const rootCheck = checkObjectShape({
       earlyHints: checkBoolean,
       checkInDoctor: checkBoolean,
     })(v, p, o);
+    if (isObject(v)) {
+      // What Purser itself refuses, said here with the config path.
+      if (v.fuse && v.names !== 'min')
+        error(o, `${p}.fuse`, 'needs names: "min" (fused classes are named by the build)');
+      if (v.names === 'min' && v.compile === false)
+        error(
+          o,
+          `${p}.compile`,
+          'cannot be false with names: "min" (only compiled modules know those names)',
+        );
+      if (v.namesFile !== undefined && v.names !== 'min')
+        error(o, `${p}.namesFile`, 'is only used with names: "min"');
+    }
   },
   flags: checkObjectShape({
     definitions: recordOf(

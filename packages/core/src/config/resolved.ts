@@ -292,6 +292,13 @@ export interface ResolvedPurser {
   packageName: string;
   cssModule: string | null;
   layers: { tokens: string; globals: string; atoms: string };
+  names: 'legacy' | 'short' | 'min';
+  granularity: 'property' | 'rule';
+  minify: boolean;
+  fuse: false | 'exact' | 'balanced' | 'max';
+  /** With `names: 'min'`: where the names are kept, relative to the Purser project; `null` otherwise. */
+  namesFile: string | null;
+  compile: boolean;
   verify: 'error' | 'warn' | 'off';
   usageReport: boolean;
   theme: null | {

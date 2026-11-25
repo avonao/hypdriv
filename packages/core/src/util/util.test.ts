@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { base64Decode, base64UrlEncode, hexEncode, stableStringify, timingSafeEqual } from './encoding';
 import { bucketPercent, cspHash, cyrb53, hmacSign, hmacVerify, sha256Hex, shortHash } from './hash';
-import { createNonce, createRequestId, uuidv7 } from './id';
+import { createNonce, createRequestId, createSpanId, createTraceId, randomToken, uuidv7 } from './id';
 import { LRUCache } from './lru';
 import { compilePattern, firstMatch, matchesAny, matchPattern, patternSpecificity } from './pattern';
 import { memoizeAsync, SingleFlight } from './singleflight';
@@ -82,6 +82,44 @@ describe('ids', () => {
     expect(a < b).toBe(true);
     expect(createRequestId()).toHaveLength(36);
     expect(createNonce()).toMatch(/^[A-Za-z0-9_-]{22}$/);
+  });
+
+  it('writes the 48 bits of the timestamp exactly, also beyond 32 bits', () => {
+    // 2026-11-25T00:00:00Z = 0x019a 21d0 8800 ms… the first twelve hex digits are the time
+    const now = Date.UTC(2026, 10, 25);
+    const id = uuidv7(now);
+    expect(Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16)).toBe(now);
+    expect(
+      Number.parseInt(
+        uuidv7(2 ** 48 - 1)
+          .replace(/-/g, '')
+          .slice(0, 12),
+        16,
+      ),
+    ).toBe(2 ** 48 - 1);
+    expect(uuidv7(0).startsWith('00000000-0000-7')).toBe(true);
+  });
+
+  it('hands out random bytes once: thousands of ids, nonces and trace ids without a repeat', () => {
+    // more values than one fill of the pool holds, so refills are crossed many times
+    const seen = new Set<string>();
+    for (let i = 0; i < 4000; i++) {
+      seen.add(createNonce());
+      seen.add(createTraceId());
+      seen.add(createSpanId());
+      seen.add(uuidv7(1_700_000_000_000));
+      seen.add(randomToken(24));
+    }
+    expect(seen.size).toBe(20_000);
+    expect(createTraceId()).toMatch(/^[0-9a-f]{32}$/);
+    expect(createSpanId()).toMatch(/^[0-9a-f]{16}$/);
+    // a request larger than the pool serves is drawn directly
+    expect(randomToken(600)).toHaveLength(800);
+    // the values are not biased by the pool: every byte value shows up
+    const counts = new Array<number>(256).fill(0);
+    for (let i = 0; i < 400; i++)
+      for (const c of createTraceId().match(/../g) ?? []) counts[Number.parseInt(c, 16)]!++;
+    expect(counts.filter((n) => n === 0)).toHaveLength(0);
   });
 });
 

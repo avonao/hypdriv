@@ -1,4 +1,4 @@
-import { atomClassPattern } from './stylesheet';
+import { type AtomNamingInput, atomClassPattern } from './stylesheet';
 
 /** `class="…"`, `class='…'` and unquoted `class=…` attributes. */
 const CLASS_ATTR_RE = /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
@@ -12,11 +12,13 @@ const CLASSNAME_PROP_RE = /\\?"className\\?"\s*:\s*\\?"([^"\\]*)/g;
 
 /**
  * Every Purser class referenced by a document: tokens of `class` attributes and of `className`
- * strings in RSC payloads (embedded or standalone `.rsc` files) that match `<prefix>[0-9a-z]{7}`.
- * A non-Purser class that happens to match the pattern is reported too; choose a distinctive
- * `purser.prefix` when legacy class names collide with it.
+ * strings in RSC payloads (embedded or standalone `.rsc` files) that match the naming's pattern
+ * (`<prefix>[0-9a-z]{7}` for legacy names). A non-Purser class that happens to match the pattern is
+ * reported too; choose a distinctive `purser.prefix` when other class names collide with it. With
+ * short names, or minimal names without a prefix, every class of that shape matches: use the result
+ * only together with the stylesheet's atoms (`verifyAtomsAgainst` does).
  */
-export function extractHtmlClasses(html: string, prefix: string): Set<string> {
+export function extractHtmlClasses(html: string, prefix: AtomNamingInput): Set<string> {
   const out = new Set<string>();
   const pattern = atomClassPattern(prefix);
   const add = (list: string) => {

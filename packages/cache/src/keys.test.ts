@@ -32,6 +32,23 @@ describe('buildCacheKey', () => {
     expect(cacheKeyUrl('k', 'https://x.test/')).toBe('https://x.test/k');
   });
 
+  it('hashes a material once and gives the same key from memory, however many others came between', async () => {
+    const first = await key(input('https://example.com/products/1'));
+    // more materials than are remembered, and one too long to be remembered at all
+    const long = `https://example.com/search?q=${'x'.repeat(700)}`;
+    const longKey = await key(input(long));
+    const others = new Set<string>();
+    for (let i = 0; i < 2100; i++) others.add(await key(input(`https://example.com/other/${i}`)));
+    expect(others.size).toBe(2100);
+    expect(await key(input('https://example.com/products/1'))).toBe(first);
+    expect(await key(input(long))).toBe(longKey);
+    expect(await key(input('https://example.com/other/2099'))).toBe([...others].at(-1));
+    // the key is the SHA-256 of the material, remembered or not
+    const { material } = serializeCacheKey(input('https://example.com/products/1'));
+    const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material)));
+    expect(first).toBe(Buffer.from(bytes).toString('base64url'));
+  });
+
   it('keys HEAD like GET and distinguishes other methods', async () => {
     const get = await key(input('https://x.test/p'));
     const head = await key(input('https://x.test/p', { method: 'HEAD' }));

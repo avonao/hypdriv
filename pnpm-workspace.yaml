@@ -2,6 +2,7 @@ packages:
   - packages/*
   - examples/*
   - e2e/*
+  - benchmarks
 
 # Shared dependency versions. Reference them as "catalog:" in package.json files.
 catalog:

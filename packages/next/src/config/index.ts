@@ -41,6 +41,18 @@ export interface PurserBridgeLike {
   formatSummary?(result: PurserBuildResultLike): string;
   hasErrors?(result: PurserBuildResultLike): boolean;
   outFile: string | null;
+  /** With `purser.compile`: the loader the bundler runs on source modules (see `applyPurserCompiler`). */
+  compile?: PurserCompileLike | null;
+}
+
+/** What `applyPurserCompiler` needs to know about Purser's loader (`PurserCompile` of `@hypdriv/purser/node`). */
+export interface PurserCompileLike {
+  loader: string;
+  options: Record<string, string | number | boolean>;
+  /** The import specifier a module that uses Purser contains. */
+  packageName: string;
+  /** A custom `css` module is configured: modules that use it need not name the package. */
+  customCss: boolean;
 }
 
 export interface PurserBuildResultLike {
@@ -87,6 +99,16 @@ function watcherRegistry(): WatcherRegistry {
   const g = globalThis as typeof globalThis & { [WATCHERS]?: WatcherRegistry };
   g[WATCHERS] ??= new Map();
   return g[WATCHERS];
+}
+
+const COMPILES = Symbol.for('hypdriv.next.purser-compile');
+type CompileRegistry = Map<string, PurserCompileLike | null>;
+
+/** Per project directory: the loader of the watcher that is subscribed (`next.config` is evaluated repeatedly). */
+function compileRegistry(): CompileRegistry {
+  const g = globalThis as typeof globalThis & { [COMPILES]?: CompileRegistry };
+  g[COMPILES] ??= new Map();
+  return g[COMPILES];
 }
 
 /** Resolves the file path of the Hypdriv adapter module for `adapterPath`. */
@@ -267,18 +289,22 @@ function purserHasErrors(bridge: PurserBridgeLike, result: PurserBuildResultLike
   return bridge.hasErrors?.(result) ?? result.diagnostics.some((d) => d.severity === 'error');
 }
 
+/**
+ * Runs the Purser build (production) or joins its watcher (development). Returns the loader for compiled modules
+ * when `purser.compile` is on, so the bundler configuration can be given it in the same pass.
+ */
 async function runPurser(
   phase: string,
   projectDir: string,
   config: ResolvedConfig,
   options: WithHypDrivOptions,
   log: Logger,
-): Promise<void> {
-  if (options.purser === false) return;
+): Promise<PurserCompileLike | null> {
+  if (options.purser === false) return null;
   const factory = options.purserBridge ?? ((dir, cfg) => defaultPurserBridge(dir, cfg, log));
   if (phase === PHASE.productionBuild || phase === PHASE.export) {
     const bridge = await factory(projectDir, config);
-    if (!bridge) return;
+    if (!bridge) return null;
     const result = await bridge.build();
     if (purserHasErrors(bridge, result))
       throw new HypDrivError(
@@ -286,14 +312,17 @@ async function runPurser(
         `hypdriv: Purser build failed\n${formatPurserDiagnostics(bridge, result)}`,
       );
     // The bridge logs warnings and the build summary through the logger it was created with.
-    return;
+    return bridge.compile ?? null;
   }
   if (phase === PHASE.developmentServer) {
-    // next.config is evaluated more than once per dev process; subscribe exactly once per project.
+    // next.config is evaluated more than once per dev process; subscribe exactly once per project. The loader is
+    // the same for every evaluation, so it is kept with the subscription.
     const registry = watcherRegistry();
-    if (registry.has(projectDir)) return;
+    const compiles = compileRegistry();
+    if (registry.has(projectDir)) return compiles.get(projectDir) ?? null;
     const bridge = await factory(projectDir, config);
-    if (!bridge) return;
+    if (!bridge) return null;
+    compiles.set(projectDir, bridge.compile ?? null);
     registry.set(projectDir, { close() {} });
     try {
       const handle = await bridge.watch(
@@ -308,9 +337,57 @@ async function runPurser(
       process.once('exit', () => handle.close());
     } catch (err) {
       registry.delete(projectDir);
+      compiles.delete(projectDir);
       throw err;
     }
+    return bridge.compile ?? null;
   }
+  return null;
+}
+
+/** The glob of the Turbopack rule that runs Purser's loader: the project's script modules. */
+export const PURSER_COMPILE_GLOB = '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}';
+
+/**
+ * Gives the bundler Purser's loader, so modules are compiled and the browser runs no style code (`purser.compile`).
+ *
+ * - **Turbopack** (the default bundler): a rule for the project's own script modules. Dependencies (`foreign`) are
+ *   left alone, and so is every module that does not name the package, which Turbopack decides from the file's
+ *   content before it starts the loader. With a custom `css` module a file need not name the package, so that
+ *   second condition is dropped.
+ * - **webpack** (`next build --webpack`): the same loader as a `pre` rule, in front of the application's own
+ *   `webpack()` function.
+ *
+ * The application's rules stay: one that uses the same glob runs after Purser's loader.
+ */
+export function applyPurserCompiler(out: NextConfig, compile: PurserCompileLike): void {
+  const use = { loader: compile.loader, options: compile.options };
+
+  const mentionsPackage = new RegExp(compile.packageName.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'));
+  const condition = compile.customCss
+    ? { not: 'foreign' as const }
+    : { all: [{ not: 'foreign' as const }, { content: mentionsPackage }] };
+  const turbopack = out.turbopack ?? {};
+  const existing = turbopack.rules?.[PURSER_COMPILE_GLOB];
+  const rule = { condition, loaders: [use] };
+  out.turbopack = {
+    ...turbopack,
+    rules: {
+      ...(turbopack.rules ?? {}),
+      [PURSER_COMPILE_GLOB]:
+        existing === undefined ? rule : [rule, ...(Array.isArray(existing) ? existing : [existing])],
+    },
+  };
+
+  const appWebpack = out.webpack;
+  out.webpack = (webpackConfig, context) => {
+    webpackConfig.module = webpackConfig.module ?? {};
+    webpackConfig.module.rules = [
+      { test: /\.[cm]?[jt]sx?$/, exclude: /node_modules/, enforce: 'pre', use: [use] },
+      ...(webpackConfig.module.rules ?? []),
+    ];
+    return appWebpack ? appWebpack(webpackConfig, context) : webpackConfig;
+  };
 }
 
 /**
@@ -464,11 +541,16 @@ export function withHypDriv(
       log.warn(`hypdriv: could not write ${ADAPTER_CONFIG_FILE}: ${(err as Error).message}`);
     }
 
-    if (phase === PHASE.productionBuild || phase === PHASE.developmentServer || phase === PHASE.export) {
-      await runPurser(phase, projectDir, resolved, options, log);
-    }
+    const purserCompile =
+      phase === PHASE.productionBuild || phase === PHASE.developmentServer || phase === PHASE.export
+        ? await runPurser(phase, projectDir, resolved, options, log)
+        : null;
 
     const out: NextConfig = { ...base };
+    if (purserCompile) {
+      applyPurserCompiler(out, purserCompile);
+      if (phase === PHASE.productionBuild) log.info('hypdriv: Purser compiles modules (purser.compile)');
+    }
     if (options.safeDefaults !== false) applySafeDefaults(out, resolved, phase, projectDir, options, log);
     const target = options.target ?? resolveBuildTarget(projectDir, resolved);
     if (target === 'vercel') await applyVercelCdnHeaders(out, resolved, phase, log);

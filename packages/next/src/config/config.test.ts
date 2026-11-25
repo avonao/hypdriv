@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { silentLogger } from '@hypdriv/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { BUILD_DEPLOYMENT_ID_ENV, defaultDeploymentId, PHASE, withHypDriv } from './index';
+import {
+  applyPurserCompiler,
+  BUILD_DEPLOYMENT_ID_ENV,
+  defaultDeploymentId,
+  PHASE,
+  PURSER_COMPILE_GLOB,
+  type PurserCompileLike,
+  withHypDriv,
+} from './index';
 import { reviveConfig, serializeConfig } from './serialize';
 
 let dir: string;
@@ -265,6 +273,145 @@ describe('withHypDriv', () => {
     await fn(PHASE.developmentServer, { defaultConfig: {} });
     expect(watches).toBe(1);
     expect(devDiagnostics).toBe(true);
+  });
+
+  const compile: PurserCompileLike = {
+    loader: '@avonao/purser/webpack-loader',
+    options: {
+      projectDir: '/app',
+      tokens: 'lib/tokens.ts',
+      names: 'min',
+      namesFile: 'node_modules/.cache/purser/names.json',
+    },
+    packageName: '@avonao/purser',
+    customCss: false,
+  };
+  const compilingBridge = (calls: string[]) => async () => ({
+    outFile: null,
+    compile,
+    async build() {
+      calls.push('build');
+      return { css: '', diagnostics: [], stats: null, written: true, outFile: null };
+    },
+    async watch() {
+      calls.push('watch');
+      return { close() {} };
+    },
+  });
+
+  it('gives Turbopack and webpack the Purser loader when the bridge compiles modules', async () => {
+    const calls: string[] = [];
+    const appRule = { loaders: ['app-loader'] };
+    const fn = withHypDriv(
+      {
+        turbopack: { resolveExtensions: ['.tsx'], rules: { '*.svg': appRule } },
+        webpack(config) {
+          config.plugins = ['app-plugin'];
+          return config;
+        },
+      },
+      {
+        projectDir: dir,
+        config: { purser: { enabled: true } },
+        adapterPath: '/virtual/adapter.js',
+        log: silentLogger,
+        purserBridge: compilingBridge(calls),
+      },
+    );
+    const out = await fn(PHASE.productionBuild, { defaultConfig: {} });
+    expect(calls).toEqual(['build']);
+    // Turbopack: the project's own modules that name the package; the application's rules and options stay
+    expect(out.turbopack?.resolveExtensions).toEqual(['.tsx']);
+    expect(out.turbopack?.rules?.['*.svg']).toBe(appRule);
+    const rule = out.turbopack?.rules?.[PURSER_COMPILE_GLOB] as {
+      condition: { all: [{ not: string }, { content: RegExp }] };
+      loaders: unknown[];
+    };
+    expect(rule.loaders).toEqual([{ loader: compile.loader, options: compile.options }]);
+    expect(rule.condition.all[0]).toEqual({ not: 'foreign' });
+    expect(rule.condition.all[1].content.test("import { css } from '@avonao/purser';")).toBe(true);
+    expect(rule.condition.all[1].content.test("import { css } from '@avonaoXpurser';")).toBe(false);
+    // loader options cross a process boundary under Turbopack: plain values only
+    expect(JSON.parse(JSON.stringify(compile.options))).toEqual(compile.options);
+    // webpack: a pre rule in front of what is there, then the application's own function
+    const built = out.webpack?.({ module: { rules: [{ test: /\.css$/ }] } }, {} as never) as {
+      module: { rules: Array<{ test: RegExp; enforce?: string; exclude?: RegExp; use?: unknown[] }> };
+      plugins: unknown[];
+    };
+    expect(built.plugins).toEqual(['app-plugin']);
+    expect(built.module.rules).toHaveLength(2);
+    expect(built.module.rules[0]).toMatchObject({ enforce: 'pre', use: [{ loader: compile.loader }] });
+    expect(built.module.rules[0]?.test.test('components/button.tsx')).toBe(true);
+    expect(built.module.rules[0]?.test.test('lib/util.mts')).toBe(true);
+    expect(built.module.rules[0]?.test.test('app/page.css')).toBe(false);
+    expect(built.module.rules[0]?.exclude?.test('/app/node_modules/x/index.js')).toBe(true);
+  });
+
+  it('keeps the loader for every evaluation of next.config in development, and adds none without compile', async () => {
+    const calls: string[] = [];
+    const options = {
+      projectDir: dir,
+      config: { purser: { enabled: true } },
+      adapterPath: '/virtual/adapter.js',
+      log: silentLogger,
+    } as const;
+    const fn = withHypDriv({}, { ...options, purserBridge: compilingBridge(calls) });
+    const first = await fn(PHASE.developmentServer, { defaultConfig: {} });
+    const second = await fn(PHASE.developmentServer, { defaultConfig: {} });
+    expect(calls).toEqual(['watch']);
+    expect(first.turbopack?.rules?.[PURSER_COMPILE_GLOB]).toBeDefined();
+    expect(second.turbopack?.rules?.[PURSER_COMPILE_GLOB]).toEqual(
+      first.turbopack?.rules?.[PURSER_COMPILE_GLOB],
+    );
+    // a bridge that does not compile (Purser's runtime stays in the modules): the bundler is left alone
+    const plainDir = mkdtempSync(join(tmpdir(), 'hypdriv-config-plain-'));
+    try {
+      const plain = withHypDriv(
+        {},
+        {
+          ...options,
+          projectDir: plainDir,
+          purserBridge: async () => ({
+            outFile: null,
+            compile: null,
+            async build() {
+              return { css: '', diagnostics: [], stats: null, written: true, outFile: null };
+            },
+            async watch() {
+              return { close() {} };
+            },
+          }),
+        },
+      );
+      const out = await plain(PHASE.productionBuild, { defaultConfig: {} });
+      expect(out.turbopack).toBeUndefined();
+      expect(out.webpack).toBeUndefined();
+    } finally {
+      rmSync(plainDir, { recursive: true, force: true });
+    }
+  });
+
+  it('applyPurserCompiler: a custom css module drops the content condition; a rule on the same glob runs after', () => {
+    const own = { loaders: ['own-loader'] };
+    const out: Parameters<typeof applyPurserCompiler>[0] = {
+      turbopack: { rules: { [PURSER_COMPILE_GLOB]: own } },
+    };
+    applyPurserCompiler(out, { ...compile, packageName: '@acme/styles', customCss: true });
+    const rules = out.turbopack?.rules?.[PURSER_COMPILE_GLOB] as unknown[];
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toEqual({
+      condition: { not: 'foreign' },
+      loaders: [{ loader: compile.loader, options: compile.options }],
+    });
+    expect(rules[1]).toBe(own);
+    // without a custom css module the package's name is matched literally
+    const named: Parameters<typeof applyPurserCompiler>[0] = {};
+    applyPurserCompiler(named, { ...compile, packageName: '@acme/styles.v2' });
+    const rule = named.turbopack?.rules?.[PURSER_COMPILE_GLOB] as {
+      condition: { all: [unknown, { content: RegExp }] };
+    };
+    expect(rule.condition.all[1].content.test('from "@acme/styles.v2"')).toBe(true);
+    expect(rule.condition.all[1].content.test('from "@acme/stylesXv2"')).toBe(false);
   });
 
   it('uses HYPDRIV_DEPLOYMENT_ID verbatim (sanitised)', () => {

@@ -7,6 +7,12 @@ export default defineConfig({
     src: ['app', 'components', 'lib'],
     tokens: 'lib/tokens.ts',
     out: 'app/purser.css',
+    // Purser 0.2: the build names the classes (`_a`, `_b`, …), gives classes that are always applied together one
+    // class, and `withHypDriv` gives the bundler Purser's loader, so the browser runs no style code.
+    names: 'min',
+    granularity: 'rule',
+    minify: true,
+    fuse: 'exact',
     // Fail `next build` when prerendered HTML references an atom the stylesheet does not declare.
     verify: 'error',
     usageReport: true,
